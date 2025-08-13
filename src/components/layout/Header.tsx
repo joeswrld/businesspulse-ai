@@ -1,7 +1,7 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Zap } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -18,12 +18,12 @@ const Header = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center space-x-2">
+          <Link to="/" className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
               <Zap className="h-5 w-5 text-white" />
             </div>
             <span className="text-xl font-bold gradient-text">NoteX</span>
-          </div>
+          </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
@@ -40,11 +40,11 @@ const Header = () => {
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center space-x-3">
-            <Button variant="ghost" size="sm">
-              Sign In
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/auth">Sign In</Link>
             </Button>
-            <Button variant="hero" size="sm">
-              Start Free Trial
+            <Button variant="hero" size="sm" asChild>
+              <Link to="/auth">Start Free Trial</Link>
             </Button>
           </div>
 
@@ -75,11 +75,11 @@ const Header = () => {
               </a>
             ))}
             <div className="flex flex-col space-y-2 pt-4">
-              <Button variant="ghost" size="sm">
-                Sign In
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/auth">Sign In</Link>
               </Button>
-              <Button variant="hero" size="sm">
-                Start Free Trial
+              <Button variant="hero" size="sm" asChild>
+                <Link to="/auth">Start Free Trial</Link>
               </Button>
             </div>
           </div>
