@@ -15,49 +15,64 @@ import {
   Plus
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useRealtimeInsights, useRealtimeDataSources, useRealtimeAnalytics } from "@/hooks/useRealtime";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/use-toast";
 
 const Dashboard = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const { data: insights, loading: insightsLoading } = useRealtimeInsights();
+  const { data: dataSources, loading: sourcesLoading } = useRealtimeDataSources();
+  const { data: analyticsEvents } = useRealtimeAnalytics();
+  
   const [metrics, setMetrics] = useState({
-    totalInsights: 142,
-    activeDataSources: 8,
-    teamMembers: 3,
-    monthlyGrowth: 24.5
+    totalInsights: 0,
+    activeDataSources: 0,
+    teamMembers: 1,
+    monthlyGrowth: 0
   });
 
-  const [recentInsights] = useState([
-    {
-      id: 1,
-      title: "Customer Satisfaction Trend",
-      summary: "Customer satisfaction has increased by 15% over the last quarter, with particularly strong performance in support response times.",
-      priority: "high",
-      category: "Customer Experience",
-      createdAt: "2 hours ago",
-      confidence: 92
-    },
-    {
-      id: 2,
-      title: "Revenue Opportunity Detected",
-      summary: "Analysis shows potential 30% revenue increase by expanding premium features to existing customers.",
-      priority: "high",
-      category: "Revenue",
-      createdAt: "4 hours ago",
-      confidence: 87
-    },
-    {
-      id: 3,
-      title: "Operational Efficiency Improvement",
-      summary: "Workflow optimization could reduce processing time by 40% based on current data patterns.",
-      priority: "medium",
-      category: "Operations",
-      createdAt: "1 day ago",
-      confidence: 78
+  // Track page view
+  useEffect(() => {
+    if (user) {
+      const trackPageView = async () => {
+        await supabase.from('analytics_events').insert({
+          user_id: user.id,
+          event_type: 'page_view',
+          event_data: { page: 'dashboard' }
+        });
+      };
+      trackPageView();
     }
-  ]);
+  }, [user]);
+
+  // Update metrics in real-time
+  useEffect(() => {
+    setMetrics(prev => ({
+      ...prev,
+      totalInsights: insights.length,
+      activeDataSources: dataSources.filter(source => source.status === 'completed').length,
+      monthlyGrowth: insights.length > 0 ? 
+        ((insights.filter(i => new Date(i.created_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length / insights.length) * 100) : 0
+    }));
+  }, [insights, dataSources]);
+
+  const recentInsights = insights.slice(0, 3).map(insight => ({
+    id: insight.id,
+    title: insight.title,
+    summary: insight.summary || 'AI-generated insight ready for review',
+    priority: insight.priority || 'medium',
+    category: insight.industry_category || 'General',
+    createdAt: new Date(insight.created_at).toLocaleString(),
+    confidence: Math.round((insight.confidence_score || 0.8) * 100)
+  }));
 
   const [aiSuggestions] = useState([
-    "Review customer feedback from last week for sentiment trends",
-    "Analyze Q4 sales data for seasonal patterns",
-    "Compare team productivity metrics with industry benchmarks"
+    "Upload sales data to identify revenue trends",
+    "Analyze customer feedback for sentiment patterns",
+    "Review team productivity metrics for this quarter"
   ]);
 
   return (
@@ -67,7 +82,7 @@ const Dashboard = () => {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">
-            Welcome back! Here's what's happening with your business.
+            Welcome back! Here's your real-time business intelligence.
           </p>
         </div>
         <div className="flex gap-3">
@@ -96,7 +111,7 @@ const Dashboard = () => {
           <CardContent>
             <div className="text-2xl font-bold">{metrics.totalInsights}</div>
             <p className="text-xs text-muted-foreground">
-              +12 from last week
+              {insightsLoading ? 'Loading...' : `${insights.filter(i => new Date(i.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length} this week`}
             </p>
           </CardContent>
         </Card>
@@ -109,7 +124,7 @@ const Dashboard = () => {
           <CardContent>
             <div className="text-2xl font-bold">{metrics.activeDataSources}</div>
             <p className="text-xs text-muted-foreground">
-              3 processed today
+              {sourcesLoading ? 'Loading...' : `${dataSources.filter(s => s.status === 'processing').length} processing`}
             </p>
           </CardContent>
         </Card>
@@ -133,7 +148,7 @@ const Dashboard = () => {
             <TrendingUp className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+{metrics.monthlyGrowth}%</div>
+            <div className="text-2xl font-bold">+{metrics.monthlyGrowth.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">
               vs last month
             </p>
@@ -156,35 +171,51 @@ const Dashboard = () => {
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              {recentInsights.map((insight) => (
-                <div key={insight.id} className="p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Badge 
-                        variant={insight.priority === "high" ? "default" : "secondary"}
-                        className="text-xs"
-                      >
-                        {insight.priority} priority
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {insight.category}
-                      </Badge>
+              {insightsLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="animate-pulse">
+                      <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-muted rounded w-1/2"></div>
                     </div>
-                    <span className="text-xs text-muted-foreground">{insight.createdAt}</span>
-                  </div>
-                  <h4 className="font-semibold mb-2">{insight.title}</h4>
-                  <p className="text-sm text-muted-foreground mb-3">{insight.summary}</p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center text-xs text-muted-foreground">
-                      <Zap className="h-3 w-3 mr-1" />
-                      {insight.confidence}% confidence
-                    </div>
-                    <Button variant="ghost" size="sm">
-                      View Details
-                    </Button>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              ) : recentInsights.length > 0 ? (
+                recentInsights.map((insight) => (
+                  <div key={insight.id} className="p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant={insight.priority === "high" ? "default" : "secondary"}
+                          className="text-xs"
+                        >
+                          {insight.priority} priority
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {insight.category}
+                        </Badge>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{insight.createdAt}</span>
+                    </div>
+                    <h4 className="font-semibold mb-2">{insight.title}</h4>
+                    <p className="text-sm text-muted-foreground mb-3">{insight.summary}</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-xs text-muted-foreground">
+                        <Zap className="h-3 w-3 mr-1" />
+                        {insight.confidence}% confidence
+                      </div>
+                      <Button variant="ghost" size="sm">
+                        View Details
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Brain className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No insights yet. Upload some data to get started!</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -203,7 +234,15 @@ const Dashboard = () => {
               {aiSuggestions.map((suggestion, index) => (
                 <div key={index} className="p-3 bg-primary-light rounded-lg">
                   <p className="text-sm">{suggestion}</p>
-                  <Button variant="ghost" size="sm" className="mt-2 h-8 px-3">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="mt-2 h-8 px-3"
+                    onClick={() => toast({
+                      title: "Action Started",
+                      description: "AI is processing your request..."
+                    })}
+                  >
                     Analyze Now
                   </Button>
                 </div>

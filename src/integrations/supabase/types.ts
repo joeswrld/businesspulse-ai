@@ -70,6 +70,60 @@ export type Database = {
           },
         ]
       }
+      analytics_events: {
+        Row: {
+          created_at: string
+          event_data: Json | null
+          event_type: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chat_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          messages: Json | null
+          status: string | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          messages?: Json | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          messages?: Json | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       data_sources: {
         Row: {
           created_at: string
@@ -392,6 +446,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_preferences: {
+        Row: {
+          ai_tone: string | null
+          alert_frequency: string | null
+          created_at: string
+          data_retention_days: number | null
+          email_notifications: boolean | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_tone?: string | null
+          alert_frequency?: string | null
+          created_at?: string
+          data_retention_days?: number | null
+          email_notifications?: boolean | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_tone?: string | null
+          alert_frequency?: string | null
+          created_at?: string
+          data_retention_days?: number | null
+          email_notifications?: boolean | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_subscriptions: {
         Row: {
