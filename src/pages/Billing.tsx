@@ -1,400 +1,629 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import {
-  CreditCard,
-  Calendar,
-  CheckCircle,
-  AlertTriangle,
-  Star,
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { 
+  CreditCard, 
+  Calendar, 
+  Users, 
+  CheckCircle, 
+  AlertTriangle, 
+  Clock, 
+  DollarSign,
   Zap,
   Shield,
-  Users,
-  Database,
-  Brain,
   Download,
-  Clock
-} from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+  Loader2,
+  ExternalLink,
+  Crown,
+  Star
+} from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
-const Billing = () => {
+interface Plan {
+  code: string;
+  name: string;
+  price_cents: number;
+  currency: string;
+  interval: string;
+  seat_limit: number;
+  features: string[];
+  is_active: boolean;
+}
+
+interface Subscription {
+  id: string;
+  user_id: string;
+  plan_code: string;
+  status: 'trialing' | 'active' | 'past_due' | 'canceled';
+  trial_end: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  paystack_customer_id: string | null;
+  paystack_subscription_code: string | null;
+  cancel_at_period_end: boolean;
+  canceled_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Transaction {
+  id: string;
+  user_id: string;
+  subscription_id: string | null;
+  reference: string;
+  amount_cents: number;
+  currency: string;
+  status: 'pending' | 'success' | 'failed' | 'reversed';
+  authorization_url: string | null;
+  paid_at: string | null;
+  metadata: any;
+  created_at: string;
+}
+
+const Billing: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   
-  const [subscription, setSubscription] = useState<any>(null);
-  const [subscriptionPlan, setSubscriptionPlan] = useState<any>(null);
-  const [usage, setUsage] = useState({
-    insights_generated: 0,
-    data_sources: 0,
-    team_members: 1
-  });
+  // State
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processingPayment, setProcessingPayment] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      fetchSubscriptionData();
-      fetchUsageData();
-    }
-  }, [user]);
-
-  const fetchSubscriptionData = async () => {
+  // Fetch billing data
+  const fetchBillingData = useCallback(async () => {
     if (!user) return;
 
     try {
-      // Get user subscription
-      const { data: userSub } = await supabase
-        .from('user_subscriptions')
-        .select(`
-          *,
-          subscription_plans (*)
-        `)
+      console.log('🔍 Fetching billing data for user:', user.id);
+      
+      // Fetch available plans
+      const { data: plansData, error: plansError } = await supabase
+        .from('plans')
+        .select('*')
+        .eq('is_active', true)
+        .order('price_cents', { ascending: true });
+
+      if (plansError) throw plansError;
+
+      // Fetch user subscription
+      const { data: subData, error: subError } = await supabase
+        .from('subscriptions')
+        .select('*')
         .eq('user_id', user.id)
         .single();
 
-      if (userSub) {
-        setSubscription(userSub);
-        setSubscriptionPlan(userSub.subscription_plans);
-      }
+      if (subError && subError.code !== 'PGRST116') throw subError;
+
+      // Fetch transactions
+      const { data: txData, error: txError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (txError) throw txError;
+
+      console.log('💰 Billing data fetched:', {
+        plans: plansData?.length || 0,
+        subscription: subData ? 'Yes' : 'No',
+        transactions: txData?.length || 0
+      });
+      
+      setPlans(plansData || []);
+      setSubscription(subData);
+      setTransactions(txData || []);
+      
     } catch (error) {
-      console.error('Error fetching subscription:', error);
+      console.error('❌ Error fetching billing data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load billing information",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, toast]);
 
-  const fetchUsageData = async () => {
+  // Real-time subscriptions
+  useEffect(() => {
     if (!user) return;
 
+    console.log('🔄 Setting up real-time billing subscriptions for user:', user.id);
+
+    // Subscribe to subscription changes
+    const subscriptionChannel = supabase
+      .channel('billing-subscription-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'subscriptions',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('🔄 Subscription real-time update:', payload.eventType, payload.new);
+          
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            setSubscription(payload.new as Subscription);
+          } else if (payload.eventType === 'DELETE') {
+            setSubscription(null);
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to transaction changes
+    const transactionChannel = supabase
+      .channel('billing-transaction-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'transactions',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('🔄 Transaction real-time update:', payload.eventType, payload.new);
+          
+          if (payload.eventType === 'INSERT') {
+            setTransactions(prev => [payload.new as Transaction, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setTransactions(prev => 
+              prev.map(tx => 
+                tx.id === payload.new.id ? payload.new as Transaction : tx
+              )
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🔄 Cleaning up real-time billing subscriptions');
+      supabase.removeChannel(subscriptionChannel);
+      supabase.removeChannel(transactionChannel);
+    };
+  }, [user]);
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchBillingData();
+  }, [fetchBillingData]);
+
+  // Calculate trial days remaining
+  const trialDaysLeft = useMemo(() => {
+    if (!subscription?.trial_end) return null;
+    const ms = new Date(subscription.trial_end).getTime() - Date.now();
+    return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+  }, [subscription]);
+
+  // Get current plan details
+  const currentPlan = useMemo(() => {
+    if (!subscription?.plan_code) return null;
+    return plans.find(plan => plan.code === subscription.plan_code);
+  }, [subscription, plans]);
+
+  // Start checkout process
+  const startCheckout = async (planCode: string, currency: string = 'USD') => {
+    if (!user) return;
+    
+    setProcessingPayment(true);
+    
     try {
-      // Get insights count
-      const { count: insightsCount } = await supabase
-        .from('ai_insights')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
+      console.log(`🚀 Starting checkout for plan: ${planCode}`);
+      
+      const { data, error } = await supabase.functions.invoke('billing-init', {
+        body: { 
+          user_id: user.id, 
+          plan_code: planCode, 
+          currency 
+        }
+      });
 
-      // Get data sources count
-      const { count: sourcesCount } = await supabase
-        .from('data_sources')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
+      if (error) throw error;
 
-      setUsage({
-        insights_generated: insightsCount || 0,
-        data_sources: sourcesCount || 0,
-        team_members: 1 // Will be updated when team features are implemented
+      if (data?.authorization_url) {
+        console.log('✅ Redirecting to Paystack checkout');
+        window.location.href = data.authorization_url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
+
+    } catch (error: any) {
+      console.error('❌ Checkout error:', error);
+      toast({
+        title: "Checkout Failed",
+        description: error.message || "Failed to start checkout process",
+        variant: "destructive"
+      });
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
+  // Cancel subscription
+  const cancelSubscription = async () => {
+    if (!subscription) return;
+    
+    try {
+      // For now, just show a message. You can implement a cancel Edge Function later
+      toast({
+        title: "Contact Support",
+        description: "Please contact our support team to cancel your subscription",
       });
     } catch (error) {
-      console.error('Error fetching usage:', error);
+      toast({
+        title: "Error",
+        description: "Failed to cancel subscription",
+        variant: "destructive"
+      });
     }
   };
 
-  const plans = [
-    {
-      name: "Trial",
-      price: 0,
-      interval: "8 days",
-      features: [
-        "10 AI insights per month",
-        "3 data sources",
-        "1 team member",
-        "Basic analytics",
-        "Email support"
-      ],
-      popular: false,
-      current: subscriptionPlan?.name === "Trial"
-    },
-    {
-      name: "Pro",
-      price: 17,
-      interval: "month",
-      features: [
-        "100 AI insights per month",
-        "Unlimited data sources",
-        "5 team members",
-        "Advanced analytics",
-        "Priority support",
-        "Custom reports",
-        "API access"
-      ],
-      popular: true,
-      current: subscriptionPlan?.name === "Pro"
-    },
-    {
-      name: "Business",
-      price: 30,
-      interval: "month",
-      features: [
-        "Unlimited AI insights",
-        "Unlimited data sources",
-        "15 team members",
-        "Advanced analytics",
-        "24/7 phone support",
-        "Custom integrations",
-        "White-label reports",
-        "SSO integration"
-      ],
-      popular: false,
-      current: subscriptionPlan?.name === "Business"
+  // Utility functions
+  const formatCurrency = (amountCents: number, currency: string) => {
+    const amount = amountCents / 100;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency
+    }).format(amount);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'trialing':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'past_due':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'canceled':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
-  ];
-
-  const handleUpgrade = async (planName: string) => {
-    // In a real app, this would integrate with Paystack
-    toast({
-      title: "Upgrade initiated",
-      description: `Redirecting to payment for ${planName} plan...`
-    });
-    
-    // Simulate Paystack integration
-    console.log(`Upgrading to ${planName} plan`);
-    
-    // Track upgrade attempt
-    await supabase.from('analytics_events').insert({
-      user_id: user?.id,
-      event_type: 'upgrade_attempt',
-      event_data: { plan: planName }
-    });
   };
 
-  const handleCancelSubscription = async () => {
-    toast({
-      title: "Cancellation initiated",
-      description: "Your subscription will be cancelled at the end of the current billing period."
-    });
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'trialing':
+        return <Clock className="h-4 w-4" />;
+      case 'past_due':
+        return <AlertTriangle className="h-4 w-4" />;
+      case 'canceled':
+        return <AlertTriangle className="h-4 w-4" />;
+      default:
+        return <Clock className="h-4 w-4" />;
+    }
   };
 
-  const getTrialDaysRemaining = () => {
-    if (!subscription?.trial_end) return 0;
-    const trialEnd = new Date(subscription.trial_end);
-    const now = new Date();
-    const diffTime = trialEnd.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, diffDays);
-  };
-
-  const getUsagePercentage = (used: number, limit: number) => {
-    if (limit === 0) return 0;
-    return Math.min((used / limit) * 100, 100);
+  const getTransactionStatusColor = (status: string) => {
+    switch (status) {
+      case 'success':
+        return 'bg-green-100 text-green-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'failed':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-1/4"></div>
-          <div className="h-4 bg-muted rounded w-1/2"></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-64 bg-muted rounded"></div>
-            ))}
-          </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading billing information...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Billing & Subscription</h1>
-          <p className="text-muted-foreground">
-            Manage your subscription and view usage details
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-3xl font-bold text-gray-900">Billing & Subscription</h1>
+          <p className="mt-2 text-lg text-gray-600">
+            Manage your plan, payments, and subscription in real-time.
           </p>
         </div>
       </div>
 
-      {/* Current Subscription Status */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center">
-              <CreditCard className="h-5 w-5 mr-2" />
-              Current Subscription
-            </span>
-            <Badge className={subscription?.status === 'active' ? 'bg-success' : 'bg-warning'}>
-              {subscription?.status || 'Unknown'}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="font-semibold text-lg mb-2">
-                {subscriptionPlan?.name || 'Trial'} Plan
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                ${subscriptionPlan?.price || 0}/{subscriptionPlan?.interval || 'trial'}
-              </p>
-              
-              {subscription?.status === 'trialing' && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Trial Progress</span>
-                    <span>{8 - getTrialDaysRemaining()} of 8 days used</span>
-                  </div>
-                  <Progress value={((8 - getTrialDaysRemaining()) / 8) * 100} />
-                  <p className="text-sm text-muted-foreground">
-                    {getTrialDaysRemaining()} days remaining in your trial
-                  </p>
-                </div>
-              )}
-              
-              {subscription?.current_period_end && (
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Next billing: {new Date(subscription.current_period_end).toLocaleDateString()}
-                </div>
-              )}
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium mb-2">Usage This Month</h4>
-                <div className="space-y-3">
+      <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        {/* Current Plan Status */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Current Plan */}
+          <Card className="bg-white shadow-sm border-0">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-semibold">Current Plan</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
                   <div>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="flex items-center">
-                        <Brain className="h-4 w-4 mr-1" />
-                        AI Insights
-                      </span>
-                      <span>{usage.insights_generated} / {subscriptionPlan?.max_insights_per_month || 10}</span>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {currentPlan?.name || 'Trial'}
                     </div>
-                    <Progress value={getUsagePercentage(usage.insights_generated, subscriptionPlan?.max_insights_per_month || 10)} />
-                  </div>
-                  
-                  <div>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="flex items-center">
-                        <Database className="h-4 w-4 mr-1" />
-                        Data Sources
-                      </span>
-                      <span>{usage.data_sources} / {subscriptionPlan?.max_data_sources || 3}</span>
+                    <div className="text-sm text-gray-500">
+                      {currentPlan ? formatCurrency(currentPlan.price_cents, currentPlan.currency) : 'Free'} / month
                     </div>
-                    <Progress value={getUsagePercentage(usage.data_sources, subscriptionPlan?.max_data_sources || 3)} />
                   </div>
-                  
-                  <div>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="flex items-center">
-                        <Users className="h-4 w-4 mr-1" />
-                        Team Members
-                      </span>
-                      <span>{usage.team_members} / {subscriptionPlan?.max_team_members || 1}</span>
-                    </div>
-                    <Progress value={getUsagePercentage(usage.team_members, subscriptionPlan?.max_team_members || 1)} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Upgrade Plans */}
-      <div>
-        <h2 className="text-xl font-bold mb-4">Available Plans</h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          {plans.map((plan) => (
-            <Card key={plan.name} className={`relative ${plan.popular ? 'ring-2 ring-primary' : ''}`}>
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-primary px-3 py-1">
-                    <Star className="h-3 w-3 mr-1" />
-                    Most Popular
-                  </Badge>
-                </div>
-              )}
-              
-              <CardHeader className="text-center">
-                <CardTitle className="text-lg">{plan.name}</CardTitle>
-                <div className="mt-2">
-                  <span className="text-3xl font-bold">${plan.price}</span>
-                  <span className="text-muted-foreground">/{plan.interval}</span>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="space-y-4">
-                <ul className="space-y-2">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-start text-sm">
-                      <CheckCircle className="h-4 w-4 mr-2 text-success mt-0.5 flex-shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                
-                <div className="pt-4">
-                  {plan.current ? (
-                    <Button variant="outline" disabled className="w-full">
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Current Plan
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={() => handleUpgrade(plan.name)}
-                      className="w-full"
-                      variant={plan.popular ? "default" : "outline"}
-                    >
-                      <Zap className="h-4 w-4 mr-2" />
-                      {subscriptionPlan?.price && plan.price > subscriptionPlan.price ? 'Upgrade' : 'Select'} Plan
-                    </Button>
+                  {subscription?.status === 'trialing' && (
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Trial
+                    </Badge>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+
+                {trialDaysLeft !== null && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-center text-blue-800">
+                      <Clock className="h-4 w-4 mr-2" />
+                      <span className="text-sm font-medium">
+                        Trial ends in {trialDaysLeft} day{trialDaysLeft !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Status:</span>
+                    <Badge className={`${getStatusColor(subscription?.status || 'unknown')} border`}>
+                      <div className="flex items-center gap-1">
+                        {getStatusIcon(subscription?.status || 'unknown')}
+                        <span className="capitalize">{subscription?.status || 'unknown'}</span>
+                      </div>
+                    </Badge>
+                  </div>
+                  
+                  {subscription?.current_period_end && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Next billing:</span>
+                      <span className="text-gray-900">
+                        {new Date(subscription.current_period_end).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Plan Features */}
+          <Card className="bg-white shadow-sm border-0">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-semibold">Plan Features</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {currentPlan?.features ? (
+                  currentPlan.features.map((feature, index) => (
+                    <div key={index} className="flex items-center text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                      <span className="text-gray-700">{feature}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-gray-500 text-sm">
+                    <div className="flex items-center mb-2">
+                      <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                      AI Insights (100/month)
+                    </div>
+                    <div className="flex items-center mb-2">
+                      <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                      Basic Reports (10/month)
+                    </div>
+                    <div className="flex items-center mb-2">
+                      <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                      Email Support
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Plan Limits */}
+          <Card className="bg-white shadow-sm border-0">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-semibold">Plan Limits</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Team Members:</span>
+                  <span className="font-medium text-gray-900">
+                    {currentPlan?.seat_limit || 1} seats
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Storage:</span>
+                  <span className="font-medium text-gray-900">
+                    {currentPlan?.code === 'business' ? '500GB' : 
+                     currentPlan?.code === 'pro' ? '50GB' : '5GB'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Support:</span>
+                  <span className="font-medium text-gray-900">
+                    {currentPlan?.code === 'business' ? '24/7' : 
+                     currentPlan?.code === 'pro' ? 'Priority' : 'Email'}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </div>
 
-      {/* Payment History */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Clock className="h-5 w-5 mr-2" />
-            Payment History
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <CreditCard className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No payment history yet</p>
-            <p className="text-sm">Your payment history will appear here after your first payment</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Actions */}
-      {subscription?.status === 'active' && (
-        <Card>
+        {/* Plan Selection */}
+        <Card className="bg-white shadow-sm border-0 mb-8">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Shield className="h-5 w-5 mr-2" />
-              Subscription Management
-            </CardTitle>
+            <CardTitle>Choose Your Plan</CardTitle>
+            <CardDescription>
+              Select the plan that best fits your business needs
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground">
-              Need to make changes to your subscription? We're here to help.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button variant="outline" onClick={handleCancelSubscription}>
-                <AlertTriangle className="h-4 w-4 mr-2" />
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {plans.map((plan) => (
+                <div
+                  key={plan.code}
+                  className={`border rounded-xl p-6 ${
+                    subscription?.plan_code === plan.code
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-center mb-4">
+                    <div className="text-2xl font-bold text-gray-900 mb-2">
+                      {plan.name}
+                    </div>
+                    <div className="text-3xl font-bold text-blue-600">
+                      {formatCurrency(plan.price_cents, plan.currency)}
+                      <span className="text-lg text-gray-500">/month</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 mb-6">
+                    {plan.features.map((feature, index) => (
+                      <div key={index} className="flex items-center text-sm">
+                        <CheckCircle className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                        <span className="text-gray-700">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Button
+                    onClick={() => startCheckout(plan.code, plan.currency)}
+                    disabled={processingPayment || subscription?.plan_code === plan.code}
+                    className={`w-full ${
+                      subscription?.plan_code === plan.code
+                        ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
+                  >
+                    {processingPayment ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : subscription?.plan_code === plan.code ? (
+                      'Current Plan'
+                    ) : (
+                      <>
+                        {subscription?.plan_code ? 'Switch to ' : 'Choose '}
+                        {plan.name}
+                        <ExternalLink className="h-4 w-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Transaction History */}
+        <Card className="bg-white shadow-sm border-0">
+          <CardHeader>
+            <CardTitle>Transaction History</CardTitle>
+            <CardDescription>
+              Your payment and subscription history
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {transactions.length === 0 ? (
+              <div className="text-center py-8">
+                <CreditCard className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions yet</h3>
+                <p className="text-gray-500">
+                  Your payment history will appear here once you make your first payment.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {transactions.map((transaction) => (
+                  <div
+                    key={transaction.id}
+                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center">
+                          <CreditCard className="h-5 w-5 text-gray-400 mr-2" />
+                          <span className="font-medium text-gray-900">
+                            {transaction.metadata?.plan_name || 'Subscription'}
+                          </span>
+                        </div>
+                        <Badge className={getTransactionStatusColor(transaction.status)}>
+                          {transaction.status}
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        Reference: {transaction.reference} • {new Date(transaction.created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                    
+                    <div className="text-right">
+                      <div className="font-medium text-gray-900">
+                        {formatCurrency(transaction.amount_cents, transaction.currency)}
+                      </div>
+                      {transaction.paid_at && (
+                        <div className="text-xs text-gray-500">
+                          Paid {new Date(transaction.paid_at).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Account Actions */}
+        <Card className="bg-white shadow-sm border-0 mt-8">
+          <CardHeader>
+            <CardTitle>Account Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-4">
+              <Button
+                variant="outline"
+                onClick={cancelSubscription}
+                disabled={!subscription || subscription.status === 'canceled'}
+              >
                 Cancel Subscription
               </Button>
               <Button variant="outline">
                 <Download className="h-4 w-4 mr-2" />
-                Download Invoice
+                Download Invoices
+              </Button>
+              <Button variant="outline">
+                <Shield className="h-4 w-4 mr-2" />
+                Privacy Settings
               </Button>
             </div>
           </CardContent>
         </Card>
-      )}
+      </div>
     </div>
   );
 };
