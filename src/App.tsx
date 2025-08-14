@@ -42,14 +42,14 @@ const App = () => (
                 </DashboardLayout>
               </ProtectedRoute>
             } />
-            <Route path="/upload" element={
+            <Route path="/data-upload" element={
               <ProtectedRoute>
                 <DashboardLayout>
                   <DataUpload />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
-            <Route path="/insights" element={
+            <Route path="/ai-insights" element={
               <ProtectedRoute>
                 <DashboardLayout>
                   <AIInsights />

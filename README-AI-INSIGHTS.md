@@ -75,7 +75,7 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 ### **4. Component Integration**
 
-The AI Insights page is already integrated into your routing system at `/insights`. Ensure the route is properly configured in your `App.tsx`.
+The AI Insights page is already integrated into your routing system at `/ai-insights`. Ensure the route is properly configured in your `App.tsx`.
 
 ## 📱 UI Components
 
@@ -183,7 +183,7 @@ User action → Update local state → API call → Update database → Real-tim
 
 ### **Local Development**
 1. Start your React dev server: `npm run dev`
-2. Navigate to `/insights`
+2. Navigate to `/ai-insights`
 3. Test real-time updates by modifying data in Supabase
 4. Verify filtering and search functionality
 5. Test bookmarking system

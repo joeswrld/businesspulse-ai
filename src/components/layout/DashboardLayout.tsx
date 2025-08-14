@@ -28,13 +28,13 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Data Upload", href: "/upload", icon: Upload },
-    { name: "AI Insights", href: "/insights", icon: Brain },
+    { name: "Data Upload", href: "/data-upload", icon: Upload },
+    { name: "AI Insights", href: "/ai-insights", icon: Brain },
     { name: "Reports", href: "/reports", icon: FileText },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
     { name: "Billing", href: "/billing", icon: CreditCard },
+    { name: "Teams", href: "/teams", icon: HelpCircle },
     { name: "Settings", href: "/settings", icon: Settings },
-    { name: "Help Center", href: "/help", icon: HelpCircle },
   ];
 
   const handleSignOut = async () => {

@@ -160,7 +160,7 @@ npm run dev
 
 ### **4.2 Navigate to AI Insights**
 
-Go to `http://localhost:5173/insights`
+Go to `http://localhost:5173/ai-insights`
 
 ### **4.3 What You Should See**
 
