@@ -60,7 +60,7 @@ const App = () => (
               </ProtectedRoute>
             } />
             
-            {/* Catch-all route */
+            {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
