@@ -13,6 +13,7 @@ import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
 import DataUpload from "./pages/DataUpload";
 import AIInsights from "./pages/AIInsights";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -51,8 +52,15 @@ const App = () => (
                 </DashboardLayout>
               </ProtectedRoute>
             } />
+            <Route path="/reports" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <Reports />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
             
-            {/* Catch-all route */}
+            {/* Catch-all route */
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
