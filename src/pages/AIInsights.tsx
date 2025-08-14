@@ -7,73 +7,65 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
-  Lightbulb, 
-  Bookmark, 
-  BookmarkPlus, 
+  Brain, 
   Search, 
-  Download, 
-  Plus,
-  TrendingUp,
+  Filter, 
+  Plus, 
+  Eye, 
+  Bookmark, 
+  TrendingUp, 
+  Target,
+  Calendar,
+  Tag,
+  RefreshCw,
+  Loader2,
   AlertTriangle,
   CheckCircle,
   Clock,
-  Eye,
-  Target,
-  BarChart3,
-  Calendar,
-  Tag,
-  Loader2
+  ArrowRight,
+  Download,
+  Share2
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useNavigate } from 'react-router-dom';
 
-interface AIInsight {
+interface Insight {
   id: string;
   user_id: string;
   title: string;
+  description: string;
   category: string;
   priority: 'high' | 'medium' | 'low';
   confidence: number;
-  description: string;
   key_findings: string[];
   recommendations: string[];
-  projected_impact: string;
+  projected_impact: string | null;
   tags: string[];
-  source: string;
-  created_at: string;
   bookmarked: boolean;
-}
-
-interface Metrics {
-  totalInsights: number;
-  highPriority: number;
-  avgConfidence: number;
-  bookmarked: number;
+  source: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 const AIInsights: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   // State
-  const [insights, setInsights] = useState<AIInsight[]>([]);
+  const [insights, setInsights] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedPriority, setSelectedPriority] = useState('all');
-  const [metrics, setMetrics] = useState<Metrics>({
-    totalInsights: 0,
-    highPriority: 0,
-    avgConfidence: 0,
-    bookmarked: 0
-  });
+  const [selectedTimeRange, setSelectedTimeRange] = useState('all');
 
-  // Fetch insights from ai_insights table
-  const fetchInsights = useCallback(async () => {
+  // Fetch insights data
+  const fetchInsightsData = useCallback(async () => {
     if (!user) return;
 
     try {
-      console.log('🔍 Fetching insights for user:', user.id);
+      console.log('🔍 Fetching insights data for user:', user.id);
       
       const { data: insightsData, error: insightsError } = await supabase
         .from('ai_insights')
@@ -81,16 +73,13 @@ const AIInsights: React.FC = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (insightsError) {
-        console.error('❌ Insights fetch error:', insightsError);
-        throw insightsError;
-      }
+      if (insightsError) throw insightsError;
 
-      console.log('📊 Insights fetched:', insightsData?.length || 0);
+      console.log('📊 Insights data fetched:', insightsData?.length || 0);
       setInsights(insightsData || []);
       
     } catch (error) {
-      console.error('❌ Error fetching insights:', error);
+      console.error('❌ Error fetching insights data:', error);
       toast({
         title: "Error",
         description: "Failed to load insights",
@@ -101,36 +90,14 @@ const AIInsights: React.FC = () => {
     }
   }, [user, toast]);
 
-  // Calculate metrics from insights data
-  const calculateMetrics = useCallback((insightsData: AIInsight[]) => {
-    const totalInsights = insightsData.length;
-    const highPriority = insightsData.filter(insight => insight.priority === 'high').length;
-    const avgConfidence = insightsData.length > 0 
-      ? Math.round(insightsData.reduce((sum, insight) => sum + insight.confidence, 0) / insightsData.length)
-      : 0;
-    const bookmarked = insightsData.filter(insight => insight.bookmarked).length;
-
-    setMetrics({
-      totalInsights,
-      highPriority,
-      avgConfidence,
-      bookmarked
-    });
-  }, []);
-
-  // Update metrics when insights change
-  useEffect(() => {
-    calculateMetrics(insights);
-  }, [insights, calculateMetrics]);
-
-  // Real-time subscription to ai_insights table
+  // Real-time subscriptions
   useEffect(() => {
     if (!user) return;
 
-    console.log('🔄 Setting up real-time subscription for user:', user.id);
+    console.log('🔄 Setting up real-time insights subscriptions for user:', user.id);
 
     const insightsChannel = supabase
-      .channel('ai-insights-realtime')
+      .channel('insights-realtime')
       .on(
         'postgres_changes',
         {
@@ -140,14 +107,14 @@ const AIInsights: React.FC = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('🔄 AI Insights real-time update:', payload.eventType, payload.new);
+          console.log('🔄 Insight real-time update:', payload.eventType, payload.new);
           
           if (payload.eventType === 'INSERT') {
-            setInsights(prev => [payload.new as AIInsight, ...prev]);
+            setInsights(prev => [payload.new as Insight, ...prev]);
           } else if (payload.eventType === 'UPDATE') {
             setInsights(prev => 
               prev.map(insight => 
-                insight.id === payload.new.id ? payload.new as AIInsight : insight
+                insight.id === payload.new.id ? payload.new as Insight : insight
               )
             );
           } else if (payload.eventType === 'DELETE') {
@@ -158,17 +125,17 @@ const AIInsights: React.FC = () => {
       .subscribe();
 
     return () => {
-      console.log('🔄 Cleaning up real-time subscription');
+      console.log('🔄 Cleaning up real-time insights subscriptions');
       supabase.removeChannel(insightsChannel);
     };
   }, [user]);
 
   // Initial data fetch
   useEffect(() => {
-    fetchInsights();
-  }, [fetchInsights]);
+    fetchInsightsData();
+  }, [fetchInsightsData]);
 
-  // Filtered insights based on search and filters
+  // Filter insights based on selections
   const filteredInsights = useMemo(() => {
     return insights.filter(insight => {
       const matchesSearch = searchTerm === '' || 
@@ -179,145 +146,156 @@ const AIInsights: React.FC = () => {
       const matchesCategory = selectedCategory === 'all' || insight.category === selectedCategory;
       const matchesPriority = selectedPriority === 'all' || insight.priority === selectedPriority;
       
-      return matchesSearch && matchesCategory && matchesPriority;
+      // Filter by time range
+      const insightDate = new Date(insight.created_at);
+      const now = new Date();
+      let matchesTimeRange = true;
+      
+      switch (selectedTimeRange) {
+        case 'today':
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          matchesTimeRange = insightDate >= today;
+          break;
+        case 'week':
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          matchesTimeRange = insightDate >= weekAgo;
+          break;
+        case 'month':
+          const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+          matchesTimeRange = insightDate >= monthAgo;
+          break;
+        case 'quarter':
+          const quarterAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+          matchesTimeRange = insightDate >= quarterAgo;
+          break;
+      }
+      
+      return matchesSearch && matchesCategory && matchesPriority && matchesTimeRange;
     });
-  }, [insights, searchTerm, selectedCategory, selectedPriority]);
+  }, [insights, searchTerm, selectedCategory, selectedPriority, selectedTimeRange]);
 
-  // Get unique categories and priorities from actual data
-  const categories = useMemo(() => {
-    const uniqueCategories = [...new Set(insights.map(insight => insight.category))];
-    return ['all', ...uniqueCategories.sort()];
+  // Calculate metrics
+  const metrics = useMemo(() => {
+    const totalInsights = insights.length;
+    const highPriority = insights.filter(i => i.priority === 'high').length;
+    const avgConfidence = insights.length > 0 
+      ? Math.round(insights.reduce((sum, i) => sum + i.confidence, 0) / insights.length)
+      : 0;
+    const bookmarked = insights.filter(i => i.bookmarked).length;
+
+    return { totalInsights, highPriority, avgConfidence, bookmarked };
   }, [insights]);
 
-  const priorities = ['all', 'high', 'medium', 'low'];
-
-  // Generate new insight using Edge Function
-  const generateNewInsight = async () => {
-    if (!user) return;
-
-    setGenerating(true);
+  // Toggle bookmark
+  const toggleBookmark = async (insightId: string, currentBookmarked: boolean) => {
     try {
-      console.log('🚀 Generating new insight for user:', user.id);
-      
-      const { data, error } = await supabase.functions.invoke('generate-insight', {
-        body: { user_id: user.id }
-      });
-
-      if (error) throw error;
-
-      console.log('✅ New insight generated:', data);
-      toast({
-        title: "Success!",
-        description: "New AI insight generated and added to your dashboard",
-      });
-
-      // Refresh insights to show the new one
-      await fetchInsights();
-      
-    } catch (error: any) {
-      console.error('❌ Error generating insight:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to generate new insight",
-        variant: "destructive"
-      });
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  // Toggle bookmark status
-  const toggleBookmark = async (insightId: string) => {
-    if (!user) return;
-
-    try {
-      const insight = insights.find(i => i.id === insightId);
-      if (!insight) return;
-
-      const newBookmarkedStatus = !insight.bookmarked;
-      
       const { error } = await supabase
         .from('ai_insights')
-        .update({ bookmarked: newBookmarkedStatus })
+        .update({ bookmarked: !currentBookmarked })
         .eq('id', insightId);
 
       if (error) throw error;
 
       toast({
-        title: newBookmarkedStatus ? "Bookmarked!" : "Bookmark removed",
-        description: newBookmarkedStatus ? "Insight added to bookmarks" : "Insight removed from bookmarks",
+        title: currentBookmarked ? "Bookmark Removed" : "Bookmark Added",
+        description: currentBookmarked 
+          ? "Insight removed from bookmarks" 
+          : "Insight added to bookmarks",
       });
-      
+
     } catch (error: any) {
+      console.error('❌ Error toggling bookmark:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update bookmark",
+        description: "Failed to update bookmark",
         variant: "destructive"
       });
     }
   };
 
-  // Export filtered insights to CSV
-  const exportToCSV = () => {
-    const csvContent = [
-      ['Title', 'Priority', 'Category', 'Confidence', 'Description', 'Tags', 'Created At'].join(','),
-      ...filteredInsights.map(insight => [
-        `"${insight.title}"`,
-        insight.priority,
-        insight.category,
-        insight.confidence,
-        `"${insight.description}"`,
-        `"${insight.tags.join(', ')}"`,
-        new Date(insight.created_at).toLocaleDateString()
-      ].join(','))
-    ].join('\n');
+  // Export insights
+  const exportInsights = async (format: 'CSV' | 'JSON') => {
+    try {
+      let content = '';
+      let filename = '';
+      let mimeType = '';
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `noteX-insights-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+      if (format === 'CSV') {
+        const headers = ['Title', 'Description', 'Category', 'Priority', 'Confidence', 'Key Findings', 'Recommendations', 'Projected Impact', 'Tags', 'Created At'];
+        const rows = filteredInsights.map(insight => [
+          `"${insight.title}"`,
+          `"${insight.description}"`,
+          `"${insight.category}"`,
+          `"${insight.priority}"`,
+          insight.confidence,
+          `"${insight.key_findings.join('; ')}"`,
+          `"${insight.recommendations.join('; ')}"`,
+          `"${insight.projected_impact || ''}"`,
+          `"${insight.tags.join(', ')}"`,
+          `"${new Date(insight.created_at).toLocaleDateString()}"`
+        ]);
 
-    toast({
-      title: "Export successful",
-      description: "Insights exported to CSV",
-    });
-  };
+        content = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+        filename = `insights-${new Date().toISOString().split('T')[0]}.csv`;
+        mimeType = 'text/csv';
+      } else {
+        content = JSON.stringify(filteredInsights, null, 2);
+        filename = `insights-${new Date().toISOString().split('T')[0]}.json`;
+        mimeType = 'application/json';
+      }
 
-  // Export to PDF (placeholder)
-  const exportToPDF = () => {
-    toast({
-      title: "PDF Export",
-      description: "PDF export functionality coming soon",
-    });
+      // Create and download file
+      const blob = new Blob([content], { type: mimeType });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export Successful",
+        description: `${format} file downloaded successfully`,
+      });
+
+    } catch (error) {
+      console.error('❌ Export error:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export insights",
+        variant: "destructive"
+      });
+    }
   };
 
   // Utility functions
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-100 text-red-800';
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-yellow-100 text-yellow-800';
       case 'low':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 text-green-800';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getPriorityIcon = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return <AlertTriangle className="h-4 w-4" />;
-      case 'medium':
-        return <Clock className="h-4 w-4" />;
-      case 'low':
+  const getCategoryIcon = (category: string) => {
+    switch (category.toLowerCase()) {
+      case 'finance':
+        return <TrendingUp className="h-4 w-4" />;
+      case 'marketing':
+        return <Target className="h-4 w-4" />;
+      case 'operations':
         return <CheckCircle className="h-4 w-4" />;
+      case 'customer':
+        return <Eye className="h-4 w-4" />;
       default:
-        return <Clock className="h-4 w-4" />;
+        return <Brain className="h-4 w-4" />;
     }
   };
 
@@ -337,7 +315,7 @@ const AIInsights: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading AI insights...</p>
+          <p className="mt-4 text-gray-600">Loading insights...</p>
         </div>
       </div>
     );
@@ -348,45 +326,32 @@ const AIInsights: React.FC = () => {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-6 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900">AI Insights</h1>
-          <p className="mt-2 text-lg text-gray-600">
-            Real-time business intelligence powered by advanced AI analysis.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">AI Insights</h1>
+              <p className="mt-2 text-lg text-gray-600">
+                Discover intelligent business insights generated from your data.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => exportInsights('CSV')}>
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+              <Button variant="outline" onClick={() => exportInsights('JSON')}>
+                <Download className="h-4 w-4 mr-2" />
+                Export JSON
+              </Button>
+              <Button onClick={() => navigate('/data-upload')}>
+                <Plus className="h-4 w-4 mr-2" />
+                Generate New Insights
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <Button 
-            onClick={generateNewInsight} 
-            disabled={generating}
-            className="flex-1 sm:flex-none"
-          >
-            {generating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Plus className="h-4 w-4 mr-2" />
-                Generate New Insights
-              </>
-            )}
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={exportToCSV}>
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
-            <Button variant="outline" onClick={exportToPDF}>
-              <Download className="h-4 w-4 mr-2" />
-              Export PDF
-            </Button>
-          </div>
-        </div>
-
         {/* Metrics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="bg-white shadow-sm border-0">
@@ -395,10 +360,12 @@ const AIInsights: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="flex items-center">
-                <Lightbulb className="h-8 w-8 text-blue-600 mr-3" />
+                <Brain className="h-8 w-8 text-blue-600 mr-3" />
                 <div>
-                  <div className="text-2xl font-bold text-gray-900">{metrics.totalInsights}</div>
-                  <div className="text-sm text-gray-500">AI generated</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {metrics.totalInsights}
+                  </div>
+                  <div className="text-sm text-gray-500">AI-generated insights</div>
                 </div>
               </div>
             </CardContent>
@@ -412,8 +379,10 @@ const AIInsights: React.FC = () => {
               <div className="flex items-center">
                 <AlertTriangle className="h-8 w-8 text-red-600 mr-3" />
                 <div>
-                  <div className="text-2xl font-bold text-gray-900">{metrics.highPriority}</div>
-                  <div className="text-sm text-gray-500">Require attention</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {metrics.highPriority}
+                  </div>
+                  <div className="text-sm text-gray-500">Critical insights</div>
                 </div>
               </div>
             </CardContent>
@@ -425,10 +394,12 @@ const AIInsights: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="flex items-center">
-                <BarChart3 className="h-8 w-8 text-green-600 mr-3" />
+                <Target className="h-8 w-8 text-green-600 mr-3" />
                 <div>
-                  <div className="text-2xl font-bold text-gray-900">{metrics.avgConfidence}%</div>
-                  <div className="text-sm text-gray-500">AI accuracy</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {metrics.avgConfidence}%
+                  </div>
+                  <div className="text-sm text-gray-500">Insight accuracy</div>
                 </div>
               </div>
             </CardContent>
@@ -442,7 +413,9 @@ const AIInsights: React.FC = () => {
               <div className="flex items-center">
                 <Bookmark className="h-8 w-8 text-purple-600 mr-3" />
                 <div>
-                  <div className="text-2xl font-bold text-gray-900">{metrics.bookmarked}</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {metrics.bookmarked}
+                  </div>
                   <div className="text-sm text-gray-500">Saved insights</div>
                 </div>
               </div>
@@ -450,193 +423,224 @@ const AIInsights: React.FC = () => {
           </Card>
         </div>
 
-        {/* Search and Filters */}
-        <div className="bg-white rounded-xl shadow-sm border-0 p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search insights, tags, or categories..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+        {/* Filters and Search */}
+        <Card className="bg-white shadow-sm border-0 mb-8">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search insights by title, description, or tags..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="finance">Finance</SelectItem>
+                  <SelectItem value="marketing">Marketing</SelectItem>
+                  <SelectItem value="operations">Operations</SelectItem>
+                  <SelectItem value="customer">Customer</SelectItem>
+                  <SelectItem value="general">General</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={selectedPriority} onValueChange={setSelectedPriority}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priorities</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={selectedTimeRange} onValueChange={setSelectedTimeRange}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Time Range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">This Week</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                  <SelectItem value="quarter">This Quarter</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Button variant="outline" onClick={fetchInsightsData}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
             </div>
-
-            {/* Category Filter */}
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map(category => (
-                  <SelectItem key={category} value={category}>
-                    {category === 'all' ? 'All Categories' : category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Priority Filter */}
-            <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Priorities" />
-              </SelectTrigger>
-              <SelectContent>
-                {priorities.map(priority => (
-                  <SelectItem key={priority} value={priority}>
-                    {priority === 'all' ? 'All Priorities' : priority}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Insights List */}
-        <div className="space-y-6">
-          {filteredInsights.length === 0 ? (
-            <Card className="bg-white shadow-sm border-0">
-              <CardContent className="text-center py-12">
-                <Lightbulb className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  {insights.length === 0 ? 'No insights yet' : 'No insights match your filters'}
-                </h3>
+        <Card className="bg-white shadow-sm border-0">
+          <CardHeader>
+            <CardTitle>Business Intelligence Insights</CardTitle>
+            <CardDescription>
+              {filteredInsights.length} insight{filteredInsights.length !== 1 ? 's' : ''} found
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {filteredInsights.length === 0 ? (
+              <div className="text-center py-12">
+                <Brain className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No insights found</h3>
                 <p className="text-gray-500">
                   {insights.length === 0 
-                    ? 'Click "Generate New Insights" to create your first AI-powered business intelligence!' 
+                    ? 'Upload some data to generate your first AI insights.' 
                     : 'Try adjusting your search or filter criteria.'
                   }
                 </p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredInsights.map((insight) => (
-              <Card key={insight.id} className="bg-white shadow-sm border-0 hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  {/* Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Badge className={`${getPriorityColor(insight.priority)} border`}>
-                          <div className="flex items-center gap-1">
-                            {getPriorityIcon(insight.priority)}
-                            <span className="capitalize">{insight.priority}</span>
+                {insights.length === 0 && (
+                  <Button 
+                    className="mt-4"
+                    onClick={() => navigate('/data-upload')}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Upload Data
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {filteredInsights.map((insight) => (
+                  <div
+                    key={insight.id}
+                    className="p-6 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
+                  >
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Badge className={getPriorityColor(insight.priority)}>
+                            {insight.priority.toUpperCase()}
+                          </Badge>
+                          <div className="flex items-center gap-1 text-sm text-gray-500">
+                            {getCategoryIcon(insight.category)}
+                            <span className="capitalize">{insight.category}</span>
                           </div>
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {insight.category}
-                        </Badge>
-                        <Badge variant="secondary" className="text-xs">
-                          {insight.confidence}% confidence
-                        </Badge>
+                          <div className="flex items-center gap-1 text-sm text-gray-500">
+                            <Target className="h-3 w-3" />
+                            {insight.confidence}% confidence
+                          </div>
+                        </div>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                          {insight.title}
+                        </h3>
+                        <p className="text-gray-600 mb-3">
+                          {insight.description}
+                        </p>
                       </div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">{insight.title}</h3>
-                      <p className="text-gray-600 mb-3">{insight.description}</p>
+                      
+                      <div className="flex items-center gap-2 ml-4">
+                        <Button
+                          size="sm"
+                          variant={insight.bookmarked ? "default" : "outline"}
+                          onClick={() => toggleBookmark(insight.id, insight.bookmarked)}
+                        >
+                          <Bookmark className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => navigate('/ai-insights')}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleBookmark(insight.id)}
-                      className={`ml-4 ${insight.bookmarked ? 'text-blue-600' : 'text-gray-400'}`}
-                    >
-                      {insight.bookmarked ? (
-                        <Bookmark className="h-5 w-5 fill-current" />
-                      ) : (
-                        <BookmarkPlus className="h-5 w-5" />
-                      )}
-                    </Button>
-                  </div>
 
-                  {/* Content Grid */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
                     {/* Key Findings */}
-                    <div>
-                      <h4 className="font-medium text-gray-900 mb-2 flex items-center">
-                        <Target className="h-4 w-4 mr-2 text-blue-600" />
-                        Key Findings
-                      </h4>
-                      <ul className="space-y-1">
-                        {insight.key_findings?.map((finding, index) => (
-                          <li key={index} className="text-sm text-gray-600 flex items-start">
-                            <span className="text-blue-500 mr-2 mt-1">•</span>
-                            {finding}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    {insight.key_findings && insight.key_findings.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="font-medium text-gray-900 mb-2">Key Findings</h4>
+                        <ul className="space-y-1">
+                          {insight.key_findings.map((finding, index) => (
+                            <li key={index} className="flex items-start text-sm text-gray-600">
+                              <span className="text-blue-500 mr-2 mt-1">•</span>
+                              {finding}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     {/* Recommendations */}
-                    <div>
-                      <h4 className="font-medium text-gray-900 mb-2 flex items-center">
-                        <TrendingUp className="h-4 w-4 mr-2 text-green-600" />
-                        Recommendations
-                      </h4>
-                      <ul className="space-y-1">
-                        {insight.recommendations?.map((recommendation, index) => (
-                          <li key={index} className="text-sm text-gray-600 flex items-start">
-                            <span className="text-green-500 mr-2 mt-1">•</span>
-                            {recommendation}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
+                    {insight.recommendations && insight.recommendations.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="font-medium text-gray-900 mb-2">Recommendations</h4>
+                        <ul className="space-y-1">
+                          {insight.recommendations.map((rec, index) => (
+                            <li key={index} className="flex items-start text-sm text-gray-600">
+                              <span className="text-green-500 mr-2 mt-1">→</span>
+                              {rec}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
-                  {/* Projected Impact */}
-                  {insight.projected_impact && (
-                    <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                      <h4 className="font-medium text-blue-900 mb-1">Projected Impact</h4>
-                      <p className="text-sm text-blue-800">{insight.projected_impact}</p>
-                    </div>
-                  )}
+                    {/* Projected Impact */}
+                    {insight.projected_impact && (
+                      <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                        <h4 className="font-medium text-blue-900 mb-1">Projected Impact</h4>
+                        <p className="text-sm text-blue-800">{insight.projected_impact}</p>
+                      </div>
+                    )}
 
-                  {/* Tags */}
-                  {insight.tags && insight.tags.length > 0 && (
-                    <div className="mb-4">
-                      <h4 className="font-medium text-gray-900 mb-2 flex items-center">
-                        <Tag className="h-4 w-4 mr-2 text-gray-600" />
-                        Tags
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {insight.tags.map((tag, index) => (
-                          <Badge key={index} variant="outline" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
+                    {/* Footer */}
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          {formatTimeAgo(insight.created_at)}
+                        </div>
+                        {insight.source && (
+                          <div className="flex items-center gap-1">
+                            <Tag className="h-4 w-4" />
+                            {insight.source}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        {insight.tags && insight.tags.length > 0 && (
+                          <div className="flex gap-1">
+                            {insight.tags.slice(0, 3).map((tag, index) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                            {insight.tags.length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{insight.tags.length - 3}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
-
-                  {/* Footer */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                    <div className="flex items-center text-sm text-gray-500">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      {formatTimeAgo(insight.created_at)}
-                      {insight.source && (
-                        <>
-                          <span className="mx-2">•</span>
-                          Source: {insight.source}
-                        </>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline">
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Details
-                      </Button>
-                      <Button size="sm">
-                        <Target className="h-4 w-4 mr-2" />
-                        Create Action Plan
-                      </Button>
-                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
