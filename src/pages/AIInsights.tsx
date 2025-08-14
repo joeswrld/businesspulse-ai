@@ -11,7 +11,6 @@ import {
   Bookmark, 
   BookmarkPlus, 
   Search, 
-  Filter, 
   Download, 
   Plus,
   TrendingUp,
@@ -22,31 +21,26 @@ import {
   Target,
   BarChart3,
   Calendar,
-  Tag
+  Tag,
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
-interface Insight {
+interface AIInsight {
   id: string;
   user_id: string;
   title: string;
-  priority: 'high' | 'medium' | 'low';
   category: string;
+  priority: 'high' | 'medium' | 'low';
   confidence: number;
-  summary: string;
+  description: string;
   key_findings: string[];
   recommendations: string[];
   projected_impact: string;
-  source: string;
   tags: string[];
+  source: string;
   created_at: string;
-}
-
-interface Bookmark {
-  id: string;
-  user_id: string;
-  insight_id: string;
-  created_at: string;
+  bookmarked: boolean;
 }
 
 interface Metrics {
@@ -61,9 +55,9 @@ const AIInsights: React.FC = () => {
   const { toast } = useToast();
   
   // State
-  const [insights, setInsights] = useState<Insight[]>([]);
-  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [insights, setInsights] = useState<AIInsight[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedPriority, setSelectedPriority] = useState('all');
@@ -73,50 +67,16 @@ const AIInsights: React.FC = () => {
     avgConfidence: 0,
     bookmarked: 0
   });
-  
-  // Debug state
-  const [debugInfo, setDebugInfo] = useState({
-    userAuthenticated: false,
-    userId: null,
-    databaseConnected: false,
-    insightsCount: 0,
-    bookmarksCount: 0
-  });
 
-  // Fetch insights and bookmarks
-  const fetchData = useCallback(async () => {
-    if (!user) {
-      setDebugInfo(prev => ({ ...prev, userAuthenticated: false }));
-      return;
-    }
-
-    setDebugInfo(prev => ({ 
-      ...prev, 
-      userAuthenticated: true, 
-      userId: user.id 
-    }));
+  // Fetch insights from ai_insights table
+  const fetchInsights = useCallback(async () => {
+    if (!user) return;
 
     try {
-      console.log('🔍 Fetching data for user:', user.id);
+      console.log('🔍 Fetching insights for user:', user.id);
       
-      // Test database connection
-      const { data: testData, error: testError } = await supabase
-        .from('insights')
-        .select('count')
-        .limit(1);
-      
-      if (testError) {
-        console.error('❌ Database connection error:', testError);
-        setDebugInfo(prev => ({ ...prev, databaseConnected: false }));
-        throw testError;
-      }
-      
-      setDebugInfo(prev => ({ ...prev, databaseConnected: true }));
-      console.log('✅ Database connected successfully');
-
-      // Fetch insights
       const { data: insightsData, error: insightsError } = await supabase
-        .from('insights')
+        .from('ai_insights')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
@@ -127,34 +87,13 @@ const AIInsights: React.FC = () => {
       }
 
       console.log('📊 Insights fetched:', insightsData?.length || 0);
-
-      // Fetch bookmarks
-      const { data: bookmarksData, error: bookmarksError } = await supabase
-        .from('bookmarks')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (bookmarksError) {
-        console.error('❌ Bookmarks fetch error:', bookmarksError);
-        throw bookmarksError;
-      }
-
-      console.log('🔖 Bookmarks fetched:', bookmarksData?.length || 0);
-
       setInsights(insightsData || []);
-      setBookmarks(bookmarksData || []);
-      
-      setDebugInfo(prev => ({ 
-        ...prev, 
-        insightsCount: insightsData?.length || 0,
-        bookmarksCount: bookmarksData?.length || 0
-      }));
       
     } catch (error) {
-      console.error('❌ Error fetching data:', error);
+      console.error('❌ Error fetching insights:', error);
       toast({
         title: "Error",
-        description: "Failed to load insights and bookmarks",
+        description: "Failed to load insights",
         variant: "destructive"
       });
     } finally {
@@ -162,14 +101,14 @@ const AIInsights: React.FC = () => {
     }
   }, [user, toast]);
 
-  // Calculate metrics
-  const calculateMetrics = useCallback((insightsData: Insight[], bookmarksData: Bookmark[]) => {
+  // Calculate metrics from insights data
+  const calculateMetrics = useCallback((insightsData: AIInsight[]) => {
     const totalInsights = insightsData.length;
     const highPriority = insightsData.filter(insight => insight.priority === 'high').length;
     const avgConfidence = insightsData.length > 0 
-      ? Math.round(insightsData.reduce((sum, insight) => sum + (insight.confidence || 0), 0) / insightsData.length * 10) / 10
+      ? Math.round(insightsData.reduce((sum, insight) => sum + insight.confidence, 0) / insightsData.length)
       : 0;
-    const bookmarked = bookmarksData.length;
+    const bookmarked = insightsData.filter(insight => insight.bookmarked).length;
 
     setMetrics({
       totalInsights,
@@ -179,36 +118,36 @@ const AIInsights: React.FC = () => {
     });
   }, []);
 
-  // Update metrics when data changes
+  // Update metrics when insights change
   useEffect(() => {
-    calculateMetrics(insights, bookmarks);
-  }, [insights, bookmarks, calculateMetrics]);
+    calculateMetrics(insights);
+  }, [insights, calculateMetrics]);
 
-  // Real-time subscriptions
+  // Real-time subscription to ai_insights table
   useEffect(() => {
     if (!user) return;
 
-    console.log('🔄 Setting up real-time subscriptions for user:', user.id);
+    console.log('🔄 Setting up real-time subscription for user:', user.id);
 
-    // Subscribe to insights changes
     const insightsChannel = supabase
-      .channel('insights-realtime')
+      .channel('ai-insights-realtime')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'insights',
+          table: 'ai_insights',
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('🔄 Insights real-time update:', payload.eventType, payload.new);
+          console.log('🔄 AI Insights real-time update:', payload.eventType, payload.new);
+          
           if (payload.eventType === 'INSERT') {
-            setInsights(prev => [payload.new as Insight, ...prev]);
+            setInsights(prev => [payload.new as AIInsight, ...prev]);
           } else if (payload.eventType === 'UPDATE') {
             setInsights(prev => 
               prev.map(insight => 
-                insight.id === payload.new.id ? payload.new as Insight : insight
+                insight.id === payload.new.id ? payload.new as AIInsight : insight
               )
             );
           } else if (payload.eventType === 'DELETE') {
@@ -218,52 +157,23 @@ const AIInsights: React.FC = () => {
       )
       .subscribe();
 
-    // Subscribe to bookmarks changes
-    const bookmarksChannel = supabase
-      .channel('bookmarks-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'bookmarks',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          console.log('🔄 Bookmarks real-time update:', payload.eventType, payload.new);
-          if (payload.eventType === 'INSERT') {
-            setBookmarks(prev => [payload.new as Bookmark, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setBookmarks(prev => 
-              prev.map(bookmark => 
-                bookmark.id === payload.new.id ? payload.new as Bookmark : bookmark
-              )
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setBookmarks(prev => prev.filter(bookmark => bookmark.id !== payload.old.id));
-          }
-        }
-      )
-      .subscribe();
-
     return () => {
-      console.log('🔄 Cleaning up real-time subscriptions');
+      console.log('🔄 Cleaning up real-time subscription');
       supabase.removeChannel(insightsChannel);
-      supabase.removeChannel(bookmarksChannel);
     };
   }, [user]);
 
   // Initial data fetch
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchInsights();
+  }, [fetchInsights]);
 
-  // Filtered insights
+  // Filtered insights based on search and filters
   const filteredInsights = useMemo(() => {
     return insights.filter(insight => {
       const matchesSearch = searchTerm === '' || 
         insight.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        insight.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        insight.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         insight.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesCategory = selectedCategory === 'all' || insight.category === selectedCategory;
@@ -273,7 +183,7 @@ const AIInsights: React.FC = () => {
     });
   }, [insights, searchTerm, selectedCategory, selectedPriority]);
 
-  // Get unique categories and priorities
+  // Get unique categories and priorities from actual data
   const categories = useMemo(() => {
     const uniqueCategories = [...new Set(insights.map(insight => insight.category))];
     return ['all', ...uniqueCategories.sort()];
@@ -281,42 +191,63 @@ const AIInsights: React.FC = () => {
 
   const priorities = ['all', 'high', 'medium', 'low'];
 
-  // Bookmark functions
+  // Generate new insight using Edge Function
+  const generateNewInsight = async () => {
+    if (!user) return;
+
+    setGenerating(true);
+    try {
+      console.log('🚀 Generating new insight for user:', user.id);
+      
+      const { data, error } = await supabase.functions.invoke('generate-insight', {
+        body: { user_id: user.id }
+      });
+
+      if (error) throw error;
+
+      console.log('✅ New insight generated:', data);
+      toast({
+        title: "Success!",
+        description: "New AI insight generated and added to your dashboard",
+      });
+
+      // Refresh insights to show the new one
+      await fetchInsights();
+      
+    } catch (error: any) {
+      console.error('❌ Error generating insight:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate new insight",
+        variant: "destructive"
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // Toggle bookmark status
   const toggleBookmark = async (insightId: string) => {
     if (!user) return;
 
     try {
-      const existingBookmark = bookmarks.find(b => b.insight_id === insightId);
+      const insight = insights.find(i => i.id === insightId);
+      if (!insight) return;
+
+      const newBookmarkedStatus = !insight.bookmarked;
       
-      if (existingBookmark) {
-        // Remove bookmark
-        const { error } = await supabase
-          .from('bookmarks')
-          .delete()
-          .eq('id', existingBookmark.id);
+      const { error } = await supabase
+        .from('ai_insights')
+        .update({ bookmarked: newBookmarkedStatus })
+        .eq('id', insightId);
 
-        if (error) throw error;
+      if (error) throw error;
 
-        toast({
-          title: "Bookmark removed",
-          description: "Insight removed from bookmarks",
-        });
-      } else {
-        // Add bookmark
-        const { error } = await supabase
-          .from('bookmarks')
-          .insert({
-            user_id: user.id,
-            insight_id: insightId
-          });
-
-        if (error) throw error;
-
-        toast({
-          title: "Bookmark added",
-          description: "Insight added to bookmarks",
-        });
-      }
+      toast({
+        title: newBookmarkedStatus ? "Bookmarked!" : "Bookmark removed",
+        description: newBookmarkedStatus ? "Insight added to bookmarks" : "Insight removed from bookmarks",
+      });
+      
     } catch (error: any) {
       toast({
         title: "Error",
@@ -326,20 +257,16 @@ const AIInsights: React.FC = () => {
     }
   };
 
-  const isBookmarked = (insightId: string) => {
-    return bookmarks.some(bookmark => bookmark.insight_id === insightId);
-  };
-
-  // Export functions
+  // Export filtered insights to CSV
   const exportToCSV = () => {
     const csvContent = [
-      ['Title', 'Priority', 'Category', 'Confidence', 'Summary', 'Tags', 'Created At'].join(','),
+      ['Title', 'Priority', 'Category', 'Confidence', 'Description', 'Tags', 'Created At'].join(','),
       ...filteredInsights.map(insight => [
         `"${insight.title}"`,
         insight.priority,
         insight.category,
         insight.confidence,
-        `"${insight.summary}"`,
+        `"${insight.description}"`,
         `"${insight.tags.join(', ')}"`,
         new Date(insight.created_at).toLocaleDateString()
       ].join(','))
@@ -359,8 +286,8 @@ const AIInsights: React.FC = () => {
     });
   };
 
+  // Export to PDF (placeholder)
   const exportToPDF = () => {
-    // For now, just show a toast - PDF export would require a library like jsPDF
     toast({
       title: "PDF Export",
       description: "PDF export functionality coming soon",
@@ -418,25 +345,6 @@ const AIInsights: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Debug Info - Remove this in production */}
-      <div className="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-4">
-        <div className="flex">
-          <div className="flex-shrink-0">
-            <AlertTriangle className="h-5 w-5 text-yellow-400" />
-          </div>
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-yellow-800">Debug Information</h3>
-            <div className="mt-2 text-sm text-yellow-700">
-              <p><strong>User Authenticated:</strong> {debugInfo.userAuthenticated ? 'Yes' : 'No'}</p>
-              <p><strong>User ID:</strong> {debugInfo.userId || 'None'}</p>
-              <p><strong>Database Connected:</strong> {debugInfo.databaseConnected ? 'Yes' : 'No'}</p>
-              <p><strong>Insights Count:</strong> {debugInfo.insightsCount}</p>
-              <p><strong>Bookmarks Count:</strong> {debugInfo.bookmarksCount}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-6 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
@@ -450,9 +358,22 @@ const AIInsights: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <Button className="flex-1 sm:flex-none">
-            <Plus className="h-4 w-4 mr-2" />
-            Generate New Insights
+          <Button 
+            onClick={generateNewInsight} 
+            disabled={generating}
+            className="flex-1 sm:flex-none"
+          >
+            {generating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                Generate New Insights
+              </>
+            )}
           </Button>
           <div className="flex gap-2">
             <Button variant="outline" onClick={exportToCSV}>
@@ -584,7 +505,7 @@ const AIInsights: React.FC = () => {
                 </h3>
                 <p className="text-gray-500">
                   {insights.length === 0 
-                    ? 'Upload some data to generate your first AI insights!' 
+                    ? 'Click "Generate New Insights" to create your first AI-powered business intelligence!' 
                     : 'Try adjusting your search or filter criteria.'
                   }
                 </p>
@@ -612,15 +533,15 @@ const AIInsights: React.FC = () => {
                         </Badge>
                       </div>
                       <h3 className="text-xl font-semibold text-gray-900 mb-2">{insight.title}</h3>
-                      <p className="text-gray-600 mb-3">{insight.summary}</p>
+                      <p className="text-gray-600 mb-3">{insight.description}</p>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => toggleBookmark(insight.id)}
-                      className={`ml-4 ${isBookmarked(insight.id) ? 'text-blue-600' : 'text-gray-400'}`}
+                      className={`ml-4 ${insight.bookmarked ? 'text-blue-600' : 'text-gray-400'}`}
                     >
-                      {isBookmarked(insight.id) ? (
+                      {insight.bookmarked ? (
                         <Bookmark className="h-5 w-5 fill-current" />
                       ) : (
                         <BookmarkPlus className="h-5 w-5" />
