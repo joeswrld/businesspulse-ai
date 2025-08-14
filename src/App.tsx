@@ -16,6 +16,8 @@ import AIInsights from "./pages/AIInsights";
 import Reports from "./pages/Reports";
 import Analytics from "./pages/Analytics";
 import Billing from "./pages/Billing";
+import Teams from "./pages/Teams";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -72,6 +74,20 @@ const App = () => (
               <ProtectedRoute>
                 <DashboardLayout>
                   <Billing />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/teams" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <Teams />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <Settings />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
