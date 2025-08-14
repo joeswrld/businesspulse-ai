@@ -40,7 +40,7 @@ interface Report {
   generated_at: string | null;
   scheduled_for: string | null;
   tags: string[];
-  metadata: any;
+  metadata: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -214,11 +214,12 @@ const Reports: React.FC = () => {
       setNewReportDescription('');
       setScheduledDate('');
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error generating report:', error);
+      const message = error instanceof Error ? error.message : 'Failed to generate report';
       toast({
         title: "Error",
-        description: error.message || "Failed to generate report",
+        description: message,
         variant: "destructive"
       });
     } finally {
@@ -258,11 +259,11 @@ const Reports: React.FC = () => {
         description: `${report.title} is downloading...`,
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error downloading report:', error);
       toast({
         title: "Download Failed",
-        description: "Failed to download report file",
+        description: 'Failed to download report file',
         variant: "destructive"
       });
     }
@@ -285,11 +286,11 @@ const Reports: React.FC = () => {
         description: "Report has been removed successfully",
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error deleting report:', error);
       toast({
         title: "Error",
-        description: "Failed to delete report",
+        description: 'Failed to delete report',
         variant: "destructive"
       });
     }
@@ -608,7 +609,7 @@ const Reports: React.FC = () => {
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Report Type</label>
-              <Select value={newReportType} onValueChange={(value: any) => setNewReportType(value)}>
+              <Select value={newReportType} onValueChange={(value: 'PDF' | 'CSV' | 'XLSX') => setNewReportType(value)}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>

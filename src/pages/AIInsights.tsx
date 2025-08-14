@@ -152,22 +152,26 @@ const AIInsights: React.FC = () => {
       let matchesTimeRange = true;
       
       switch (selectedTimeRange) {
-        case 'today':
+        case 'today': {
           const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
           matchesTimeRange = insightDate >= today;
           break;
-        case 'week':
+        }
+        case 'week': {
           const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
           matchesTimeRange = insightDate >= weekAgo;
           break;
-        case 'month':
+        }
+        case 'month': {
           const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
           matchesTimeRange = insightDate >= monthAgo;
           break;
-        case 'quarter':
+        }
+        case 'quarter': {
           const quarterAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
           matchesTimeRange = insightDate >= quarterAgo;
           break;
+        }
       }
       
       return matchesSearch && matchesCategory && matchesPriority && matchesTimeRange;
@@ -203,11 +207,12 @@ const AIInsights: React.FC = () => {
           : "Insight added to bookmarks",
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error toggling bookmark:', error);
+      const message = error instanceof Error ? error.message : 'Failed to update bookmark';
       toast({
         title: "Error",
-        description: "Failed to update bookmark",
+        description: message,
         variant: "destructive"
       });
     }

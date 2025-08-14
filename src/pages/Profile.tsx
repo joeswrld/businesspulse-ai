@@ -82,8 +82,9 @@ const Profile: React.FC = () => {
         // Initialize form with auth details if no profile row yet
         setForm({ full_name: '', email: user.email || '' });
       }
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message || 'Failed to load profile', variant: 'destructive' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load profile';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -123,8 +124,9 @@ const Profile: React.FC = () => {
         }, { onConflict: 'user_id' });
       if (error) throw error;
       toast({ title: 'Profile saved', description: 'Your profile has been updated.' });
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message || 'Failed to save profile', variant: 'destructive' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save profile';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -151,8 +153,9 @@ const Profile: React.FC = () => {
 
       await resolveAvatarUrl(filePath);
       toast({ title: 'Avatar updated', description: 'Your profile photo has been updated.' });
-    } catch (err: any) {
-      toast({ title: 'Upload failed', description: err.message || 'Could not upload avatar', variant: 'destructive' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not upload avatar';
+      toast({ title: 'Upload failed', description: message, variant: 'destructive' });
     } finally {
       setAvatarUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

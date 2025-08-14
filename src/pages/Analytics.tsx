@@ -36,7 +36,7 @@ interface AnalyticsSummary {
   insights_by_priority: { priority: string; count: number }[];
   sentiment_distribution: { sentiment: string; count: number }[];
   growth_rate: number;
-  top_performing_insights: any[];
+  top_performing_insights: unknown[];
   created_at: string;
   updated_at: string;
 }

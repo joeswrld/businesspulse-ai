@@ -41,7 +41,7 @@ interface Team {
   owner_id: string;
   slug: string;
   logo_url: string | null;
-  settings: any;
+  settings: Record<string, unknown> | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -52,7 +52,7 @@ interface TeamMember {
   team_id: string;
   user_id: string;
   role: 'owner' | 'admin' | 'member' | 'viewer';
-  permissions: any;
+  permissions: Record<string, unknown> | null;
   invited_by: string | null;
   invited_at: string;
   joined_at: string | null;
@@ -75,7 +75,7 @@ interface TeamProject {
   assigned_to: string | null;
   due_date: string | null;
   tags: string[];
-  metadata: any;
+  metadata: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -114,7 +114,7 @@ interface TeamReport {
   reviewed_at: string | null;
   published_at: string | null;
   tags: string[];
-  metadata: any;
+  metadata: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -195,7 +195,8 @@ const Teams: React.FC = () => {
     if (!selectedTeam || !user) return;
 
     try {
-      console.log('🔍 Fetching data for team:', selectedTeam.name);
+      const teamNameForLog = selectedTeam?.name;
+      console.log('🔍 Fetching data for team:', teamNameForLog);
       
       // Fetch team members
       const { data: membersData, error: membersError } = await supabase
@@ -256,7 +257,7 @@ const Teams: React.FC = () => {
         variant: "destructive"
       });
     }
-  }, [selectedTeam, user, toast]);
+  }, [selectedTeam, selectedTeam?.name, user, toast]);
 
   // Real-time subscriptions
   useEffect(() => {
@@ -378,11 +379,11 @@ const Teams: React.FC = () => {
       setShowCreateTeam(false);
       setSelectedTeam(data);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error creating team:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create team",
+        description: error instanceof Error ? error.message : 'Failed to create team',
         variant: "destructive"
       });
     }
@@ -415,11 +416,11 @@ const Teams: React.FC = () => {
       setInviteRole('member');
       setShowInviteMember(false);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error inviting member:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to send invitation",
+        description: error instanceof Error ? error.message : 'Failed to send invitation',
         variant: "destructive"
       });
     }
@@ -970,7 +971,7 @@ const Teams: React.FC = () => {
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">Role</label>
-                <Select value={inviteRole} onValueChange={(value: any) => setInviteRole(value)}>
+                <Select value={inviteRole} onValueChange={(value: 'admin' | 'member' | 'viewer') => setInviteRole(value)}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>

@@ -59,7 +59,7 @@ interface Transaction {
   status: 'pending' | 'success' | 'failed' | 'reversed';
   authorization_url: string | null;
   paid_at: string | null;
-  metadata: any;
+  metadata: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -238,11 +238,12 @@ const Billing: React.FC = () => {
         throw new Error('No checkout URL received');
       }
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Checkout error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to start checkout process';
       toast({
         title: "Checkout Failed",
-        description: error.message || "Failed to start checkout process",
+        description: message,
         variant: "destructive"
       });
     } finally {

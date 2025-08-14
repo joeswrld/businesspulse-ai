@@ -85,7 +85,7 @@ interface FeatureFlag {
   user_id: string;
   feature_name: string;
   is_enabled: boolean;
-  settings: any;
+  settings: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -324,11 +324,11 @@ const Settings: React.FC = () => {
         description: "Your profile has been updated successfully!",
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error saving profile:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update profile",
+        description: error instanceof Error ? error.message : 'Failed to update profile',
         variant: "destructive"
       });
     } finally {
@@ -359,11 +359,11 @@ const Settings: React.FC = () => {
         description: "Your widget settings have been saved!",
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error saving widget settings:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to save widget settings",
+        description: error instanceof Error ? error.message : 'Failed to save widget settings',
         variant: "destructive"
       });
     } finally {
@@ -394,11 +394,11 @@ const Settings: React.FC = () => {
         description: "Your preferences have been saved!",
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error saving preferences:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to save preferences",
+        description: error instanceof Error ? error.message : 'Failed to save preferences',
         variant: "destructive"
       });
     } finally {
@@ -429,11 +429,11 @@ const Settings: React.FC = () => {
         description: `${featureName} has been ${enabled ? 'enabled' : 'disabled'}`,
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error toggling feature flag:', error);
       toast({
         title: "Error",
-        description: "Failed to update feature setting",
+        description: 'Failed to update feature setting',
         variant: "destructive"
       });
     }
@@ -624,7 +624,7 @@ const Settings: React.FC = () => {
                   <Label htmlFor="widget_position">Position</Label>
                   <Select 
                     value={widgetForm.widget_position} 
-                    onValueChange={(value: any) => setWidgetForm(prev => ({ ...prev, widget_position: value }))}
+                    onValueChange={(value: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left') => setWidgetForm(prev => ({ ...prev, widget_position: value }))}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue />
@@ -641,7 +641,7 @@ const Settings: React.FC = () => {
                   <Label htmlFor="widget_size">Size</Label>
                   <Select 
                     value={widgetForm.widget_size} 
-                    onValueChange={(value: any) => setWidgetForm(prev => ({ ...prev, widget_size: value }))}
+                    onValueChange={(value: 'small' | 'medium' | 'large') => setWidgetForm(prev => ({ ...prev, widget_size: value }))}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue />
@@ -764,7 +764,7 @@ const Settings: React.FC = () => {
                   <Label htmlFor="theme">Theme</Label>
                   <Select 
                     value={preferencesForm.theme} 
-                    onValueChange={(value: any) => setPreferencesForm(prev => ({ ...prev, theme: value }))}
+                    onValueChange={(value: 'light' | 'dark' | 'system') => setPreferencesForm(prev => ({ ...prev, theme: value }))}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue />
@@ -780,7 +780,7 @@ const Settings: React.FC = () => {
                   <Label htmlFor="language">Language</Label>
                   <Select 
                     value={preferencesForm.language} 
-                    onValueChange={(value: any) => setPreferencesForm(prev => ({ ...prev, language: value }))}
+                    onValueChange={(value: string) => setPreferencesForm(prev => ({ ...prev, language: value }))}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue />
@@ -796,7 +796,7 @@ const Settings: React.FC = () => {
                   <Label htmlFor="timezone">Timezone</Label>
                   <Select 
                     value={preferencesForm.timezone} 
-                    onValueChange={(value: any) => setPreferencesForm(prev => ({ ...prev, timezone: value }))}
+                    onValueChange={(value: string) => setPreferencesForm(prev => ({ ...prev, timezone: value }))}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue />

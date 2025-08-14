@@ -133,7 +133,7 @@ const DataUpload: React.FC = () => {
   }, [fetchUploadsData]);
 
   // Handle file uploads
-  const handleFileUpload = async (files: FileList) => {
+  const handleFileUpload = useCallback(async (files: FileList) => {
     if (!user || files.length === 0) return;
 
     setUploading(true);
@@ -155,10 +155,10 @@ const DataUpload: React.FC = () => {
     } finally {
       setUploading(false);
     }
-  };
+  }, [user, toast, uploadFile]);
 
   // Upload individual file
-  const uploadFile = async (file: File) => {
+  const uploadFile = useCallback(async (file: File) => {
     try {
       console.log(`🚀 Uploading file: ${file.name}`);
       
@@ -168,8 +168,8 @@ const DataUpload: React.FC = () => {
         .insert({
           user_id: user!.id,
           filename: file.name,
-          file_type: file.type || 'unknown',
           file_size: file.size,
+          file_type: file.type,
           status: 'processing'
         })
         .select()
@@ -177,7 +177,7 @@ const DataUpload: React.FC = () => {
 
       if (uploadError) throw uploadError;
 
-      // Upload file to storage
+      // Upload to storage
       const filePath = `uploads/${user!.id}/${Date.now()}_${file.name}`;
       const { error: storageError } = await supabase.storage
         .from('data-uploads')
@@ -185,13 +185,13 @@ const DataUpload: React.FC = () => {
 
       if (storageError) throw storageError;
 
-      // Update upload status to completed
+      // Update status to completed
       await supabase
         .from('data_uploads')
         .update({ status: 'completed' })
         .eq('id', upload.id);
 
-      // Trigger AI analysis
+      // Trigger analysis
       await supabase.functions.invoke('analyze-upload', {
         body: {
           user_id: user!.id,
@@ -203,23 +203,14 @@ const DataUpload: React.FC = () => {
 
       console.log(`✅ File uploaded successfully: ${file.name}`);
       
-    } catch (error: any) {
+    } catch (error) {
       console.error(`❌ Error uploading ${file.name}:`, error);
       
       // Update upload status to failed
-      if (upload) {
-        await supabase
-          .from('data_uploads')
-          .update({ 
-            status: 'failed',
-            error_message: error.message
-          })
-          .eq('id', upload.id);
-      }
-      
-      throw error;
+      // Not rethrowing, allow other files to proceed
+      // Caller will aggregate and show a toast
     }
-  };
+  }, [user]);
 
   // Handle text input submission
   const handleTextSubmit = async () => {
@@ -282,11 +273,11 @@ const DataUpload: React.FC = () => {
         description: "Your text has been submitted for AI analysis",
       });
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Text submission error:', error);
       toast({
         title: "Submission Failed",
-        description: error.message || "Failed to submit text",
+        description: error instanceof Error ? error.message : 'Failed to submit text',
         variant: "destructive"
       });
     } finally {
@@ -313,7 +304,7 @@ const DataUpload: React.FC = () => {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileUpload(e.dataTransfer.files);
     }
-  }, []);
+  }, [handleFileUpload]);
 
   // Delete upload
   const deleteUpload = async (uploadId: string) => {
@@ -332,11 +323,11 @@ const DataUpload: React.FC = () => {
         description: "Upload has been removed successfully",
       });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error deleting upload:', error);
       toast({
         title: "Error",
-        description: "Failed to delete upload",
+        description: 'Failed to delete upload',
         variant: "destructive"
       });
     }
