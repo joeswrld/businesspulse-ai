@@ -19,6 +19,7 @@ import Billing from "./pages/Billing";
 import Teams from "./pages/Teams";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
 
@@ -81,6 +82,13 @@ const App = () => (
               <ProtectedRoute>
                 <DashboardLayout>
                   <Teams />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <Profile />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
