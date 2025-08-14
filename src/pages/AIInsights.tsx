@@ -73,12 +73,47 @@ const AIInsights: React.FC = () => {
     avgConfidence: 0,
     bookmarked: 0
   });
+  
+  // Debug state
+  const [debugInfo, setDebugInfo] = useState({
+    userAuthenticated: false,
+    userId: null,
+    databaseConnected: false,
+    insightsCount: 0,
+    bookmarksCount: 0
+  });
 
   // Fetch insights and bookmarks
   const fetchData = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setDebugInfo(prev => ({ ...prev, userAuthenticated: false }));
+      return;
+    }
+
+    setDebugInfo(prev => ({ 
+      ...prev, 
+      userAuthenticated: true, 
+      userId: user.id 
+    }));
 
     try {
+      console.log('🔍 Fetching data for user:', user.id);
+      
+      // Test database connection
+      const { data: testData, error: testError } = await supabase
+        .from('insights')
+        .select('count')
+        .limit(1);
+      
+      if (testError) {
+        console.error('❌ Database connection error:', testError);
+        setDebugInfo(prev => ({ ...prev, databaseConnected: false }));
+        throw testError;
+      }
+      
+      setDebugInfo(prev => ({ ...prev, databaseConnected: true }));
+      console.log('✅ Database connected successfully');
+
       // Fetch insights
       const { data: insightsData, error: insightsError } = await supabase
         .from('insights')
@@ -86,7 +121,12 @@ const AIInsights: React.FC = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (insightsError) throw insightsError;
+      if (insightsError) {
+        console.error('❌ Insights fetch error:', insightsError);
+        throw insightsError;
+      }
+
+      console.log('📊 Insights fetched:', insightsData?.length || 0);
 
       // Fetch bookmarks
       const { data: bookmarksData, error: bookmarksError } = await supabase
@@ -94,12 +134,24 @@ const AIInsights: React.FC = () => {
         .select('*')
         .eq('user_id', user.id);
 
-      if (bookmarksError) throw bookmarksError;
+      if (bookmarksError) {
+        console.error('❌ Bookmarks fetch error:', bookmarksError);
+        throw bookmarksError;
+      }
+
+      console.log('🔖 Bookmarks fetched:', bookmarksData?.length || 0);
 
       setInsights(insightsData || []);
       setBookmarks(bookmarksData || []);
+      
+      setDebugInfo(prev => ({ 
+        ...prev, 
+        insightsCount: insightsData?.length || 0,
+        bookmarksCount: bookmarksData?.length || 0
+      }));
+      
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('❌ Error fetching data:', error);
       toast({
         title: "Error",
         description: "Failed to load insights and bookmarks",
@@ -136,6 +188,8 @@ const AIInsights: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
+    console.log('🔄 Setting up real-time subscriptions for user:', user.id);
+
     // Subscribe to insights changes
     const insightsChannel = supabase
       .channel('insights-realtime')
@@ -148,6 +202,7 @@ const AIInsights: React.FC = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
+          console.log('🔄 Insights real-time update:', payload.eventType, payload.new);
           if (payload.eventType === 'INSERT') {
             setInsights(prev => [payload.new as Insight, ...prev]);
           } else if (payload.eventType === 'UPDATE') {
@@ -175,6 +230,7 @@ const AIInsights: React.FC = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
+          console.log('🔄 Bookmarks real-time update:', payload.eventType, payload.new);
           if (payload.eventType === 'INSERT') {
             setBookmarks(prev => [payload.new as Bookmark, ...prev]);
           } else if (payload.eventType === 'UPDATE') {
@@ -191,6 +247,7 @@ const AIInsights: React.FC = () => {
       .subscribe();
 
     return () => {
+      console.log('🔄 Cleaning up real-time subscriptions');
       supabase.removeChannel(insightsChannel);
       supabase.removeChannel(bookmarksChannel);
     };
@@ -361,6 +418,25 @@ const AIInsights: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Debug Info - Remove this in production */}
+      <div className="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-4">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <AlertTriangle className="h-5 w-5 text-yellow-400" />
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-yellow-800">Debug Information</h3>
+            <div className="mt-2 text-sm text-yellow-700">
+              <p><strong>User Authenticated:</strong> {debugInfo.userAuthenticated ? 'Yes' : 'No'}</p>
+              <p><strong>User ID:</strong> {debugInfo.userId || 'None'}</p>
+              <p><strong>Database Connected:</strong> {debugInfo.databaseConnected ? 'Yes' : 'No'}</p>
+              <p><strong>Insights Count:</strong> {debugInfo.insightsCount}</p>
+              <p><strong>Bookmarks Count:</strong> {debugInfo.bookmarksCount}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-6 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
