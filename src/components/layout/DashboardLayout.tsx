@@ -34,7 +34,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
     { name: "Billing", href: "/billing", icon: CreditCard },
     { name: "Settings", href: "/settings", icon: Settings },
-    { name: "Help Center", href: "/help", icon: HelpCircle },
+    { name: "Teams", href: "/teams", icon: HelpCircle },
   ];
 
   const handleSignOut = async () => {

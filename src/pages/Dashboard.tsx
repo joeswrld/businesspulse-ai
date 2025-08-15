@@ -117,35 +117,20 @@ const Dashboard: React.FC = () => {
           console.log('Team members table not available yet');
         }
 
-        // Get processing jobs count (if table exists)
+        // Get processing jobs count from data_sources
         let processingJobsCount = 0;
-        try {
-          const { data: processingJobs } = await supabase
-            .from('ai_jobs')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('status', 'processing');
-          processingJobsCount = processingJobs?.length || 0;
-        } catch (error) {
-          console.log('AI jobs table not available yet');
-        }
+        const processingDataSources = dataSources?.filter(ds => ds.status === 'processing');
+        processingJobsCount = processingDataSources?.length || 0;
 
-        // Get sync status (if table exists)
+        // Get sync status based on data sources status
         let syncStatus: 'healthy' | 'warning' | 'error' = 'healthy';
-        try {
-          const { data: syncLogs } = await supabase
-            .from('sync_logs')
-            .select('status, last_run')
-            .eq('user_id', user.id)
-            .order('last_run', { ascending: false })
-            .limit(1);
-          
-          if (syncLogs && syncLogs.length > 0) {
-            syncStatus = syncLogs[0].status === 'error' ? 'error' : 
-                        syncLogs[0].status === 'warning' ? 'warning' : 'healthy';
-          }
-        } catch (error) {
-          console.log('Sync logs table not available yet');
+        const errorSources = dataSources?.filter(ds => ds.status === 'error');
+        const processingSources = dataSources?.filter(ds => ds.status === 'processing');
+        
+        if (errorSources && errorSources.length > 0) {
+          syncStatus = 'error';
+        } else if (processingSources && processingSources.length > 0) {
+          syncStatus = 'warning';
         }
 
         // Get reports status
