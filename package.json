@@ -8,7 +8,12 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy:functions": "./scripts/deploy-functions.sh",
+    "db:push": "supabase db push",
+    "db:reset": "supabase db reset",
+    "functions:deploy": "supabase functions deploy",
+    "start:local": "supabase start"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
