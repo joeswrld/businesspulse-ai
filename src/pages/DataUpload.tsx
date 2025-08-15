@@ -54,32 +54,61 @@ const DataUpload = () => {
     setUploadProgress(0);
 
     try {
+      // Handle text input
       if (textInput.trim()) {
-        await supabase.from('data_sources').insert({
+        const { data: textDataSource, error: textError } = await supabase.from('data_sources').insert({
           user_id: user?.id,
           name: 'Text Input',
           type: 'text/plain',
           status: 'processing',
           metadata: { content: textInput }
-        });
+        }).select().single();
+
+        if (textError) throw textError;
+
+        // Trigger AI processing for text input
+        await processDataSource(textDataSource.id, 'text/plain', undefined, textInput);
         setUploadProgress(50);
       }
 
+      // Handle file uploads
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
-        await supabase.from('data_sources').insert({
+        
+        // Upload file to Supabase Storage
+        const fileName = `${user?.id}/${Date.now()}_${file.name}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('data-files')
+          .upload(fileName, file);
+
+        if (uploadError) throw uploadError;
+
+        // Get file URL
+        const { data: urlData } = supabase.storage
+          .from('data-files')
+          .getPublicUrl(fileName);
+
+        // Create data source record
+        const { data: fileDataSource, error: fileError } = await supabase.from('data_sources').insert({
           user_id: user?.id,
           name: file.name,
           type: file.type,
           file_size: file.size,
+          file_url: urlData.publicUrl,
           status: 'processing'
-        });
+        }).select().single();
+
+        if (fileError) throw fileError;
+
+        // Trigger AI processing for file
+        await processDataSource(fileDataSource.id, file.type, urlData.publicUrl);
+        
         setUploadProgress(50 + ((i + 1) / selectedFiles.length) * 50);
       }
 
       toast({
         title: "Upload successful",
-        description: "Your data is being processed."
+        description: "Your data is being processed by AI."
       });
 
       setSelectedFiles([]);
@@ -92,13 +121,49 @@ const DataUpload = () => {
       }, 1000);
 
     } catch (error) {
+      console.error('Upload error:', error);
       toast({
         title: "Upload failed",
-        description: "Please try again.",
+        description: error.message || "Please try again.",
         variant: "destructive"
       });
       setIsUploading(false);
       setUploadProgress(0);
+    }
+  };
+
+  const processDataSource = async (dataSourceId: string, fileType: string, fileUrl?: string, textContent?: string) => {
+    try {
+      // Call the Edge Function to process the data
+      const response = await fetch('/api/process-upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({
+          data_source_id: dataSourceId,
+          user_id: user?.id,
+          file_url: fileUrl,
+          file_type: fileType,
+          text_content: textContent
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to process data');
+      }
+
+      const result = await response.json();
+      console.log('Processing result:', result);
+
+    } catch (error) {
+      console.error('Processing error:', error);
+      // Update data source status to failed
+      await supabase
+        .from('data_sources')
+        .update({ status: 'failed' })
+        .eq('id', dataSourceId);
     }
   };
 
@@ -119,9 +184,26 @@ const DataUpload = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="border-2 border-dashed rounded-lg p-8 text-center">
+              <div 
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  dragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragActive(true);
+                }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragActive(false);
+                  const files = Array.from(e.dataTransfer.files);
+                  setSelectedFiles(prev => [...prev, ...files]);
+                }}
+              >
                 <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-lg font-medium mb-2">Drop files here or click to browse</p>
+                <p className="text-lg font-medium mb-2">
+                  {dragActive ? 'Drop files here' : 'Drop files here or click to browse'}
+                </p>
                 <Input
                   type="file"
                   multiple
