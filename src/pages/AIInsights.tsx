@@ -19,21 +19,22 @@ import {
   Share,
   Bookmark,
   Plus,
-  Loader2
+  Loader2,
+  CheckCircle
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { AIService, AIInsight } from "@/lib/ai-service";
 import { useRealtimeInsights } from "@/hooks/useRealtime";
 
 const AIInsights = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [filteredInsights, setFilteredInsights] = useState<AIInsight[]>([]);
+  const [activeTab, setActiveTab] = useState("high");
+  const [filteredInsights, setFilteredInsights] = useState<any[]>([]);
   
   const { toast } = useToast();
   const { data: insights, loading } = useRealtimeInsights();
+
   // Filter insights based on search and filters
   useEffect(() => {
     if (!insights) return;
@@ -41,11 +42,10 @@ const AIInsights = () => {
     const filtered = insights.filter(insight => {
       const matchesSearch = searchTerm === "" || 
         insight.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        insight.summary?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        insight.content.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+        insight.projected_impact?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesPriority = filterPriority === "all" || insight.priority === filterPriority;
-      const matchesCategory = filterCategory === "all" || insight.industry_category === filterCategory;
+      const matchesCategory = filterCategory === "all" || insight.category === filterCategory;
       
       return matchesSearch && matchesPriority && matchesCategory;
     });
@@ -53,92 +53,42 @@ const AIInsights = () => {
     setFilteredInsights(filtered);
   }, [insights, searchTerm, filterPriority, filterCategory]);
 
-  const generateNewInsights = async () => {
-    setIsGenerating(true);
-    try {
-      const result = await AIService.generateInsights();
-      
-      if (result.success) {
-        toast({
-          title: "Success!",
-          description: `Generated ${result.count} new insights from your data.`,
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to generate insights",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to generate insights. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleBookmark = async (insightId: string, currentState: boolean) => {
-    const success = await AIService.toggleBookmark(insightId, !currentState);
-    if (success) {
-      toast({
-        title: currentState ? "Bookmark removed" : "Insight bookmarked",
-        description: currentState ? "Removed from bookmarks" : "Added to bookmarks",
-      });
-    }
-  };
-
-  const handleCreateActionPlan = async (insight: AIInsight) => {
-    const success = await AIService.createActionPlan(insight.id, insight);
-    if (success) {
-      toast({
-        title: "Action Plan Created",
-        description: "A new goal has been created based on this insight.",
-      });
-    } else {
-      toast({
-        title: "Error",
-        description: "Failed to create action plan",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const exportInsights = () => {
-    const csv = AIService.exportToCSV(filteredInsights);
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('hidden', '');
-    a.setAttribute('href', url);
-    a.setAttribute('download', `insights-${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    
-    toast({
-      title: "Export Complete",
-      description: "Insights have been exported to CSV",
-    });
-  };
-
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case "high": return "default";
-      case "medium": return "secondary";
-      case "low": return "outline";
-      default: return "outline";
+      case 'high':
+        return 'text-red-500 bg-red-50 border-red-200';
+      case 'medium':
+        return 'text-yellow-500 bg-yellow-50 border-yellow-200';
+      case 'low':
+        return 'text-green-500 bg-green-50 border-green-200';
+      default:
+        return 'text-gray-500 bg-gray-50 border-gray-200';
     }
   };
 
-  const categories = ["all", "Revenue", "Customer Experience", "Operations", "Growth", "Marketing"];
+  const getPriorityIcon = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return <AlertCircle className="h-4 w-4" />;
+      case 'medium':
+        return <Clock className="h-4 w-4" />;
+      case 'low':
+        return <CheckCircle className="h-4 w-4" />;
+      default:
+        return <Star className="h-4 w-4" />;
+    }
+  };
+
+  const categories = ["all", "business_opportunity", "risk_alert", "trend_analysis", "operational_insight"];
   const priorities = ["all", "high", "medium", "low"];
   
   // Calculate statistics
-  const stats = insights ? AIService.getInsightsStats(insights) : {
+  const stats = insights ? {
+    totalInsights: insights.length,
+    highPriorityCount: insights.filter(i => i.priority === 'high').length,
+    avgConfidence: insights.reduce((acc, i) => acc + (i.confidence || 0), 0) / insights.length || 0,
+    bookmarkedCount: 0
+  } : {
     totalInsights: 0,
     highPriorityCount: 0,
     avgConfidence: 0,
@@ -148,40 +98,27 @@ const AIInsights = () => {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">AI Insights</h1>
-          <p className="text-muted-foreground">
-            Real-time business intelligence powered by advanced AI analysis.
-          </p>
+          <p className="text-muted-foreground">Discover actionable insights from your data</p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={generateNewInsights} disabled={isGenerating}>
-            {isGenerating ? (
-              <>
-                <Brain className="h-4 w-4 mr-2 animate-pulse" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Brain className="h-4 w-4 mr-2" />
-                Generate New Insights
-              </>
-            )}
-          </Button>
-          <Button variant="hero" onClick={exportInsights}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" asChild>
+            <Link to="/upload">
+              <Plus className="h-4 w-4 mr-2" />
+              Upload Data
+            </Link>
           </Button>
         </div>
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
-            placeholder="Search insights, tags, or keywords..."
+            placeholder="Search insights..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -193,9 +130,9 @@ const AIInsights = () => {
             onChange={(e) => setFilterCategory(e.target.value)}
             className="px-3 py-2 border border-border rounded-lg bg-background text-sm"
           >
-            {categories.map(cat => (
-              <option key={cat} value={cat}>
-                {cat === "all" ? "All Categories" : cat}
+            {categories.map(category => (
+              <option key={category} value={category}>
+                {category === "all" ? "All Categories" : category.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </option>
             ))}
           </select>
@@ -247,7 +184,7 @@ const AIInsights = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Avg Confidence</p>
                 <p className="text-2xl font-bold">
-                  {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : `${stats.avgConfidence}%`}
+                  {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : `${(stats.avgConfidence * 100).toFixed(0)}%`}
                 </p>
               </div>
               <Target className="h-8 w-8 text-success" />
@@ -269,134 +206,93 @@ const AIInsights = () => {
         </Card>
       </div>
 
+      {/* Priority Tabs */}
+      <div className="flex space-x-4 mb-6">
+        {["high", "medium", "low"].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === tab
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)} Priority
+          </button>
+        ))}
+      </div>
+
       {/* Insights List */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <span className="ml-2 text-muted-foreground">Loading insights...</span>
         </div>
+      ) : filteredInsights.filter(i => i.priority === activeTab).length === 0 ? (
+        <div className="text-center py-12">
+          <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <p className="text-muted-foreground">No {activeTab} priority insights yet.</p>
+        </div>
       ) : (
-        <div className="space-y-6">
-          {filteredInsights.map((insight) => {
-            const isBookmarked = typeof insight.content === 'object' && 
-              'bookmarked' in insight.content && 
-              Boolean(insight.content.bookmarked);
-            
-            return (
-              <Card key={insight.id} className="hover:shadow-medium transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant={getPriorityColor(insight.priority || 'medium')}>
-                          {insight.priority || 'medium'} priority
-                        </Badge>
-                        <Badge variant="outline">{insight.industry_category || 'General'}</Badge>
-                        {insight.is_actionable && (
-                          <Badge variant="secondary">Actionable</Badge>
-                        )}
-                        <div className="flex items-center text-xs text-muted-foreground">
-                          <Target className="h-3 w-3 mr-1" />
-                          {insight.confidence_score || 0}% confidence
-                        </div>
-                      </div>
-                      <h3 className="text-xl font-semibold mb-2">{insight.title}</h3>
-                      <p className="text-muted-foreground mb-4">{insight.summary}</p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleBookmark(insight.id, isBookmarked)}
-                      >
-                        <Bookmark className={`h-4 w-4 ${isBookmarked ? 'fill-current' : ''}`} />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Share className="h-4 w-4" />
-                      </Button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredInsights
+            .filter(i => i.priority === activeTab)
+            .map((insight) => (
+              <Card key={insight.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <h2 className="text-lg font-semibold">{insight.title}</h2>
+                    <div className={`p-2 rounded-full ${getPriorityColor(insight.priority)}`}>
+                      {getPriorityIcon(insight.priority)}
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid md:grid-cols-3 gap-6">
-                    {/* Key Findings */}
-                    <div>
-                      <h4 className="font-medium mb-3 flex items-center">
-                        <BarChart3 className="h-4 w-4 mr-2 text-primary" />
-                        Key Findings
-                      </h4>
-                      <ul className="space-y-2">
-                        {insight.content.key_findings?.map((finding, index) => (
-                          <li key={index} className="text-sm text-muted-foreground flex items-start">
-                            <span className="w-1 h-1 bg-primary rounded-full mt-2 mr-2 flex-shrink-0"></span>
-                            {finding}
-                          </li>
+                  
+                  <p className="text-sm text-gray-500 mb-3">
+                    Confidence: {(insight.confidence * 100).toFixed(0)}%
+                  </p>
+
+                  {insight.findings && insight.findings.length > 0 && (
+                    <div className="mb-3">
+                      <h3 className="font-medium text-sm mb-2">Key Findings</h3>
+                      <ul className="list-disc ml-5 text-sm space-y-1">
+                        {insight.findings.map((finding: string, i: number) => (
+                          <li key={i} className="text-gray-600">{finding}</li>
                         ))}
                       </ul>
                     </div>
+                  )}
 
-                    {/* Recommendations */}
-                    <div>
-                      <h4 className="font-medium mb-3 flex items-center">
-                        <TrendingUp className="h-4 w-4 mr-2 text-success" />
-                        Recommendations
-                      </h4>
-                      <ul className="space-y-2">
-                        {insight.content.recommendations?.map((rec, index) => (
-                          <li key={index} className="text-sm text-muted-foreground flex items-start">
-                            <span className="w-1 h-1 bg-success rounded-full mt-2 mr-2 flex-shrink-0"></span>
-                            {rec}
-                          </li>
+                  {insight.recommendations && insight.recommendations.length > 0 && (
+                    <div className="mb-3">
+                      <h3 className="font-medium text-sm mb-2">Recommendations</h3>
+                      <ul className="list-disc ml-5 text-sm space-y-1">
+                        {insight.recommendations.map((rec: string, i: number) => (
+                          <li key={i} className="text-gray-600">{rec}</li>
                         ))}
                       </ul>
                     </div>
+                  )}
 
-                    {/* Impact & Metadata */}
-                    <div>
-                      <h4 className="font-medium mb-3 flex items-center">
-                        <Target className="h-4 w-4 mr-2 text-warning" />
-                        Projected Impact
-                      </h4>
-                      <p className="text-sm text-muted-foreground mb-4">{insight.content.projected_impact}</p>
-                      
-                      <div className="space-y-2 text-xs text-muted-foreground">
-                        <div className="flex items-center">
-                          <Clock className="h-3 w-3 mr-2" />
-                          {new Date(insight.created_at).toLocaleDateString()}
-                        </div>
-                        <div className="flex items-center">
-                          <FileText className="h-3 w-3 mr-2" />
-                          AI Generated
-                        </div>
-                      </div>
+                  {insight.projected_impact && (
+                    <div className="mt-3 pt-3 border-t">
+                      <p className="text-sm italic text-gray-600">
+                        {insight.projected_impact}
+                      </p>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Tags */}
-                  <div className="mt-4 pt-4 border-t border-border">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {insight.content.tags?.map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-xs">
-                            #{tag}
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm">
-                          View Details
-                        </Button>
-                        <Button size="sm" onClick={() => handleCreateActionPlan(insight)}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Action Plan
-                        </Button>
-                      </div>
-                    </div>
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                    <span className="text-xs text-gray-500">
+                      {new Date(insight.created_at).toLocaleDateString()}
+                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {insight.category}
+                    </Badge>
                   </div>
                 </CardContent>
               </Card>
-            );
-          })}
+            ))}
         </div>
       )}
 

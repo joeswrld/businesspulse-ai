@@ -1,254 +1,183 @@
-# NoteX - AI-Powered Business Intelligence Platform
+# Supabase CLI
 
-NoteX transforms your company data into actionable, quantified insights in real-time using AI, vector search, and real-time analytics.
+[![Coverage Status](https://coveralls.io/repos/github/supabase/cli/badge.svg?branch=main)](https://coveralls.io/github/supabase/cli?branch=main) [![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/supabase-cli/setup-cli/master?style=flat-square&label=Bitbucket%20Canary)](https://bitbucket.org/supabase-cli/setup-cli/pipelines) [![Gitlab Pipeline Status](https://img.shields.io/gitlab/pipeline-status/sweatybridge%2Fsetup-cli?label=Gitlab%20Canary)
+](https://gitlab.com/sweatybridge/setup-cli/-/pipelines)
 
-## 🚀 Features
+[Supabase](https://supabase.io) is an open source Firebase alternative. We're building the features of Firebase using enterprise-grade open source tools.
 
-- **Real-time AI Insights**: Instant analysis of uploaded data using Gemini API
-- **Vector Search**: Semantic search across documents using pgvector
-- **Live Dashboard**: Real-time updates via Supabase Realtime
-- **Multi-format Support**: CSV, XLSX, PDF, DOCX, TXT, and API sources
-- **Team Collaboration**: Shared insights and action plans
-- **Advanced Analytics**: Trend analysis and business intelligence
-- **Paystack Integration**: Seamless subscription management
-- **Production Ready**: Built with security, scalability, and performance in mind
+This repository contains all the functionality for Supabase CLI.
 
-## 🏗️ Architecture
+- [x] Running Supabase locally
+- [x] Managing database migrations
+- [x] Creating and deploying Supabase Functions
+- [x] Generating types directly from your database schema
+- [x] Making authenticated HTTP requests to [Management API](https://supabase.com/docs/reference/api/introduction)
 
-- **Frontend**: React + TypeScript + Tailwind CSS + shadcn/ui
-- **Backend**: Supabase (Auth, Database, Storage, Realtime, Edge Functions)
-- **AI Engine**: Google Gemini API for insights generation
-- **Vector Search**: pgvector extension in Supabase
-- **Billing**: Paystack for subscription management
-- **Real-time**: Supabase Realtime for live updates
+## Getting started
 
-## 📋 Prerequisites
+### Install the CLI
 
-- Node.js 18+ and npm/yarn
-- Supabase account and project
-- Google Gemini API key
-- Paystack account and API keys
-- Git
-
-## 🛠️ Setup Instructions
-
-### 1. Clone and Install Dependencies
+Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
 
 ```bash
-git clone <repository-url>
-cd notex
-npm install
+npm i supabase --save-dev
 ```
 
-### 2. Environment Configuration
-
-Create a `.env.local` file in the root directory:
-
-```env
-# Supabase Configuration
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-
-# Gemini API
-VITE_GEMINI_API_KEY=your-gemini-api-key
-
-# Paystack Configuration
-VITE_PAYSTACK_PUBLIC_KEY=your-paystack-public-key
-```
-
-### 3. Supabase Setup
-
-#### 3.1 Create Supabase Project
-
-1. Go to [supabase.com](https://supabase.com) and create a new project
-2. Note down your project URL and anon key
-
-#### 3.2 Run Database Migrations
+To install the beta release channel:
 
 ```bash
-# Install Supabase CLI
-npm install -g supabase
-
-# Login to Supabase
-supabase login
-
-# Link your project
-supabase link --project-ref your-project-ref
-
-# Run migrations
-supabase db push
+npm i supabase@beta --save-dev
 ```
 
-#### 3.3 Configure Storage Buckets
+When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.
 
-The migrations will automatically create the required storage buckets:
-- `data-files`: For uploaded documents
-- `reports`: For generated reports
-
-#### 3.4 Set Environment Variables in Supabase
-
-Go to your Supabase project dashboard → Settings → Edge Functions and set:
-
-```env
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-GEMINI_API_KEY=your-gemini-api-key
-PAYSTACK_SECRET_KEY=your-paystack-secret-key
-PAYSTACK_PUBLIC_KEY=your-paystack-public-key
+```
+NODE_OPTIONS=--no-experimental-fetch yarn add supabase
 ```
 
-### 4. Deploy Edge Functions
+> **Note**
+For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
+
+<details>
+  <summary><b>macOS</b></summary>
+
+  Available via [Homebrew](https://brew.sh). To install:
+
+  ```sh
+  brew install supabase/tap/supabase
+  ```
+
+  To install the beta release channel:
+  
+  ```sh
+  brew install supabase/tap/supabase-beta
+  brew link --overwrite supabase-beta
+  ```
+  
+  To upgrade:
+
+  ```sh
+  brew upgrade supabase
+  ```
+</details>
+
+<details>
+  <summary><b>Windows</b></summary>
+
+  Available via [Scoop](https://scoop.sh). To install:
+
+  ```powershell
+  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+  scoop install supabase
+  ```
+
+  To upgrade:
+
+  ```powershell
+  scoop update supabase
+  ```
+</details>
+
+<details>
+  <summary><b>Linux</b></summary>
+
+  Available via [Homebrew](https://brew.sh) and Linux packages.
+
+  #### via Homebrew
+
+  To install:
+
+  ```sh
+  brew install supabase/tap/supabase
+  ```
+
+  To upgrade:
+
+  ```sh
+  brew upgrade supabase
+  ```
+
+  #### via Linux packages
+
+  Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
+
+  ```sh
+  sudo apk add --allow-untrusted <...>.apk
+  ```
+
+  ```sh
+  sudo dpkg -i <...>.deb
+  ```
+
+  ```sh
+  sudo rpm -i <...>.rpm
+  ```
+
+  ```sh
+  sudo pacman -U <...>.pkg.tar.zst
+  ```
+</details>
+
+<details>
+  <summary><b>Other Platforms</b></summary>
+
+  You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
+
+  ```sh
+  go install github.com/supabase/cli@latest
+  ```
+
+  Add a symlink to the binary in `$PATH` for easier access:
+
+  ```sh
+  ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
+  ```
+
+  This works on other non-standard Linux distros.
+</details>
+
+<details>
+  <summary><b>Community Maintained Packages</b></summary>
+
+  Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
+  To install in your working directory:
+
+  ```bash
+  pkgx install supabase
+  ```
+
+  Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
+</details>
+
+### Run the CLI
 
 ```bash
-# Deploy all Edge Functions
-supabase functions deploy
-
-# Or deploy individually
-supabase functions deploy process-upload
-supabase functions deploy generate-report
-supabase functions deploy paystack-webhook
+supabase bootstrap
 ```
 
-### 5. Configure Paystack Webhooks
-
-1. Go to your Paystack dashboard → Settings → Webhooks
-2. Add webhook URL: `https://your-project.supabase.co/functions/v1/paystack-webhook`
-3. Select events: `charge.success`, `subscription.create`, `subscription.update`, `subscription.disable`, `invoice.payment_failed`
-
-### 6. Start Development Server
+Or using npx:
 
 ```bash
-npm run dev
+npx supabase bootstrap
 ```
 
-Visit `http://localhost:5173` to see your application.
+The bootstrap command will guide you through the process of setting up a Supabase project using one of the [starter](https://github.com/supabase-community/supabase-samples/blob/main/samples.json) templates.
 
-## 🗄️ Database Schema
+## Docs
 
-The application uses the following core tables:
+Command & config reference can be found [here](https://supabase.com/docs/reference/cli/about).
 
-- **`data_sources`**: Uploaded files and data sources
-- **`normalized_docs`**: Processed and cleaned documents
-- **`doc_chunks`**: Document chunks with vector embeddings
-- **`ai_insights`**: Generated AI insights and recommendations
-- **`ai_insights_feedback`**: User feedback on insights
-- **`action_plans`**: Action plans created from insights
-- **`analytics_daily`**: Daily aggregated analytics
-- **`user_subscriptions`**: User subscription status
-- **`paystack_webhooks`**: Webhook event tracking
+## Breaking changes
 
-## 🔐 Security Features
+We follow semantic versioning for changes that directly impact CLI commands, flags, and configurations.
 
-- **Row Level Security (RLS)**: All data is scoped to user's team
-- **JWT Authentication**: Secure user sessions via Supabase Auth
-- **Signed URLs**: Secure file access with expiration
-- **Webhook Verification**: Paystack webhook signature validation
-- **Least Privilege**: Minimal required permissions for each operation
+However, due to dependencies on other service images, we cannot guarantee that schema migrations, seed.sql, and generated types will always work for the same CLI major version. If you need such guarantees, we encourage you to pin a specific version of CLI in package.json.
 
-## 📊 AI Pipeline
+## Developing
 
-1. **Data Upload**: Files uploaded to Supabase Storage
-2. **Processing**: Edge Function processes and normalizes content
-3. **Chunking**: Content split into semantic chunks
-4. **Embeddings**: Vector embeddings generated using Gemini
-5. **Insight Generation**: AI analyzes content and generates insights
-6. **Real-time Updates**: UI updates instantly via Supabase Realtime
+To run from source:
 
-## 🚀 Production Deployment
-
-### Vercel Deployment
-
-1. Connect your repository to Vercel
-2. Set environment variables in Vercel dashboard
-3. Deploy
-
-### Environment Variables for Production
-
-```env
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-VITE_GEMINI_API_KEY=your-gemini-api-key
-VITE_PAYSTACK_PUBLIC_KEY=your-paystack-public-key
+```sh
+# Go >= 1.22
+go run . help
 ```
-
-## 🔧 Development
-
-### Available Scripts
-
-```bash
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run preview      # Preview production build
-npm run lint         # Run ESLint
-```
-
-### Project Structure
-
-```
-src/
-├── components/       # Reusable UI components
-├── pages/           # Application pages
-├── contexts/        # React contexts
-├── hooks/           # Custom React hooks
-├── lib/             # Utility libraries and services
-├── integrations/    # Third-party integrations
-└── assets/          # Static assets
-
-supabase/
-├── functions/       # Edge Functions
-├── migrations/      # Database migrations
-└── config.toml     # Supabase configuration
-```
-
-## 🧪 Testing
-
-```bash
-# Run tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-```
-
-## 📝 API Documentation
-
-### Edge Functions
-
-- **`/api/process-upload`**: Process uploaded files and generate insights
-- **`/api/generate-report`**: Generate PDF/CSV reports from insights
-- **`/api/paystack-webhook`**: Handle Paystack webhook events
-
-### Authentication
-
-All protected routes require valid JWT tokens from Supabase Auth.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🆘 Support
-
-For support and questions:
-
-1. Check the [Issues](https://github.com/your-repo/notex/issues) page
-2. Create a new issue with detailed description
-3. Contact the development team
-
-## 🔄 Updates and Maintenance
-
-- **Regular Updates**: Keep dependencies updated
-- **Security Patches**: Monitor for security updates
-- **Performance Monitoring**: Use Supabase dashboard for monitoring
-- **Backup**: Regular database backups via Supabase
-
----
-
-Built with ❤️ using modern web technologies and AI capabilities.
