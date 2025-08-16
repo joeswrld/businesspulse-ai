@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS data_sources (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  type TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('file', 'api', 'text')),
   file_size INTEGER,
   file_url TEXT,
   metadata JSONB DEFAULT '{}',

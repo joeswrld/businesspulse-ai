@@ -64,29 +64,15 @@ const DataUpload = () => {
         const { data: textDataSource, error: textError } = await supabase.from('data_sources').insert({
           user_id: user?.id,
           name: 'Text Input',
-          type: 'analytics', // Use valid ENUM value
+          type: 'text', // Use valid ENUM value from constraint
           status: 'processing',
           metadata: { content: textInput }
         }).select().single();
 
-        if (textError) {
-          // If analytics fails, try with 'feedback' as fallback
-          const { data: fallbackDataSource, error: fallbackError } = await supabase.from('data_sources').insert({
-            user_id: user?.id,
-            name: 'Text Input',
-            type: 'feedback', // Fallback ENUM value
-            status: 'processing',
-            metadata: { content: textInput }
-          }).select().single();
-
-          if (fallbackError) throw fallbackError;
-          
-          // Trigger AI processing for text input
-          await processDataSource(fallbackDataSource.id, 'text/plain', undefined, textInput);
-        } else {
-          // Trigger AI processing for text input
-          await processDataSource(textDataSource.id, 'text/plain', undefined, textInput);
-        }
+        if (textError) throw textError;
+        
+        // Trigger AI processing for text input
+        await processDataSource(textDataSource.id, 'text/plain', undefined, textInput);
         setUploadProgress(50);
       }
 
@@ -107,11 +93,15 @@ const DataUpload = () => {
           .from('data-files')
           .getPublicUrl(fileName);
 
-        // Determine file type for ENUM
-        let fileType = 'analytics'; // Default
-        if (file.type.includes('pdf')) fileType = 'feedback';
-        else if (file.type.includes('csv') || file.type.includes('excel')) fileType = 'analytics';
-        else if (file.type.includes('text')) fileType = 'feedback';
+        // Determine file type for ENUM - use allowed values from constraint
+        let fileType = 'file'; // Default to 'file' for most uploads
+        if (file.type.includes('text') || file.type.includes('txt')) {
+          fileType = 'text';
+        } else if (file.type.includes('api') || file.type.includes('json')) {
+          fileType = 'api';
+        } else {
+          fileType = 'file'; // Default for PDFs, CSVs, etc.
+        }
 
         // Create data source record with valid ENUM type
         const { data: fileDataSource, error: fileError } = await supabase.from('data_sources').insert({
@@ -173,50 +163,19 @@ const DataUpload = () => {
 
   const processDataSource = async (dataSourceId: string, fileType: string, fileUrl?: string, textContent?: string) => {
     try {
-      // Extract content from file or use text content
-      let content = textContent || '';
-      
-      if (fileUrl && !textContent) {
-        // Download file content
-        const response = await fetch(fileUrl);
-        if (response.ok) {
-          const buffer = await response.arrayBuffer();
-          const decoder = new TextDecoder();
-          content = decoder.decode(buffer);
-        }
-      }
-
-      if (!content.trim()) {
-        throw new Error('No content extracted from file');
-      }
-
-      // Call the generate-insights Edge Function
-      const { data, error } = await supabase.functions.invoke('generate-insights', {
+      // Call the generate_insights Edge Function
+      const { data, error } = await supabase.functions.invoke('generate_insights', {
         body: {
-          data_source_id: dataSourceId,
-          user_id: user?.id,
-          content: content
+          data_source_id: dataSourceId
         }
       });
 
       if (error) {
-        console.error('Error calling generate-insights:', error);
+        console.error('Error calling generate_insights:', error);
         throw error;
       }
 
       console.log('Insights generated:', data);
-
-      // Update data source status to completed
-      await supabase
-        .from('data_sources')
-        .update({ 
-          status: 'completed',
-          metadata: {
-            processed_at: new Date().toISOString(),
-            insights_generated: data?.data?.insights_generated || 0
-          }
-        })
-        .eq('id', dataSourceId);
 
     } catch (error) {
       console.error('Processing error:', error);
