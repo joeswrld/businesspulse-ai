@@ -38,37 +38,34 @@ serve(async (req) => {
 
     console.log('Generating insights for user:', user.id);
 
-    // Fetch user's data sources
-    const { data: dataSources, error: dataError } = await supabase
-      .from('data_sources')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('status', 'processed')
-      .order('created_at', { ascending: false })
-      .limit(5);
+    // Fetch user's data from multiple sources
+    const [dataSources, analyticsEvents, goals, userPrefs] = await Promise.all([
+      supabase.from('data_sources').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5),
+      supabase.from('analytics_events').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
+      supabase.from('goals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(5),
+      supabase.from('user_preferences').select('*').eq('user_id', user.id).limit(5)
+    ]);
 
-    if (dataError) {
-      console.error('Error fetching data sources:', dataError);
-      throw new Error('Failed to fetch user data');
+    // Collect all available data
+    const analysisData = {
+      user_id: user.id,
+      data_sources: dataSources.data || [],
+      analytics_events: analyticsEvents.data || [],
+      goals: goals.data || [],
+      user_preferences: userPrefs.data || [],
+      timestamp: new Date().toISOString()
+    };
+
+    // If no data exists, generate sample insights based on user profile
+    if (!analysisData.data_sources.length && !analysisData.analytics_events.length && !analysisData.goals.length) {
+      console.log('No user data found, generating sample insights');
+      analysisData.sample_user = {
+        id: user.id,
+        email: user.email,
+        created_at: user.created_at,
+        note: "Sample insights generated for new user with no data"
+      };
     }
-
-    if (!dataSources || dataSources.length === 0) {
-      return new Response(JSON.stringify({ 
-        error: 'No processed data sources found. Please upload some data first.' 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Prepare data for Gemini analysis
-    const analysisData = dataSources.map(source => ({
-      name: source.name,
-      type: source.type,
-      metadata: source.metadata,
-      file_size: source.file_size,
-      created_at: source.created_at
-    }));
 
     // Call Gemini API
     const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiApiKey}`, {
@@ -152,7 +149,7 @@ serve(async (req) => {
           priority: insight.priority,
           confidence_score: insight.confidence,
           is_actionable: true,
-          data_source_id: dataSources[0]?.id
+          data_source_id: analysisData.data_sources[0]?.id || null
         })
         .select()
         .single();
