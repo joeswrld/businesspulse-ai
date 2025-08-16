@@ -15,20 +15,24 @@ import {
   Clock,
   AlertCircle,
   X,
-  Plus
+  Plus,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRealtimeDataSources } from "@/hooks/useRealtime";
+import { useNavigate } from "react-router-dom";
 
 const DataUpload = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { data: dataSources, loading } = useRealtimeDataSources();
   
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -51,6 +55,7 @@ const DataUpload = () => {
     }
 
     setIsUploading(true);
+    setIsGenerating(false);
     setUploadProgress(0);
 
     try {
@@ -59,15 +64,29 @@ const DataUpload = () => {
         const { data: textDataSource, error: textError } = await supabase.from('data_sources').insert({
           user_id: user?.id,
           name: 'Text Input',
-          type: 'text/plain',
+          type: 'analytics', // Use valid ENUM value
           status: 'processing',
           metadata: { content: textInput }
         }).select().single();
 
-        if (textError) throw textError;
+        if (textError) {
+          // If analytics fails, try with 'feedback' as fallback
+          const { data: fallbackDataSource, error: fallbackError } = await supabase.from('data_sources').insert({
+            user_id: user?.id,
+            name: 'Text Input',
+            type: 'feedback', // Fallback ENUM value
+            status: 'processing',
+            metadata: { content: textInput }
+          }).select().single();
 
-        // Trigger AI processing for text input
-        await processDataSource(textDataSource.id, 'text/plain', undefined, textInput);
+          if (fallbackError) throw fallbackError;
+          
+          // Trigger AI processing for text input
+          await processDataSource(fallbackDataSource.id, 'text/plain', undefined, textInput);
+        } else {
+          // Trigger AI processing for text input
+          await processDataSource(textDataSource.id, 'text/plain', undefined, textInput);
+        }
         setUploadProgress(50);
       }
 
@@ -88,17 +107,34 @@ const DataUpload = () => {
           .from('data-files')
           .getPublicUrl(fileName);
 
-        // Create data source record
+        // Determine file type for ENUM
+        let fileType = 'analytics'; // Default
+        if (file.type.includes('pdf')) fileType = 'feedback';
+        else if (file.type.includes('csv') || file.type.includes('excel')) fileType = 'analytics';
+        else if (file.type.includes('text')) fileType = 'feedback';
+
+        // Create data source record with valid ENUM type
         const { data: fileDataSource, error: fileError } = await supabase.from('data_sources').insert({
           user_id: user?.id,
           name: file.name,
-          type: file.type,
+          type: fileType,
           file_size: file.size,
           file_url: urlData.publicUrl,
           status: 'processing'
         }).select().single();
 
-        if (fileError) throw fileError;
+        if (fileError) {
+          // If the type is invalid, show error
+          if (fileError.message.includes('type_check')) {
+            toast({
+              title: "Invalid data type",
+              description: "Please select a valid category.",
+              variant: "destructive"
+            });
+            throw new Error("Invalid data type. Please select a valid category.");
+          }
+          throw fileError;
+        }
 
         // Trigger AI processing for file
         await processDataSource(fileDataSource.id, file.type, urlData.publicUrl);
@@ -106,19 +142,21 @@ const DataUpload = () => {
         setUploadProgress(50 + ((i + 1) / selectedFiles.length) * 50);
       }
 
+      // Start AI generation
+      setIsGenerating(true);
       toast({
         title: "Upload successful",
-        description: "Your data is being processed by AI."
+        description: "Generating insights from your data..."
       });
 
       setSelectedFiles([]);
       setTextInput("");
       setUploadProgress(100);
 
+      // Redirect to insights page after a short delay
       setTimeout(() => {
-        setUploadProgress(0);
-        setIsUploading(false);
-      }, 1000);
+        navigate('/ai-insights');
+      }, 2000);
 
     } catch (error) {
       console.error('Upload error:', error);
@@ -128,34 +166,57 @@ const DataUpload = () => {
         variant: "destructive"
       });
       setIsUploading(false);
+      setIsGenerating(false);
       setUploadProgress(0);
     }
   };
 
   const processDataSource = async (dataSourceId: string, fileType: string, fileUrl?: string, textContent?: string) => {
     try {
-      // Call the Edge Function to process the data
-      const response = await fetch('/api/process-upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        },
-        body: JSON.stringify({
-          data_source_id: dataSourceId,
-          user_id: user?.id,
-          file_url: fileUrl,
-          file_type: fileType,
-          text_content: textContent
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to process data');
+      // Extract content from file or use text content
+      let content = textContent || '';
+      
+      if (fileUrl && !textContent) {
+        // Download file content
+        const response = await fetch(fileUrl);
+        if (response.ok) {
+          const buffer = await response.arrayBuffer();
+          const decoder = new TextDecoder();
+          content = decoder.decode(buffer);
+        }
       }
 
-      const result = await response.json();
-      console.log('Processing result:', result);
+      if (!content.trim()) {
+        throw new Error('No content extracted from file');
+      }
+
+      // Call the generate-insights Edge Function
+      const { data, error } = await supabase.functions.invoke('generate-insights', {
+        body: {
+          data_source_id: dataSourceId,
+          user_id: user?.id,
+          content: content
+        }
+      });
+
+      if (error) {
+        console.error('Error calling generate-insights:', error);
+        throw error;
+      }
+
+      console.log('Insights generated:', data);
+
+      // Update data source status to completed
+      await supabase
+        .from('data_sources')
+        .update({ 
+          status: 'completed',
+          metadata: {
+            processed_at: new Date().toISOString(),
+            insights_generated: data?.data?.insights_generated || 0
+          }
+        })
+        .eq('id', dataSourceId);
 
     } catch (error) {
       console.error('Processing error:', error);
@@ -262,8 +323,20 @@ const DataUpload = () => {
             </CardContent>
           </Card>
 
-          <Button onClick={handleUpload} disabled={isUploading} className="w-full" size="lg">
-            {isUploading ? "Processing..." : "Upload & Analyze"}
+          <Button onClick={handleUpload} disabled={isUploading || isGenerating} className="w-full" size="lg">
+            {isUploading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Uploading...
+              </>
+            ) : isGenerating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating insights...
+              </>
+            ) : (
+              "Upload & Analyze"
+            )}
           </Button>
         </div>
 

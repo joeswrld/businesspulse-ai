@@ -3,29 +3,42 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Specific hooks for each table to avoid TypeScript issues
-export function useRealtimeInsights() {
+export const useRealtimeInsights = () => {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user) return;
-
-    const fetchData = async () => {
-      const { data: insights, error } = await supabase
-        .from('ai_insights')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (!error && insights) {
-        setData(insights);
-      }
+    if (!user) {
+      setData([]);
       setLoading(false);
+      return;
+    }
+
+    // Initial fetch
+    const fetchInsights = async () => {
+      try {
+        const { data: insights, error } = await supabase
+          .from('insights')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching insights:', error);
+        } else {
+          setData(insights || []);
+        }
+      } catch (error) {
+        console.error('Error in fetchInsights:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    fetchData();
+    fetchInsights();
 
+    // Set up real-time subscription
     const channel = supabase
       .channel('insights-changes')
       .on(
@@ -33,22 +46,19 @@ export function useRealtimeInsights() {
         {
           event: '*',
           schema: 'public',
-          table: 'ai_insights',
+          table: 'insights',
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
+          console.log('Insights real-time update:', payload);
           if (payload.eventType === 'INSERT') {
             setData(prev => [payload.new, ...prev]);
           } else if (payload.eventType === 'UPDATE') {
-            setData(prev => 
-              prev.map(item => 
-                item.id === payload.new.id ? payload.new : item
-              )
-            );
+            setData(prev => prev.map(item => 
+              item.id === payload.new.id ? payload.new : item
+            ));
           } else if (payload.eventType === 'DELETE') {
-            setData(prev => 
-              prev.filter(item => item.id !== payload.old.id)
-            );
+            setData(prev => prev.filter(item => item.id !== payload.old.id));
           }
         }
       )
@@ -59,8 +69,8 @@ export function useRealtimeInsights() {
     };
   }, [user]);
 
-  return { data, loading, setData };
-}
+  return { data, loading };
+};
 
 export function useRealtimeDataSources() {
   const [data, setData] = useState<any[]>([]);
