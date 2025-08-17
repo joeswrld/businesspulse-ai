@@ -144,7 +144,7 @@ const DataUpload = () => {
 
       // Redirect to insights page after a short delay
       setTimeout(() => {
-        navigate('/ai-insights');
+        navigate('/insights');
       }, 2000);
 
     } catch (error) {
