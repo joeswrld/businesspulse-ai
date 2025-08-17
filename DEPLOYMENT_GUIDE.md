@@ -52,6 +52,65 @@ SELECT * FROM storage.buckets WHERE id = 'uploads';
 SELECT * FROM storage.policies WHERE bucket_id = 'uploads';
 ```
 
+## 🚨 IMPORTANT: Create Uploads Bucket
+
+The most common issue is the "bucket not found" error. Here's how to fix it:
+
+### Option 1: Manual Creation (Recommended)
+1. Go to your **Supabase Dashboard**
+2. Navigate to **Storage > Buckets**
+3. Click **"New Bucket"**
+4. Set bucket name: `uploads`
+5. Set **Public**: `false` (for security)
+6. Click **"Create bucket"**
+
+### Option 2: Automatic Creation via Script
+```bash
+# Set environment variables
+export VITE_SUPABASE_URL=your_supabase_url
+export SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Run the bucket creation script
+node scripts/create-uploads-bucket.js
+```
+
+### Option 3: SQL Commands
+Run these in your Supabase SQL Editor:
+
+```sql
+-- Create the uploads bucket
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('uploads', 'uploads', false)
+ON CONFLICT (id) DO NOTHING;
+
+-- Create storage policies for uploads bucket
+CREATE POLICY "Users can upload their own files"
+ON storage.objects
+FOR INSERT
+WITH CHECK (bucket_id = 'uploads' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+CREATE POLICY "Users can view their own files"
+ON storage.objects
+FOR SELECT
+USING (bucket_id = 'uploads' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+CREATE POLICY "Users can update their own files"
+ON storage.objects
+FOR UPDATE
+USING (bucket_id = 'uploads' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+CREATE POLICY "Users can delete their own files"
+ON storage.objects
+FOR DELETE
+USING (bucket_id = 'uploads' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+-- Allow service role to access all files for processing
+CREATE POLICY "Service role can access all files"
+ON storage.objects
+FOR ALL
+USING (bucket_id = 'uploads' AND auth.role() = 'service_role');
+```
+
 ## Edge Function Deployment
 
 ### 1. Deploy Edge Function
@@ -129,7 +188,15 @@ In Vercel dashboard, set:
 
 ### Common Issues
 
-#### 1. File Upload Fails
+#### 1. "Bucket not found" Error
+**Symptoms**: File upload fails with "bucket not found" error
+**Solutions**:
+- ✅ **Create the uploads bucket manually** in Supabase Dashboard
+- ✅ **Run the bucket creation script**: `node scripts/create-uploads-bucket.js`
+- ✅ **Execute SQL commands** in Supabase SQL Editor
+- ✅ **Check bucket name** matches exactly: `uploads`
+
+#### 2. File Upload Fails
 **Symptoms**: File upload button doesn't work or shows error
 **Solutions**:
 - Check Supabase storage bucket exists
@@ -137,7 +204,7 @@ In Vercel dashboard, set:
 - Check file size limits (10MB max)
 - Ensure user is authenticated
 
-#### 2. No Insights Generated
+#### 3. No Insights Generated
 **Symptoms**: Upload succeeds but no insights appear
 **Solutions**:
 - Check Gemini API key is configured
@@ -145,7 +212,7 @@ In Vercel dashboard, set:
 - Check Edge Function logs for errors
 - Ensure content is substantial enough for analysis
 
-#### 3. Real-time Not Working
+#### 4. Real-time Not Working
 **Symptoms**: Insights don't appear automatically
 **Solutions**:
 - Check Supabase Realtime is enabled
@@ -153,7 +220,7 @@ In Vercel dashboard, set:
 - Check network connectivity
 - Ensure user authentication is valid
 
-#### 4. Edge Function Errors
+#### 5. Edge Function Errors
 **Symptoms**: 500 errors or function timeouts
 **Solutions**:
 - Check function logs in Supabase Dashboard
@@ -185,6 +252,13 @@ console.log('Supabase client:', supabase);
 ```bash
 # View function logs
 npx supabase functions logs process-upload-to-insights
+```
+
+#### 5. Verify Bucket Setup
+```bash
+# Check if bucket exists
+curl -X GET "https://your-project.supabase.co/storage/v1/bucket/list" \
+  -H "Authorization: Bearer your_service_role_key"
 ```
 
 ## Performance Optimization
@@ -274,3 +348,16 @@ If issues arise, you can rollback by:
 4. Reverting frontend changes
 
 The upload functionality is designed to be non-breaking and can be safely disabled if needed.
+
+## Quick Fix Checklist
+
+If uploads aren't working, check these in order:
+
+- [ ] **Uploads bucket exists** in Supabase Storage
+- [ ] **RLS policies** are set up for the uploads bucket
+- [ ] **Edge Function** is deployed and working
+- [ ] **Environment variables** are configured
+- [ ] **User is authenticated** before upload
+- [ ] **File type** is supported (CSV, PDF, DOCX, TXT)
+- [ ] **File size** is under 10MB
+- [ ] **Gemini API key** is valid and has quota

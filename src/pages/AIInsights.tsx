@@ -109,6 +109,50 @@ const AIInsights = () => {
     }
   };
 
+  // Ensure uploads bucket exists
+  const ensureUploadsBucket = async () => {
+    try {
+      // Try to list buckets to check if uploads exists
+      const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+      
+      if (listError) {
+        console.error('Error listing buckets:', listError);
+        return false;
+      }
+
+      const uploadsBucket = buckets?.find(bucket => bucket.name === 'uploads');
+      
+      if (!uploadsBucket) {
+        toast({
+          title: "Setting up storage",
+          description: "Creating uploads bucket...",
+        });
+        
+        // Try to create the bucket (this requires service role, so it might fail on client)
+        const { error: createError } = await supabase.storage.createBucket('uploads', {
+          public: false,
+          allowedMimeTypes: ['text/csv', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'],
+          fileSizeLimit: 10485760 // 10MB
+        });
+
+        if (createError) {
+          console.error('Error creating bucket:', createError);
+          toast({
+            title: "Storage setup required",
+            description: "Please create an 'uploads' bucket in your Supabase dashboard under Storage > Buckets.",
+            variant: "destructive",
+          });
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error ensuring bucket:', error);
+      return false;
+    }
+  };
+
   const handleUpload = async () => {
     if (!uploadFile && !textInput.trim()) {
       toast({
@@ -137,7 +181,13 @@ const AIInsights = () => {
       // Upload file to Supabase Storage if provided
       if (uploadFile) {
         fileName = uploadFile.name;
-        const fileExt = uploadFile.name.split('.').pop();
+        
+        // Ensure bucket exists before upload
+        const bucketExists = await ensureUploadsBucket();
+        if (!bucketExists) {
+          throw new Error("Storage bucket not available. Please contact support.");
+        }
+
         const fileNameWithTimestamp = `${Date.now()}-${uploadFile.name}`;
         
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -148,7 +198,18 @@ const AIInsights = () => {
           });
 
         if (uploadError) {
-          throw uploadError;
+          console.error('Upload error:', uploadError);
+          
+          // Provide specific error messages
+          if (uploadError.message.includes('bucket')) {
+            throw new Error("Storage bucket not found. Please create an 'uploads' bucket in your Supabase dashboard.");
+          } else if (uploadError.message.includes('size')) {
+            throw new Error("File too large. Maximum size is 10MB.");
+          } else if (uploadError.message.includes('type')) {
+            throw new Error("File type not supported. Please upload CSV, PDF, DOCX, or TXT files.");
+          } else {
+            throw uploadError;
+          }
         }
 
         const { data: { publicUrl } } = supabase.storage
@@ -179,6 +240,11 @@ const AIInsights = () => {
         throw insertError;
       }
 
+      toast({
+        title: "Processing started",
+        description: "Your data is being analyzed. Insights will appear shortly.",
+      });
+
       // Trigger Edge Function to process upload and generate insights
       const { error: functionError } = await supabase.functions.invoke('process-upload-to-insights', {
         body: {
@@ -192,13 +258,11 @@ const AIInsights = () => {
 
       if (functionError) {
         console.error('Edge function error:', functionError);
-        // Don't throw here as the function might still process in background
+        toast({
+          title: "Processing started",
+          description: "Your data is being processed in the background. Insights will appear shortly.",
+        });
       }
-
-      toast({
-        title: "Upload successful",
-        description: "Your data is being processed. Insights will appear shortly.",
-      });
 
       // Reset form and close modal
       setUploadFile(null);
