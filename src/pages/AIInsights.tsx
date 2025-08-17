@@ -207,37 +207,34 @@ const AIInsights = () => {
     try {
       console.log('🚀 Starting insight generation:', { contentLength: content.length, source });
       
-      // Call Supabase Edge Function for streaming insights
-      // This uses the correct Supabase Edge Function endpoint
-      const response = await supabase.functions.invoke('stream-insights', {
-        body: {
+      // Call Next.js API route for insights (no Supabase Edge Function needed)
+      const response = await fetch('/api/generate-insights', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           content: content,
           source: source
-        }
+        })
       });
 
-      console.log('📥 Edge Function response:', response);
+      console.log('📥 API response status:', response.status);
 
-      if (response.error) {
-        console.error('❌ Edge Function error:', response.error);
-        throw new Error(response.error.message || 'Failed to generate insights');
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ API error:', errorData);
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      if (!response.data) {
-        console.error('❌ No data returned from Edge Function');
-        throw new Error('No data returned from analysis service');
-      }
-
-      // Check if the response indicates success
-      if (response.data.success === false) {
-        console.error('❌ Analysis failed:', response.data.error);
-        throw new Error(response.data.error || 'Analysis failed');
-      }
-
-      // Parse the streaming response
-      const result = response.data;
+      const result = await response.json();
       console.log('✅ Analysis result:', result);
       
+      if (!result.success) {
+        console.error('❌ Analysis failed:', result.error);
+        throw new Error(result.error || 'Analysis failed');
+      }
+
       // Update the insight with final data
       const finalInsight: LiveInsight = {
         ...newInsight,
