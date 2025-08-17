@@ -19,7 +19,7 @@ export const useRealtimeInsights = () => {
     const fetchInsights = async () => {
       try {
         const { data: insights, error } = await supabase
-          .from('insights')
+          .from('ai_insights')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
@@ -46,7 +46,7 @@ export const useRealtimeInsights = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'insights',
+          table: 'ai_insights',
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
