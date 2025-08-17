@@ -23,7 +23,7 @@ import {
   CheckCircle
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useRealtimeInsights } from "@/hooks/useRealtime";
+import { useAIInsights } from "@/hooks/useAIInsights";
 
 const AIInsights = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -33,25 +33,13 @@ const AIInsights = () => {
   const [filteredInsights, setFilteredInsights] = useState<any[]>([]);
   
   const { toast } = useToast();
-  const { data: insights, loading } = useRealtimeInsights();
+  const { insights, loading, stats, filterInsights, bookmarkInsight } = useAIInsights();
 
   // Filter insights based on search and filters
   useEffect(() => {
-    if (!insights) return;
-
-    const filtered = insights.filter(insight => {
-      const matchesSearch = searchTerm === "" || 
-        insight.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        insight.projected_impact?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesPriority = filterPriority === "all" || insight.priority === filterPriority;
-      const matchesCategory = filterCategory === "all" || insight.category === filterCategory;
-      
-      return matchesSearch && matchesPriority && matchesCategory;
-    });
-
+    const filtered = filterInsights(searchTerm, filterCategory, filterPriority);
     setFilteredInsights(filtered);
-  }, [insights, searchTerm, filterPriority, filterCategory]);
+  }, [insights, searchTerm, filterPriority, filterCategory, filterInsights]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -79,21 +67,8 @@ const AIInsights = () => {
     }
   };
 
-  const categories = ["all", "business_opportunity", "risk_alert", "trend_analysis", "operational_insight"];
+  const categories = ["all", "Customer Experience", "Revenue", "Operations", "Growth", "business_opportunity", "risk_alert", "trend_analysis", "operational_insight"];
   const priorities = ["all", "high", "medium", "low"];
-  
-  // Calculate statistics
-  const stats = insights ? {
-    totalInsights: insights.length,
-    highPriorityCount: insights.filter(i => i.priority === 'High').length,
-    avgConfidence: insights.reduce((acc, i) => acc + (i.confidence_score || 0), 0) / insights.length || 0,
-    bookmarkedCount: 0
-  } : {
-    totalInsights: 0,
-    highPriorityCount: 0,
-    avgConfidence: 0,
-    bookmarkedCount: 0
-  };
 
   return (
     <div className="space-y-6">
@@ -237,7 +212,7 @@ const AIInsights = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredInsights
-            .filter(i => i.priority === activeTab.charAt(0).toUpperCase() + activeTab.slice(1))
+            .filter(i => i.priority?.toLowerCase() === activeTab)
             .map((insight) => (
               <Card key={insight.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
@@ -249,14 +224,14 @@ const AIInsights = () => {
                   </div>
                   
                   <p className="text-sm text-gray-500 mb-3">
-                    Confidence: {(insight.confidence_score * 100).toFixed(0)}% | {insight.summary}
+                    Confidence: {((insight.confidence || 0) * 100).toFixed(0)}% | {insight.summary}
                   </p>
 
-                  {insight.findings && insight.findings.length > 0 && (
+                  {insight.key_findings && insight.key_findings.length > 0 && (
                     <div className="mb-3">
                       <h3 className="font-medium text-sm mb-2">Key Findings</h3>
                       <ul className="list-disc ml-5 text-sm space-y-1">
-                        {insight.findings.map((finding: string, i: number) => (
+                        {insight.key_findings.map((finding: string, i: number) => (
                           <li key={i} className="text-gray-600">{finding}</li>
                         ))}
                       </ul>
@@ -265,7 +240,7 @@ const AIInsights = () => {
 
                   {insight.recommendations && insight.recommendations.length > 0 && (
                     <div className="mb-3">
-                      <h3 className="font-medium text-sm mb-2">Recommendations</h3>
+                      <h3 className="text-sm mb-2">Recommendations</h3>
                       <ul className="list-disc ml-5 text-sm space-y-1">
                         {insight.recommendations.map((rec: string, i: number) => (
                           <li key={i} className="text-gray-600">{rec}</li>
@@ -286,9 +261,30 @@ const AIInsights = () => {
                     <span className="text-xs text-gray-500">
                       {new Date(insight.created_at).toLocaleDateString()}
                     </span>
-                    <Badge variant="outline" className="text-xs">
-                      {insight.insight_type || insight.category}
-                    </Badge>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => bookmarkInsight(insight.id, !insight.tags?.includes('bookmarked'))}
+                        className="p-1 h-auto"
+                      >
+                        <Bookmark 
+                          className={`h-4 w-4 ${
+                            insight.tags?.includes('bookmarked') 
+                              ? 'text-yellow-500 fill-current' 
+                              : 'text-gray-400'
+                          }`} 
+                        />
+                      </Button>
+                      <Badge variant="outline" className="text-xs">
+                        {insight.category}
+                      </Badge>
+                      {insight.source && (
+                        <Badge variant="secondary" className="text-xs">
+                          {insight.source}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
