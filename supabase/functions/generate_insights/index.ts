@@ -117,7 +117,7 @@ serve(async (req) => {
     const savedInsights = [];
     for (const insight of insights) {
       const { data: insightData, error } = await supabase
-        .from('insights')
+        .from('ai_insights')
         .insert({
           source_id: data_source_id,
           user_id: dataSource.user_id,

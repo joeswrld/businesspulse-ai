@@ -224,7 +224,7 @@ export default function DataUploadRealTime() {
         description: "Insights will appear on the AI Insights page shortly.",
       });
 
-      // Redirect to insights page after a short delay
+      // Redirect to ai-insights page after a short delay
       setTimeout(() => {
         navigate('/ai-insights');
       }, 2000);

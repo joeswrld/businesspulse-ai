@@ -44,8 +44,8 @@ This document provides a complete implementation of a real-time Data Upload page
 Run this SQL in your Supabase Dashboard:
 
 ```sql
--- Create insights table
-CREATE TABLE IF NOT EXISTS insights (
+-- Create ai_insights table
+CREATE TABLE IF NOT EXISTS ai_insights (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   source_id UUID REFERENCES data_sources(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -60,9 +60,9 @@ CREATE TABLE IF NOT EXISTS insights (
 );
 
 -- Enable RLS and realtime
-ALTER TABLE insights ENABLE ROW LEVEL SECURITY;
-ALTER TABLE insights REPLICA IDENTITY FULL;
-ALTER PUBLICATION supabase_realtime ADD TABLE insights;
+ALTER TABLE ai_insights ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_insights REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE ai_insights;
 ```
 
 ### **Step 2: Deploy Edge Function**
@@ -168,11 +168,11 @@ const typeMapping = {
 ```typescript
 // Supabase realtime setup
 const channel = supabase
-  .channel('insights-realtime')
+  .channel('ai-insights-realtime')
   .on('postgres_changes', {
     event: 'INSERT',
     schema: 'public',
-    table: 'insights',
+    table: 'ai_insights',
     filter: `user_id=eq.${user.id}`
   }, (payload) => {
     // Add new insight to UI

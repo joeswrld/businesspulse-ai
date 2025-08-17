@@ -54,7 +54,7 @@ export default function AIInsightsRealTime() {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'insights',
+          table: 'ai_insights',
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
@@ -71,7 +71,7 @@ export default function AIInsightsRealTime() {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'insights',
+          table: 'ai_insights',
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
@@ -91,7 +91,7 @@ export default function AIInsightsRealTime() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('insights')
+        .from('ai_insights')
         .select('*')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
