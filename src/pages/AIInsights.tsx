@@ -25,12 +25,28 @@ import {
   Upload,
   X,
   FileUp,
-  MessageSquare
+  MessageSquare,
+  Sparkles
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAIInsights } from "@/hooks/useAIInsights";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+
+interface LiveInsight {
+  id: string;
+  title: string;
+  content: string;
+  priority: "High" | "Medium" | "Low";
+  confidence: number;
+  category: string;
+  key_findings: string[];
+  recommendations: string[];
+  projected_impact: string;
+  source: string;
+  isStreaming: boolean;
+  createdAt: Date;
+}
 
 const AIInsights = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -43,6 +59,8 @@ const AIInsights = () => {
   const [textInput, setTextInput] = useState("");
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [liveInsights, setLiveInsights] = useState<LiveInsight[]>([]);
+  const [streamingInsight, setStreamingInsight] = useState<LiveInsight | null>(null);
   
   const { toast } = useToast();
   const { insights, loading, stats, filterInsights, bookmarkInsight } = useAIInsights();
@@ -109,47 +127,123 @@ const AIInsights = () => {
     }
   };
 
-  // Ensure uploads bucket exists
-  const ensureUploadsBucket = async () => {
+  // Extract text content from file
+  const extractFileContent = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        resolve(content);
+      };
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  };
+
+  // Stream insights from Gemini AI
+  const streamInsights = async (content: string, source: string) => {
+    const insightId = `live-${Date.now()}`;
+    
+    // Create initial streaming insight
+    const newInsight: LiveInsight = {
+      id: insightId,
+      title: "Analyzing...",
+      content: "",
+      priority: "Medium",
+      confidence: 0,
+      category: "Operations",
+      key_findings: [],
+      recommendations: [],
+      projected_impact: "",
+      source: source,
+      isStreaming: true,
+      createdAt: new Date()
+    };
+
+    setStreamingInsight(newInsight);
+    setLiveInsights(prev => [newInsight, ...prev]);
+
     try {
-      // Try to list buckets to check if uploads exists
-      const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-      
-      if (listError) {
-        console.error('Error listing buckets:', listError);
-        return false;
-      }
-
-      const uploadsBucket = buckets?.find(bucket => bucket.name === 'uploads');
-      
-      if (!uploadsBucket) {
-        toast({
-          title: "Setting up storage",
-          description: "Creating uploads bucket...",
-        });
-        
-        // Try to create the bucket (this requires service role, so it might fail on client)
-        const { error: createError } = await supabase.storage.createBucket('uploads', {
-          public: false,
-          allowedMimeTypes: ['text/csv', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'],
-          fileSizeLimit: 10485760 // 10MB
-        });
-
-        if (createError) {
-          console.error('Error creating bucket:', createError);
-          toast({
-            title: "Storage setup required",
-            description: "Please create an 'uploads' bucket in your Supabase dashboard under Storage > Buckets.",
-            variant: "destructive",
-          });
-          return false;
+      // Call Edge Function for streaming insights
+      const response = await supabase.functions.invoke('stream-insights', {
+        body: {
+          content: content,
+          source: source
         }
+      });
+
+      if (response.error) {
+        throw response.error;
       }
 
-      return true;
+      // Parse the streaming response
+      const result = response.data;
+      
+      // Update the insight with final data
+      const finalInsight: LiveInsight = {
+        ...newInsight,
+        title: result.title || "AI Insight",
+        content: result.content || "",
+        priority: result.priority || "Medium",
+        confidence: result.confidence || 75,
+        category: result.category || "Operations",
+        key_findings: result.key_findings || [],
+        recommendations: result.recommendations || [],
+        projected_impact: result.projected_impact || "",
+        isStreaming: false
+      };
+
+      // Update live insights
+      setLiveInsights(prev => 
+        prev.map(insight => 
+          insight.id === insightId ? finalInsight : insight
+        )
+      );
+
+      // Save to Supabase
+      await supabase.from('ai_insights').insert({
+        user_id: user?.id,
+        title: finalInsight.title,
+        category: finalInsight.category,
+        priority: finalInsight.priority,
+        confidence: finalInsight.confidence / 100, // Convert to decimal
+        summary: finalInsight.content,
+        key_findings: finalInsight.key_findings,
+        recommendations: finalInsight.recommendations,
+        projected_impact: finalInsight.projected_impact,
+        source: finalInsight.source,
+        tags: []
+      });
+
+      toast({
+        title: "Insight generated!",
+        description: "Your AI insight has been saved and is ready for analysis.",
+      });
+
     } catch (error) {
-      console.error('Error ensuring bucket:', error);
-      return false;
+      console.error('Streaming failed:', error);
+      
+      // Update with error state
+      const errorInsight: LiveInsight = {
+        ...newInsight,
+        title: "Analysis Failed",
+        content: "Sorry, we couldn't analyze your data. Please try again.",
+        isStreaming: false
+      };
+
+      setLiveInsights(prev => 
+        prev.map(insight => 
+          insight.id === insightId ? errorInsight : insight
+        )
+      );
+
+      toast({
+        title: "Analysis failed",
+        description: "Please try again or contact support if the issue persists.",
+        variant: "destructive",
+      });
+    } finally {
+      setStreamingInsight(null);
     }
   };
 
@@ -175,94 +269,18 @@ const AIInsights = () => {
     setUploading(true);
 
     try {
-      let fileUrl = null;
-      let fileName = "Text Input";
+      let content = "";
+      let source = "Text Input";
 
-      // Upload file to Supabase Storage if provided
       if (uploadFile) {
-        fileName = uploadFile.name;
-        
-        // Ensure bucket exists before upload
-        const bucketExists = await ensureUploadsBucket();
-        if (!bucketExists) {
-          throw new Error("Storage bucket not available. Please contact support.");
-        }
-
-        const fileNameWithTimestamp = `${Date.now()}-${uploadFile.name}`;
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('uploads')
-          .upload(`user-${user.id}/${fileNameWithTimestamp}`, uploadFile, {
-            cacheControl: '3600',
-            upsert: false
-          });
-
-        if (uploadError) {
-          console.error('Upload error:', uploadError);
-          
-          // Provide specific error messages
-          if (uploadError.message.includes('bucket')) {
-            throw new Error("Storage bucket not found. Please create an 'uploads' bucket in your Supabase dashboard.");
-          } else if (uploadError.message.includes('size')) {
-            throw new Error("File too large. Maximum size is 10MB.");
-          } else if (uploadError.message.includes('type')) {
-            throw new Error("File type not supported. Please upload CSV, PDF, DOCX, or TXT files.");
-          } else {
-            throw uploadError;
-          }
-        }
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('uploads')
-          .getPublicUrl(uploadData.path);
-
-        fileUrl = publicUrl;
+        content = await extractFileContent(uploadFile);
+        source = uploadFile.name;
+      } else {
+        content = textInput;
       }
 
-      // Create data source record
-      const { data: dataSource, error: insertError } = await supabase
-        .from('data_sources')
-        .insert({
-          user_id: user.id,
-          name: fileName,
-          type: uploadFile ? 'file' : 'text',
-          status: 'processing',
-          metadata: {
-            file_url: fileUrl,
-            text_content: textInput || null,
-            uploaded_at: new Date().toISOString()
-          }
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        throw insertError;
-      }
-
-      toast({
-        title: "Processing started",
-        description: "Your data is being analyzed. Insights will appear shortly.",
-      });
-
-      // Trigger Edge Function to process upload and generate insights
-      const { error: functionError } = await supabase.functions.invoke('process-upload-to-insights', {
-        body: {
-          upload_id: dataSource.id,
-          user_id: user.id,
-          file_url: fileUrl,
-          file_name: fileName,
-          text_input: textInput || null
-        }
-      });
-
-      if (functionError) {
-        console.error('Edge function error:', functionError);
-        toast({
-          title: "Processing started",
-          description: "Your data is being processed in the background. Insights will appear shortly.",
-        });
-      }
+      // Start streaming insights immediately
+      await streamInsights(content, source);
 
       // Reset form and close modal
       setUploadFile(null);
@@ -309,6 +327,9 @@ const AIInsights = () => {
 
   const categories = ["all", "Customer Experience", "Revenue", "Operations", "Growth", "business_opportunity", "risk_alert", "trend_analysis", "operational_insight"];
   const priorities = ["all", "high", "medium", "low"];
+
+  // Combine database insights with live insights
+  const allInsights = [...liveInsights, ...filteredInsights];
 
   return (
     <div className="space-y-6">
@@ -414,12 +435,12 @@ const AIInsights = () => {
                     {uploading ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Processing...
+                        Analyzing...
                       </>
                     ) : (
                       <>
-                        <Brain className="h-4 w-4 mr-2" />
-                        Upload & Analyze
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Generate Insights
                       </>
                     )}
                   </Button>
@@ -475,7 +496,7 @@ const AIInsights = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Total Insights</p>
                 <p className="text-2xl font-bold">
-                  {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : stats.totalInsights}
+                  {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : allInsights.length}
                 </p>
               </div>
               <Brain className="h-8 w-8 text-primary" />
@@ -488,7 +509,7 @@ const AIInsights = () => {
               <div>
                 <p className="text-sm text-muted-foreground">High Priority</p>
                 <p className="text-2xl font-bold">
-                  {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : stats.highPriorityCount}
+                  {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : allInsights.filter(i => i.priority?.toLowerCase() === 'high').length}
                 </p>
               </div>
               <AlertCircle className="h-8 w-8 text-destructive" />
@@ -501,7 +522,11 @@ const AIInsights = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Avg Confidence</p>
                 <p className="text-2xl font-bold">
-                  {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : `${(stats.avgConfidence * 100).toFixed(0)}%`}
+                  {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : 
+                    allInsights.length > 0 
+                      ? `${Math.round(allInsights.reduce((acc, i) => acc + (i.confidence || 0), 0) / allInsights.length)}%`
+                      : '0%'
+                  }
                 </p>
               </div>
               <Target className="h-8 w-8 text-success" />
@@ -512,9 +537,16 @@ const AIInsights = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Bookmarked</p>
+                <p className="text-sm text-muted-foreground">Live Analysis</p>
                 <p className="text-2xl font-bold">
-                  {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : stats.bookmarkedCount}
+                  {streamingInsight ? (
+                    <div className="flex items-center">
+                      <Sparkles className="h-4 w-4 mr-1 animate-pulse text-blue-500" />
+                      Active
+                    </div>
+                  ) : (
+                    'Ready'
+                  )}
                 </p>
               </div>
               <Bookmark className="h-8 w-8 text-warning" />
@@ -540,13 +572,42 @@ const AIInsights = () => {
         ))}
       </div>
 
+      {/* Live Streaming Insight */}
+      {streamingInsight && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between mb-3">
+              <h2 className="text-lg font-semibold flex items-center">
+                <Sparkles className="h-4 w-4 mr-2 animate-pulse text-blue-500" />
+                {streamingInsight.title}
+              </h2>
+              <div className="p-2 rounded-full bg-blue-100">
+                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <p className="text-sm text-gray-600">
+                {streamingInsight.content || "Analyzing your data..."}
+              </p>
+              
+              <div className="flex items-center space-x-4 text-xs text-gray-500">
+                <span>Source: {streamingInsight.source}</span>
+                <span>Priority: {streamingInsight.priority}</span>
+                <span>Confidence: {streamingInsight.confidence}%</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Insights List */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <span className="ml-2 text-muted-foreground">Loading insights...</span>
         </div>
-      ) : filteredInsights.filter(i => i.priority === activeTab.charAt(0).toUpperCase() + activeTab.slice(1)).length === 0 ? (
+      ) : allInsights.filter(i => i.priority?.toLowerCase() === activeTab).length === 0 ? (
         <div className="text-center py-12">
           <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">No {activeTab} priority insights yet.</p>
@@ -560,20 +621,29 @@ const AIInsights = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredInsights
+          {allInsights
             .filter(i => i.priority?.toLowerCase() === activeTab)
             .map((insight) => (
-              <Card key={insight.id} className="hover:shadow-md transition-shadow">
+              <Card key={insight.id} className={`hover:shadow-md transition-shadow ${
+                insight.isStreaming ? 'border-blue-200 bg-blue-50' : ''
+              }`}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
-                    <h2 className="text-lg font-semibold">{insight.title}</h2>
+                    <h2 className="text-lg font-semibold flex items-center">
+                      {insight.isStreaming && <Sparkles className="h-4 w-4 mr-2 animate-pulse text-blue-500" />}
+                      {insight.title}
+                    </h2>
                     <div className={`p-2 rounded-full ${getPriorityColor(insight.priority)}`}>
-                      {getPriorityIcon(insight.priority)}
+                      {insight.isStreaming ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        getPriorityIcon(insight.priority)
+                      )}
                     </div>
                   </div>
                   
                   <p className="text-sm text-gray-500 mb-3">
-                    Confidence: {((insight.confidence || 0) * 100).toFixed(0)}% | {insight.summary}
+                    Confidence: {insight.confidence}% | {insight.content || insight.summary}
                   </p>
 
                   {insight.key_findings && insight.key_findings.length > 0 && (
@@ -608,23 +678,9 @@ const AIInsights = () => {
 
                   <div className="flex items-center justify-between mt-4 pt-3 border-t">
                     <span className="text-xs text-gray-500">
-                      {new Date(insight.created_at).toLocaleDateString()}
+                      {new Date(insight.createdAt || insight.created_at).toLocaleDateString()}
                     </span>
                     <div className="flex items-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => bookmarkInsight(insight.id, !insight.tags?.includes('bookmarked'))}
-                        className="p-1 h-auto"
-                      >
-                        <Bookmark 
-                          className={`h-4 w-4 ${
-                            insight.tags?.includes('bookmarked') 
-                              ? 'text-yellow-500 fill-current' 
-                              : 'text-gray-400'
-                          }`} 
-                        />
-                      </Button>
                       <Badge variant="outline" className="text-xs">
                         {insight.category}
                       </Badge>
@@ -641,7 +697,7 @@ const AIInsights = () => {
         </div>
       )}
 
-      {!loading && filteredInsights.length === 0 && (
+      {!loading && allInsights.length === 0 && (
         <Card>
           <CardContent className="text-center py-12">
             <Brain className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
