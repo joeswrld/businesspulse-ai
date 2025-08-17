@@ -33,7 +33,18 @@ async function testAPI() {
       return false;
     }
 
-    const result = await response.json();
+    // Get response text first to debug JSON issues
+    const responseText = await response.text();
+    console.log('📋 Raw response preview:', responseText.substring(0, 200) + '...');
+
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ JSON parse error:', parseError);
+      console.error('❌ Response text:', responseText);
+      return false;
+    }
     
     if (result.success) {
       console.log('✅ API Response:');
@@ -66,5 +77,6 @@ testAPI().then(success => {
     console.log('1. Development server is running: npm run dev');
     console.log('2. GEMINI_API_KEY is set in .env.local');
     console.log('3. API route file exists: src/pages/api/generate-insights.ts');
+    console.log('4. Check the console output above for specific error details');
   }
 });

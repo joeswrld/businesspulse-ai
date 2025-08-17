@@ -159,10 +159,12 @@ Ensure the insight is practical, measurable, and immediately actionable for busi
   try {
     console.log('📡 Making request to Gemini API...');
     
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+    // Use the new Gemini 2.0 model with the correct headers
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-goog-api-key': apiKey
       },
       body: JSON.stringify({
         contents: [{
@@ -187,26 +189,47 @@ Ensure the insight is practical, measurable, and immediately actionable for busi
       throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
     }
 
-    const data = await response.json();
-    console.log('📋 Gemini API response received');
+    // Get the response text first to debug any JSON issues
+    const responseText = await response.text();
+    console.log('📋 Raw Gemini response:', responseText.substring(0, 500) + '...');
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ JSON parse error:', parseError);
+      console.error('❌ Response text:', responseText);
+      throw new Error('Invalid JSON response from Gemini API');
+    }
+
+    console.log('📋 Parsed Gemini response structure:', Object.keys(data));
     
     if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
       console.error('❌ Invalid Gemini response structure:', data);
-      throw new Error('Invalid response from Gemini API');
+      throw new Error('Invalid response structure from Gemini API');
     }
 
     const text = data.candidates[0].content.parts[0].text;
     console.log('📝 Gemini response text length:', text.length);
+    console.log('📝 Gemini response text preview:', text.substring(0, 200) + '...');
     
-    // Extract JSON from the response
+    // Extract JSON from the response - be more flexible with the regex
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      console.error('❌ Could not extract JSON from Gemini response:', text.substring(0, 200));
+      console.error('❌ Could not extract JSON from Gemini response');
+      console.error('❌ Full response text:', text);
       throw new Error('Could not extract JSON from Gemini response');
     }
 
     console.log('🔍 Extracted JSON from response');
-    const insight = JSON.parse(jsonMatch[0]) as InsightResponse;
+    let insight;
+    try {
+      insight = JSON.parse(jsonMatch[0]) as InsightResponse;
+    } catch (parseError) {
+      console.error('❌ Error parsing extracted JSON:', parseError);
+      console.error('❌ Extracted JSON text:', jsonMatch[0]);
+      throw new Error('Invalid JSON format in Gemini response');
+    }
     
     // Validate and provide defaults
     const validatedInsight = {
