@@ -130,12 +130,53 @@ const AIInsights = () => {
   // Extract text content from file
   const extractFileContent = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
+      console.log('📁 Extracting content from file:', { 
+        name: file.name, 
+        size: file.size, 
+        type: file.type 
+      });
+
+      // Validate file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        reject(new Error('File too large. Maximum size is 10MB.'));
+        return;
+      }
+
+      // Validate file type
+      if (!isValidFileType(file)) {
+        reject(new Error('Unsupported file type. Please upload CSV, PDF, DOCX, or TXT files only.'));
+        return;
+      }
+
       const reader = new FileReader();
+      
       reader.onload = (e) => {
-        const content = e.target?.result as string;
-        resolve(content);
+        try {
+          const content = e.target?.result as string;
+          
+          if (!content || content.trim().length === 0) {
+            reject(new Error('File appears to be empty. Please check the file content.'));
+            return;
+          }
+
+          console.log('✅ File content extracted:', { 
+            length: content.length, 
+            preview: content.substring(0, 100) + '...' 
+          });
+          
+          resolve(content);
+        } catch (error) {
+          console.error('❌ Error processing file content:', error);
+          reject(new Error('Failed to read file content. Please try again.'));
+        }
       };
-      reader.onerror = reject;
+
+      reader.onerror = (error) => {
+        console.error('❌ FileReader error:', error);
+        reject(new Error('Failed to read file. Please try again.'));
+      };
+
+      // Read file as text
       reader.readAsText(file);
     });
   };
@@ -164,6 +205,8 @@ const AIInsights = () => {
     setLiveInsights(prev => [newInsight, ...prev]);
 
     try {
+      console.log('🚀 Starting insight generation:', { contentLength: content.length, source });
+      
       // Call Edge Function for streaming insights
       const response = await supabase.functions.invoke('stream-insights', {
         body: {
@@ -172,12 +215,27 @@ const AIInsights = () => {
         }
       });
 
+      console.log('📥 Edge Function response:', response);
+
       if (response.error) {
-        throw response.error;
+        console.error('❌ Edge Function error:', response.error);
+        throw new Error(response.error.message || 'Failed to generate insights');
+      }
+
+      if (!response.data) {
+        console.error('❌ No data returned from Edge Function');
+        throw new Error('No data returned from analysis service');
+      }
+
+      // Check if the response indicates success
+      if (response.data.success === false) {
+        console.error('❌ Analysis failed:', response.data.error);
+        throw new Error(response.data.error || 'Analysis failed');
       }
 
       // Parse the streaming response
       const result = response.data;
+      console.log('✅ Analysis result:', result);
       
       // Update the insight with final data
       const finalInsight: LiveInsight = {
@@ -193,6 +251,8 @@ const AIInsights = () => {
         isStreaming: false
       };
 
+      console.log('📝 Final insight:', finalInsight);
+
       // Update live insights
       setLiveInsights(prev => 
         prev.map(insight => 
@@ -201,19 +261,29 @@ const AIInsights = () => {
       );
 
       // Save to Supabase
-      await supabase.from('ai_insights').insert({
-        user_id: user?.id,
-        title: finalInsight.title,
-        category: finalInsight.category,
-        priority: finalInsight.priority,
-        confidence: finalInsight.confidence / 100, // Convert to decimal
-        summary: finalInsight.content,
-        key_findings: finalInsight.key_findings,
-        recommendations: finalInsight.recommendations,
-        projected_impact: finalInsight.projected_impact,
-        source: finalInsight.source,
-        tags: []
-      });
+      if (user?.id) {
+        console.log('💾 Saving insight to database...');
+        const { error: dbError } = await supabase.from('ai_insights').insert({
+          user_id: user.id,
+          title: finalInsight.title,
+          category: finalInsight.category,
+          priority: finalInsight.priority,
+          confidence: finalInsight.confidence / 100, // Convert to decimal
+          summary: finalInsight.content,
+          key_findings: finalInsight.key_findings,
+          recommendations: finalInsight.recommendations,
+          projected_impact: finalInsight.projected_impact,
+          source: finalInsight.source,
+          tags: []
+        });
+
+        if (dbError) {
+          console.error('❌ Database save error:', dbError);
+          // Don't throw here - the insight was generated successfully
+        } else {
+          console.log('✅ Insight saved to database');
+        }
+      }
 
       toast({
         title: "Insight generated!",
@@ -221,13 +291,13 @@ const AIInsights = () => {
       });
 
     } catch (error) {
-      console.error('Streaming failed:', error);
+      console.error('❌ Streaming failed:', error);
       
       // Update with error state
       const errorInsight: LiveInsight = {
         ...newInsight,
         title: "Analysis Failed",
-        content: "Sorry, we couldn't analyze your data. Please try again.",
+        content: error instanceof Error ? error.message : "Sorry, we couldn't analyze your data. Please try again.",
         isStreaming: false
       };
 
@@ -239,7 +309,7 @@ const AIInsights = () => {
 
       toast({
         title: "Analysis failed",
-        description: "Please try again or contact support if the issue persists.",
+        description: error instanceof Error ? error.message : "Please try again or contact support if the issue persists.",
         variant: "destructive",
       });
     } finally {
@@ -273,11 +343,24 @@ const AIInsights = () => {
       let source = "Text Input";
 
       if (uploadFile) {
+        console.log('📤 Processing uploaded file:', uploadFile.name);
         content = await extractFileContent(uploadFile);
         source = uploadFile.name;
       } else {
-        content = textInput;
+        console.log('📝 Processing text input:', textInput.length, 'characters');
+        content = textInput.trim();
+        
+        if (content.length < 10) {
+          throw new Error('Text input is too short. Please provide at least 10 characters for meaningful analysis.');
+        }
+        
+        source = "Text Input";
       }
+
+      console.log('✅ Content prepared for analysis:', { 
+        contentLength: content.length, 
+        source 
+      });
 
       // Start streaming insights immediately
       await streamInsights(content, source);
@@ -288,10 +371,13 @@ const AIInsights = () => {
       setShowUploadModal(false);
 
     } catch (error) {
-      console.error('Upload failed:', error);
+      console.error('❌ Upload failed:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : "An error occurred during upload.";
+      
       toast({
         title: "Upload failed",
-        description: error instanceof Error ? error.message : "An error occurred during upload.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
