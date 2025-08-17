@@ -162,50 +162,26 @@ const DataUpload = () => {
 
   const processDataSource = async (dataSourceId: string, fileType: string, fileUrl?: string, textContent?: string) => {
     try {
-      // Extract content from file or use text content
-      let content = textContent || '';
-      
-      if (fileUrl && !textContent) {
-        // Download file content
-        const response = await fetch(fileUrl);
-        if (response.ok) {
-          const buffer = await response.arrayBuffer();
-          const decoder = new TextDecoder();
-          content = decoder.decode(buffer);
-        }
-      }
-
-      if (!content.trim()) {
-        throw new Error('No content extracted from file');
-      }
-
-      // Call the generate-insights Edge Function
-      const { data, error } = await supabase.functions.invoke('generate-insights', {
+      // Call the new process-upload-to-insights Edge Function
+      const { data, error } = await supabase.functions.invoke('process-upload-to-insights', {
         body: {
-          data_source_id: dataSourceId,
+          upload_id: dataSourceId,
           user_id: user?.id,
-          content: content
+          file_url: fileUrl,
+          file_name: fileUrl ? fileUrl.split('/').pop() : undefined,
+          text_input: textContent
         }
       });
 
       if (error) {
-        console.error('Error calling generate-insights:', error);
+        console.error('Error calling process-upload-to-insights:', error);
         throw error;
       }
 
       console.log('Insights generated:', data);
 
-      // Update data source status to completed
-      await supabase
-        .from('data_sources')
-        .update({ 
-          status: 'completed',
-          metadata: {
-            processed_at: new Date().toISOString(),
-            insights_generated: data?.data?.insights_generated || 0
-          }
-        })
-        .eq('id', dataSourceId);
+      // The Edge Function already updates the data source status
+      // No need to update it here as it's handled in the Edge Function
 
     } catch (error) {
       console.error('Processing error:', error);
