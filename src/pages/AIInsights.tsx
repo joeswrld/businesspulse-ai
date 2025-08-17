@@ -85,8 +85,8 @@ const AIInsights = () => {
   // Calculate statistics
   const stats = insights ? {
     totalInsights: insights.length,
-    highPriorityCount: insights.filter(i => i.priority === 'high').length,
-    avgConfidence: insights.reduce((acc, i) => acc + (i.confidence || 0), 0) / insights.length || 0,
+    highPriorityCount: insights.filter(i => i.priority === 'High').length,
+    avgConfidence: insights.reduce((acc, i) => acc + (i.confidence_score || 0), 0) / insights.length || 0,
     bookmarkedCount: 0
   } : {
     totalInsights: 0,
@@ -229,7 +229,7 @@ const AIInsights = () => {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <span className="ml-2 text-muted-foreground">Loading insights...</span>
         </div>
-      ) : filteredInsights.filter(i => i.priority === activeTab).length === 0 ? (
+      ) : filteredInsights.filter(i => i.priority === activeTab.charAt(0).toUpperCase() + activeTab.slice(1)).length === 0 ? (
         <div className="text-center py-12">
           <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">No {activeTab} priority insights yet.</p>
@@ -237,7 +237,7 @@ const AIInsights = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredInsights
-            .filter(i => i.priority === activeTab)
+            .filter(i => i.priority === activeTab.charAt(0).toUpperCase() + activeTab.slice(1))
             .map((insight) => (
               <Card key={insight.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
@@ -249,7 +249,7 @@ const AIInsights = () => {
                   </div>
                   
                   <p className="text-sm text-gray-500 mb-3">
-                    Confidence: {(insight.confidence * 100).toFixed(0)}%
+                    Confidence: {(insight.confidence_score * 100).toFixed(0)}% | {insight.summary}
                   </p>
 
                   {insight.findings && insight.findings.length > 0 && (
@@ -287,7 +287,7 @@ const AIInsights = () => {
                       {new Date(insight.created_at).toLocaleDateString()}
                     </span>
                     <Badge variant="outline" className="text-xs">
-                      {insight.category}
+                      {insight.insight_type || insight.category}
                     </Badge>
                   </div>
                 </CardContent>

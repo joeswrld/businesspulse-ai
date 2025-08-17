@@ -381,9 +381,9 @@ const Dashboard: React.FC = () => {
                               <Badge variant="secondary" className="text-xs">
                                 {insight.insight_type}
                               </Badge>
-                              {insight.priority && (
+                               {insight.priority && (
                                 <Badge 
-                                  variant={insight.priority === 'high' ? 'destructive' : 'secondary'}
+                                  variant={insight.priority === 'High' ? 'destructive' : 'secondary'}
                                   className="text-xs"
                                 >
                                   {insight.priority}

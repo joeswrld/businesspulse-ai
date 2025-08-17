@@ -64,29 +64,15 @@ const DataUpload = () => {
         const { data: textDataSource, error: textError } = await supabase.from('data_sources').insert({
           user_id: user?.id,
           name: 'Text Input',
-          type: 'analytics', // Use valid ENUM value
+          type: 'text',
           status: 'processing',
           metadata: { content: textInput }
         }).select().single();
 
-        if (textError) {
-          // If analytics fails, try with 'feedback' as fallback
-          const { data: fallbackDataSource, error: fallbackError } = await supabase.from('data_sources').insert({
-            user_id: user?.id,
-            name: 'Text Input',
-            type: 'feedback', // Fallback ENUM value
-            status: 'processing',
-            metadata: { content: textInput }
-          }).select().single();
-
-          if (fallbackError) throw fallbackError;
-          
-          // Trigger AI processing for text input
-          await processDataSource(fallbackDataSource.id, 'text/plain', undefined, textInput);
-        } else {
-          // Trigger AI processing for text input
-          await processDataSource(textDataSource.id, 'text/plain', undefined, textInput);
-        }
+        if (textError) throw textError;
+        
+        // Trigger AI processing for text input
+        await processDataSource(textDataSource.id, 'text/plain', undefined, textInput);
         setUploadProgress(50);
       }
 
@@ -107,11 +93,14 @@ const DataUpload = () => {
           .from('data-files')
           .getPublicUrl(fileName);
 
-        // Determine file type for ENUM
-        let fileType = 'analytics'; // Default
-        if (file.type.includes('pdf')) fileType = 'feedback';
-        else if (file.type.includes('csv') || file.type.includes('excel')) fileType = 'analytics';
-        else if (file.type.includes('text')) fileType = 'feedback';
+        // Determine file type based on extension
+        let fileType = 'text'; // Default
+        if (file.type.includes('pdf')) fileType = 'pdf';
+        else if (file.type.includes('csv')) fileType = 'csv';
+        else if (file.type.includes('excel') || file.type.includes('spreadsheet')) fileType = 'xlsx';
+        else if (file.type.includes('word')) fileType = 'docx';
+        else if (file.type.includes('json')) fileType = 'json';
+        else if (file.type.includes('text')) fileType = 'txt';
 
         // Create data source record with valid ENUM type
         const { data: fileDataSource, error: fileError } = await supabase.from('data_sources').insert({
