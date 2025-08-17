@@ -52,8 +52,7 @@ serve(async (req) => {
       throw new Error('GEMINI_API_KEY not configured');
     }
 
-    // 1️⃣ Fetch upload from Supabase (assuming uploads table exists)
-    // For now, we'll work with data_sources table
+    // 1️⃣ Fetch upload from Supabase
     const { data: upload, error: fetchErr } = await supabase
       .from("data_sources")
       .select("*")
@@ -70,15 +69,23 @@ serve(async (req) => {
     // 2️⃣ Get file content if uploaded, or text input
     let textContent = "";
     if (file_url) {
-      const fileRes = await fetch(file_url);
-      if (!fileRes.ok) {
-        throw new Error('Failed to fetch file content');
+      try {
+        const fileRes = await fetch(file_url);
+        if (!fileRes.ok) {
+          throw new Error('Failed to fetch file content');
+        }
+        textContent = await fileRes.text();
+      } catch (error) {
+        console.error('Error fetching file:', error);
+        // Fall back to metadata content if available
+        if (upload.metadata?.text_content) {
+          textContent = upload.metadata.text_content;
+        }
       }
-      textContent = await fileRes.text();
     } else if (text_input) {
       textContent = text_input;
-    } else if (upload.metadata?.content) {
-      textContent = upload.metadata.content;
+    } else if (upload.metadata?.text_content) {
+      textContent = upload.metadata.text_content;
     }
 
     if (!textContent.trim()) {
@@ -105,7 +112,7 @@ serve(async (req) => {
           title: insight.title,
           category: insight.category,
           priority: insight.priority,
-          confidence: insight.confidence,
+          confidence: insight.confidence / 100, // Convert percentage to decimal
           summary: insight.summary,
           key_findings: insight.key_findings,
           recommendations: insight.recommendations,
@@ -141,7 +148,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        insight: savedInsights,
+        insights: savedInsights,
         insights_generated: savedInsights.length
       }), 
       { 
@@ -195,30 +202,52 @@ async function createSemanticChunks(content: string): Promise<string[]> {
 
 async function callGeminiAI(chunks: string[], apiKey: string, source: string): Promise<GeminiInsightResponse[]> {
   const prompt = `
-    Task: Generate actionable business insights
-    Data: ${chunks.join('\n\n')}
-    Context:
-      Categories: Customer Experience, Revenue, Operations, Growth
-      Goals: Reduce churn, Increase MRR, Improve efficiency, Expand markets
-    Output schema: JSON with title, category, priority, confidence, summary, key_findings[], recommendations[], projected_impact, tags[], source, created_at
+You are NoteX, a real-time AI business intelligence assistant. Your task is to analyze the provided business data and generate actionable insights.
 
-    Generate 3-5 actionable business insights from the provided data. Each insight should be in this exact JSON format:
-    {
-      "title": "string",
-      "category": "Customer Experience | Revenue | Operations | Growth",
-      "priority": "High | Medium | Low",
-      "confidence": 0-100,
-      "summary": "string",
-      "key_findings": ["string"],
-      "recommendations": ["string"],
-      "projected_impact": "string",
-      "tags": ["string"],
-      "source": "upload filename",
-      "created_at": "timestamp"
-    }
+DATA TO ANALYZE:
+${chunks.join('\n\n')}
 
-    Focus on actionable insights that provide clear business value and quantifiable impact.
-  `;
+INSTRUCTIONS:
+1. Analyze the data for business opportunities, risks, trends, and operational insights
+2. Focus on actionable insights that provide clear business value
+3. Categorize insights into: Customer Experience, Revenue, Operations, or Growth
+4. Prioritize based on potential impact: High, Medium, or Low
+5. Provide confidence scores (0-100) based on data quality and insight reliability
+
+OUTPUT FORMAT:
+Generate 3-5 insights in this exact JSON format:
+[
+  {
+    "title": "Clear, actionable insight title",
+    "category": "Customer Experience|Revenue|Operations|Growth",
+    "priority": "High|Medium|Low",
+    "confidence": 85,
+    "summary": "Brief summary of the insight",
+    "key_findings": [
+      "Finding 1",
+      "Finding 2",
+      "Finding 3"
+    ],
+    "recommendations": [
+      "Specific, actionable recommendation 1",
+      "Specific, actionable recommendation 2",
+      "Specific, actionable recommendation 3"
+    ],
+    "projected_impact": "Quantified business impact (e.g., 'Could increase revenue by 15% within 6 months')",
+    "tags": ["tag1", "tag2", "tag3"],
+    "source": "${source}",
+    "created_at": "${new Date().toISOString()}"
+  }
+]
+
+FOCUS AREAS:
+- Customer Experience: Customer satisfaction, churn prevention, user experience
+- Revenue: Sales opportunities, pricing optimization, market expansion
+- Operations: Efficiency improvements, cost reduction, process optimization
+- Growth: Market opportunities, product development, competitive advantages
+
+Ensure all insights are practical, measurable, and immediately actionable for business decision-making.
+`;
 
   try {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
