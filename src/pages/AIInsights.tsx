@@ -207,7 +207,8 @@ const AIInsights = () => {
     try {
       console.log('🚀 Starting insight generation:', { contentLength: content.length, source });
       
-      // Call Edge Function for streaming insights
+      // Call Supabase Edge Function for streaming insights
+      // This uses the correct Supabase Edge Function endpoint
       const response = await supabase.functions.invoke('stream-insights', {
         body: {
           content: content,

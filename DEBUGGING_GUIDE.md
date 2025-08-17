@@ -1,8 +1,97 @@
-# 🔧 Debugging Guide - "Analysis Failed" Error
+# 🔧 Debugging Guide - "Analysis failed" Error
 
 ## 🚨 Common Causes & Solutions
 
-### 1. "Analysis failed" Error
+### 1. "Analysis failed: failed to send request to edge functions"
+
+#### Symptoms
+- User uploads file or pastes text
+- Sees "Analysis failed: failed to send request to edge functions" error
+- No insights generated
+- Network tab shows failed request
+
+#### Root Cause
+This error occurs when the frontend cannot reach the Supabase Edge Function. The issue is typically:
+- Edge Function not deployed
+- Wrong endpoint URL
+- CORS issues
+- Authentication problems
+
+#### Debug Steps
+
+**Step 1: Check Edge Function Deployment**
+```bash
+# List deployed functions
+npx supabase functions list
+
+# If stream-insights is not listed, deploy it
+npx supabase functions deploy stream-insights --no-verify-jwt
+```
+
+**Step 2: Test Edge Function Directly**
+```bash
+# Run the test script
+node scripts/test-edge-function.js
+
+# Or test manually
+curl -X POST https://YOUR_PROJECT_REF.supabase.co/functions/v1/stream-insights \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ANON_KEY" \
+  -d '{"content": "test", "source": "test"}'
+```
+
+**Step 3: Check Browser Network Tab**
+```javascript
+// Open DevTools (F12) → Network tab
+// Look for POST request to: /functions/v1/stream-insights
+// Check:
+// - Status code (should be 200, not 404 or 500)
+// - Request URL (should be correct Supabase endpoint)
+// - Request payload (should contain content and source)
+```
+
+**Step 4: Verify Environment Variables**
+```bash
+# Check if Supabase URL and key are set correctly
+echo $NEXT_PUBLIC_SUPABASE_URL
+echo $NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+# Check if Gemini API key is set
+npx supabase secrets list
+```
+
+#### Quick Fixes
+
+**A. Deploy Edge Function**
+```bash
+# Deploy the function
+npx supabase functions deploy stream-insights --no-verify-jwt
+
+# Set Gemini API key
+npx supabase secrets set GEMINI_API_KEY=your_api_key_here
+```
+
+**B. Check Frontend Code**
+```typescript
+// Make sure you're using the correct Supabase client call
+const response = await supabase.functions.invoke('stream-insights', {
+  body: {
+    content: content,
+    source: source
+  }
+});
+```
+
+**C. Verify CORS Headers**
+```typescript
+// Edge Function should include these headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+```
+
+### 2. "Analysis failed" Error (General)
 
 #### Symptoms
 - User uploads file or pastes text
@@ -73,7 +162,7 @@ if (file.size > 10 * 1024 * 1024) {
 }
 ```
 
-### 2. Edge Function Not Deployed
+### 3. Edge Function Not Deployed
 
 #### Symptoms
 - 404 error in Network tab
@@ -88,7 +177,7 @@ npx supabase functions deploy stream-insights
 npx supabase functions list
 ```
 
-### 3. CORS Issues
+### 4. CORS Issues
 
 #### Symptoms
 - CORS error in console
@@ -103,7 +192,7 @@ const corsHeaders = {
 };
 ```
 
-### 4. Database Save Errors
+### 5. Database Save Errors
 
 #### Symptoms
 - Insight generated but not saved
@@ -306,6 +395,33 @@ When everything is working correctly, you should see:
    - Insight card appears with content
    - Success toast notification
 
+## 🚨 Emergency Fixes
+
+### If Edge Function is Completely Broken
+
+1. **Redeploy the function:**
+   ```bash
+   npx supabase functions deploy stream-insights --no-verify-jwt
+   ```
+
+2. **Check function logs:**
+   ```bash
+   npx supabase functions logs stream-insights
+   ```
+
+3. **Verify environment variables:**
+   ```bash
+   npx supabase secrets list
+   ```
+
+4. **Test with minimal payload:**
+   ```javascript
+   const testData = {
+     content: "Test content",
+     source: "test"
+   };
+   ```
+
 ## 📞 Getting Help
 
 If you're still experiencing issues:
@@ -315,5 +431,6 @@ If you're still experiencing issues:
 3. **Test with simple content** first
 4. **Check file format** and size limits
 5. **Review error messages** for specific issues
+6. **Run the test script:** `node scripts/test-edge-function.js`
 
 The debugging logs will help identify exactly where the process is failing and provide specific solutions.
