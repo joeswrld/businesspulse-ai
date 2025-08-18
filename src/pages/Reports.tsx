@@ -4,378 +4,621 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/components/ui/use-toast';
-import {
-  FileText,
+import { toast } from 'sonner';
+import { 
+  FileText, 
+  Plus, 
+  Clock, 
+  CheckCircle, 
+  AlertCircle, 
+  TrendingUp, 
+  Lightbulb, 
+  Target,
   Download,
-  Plus,
   Search,
   Filter,
   Calendar,
-  TrendingUp,
   BarChart3,
-  Users,
-  DollarSign,
-  Loader2
+  RefreshCw,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 interface Report {
   id: string;
+  user_id: string;
   title: string;
-  type: string;
-  format: string;
-  status: string;
-  date_range_start: string | null;
-  date_range_end: string | null;
-  insights_included: number | null;
-  file_url: string | null;
-  file_size: number | null;
-  created_at: string;
-  updated_at: string;
+  description?: string;
+  insights_ids: string[];
+  generated_at: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  content?: {
+    executive_summary: string;
+    key_insights: string[];
+    trends: string[];
+    recommended_actions: string[];
+    sentiment_breakdown: {
+      positive: number;
+      negative: number;
+      neutral: number;
+    };
+    top_themes: string[];
+  };
 }
 
-const Reports: React.FC = () => {
+interface Insight {
+  id: string;
+  summary: string;
+  sentiment: 'positive' | 'negative' | 'neutral';
+  key_themes: string[];
+  suggested_actions: string[];
+  created_at: string;
+  source_file?: string;
+}
+
+export default function Reports() {
   const { user } = useAuth();
-  const { toast } = useToast();
   
+  // State management
   const [reports, setReports] = useState<Report[]>([]);
+  const [insights, setInsights] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState<string | null>(null);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [selectedInsights, setSelectedInsights] = useState<string[]>([]);
+  const [showInsightSelector, setShowInsightSelector] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'processing' | 'completed' | 'failed'>('all');
+  const [expandedReport, setExpandedReport] = useState<string | null>(null);
 
-  // Fetch reports with realtime updates
+  // Load insights from localStorage
   useEffect(() => {
-    if (!user) return;
-
-    const fetchReports = async () => {
-      const { data, error } = await supabase
-        .from('reports')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        setReports(data);
+    try {
+      const savedInsights = localStorage.getItem('insightsHistory');
+      if (savedInsights) {
+        const parsedInsights = JSON.parse(savedInsights);
+        setInsights(parsedInsights);
       }
-      setLoading(false);
+    } catch (err) {
+      console.error('Failed to load insights:', err);
+    }
+  }, []);
+
+  // Mock reports data (replace with real Supabase queries)
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        // Mock reports for demonstration
+        const mockReports: Report[] = [
+          {
+            id: '1',
+            user_id: user?.id || '',
+            title: 'Q4 Customer Feedback Analysis',
+            description: 'Comprehensive analysis of customer feedback from Q4 2024',
+            insights_ids: ['1', '2', '3'],
+            generated_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+            status: 'completed',
+            content: {
+              executive_summary: 'Customer feedback shows strong positive sentiment towards our new dashboard interface, with some concerns about mobile performance that need immediate attention.',
+              key_insights: [
+                'Dashboard interface receives 85% positive feedback',
+                'Mobile app performance issues affect 23% of users',
+                'Customer support satisfaction increased by 40%',
+                'Dark mode feature is highly requested'
+              ],
+              trends: [
+                'Positive sentiment trending upward over the last 30 days',
+                'Mobile-related complaints decreasing after recent updates',
+                'Feature requests for customization increasing',
+                'Support response times improving consistently'
+              ],
+              recommended_actions: [
+                'Prioritize mobile app performance optimization',
+                'Implement dark mode feature in next sprint',
+                'Continue dashboard improvements based on positive feedback',
+                'Maintain current support quality standards'
+              ],
+              sentiment_breakdown: {
+                positive: 65,
+                negative: 15,
+                neutral: 20
+              },
+              top_themes: ['dashboard', 'mobile app', 'customer support', 'dark mode']
+            }
+          },
+          {
+            id: '2',
+            user_id: user?.id || '',
+            title: 'Weekly Performance Review',
+            description: 'Weekly analysis of system performance and user feedback',
+            insights_ids: ['4', '5'],
+            generated_at: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+            status: 'processing',
+            insights_ids: ['4', '5']
+          },
+          {
+            id: '3',
+            user_id: user?.id || '',
+            title: 'Monthly Business Intelligence Report',
+            description: 'Monthly comprehensive business intelligence analysis',
+            insights_ids: ['6', '7', '8', '9'],
+            generated_at: new Date().toISOString(),
+            status: 'pending',
+            insights_ids: ['6', '7', '8', '9']
+          }
+        ];
+        
+        setReports(mockReports);
+      } catch (error) {
+        console.error('Error fetching reports:', error);
+        toast.error('Failed to load reports');
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchReports();
-
-    // Set up realtime subscription
-    const channel = supabase
-      .channel('reports-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'reports',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setReports(prev => [payload.new as Report, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setReports(prev => 
-              prev.map(report => 
-                report.id === payload.new.id ? payload.new as Report : report
-              )
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setReports(prev => 
-              prev.filter(report => report.id !== payload.old.id)
-            );
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [user]);
 
-  const generateReport = async (type: string, format: string) => {
-    if (!user) return;
+  // Mock real-time updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Simulate report status updates
+      setReports(prev => prev.map(report => {
+        if (report.status === 'processing' && Math.random() > 0.7) {
+          return {
+            ...report,
+            status: 'completed' as const,
+            content: {
+              executive_summary: 'Analysis completed successfully with actionable insights for business improvement.',
+              key_insights: [
+                'User engagement increased by 25%',
+                'Mobile performance issues resolved',
+                'Customer satisfaction scores improved'
+              ],
+              trends: [
+                'Positive trend in user feedback',
+                'Decreasing support tickets',
+                'Increasing feature adoption'
+              ],
+              recommended_actions: [
+                'Continue current improvement strategies',
+                'Monitor mobile performance metrics',
+                'Expand successful features'
+              ],
+              sentiment_breakdown: {
+                positive: 70,
+                negative: 10,
+                neutral: 20
+              },
+              top_themes: ['performance', 'user experience', 'features']
+            }
+          };
+        }
+        return report;
+      }));
+    }, 5000); // Check every 5 seconds
 
-    setGenerating(type);
-    
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleGenerateReport = async () => {
+    if (selectedInsights.length === 0) {
+      toast.error('Please select at least one insight to include in the report');
+      return;
+    }
+
+    if (!user?.id) {
+      toast.error('User authentication required');
+      return;
+    }
+
+    setGeneratingReport(true);
     try {
-      const { data, error } = await supabase
-        .from('reports')
-        .insert({
-          user_id: user.id,
-          title: `${type.charAt(0).toUpperCase() + type.slice(1)} Report`,
-          type,
-          format,
-          status: 'generating',
-          date_range_start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          date_range_end: new Date().toISOString().split('T')[0],
-          insights_included: 0
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Simulate report generation
-      setTimeout(async () => {
-        await supabase
-          .from('reports')
-          .update({
-            status: 'completed',
-            file_url: `https://example.com/reports/${data.id}.${format}`,
-            file_size: Math.floor(Math.random() * 1000000) + 100000,
-            insights_included: Math.floor(Math.random() * 20) + 5
+      // Call the generateReport Edge Function
+      const response = await fetch(
+        "https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/generateReport",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84"
+          },
+          body: JSON.stringify({
+            user_id: user.id,
+            insights_ids: selectedInsights,
+            title: `AI Report - ${new Date().toLocaleDateString()}`,
+            description: `Generated report based on ${selectedInsights.length} insights`
           })
-          .eq('id', data.id);
+        }
+      );
 
-        setGenerating(null);
-        toast({
-          title: "Report Generated",
-          description: `Your ${type} report has been generated successfully.`,
-        });
-      }, 3000);
+      if (!response.ok) {
+        throw new Error(`Report generation failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Report generation failed');
+      }
+
+      // Add the new report to the list
+      setReports(prev => [result.report, ...prev]);
+      setSelectedInsights([]);
+      setShowInsightSelector(false);
+      
+      toast.success('Report generated successfully!', {
+        description: 'Your AI-powered report is ready.'
+      });
 
     } catch (error) {
       console.error('Error generating report:', error);
-      setGenerating(null);
-      toast({
-        title: "Error",
-        description: "Failed to generate report. Please try again.",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : 'Failed to generate report');
+    } finally {
+      setGeneratingReport(false);
     }
   };
 
-  const downloadReport = (report: Report) => {
-    if (report.file_url) {
-      // In a real app, this would trigger the actual download
-      toast({
-        title: "Download Started",
-        description: `Downloading ${report.title}...`,
-      });
+  const handleSelectAllInsights = () => {
+    setSelectedInsights(insights.map(insight => insight.id));
+  };
+
+  const handleDeselectAllInsights = () => {
+    setSelectedInsights([]);
+  };
+
+  const handleToggleInsight = (insightId: string) => {
+    setSelectedInsights(prev => 
+      prev.includes(insightId) 
+        ? prev.filter(id => id !== insightId)
+        : [...prev, insightId]
+    );
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'processing': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'failed': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed': return <CheckCircle className="h-4 w-4" />;
+      case 'processing': return <RefreshCw className="h-4 w-4 animate-spin" />;
+      case 'pending': return <Clock className="h-4 w-4" />;
+      case 'failed': return <AlertCircle className="h-4 w-4" />;
+      default: return <Clock className="h-4 w-4" />;
     }
   };
 
   const filteredReports = reports.filter(report => {
-    const matchesSearch = report.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = typeFilter === 'all' || report.type === typeFilter;
+    const matchesSearch = report.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         report.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || report.status === statusFilter;
-    return matchesSearch && matchesType && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'generating':
-        return 'bg-blue-100 text-blue-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'analytics':
-        return <BarChart3 className="h-4 w-4" />;
-      case 'financial':
-        return <DollarSign className="h-4 w-4" />;
-      case 'team':
-        return <Users className="h-4 w-4" />;
-      default:
-        return <TrendingUp className="h-4 w-4" />;
-    }
-  };
-
-  const formatFileSize = (bytes: number | null) => {
-    if (!bytes) return 'N/A';
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
-  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-          <p className="mt-2 text-muted-foreground">Loading reports...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2">Loading reports...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Reports</h1>
-          <p className="text-muted-foreground">Generate and manage AI-powered business reports</p>
-        </div>
-        <div className="flex space-x-2">
-          <Button 
-            onClick={() => generateReport('analytics', 'pdf')}
-            disabled={generating === 'analytics'}
-          >
-            {generating === 'analytics' ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4 mr-2" />
-            )}
-            Analytics Report
-          </Button>
-          <Button 
-            variant="outline"
-            onClick={() => generateReport('financial', 'excel')}
-            disabled={generating === 'financial'}
-          >
-            {generating === 'financial' ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4 mr-2" />
-            )}
-            Financial Report
-          </Button>
-        </div>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">📊 AI Reports</h1>
+        <p className="text-gray-600">Generate comprehensive reports from your insights using AI</p>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search reports..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="analytics">Analytics</SelectItem>
-                <SelectItem value="financial">Financial</SelectItem>
-                <SelectItem value="team">Team</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="generating">Generating</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Controls */}
+      <div className="flex flex-wrap gap-4 mb-6">
+        <Button 
+          onClick={() => setShowInsightSelector(!showInsightSelector)}
+          className="flex items-center gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          Generate New Report
+        </Button>
 
-      {/* Reports Grid */}
-      {filteredReports.length > 0 ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredReports.map((report) => (
-            <Card key={report.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    {getTypeIcon(report.type)}
-                    <CardTitle className="text-lg">{report.title}</CardTitle>
-                  </div>
-                  <Badge className={getStatusColor(report.status)}>
-                    {report.status}
-                  </Badge>
-                </div>
-                <CardDescription>
-                  {report.type.charAt(0).toUpperCase() + report.type.slice(1)} • {report.format.toUpperCase()}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Date Range:</span>
-                    <span className="font-medium">
-                      {report.date_range_start && report.date_range_end
-                        ? `${new Date(report.date_range_start).toLocaleDateString()} - ${new Date(report.date_range_end).toLocaleDateString()}`
-                        : 'N/A'
-                      }
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Insights:</span>
-                    <span className="font-medium">{report.insights_included || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">File Size:</span>
-                    <span className="font-medium">{formatFileSize(report.file_size)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Created:</span>
-                    <span className="font-medium">{new Date(report.created_at).toLocaleDateString()}</span>
-                  </div>
-                  {report.status === 'completed' && report.file_url && (
-                    <Button 
-                      className="w-full" 
-                      onClick={() => downloadReport(report)}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
-                    </Button>
-                  )}
-                  {report.status === 'generating' && (
-                    <div className="flex items-center justify-center py-2">
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      <span className="text-sm text-muted-foreground">Generating...</span>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search reports..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
         </div>
-      ) : (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center">
-              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">No reports found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchTerm || typeFilter !== 'all' || statusFilter !== 'all'
-                  ? 'Try adjusting your filters to see more results.'
-                  : 'Generate your first report to get started with insights.'
-                }
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as any)}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="all">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="processing">Processing</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+        </select>
+      </div>
+
+      {/* Insight Selector */}
+      {showInsightSelector && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5" />
+              Select Insights for Report
+            </CardTitle>
+            <CardDescription>
+              Choose which insights to include in your AI-generated report
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2 mb-4">
+              <Button 
+                onClick={handleSelectAllInsights}
+                variant="outline"
+                size="sm"
+              >
+                Select All ({insights.length})
+              </Button>
+              <Button 
+                onClick={handleDeselectAllInsights}
+                variant="outline"
+                size="sm"
+              >
+                Deselect All
+              </Button>
+            </div>
+
+            <div className="max-h-60 overflow-y-auto space-y-2">
+              {insights.map((insight) => (
+                <div
+                  key={insight.id}
+                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                    selectedInsights.includes(insight.id)
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => handleToggleInsight(insight.id)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900 mb-1">
+                        {insight.summary.substring(0, 100)}...
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Badge className={insight.sentiment === 'positive' ? 'bg-green-100 text-green-800' : 
+                                        insight.sentiment === 'negative' ? 'bg-red-100 text-red-800' : 
+                                        'bg-gray-100 text-gray-800'}>
+                          {insight.sentiment}
+                        </Badge>
+                        <span className="text-xs text-gray-500">
+                          {new Date(insight.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="ml-2">
+                      {selectedInsights.includes(insight.id) ? (
+                        <CheckCircle className="h-5 w-5 text-blue-600" />
+                      ) : (
+                        <div className="h-5 w-5 border-2 border-gray-300 rounded-full" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm text-gray-600">
+                {selectedInsights.length} of {insights.length} insights selected
               </p>
-              {(!searchTerm && typeFilter === 'all' && statusFilter === 'all') && (
-                <Button onClick={() => generateReport('analytics', 'pdf')}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Generate First Report
-                </Button>
-              )}
+              <Button 
+                onClick={handleGenerateReport}
+                disabled={generatingReport || selectedInsights.length === 0}
+                className="flex items-center gap-2"
+              >
+                {generatingReport ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4" />
+                    Generate Report
+                  </>
+                )}
+              </Button>
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Reports List */}
+      <div className="space-y-4">
+        {filteredReports.length === 0 ? (
+          <Card>
+            <CardContent className="text-center py-12">
+              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No reports found</h3>
+              <p className="text-gray-500 mb-4">
+                {searchTerm || statusFilter !== 'all' 
+                  ? 'Try adjusting your search or filters'
+                  : 'Generate your first report to get started'
+                }
+              </p>
+              {!searchTerm && statusFilter === 'all' && (
+                <Button onClick={() => setShowInsightSelector(true)}>
+                  Generate First Report
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          filteredReports.map((report) => (
+            <Card key={report.id} className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                      {report.title}
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      {report.description}
+                    </CardDescription>
+                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4" />
+                        {new Date(report.generated_at).toLocaleDateString()}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Lightbulb className="h-4 w-4" />
+                        {report.insights_ids.length} insights
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className={`flex items-center gap-1 ${getStatusColor(report.status)}`}>
+                      {getStatusIcon(report.status)}
+                      {report.status}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setExpandedReport(expandedReport === report.id ? null : report.id)}
+                    >
+                      {expandedReport === report.id ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+
+              {expandedReport === report.id && report.content && (
+                <CardContent className="border-t pt-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Executive Summary */}
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4" />
+                        Executive Summary
+                      </h4>
+                      <p className="text-gray-700 text-sm leading-relaxed">
+                        {report.content.executive_summary}
+                      </p>
+                    </div>
+
+                    {/* Sentiment Breakdown */}
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" />
+                        Sentiment Breakdown
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-green-600">Positive</span>
+                          <span className="text-sm font-medium">{report.content.sentiment_breakdown.positive}%</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-red-600">Negative</span>
+                          <span className="text-sm font-medium">{report.content.sentiment_breakdown.negative}%</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600">Neutral</span>
+                          <span className="text-sm font-medium">{report.content.sentiment_breakdown.neutral}%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Key Insights */}
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <Lightbulb className="h-4 w-4" />
+                        Key Insights
+                      </h4>
+                      <ul className="space-y-1">
+                        {report.content.key_insights.map((insight, index) => (
+                          <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                            {insight}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Trends */}
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" />
+                        Trends
+                      </h4>
+                      <ul className="space-y-1">
+                        {report.content.trends.map((trend, index) => (
+                          <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-green-600 rounded-full mt-2 flex-shrink-0"></div>
+                            {trend}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Recommended Actions */}
+                    <div className="lg:col-span-2">
+                      <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <Target className="h-4 w-4" />
+                        Recommended Actions
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {report.content.recommended_actions.map((action, index) => (
+                          <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border">
+                            <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                              <span className="text-blue-600 text-sm font-bold">{index + 1}</span>
+                            </div>
+                            <span className="text-sm text-gray-700">{action}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Top Themes */}
+                    <div className="lg:col-span-2">
+                      <h4 className="font-semibold text-gray-900 mb-2">Top Themes</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {report.content.top_themes.map((theme, index) => (
+                          <Badge key={index} variant="secondary" className="bg-purple-100 text-purple-800">
+                            {theme}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex justify-end">
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <Download className="h-4 w-4" />
+                      Export Report
+                    </Button>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          ))
+        )}
+      </div>
     </div>
   );
-};
-
-export default Reports;
+}
