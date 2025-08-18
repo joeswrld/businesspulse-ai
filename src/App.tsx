@@ -43,13 +43,6 @@ const App = () => (
                 </DashboardLayout>
               </ProtectedRoute>
             } />
-            <Route path="/upload" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <DataUpload />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
             <Route path="/insights" element={
               <ProtectedRoute>
                 <DashboardLayout>

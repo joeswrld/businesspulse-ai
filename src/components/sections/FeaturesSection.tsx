@@ -115,9 +115,6 @@ const FeaturesSection = () => {
               <button className="inline-flex items-center justify-center gap-2 h-11 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 bg-gradient-primary text-primary-foreground hover:shadow-glow transform hover:scale-105 shadow-medium">
                 Start Your Free Trial
               </button>
-              <button className="inline-flex items-center justify-center gap-2 h-11 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 border border-input bg-background hover:bg-accent hover:text-accent-foreground shadow-soft">
-                Schedule Demo
-              </button>
             </div>
           </div>
         </div>

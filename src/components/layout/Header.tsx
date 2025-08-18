@@ -9,8 +9,8 @@ const Header = () => {
   const navigation = [
     { name: "Features", href: "#features" },
     { name: "Pricing", href: "#pricing" },
-    { name: "About", href: "#about" },
-    { name: "Contact", href: "#contact" },
+    { name: "About", href: "/about" },
+    { name: "Testimonials", href: "/testimonials" },
   ];
 
   return (
@@ -19,10 +19,7 @@ const Header = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-              <Zap className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold gradient-text">NoteX</span>
+          <img src="/favicon.ico" alt="Notex" />
           </Link>
 
           {/* Desktop Navigation */}

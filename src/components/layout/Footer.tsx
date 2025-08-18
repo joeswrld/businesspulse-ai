@@ -1,6 +1,9 @@
 import { Zap, Mail, Phone, MapPin, Twitter, Linkedin, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+
+
+
 const Footer = () => {
   const navigation = {
     product: [
@@ -48,10 +51,7 @@ const Footer = () => {
             {/* Brand Section */}
             <div className="lg:col-span-2 space-y-6">
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                  <Zap className="h-5 w-5 text-white" />
-                </div>
-                <span className="text-xl font-bold text-white">NoteX</span>
+              <img src="/favicon.ico" alt="Notex" />
               </div>
               <p className="text-secondary-foreground/80 max-w-md">
                 AI-powered Business Intelligence platform that transforms your data into actionable insights. Make smarter decisions with real-time analytics.
@@ -61,15 +61,7 @@ const Footer = () => {
               <div className="space-y-3">
                 <div className="flex items-center space-x-3 text-sm">
                   <Mail className="h-4 w-4 text-primary" />
-                  <span>hello@notex.ai</span>
-                </div>
-                <div className="flex items-center space-x-3 text-sm">
-                  <Phone className="h-4 w-4 text-primary" />
-                  <span>+1 (555) 123-4567</span>
-                </div>
-                <div className="flex items-center space-x-3 text-sm">
-                  <MapPin className="h-4 w-4 text-primary" />
-                  <span>Toronto, Lagos, Seattle</span>
+                  <span>hello@notex.com.ng</span>
                 </div>
               </div>
             </div>
@@ -169,7 +161,7 @@ const Footer = () => {
         <div className="py-6 border-t border-secondary-foreground/20">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-secondary-foreground/80">
-              © 2024 NoteX. All rights reserved.
+              ©  NoteX. All rights reserved.
             </div>
             
             {/* Social Links */}

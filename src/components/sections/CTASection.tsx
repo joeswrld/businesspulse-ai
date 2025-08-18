@@ -54,28 +54,21 @@ const CTASection = () => {
             </div>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4" >
               <Button 
                 size="xl" 
                 className="bg-white text-primary hover:bg-white/90 shadow-large font-semibold"
-              >
+              
+                >
                 Start Your 8-Day Free Trial
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
-              <Button 
-                variant="outline" 
-                size="xl" 
-                className="border-white/30 text-white hover:bg-white/10 backdrop-blur-sm"
-              >
-                Schedule a Demo
-              </Button>
+              
             </div>
 
             {/* Trust Indicators */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-8 pt-8 text-white/80">
-              <div className="text-sm">
-                ✓ 30-day money-back guarantee
-              </div>
+              
               <div className="text-sm">
                 ✓ Cancel anytime
               </div>
@@ -87,7 +80,7 @@ const CTASection = () => {
             {/* Urgency */}
             <div className="pt-4">
               <p className="text-sm text-white/70">
-                🔥 Over 50 businesses signed up this week
+                🔥🔥🔥 Over 50 businesses signed up this week
               </p>
             </div>
           </div>

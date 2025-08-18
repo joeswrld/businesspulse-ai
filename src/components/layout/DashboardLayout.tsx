@@ -28,7 +28,6 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Data Upload", href: "/upload", icon: Upload },
     { name: "AI Insights", href: "/insights", icon: Brain },
     { name: "Reports", href: "/reports", icon: FileText },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
@@ -73,10 +72,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           {/* Logo */}
           <div className="flex items-center justify-between p-4 border-b border-border">
             <Link to="/dashboard" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-                <Zap className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-xl font-bold gradient-text">NoteX</span>
+            <img src="/favicon.ico" alt="Notex" />
             </Link>
             <button 
               className="lg:hidden p-1"

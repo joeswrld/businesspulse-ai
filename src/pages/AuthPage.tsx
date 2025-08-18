@@ -95,10 +95,7 @@ const AuthPage = () => {
             <span>Back to Home</span>
           </Link>
           <div className="flex items-center space-x-2">
-            <div className="w-6 h-6 bg-gradient-primary rounded-md flex items-center justify-center">
-              <Zap className="h-4 w-4 text-white" />
-            </div>
-            <span className="font-bold gradient-text">NoteX</span>
+          <img src="/favicon.ico" alt="Notex" />
           </div>
         </div>
       </div>
@@ -128,7 +125,7 @@ const AuthPage = () => {
                       <Input
                         id="firstName"
                         type="text"
-                        placeholder="John"
+                        placeholder="Joseph"
                         value={formData.firstName}
                         onChange={(e) => handleInputChange("firstName", e.target.value)}
                         required
@@ -139,7 +136,7 @@ const AuthPage = () => {
                       <Input
                         id="lastName"
                         type="text"
-                        placeholder="Doe"
+                        placeholder="Essien"
                         value={formData.lastName}
                         onChange={(e) => handleInputChange("lastName", e.target.value)}
                         required

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +8,7 @@ const PricingSection = () => {
   const plans = [
     {
       name: "Free Trial",
-      price: "$0",
+      price: "₦0",
       period: "8 days",
       description: "Perfect for testing our platform",
       icon: Zap,
@@ -19,7 +20,7 @@ const PricingSection = () => {
         "Up to 10 document uploads",
         "Standard email support",
         "Export to PDF/CSV",
-        "Basic templates"
+        "Basic templates",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "hero" as const,
@@ -27,7 +28,7 @@ const PricingSection = () => {
     },
     {
       name: "Pro",
-      price: "$17",
+      price: "₦35,000",
       period: "/month",
       description: "For growing businesses and startups",
       icon: Star,
@@ -44,13 +45,13 @@ const PricingSection = () => {
         "Custom branding on reports",
         "API integrations"
       ],
-      buttonText: "Get Started",
-      buttonVariant: "default" as const,
+      buttonText: "Start Free Trial",
+      buttonVariant: "hero" as const,
       popular: true
     },
     {
       name: "Business",
-      price: "$30",
+      price: "₦53,000",
       period: "/month",
       description: "For enterprises and larger teams",
       icon: Crown,
@@ -68,7 +69,7 @@ const PricingSection = () => {
         "Custom AI model training",
         "SLA guarantee"
       ],
-      buttonText: "Contact Sales",
+      buttonText: "Start Free Trial",
       buttonVariant: "premium" as const,
       popular: false
     }
@@ -151,14 +152,12 @@ const PricingSection = () => {
                 </ul>
 
                 {/* CTA Button */}
-                <Button
-                  variant={plan.buttonVariant}
-                  size="lg"
-                  className="w-full"
-                >
-                  {plan.buttonText}
-                </Button>
+                <Button variant={plan.buttonVariant} size="lg"
+                  className="w-full" asChild>
+              <Link to="/auth">Start Free Trial</Link>
+            </Button>
               </CardContent>
+              
             </Card>
           ))}
         </div>
@@ -166,19 +165,12 @@ const PricingSection = () => {
         {/* Bottom CTA */}
         <div className="text-center mt-16">
           <div className="bg-muted/50 rounded-2xl p-8">
-            <h3 className="text-2xl font-bold mb-4">
-              All plans include our 30-day money-back guarantee
-            </h3>
-            <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
-              Not satisfied? Get a full refund within 30 days, no questions asked. We're confident you'll love NoteX.
-            </p>
+           
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button variant="outline" size="lg">
                 Compare All Features
               </Button>
-              <Button variant="ghost" size="lg">
-                Talk to Sales
-              </Button>
+              
             </div>
           </div>
         </div>

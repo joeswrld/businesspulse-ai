@@ -7,56 +7,38 @@ const TestimonialsSection = () => {
     {
       name: "Sarah Johnson",
       role: "CEO",
-      company: "TechStart Solutions",
-      location: "Toronto, Canada",
       content: "NoteX transformed how we make business decisions. The AI insights helped us identify a 40% increase in customer satisfaction opportunities we never knew existed.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=80&h=80&fit=crop&crop=face&auto=format"
     },
     {
       name: "Michael Chen",
       role: "Operations Director",
-      company: "Lagos Digital Hub",
-      location: "Lagos, Nigeria",
       content: "The real-time analytics feature is a game-changer. We can now track our KPIs live and make adjustments instantly. Our revenue grew 25% in just 3 months.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop&crop=face&auto=format"
     },
     {
       name: "Emily Rodriguez",
       role: "Founder",
-      company: "GrowthMetrics",
-      location: "Austin, USA",
       content: "Finally, a BI tool that speaks our language. The industry-specific recommendations are spot-on, and the team collaboration features keep everyone aligned.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&crop=face&auto=format"
     },
     {
       name: "David Okafor",
       role: "Business Analyst",
-      company: "Innovate Africa",
-      location: "Abuja, Nigeria",
       content: "The document analysis AI is incredibly accurate. It processes our quarterly reports in minutes and gives insights that would take our team days to discover.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=face&auto=format"
     },
     {
       name: "Jennifer Kim",
       role: "Marketing Director",
-      company: "Scale Ventures",
-      location: "Vancouver, Canada",
       content: "NoteX's automated reports save us 15+ hours per week. The branded PDF exports look professional and impress our stakeholders every time.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop&crop=face&auto=format"
     },
     {
       name: "Alex Thompson",
       role: "Co-founder",
-      company: "DataDriven Co",
-      location: "Seattle, USA",
       content: "The trial convinced us immediately. The AI suggestions helped us optimize our pricing strategy and increase our conversion rate by 35%. Absolutely worth it.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=80&h=80&fit=crop&crop=face&auto=format"
     }
   ];
 
@@ -102,19 +84,13 @@ const TestimonialsSection = () => {
 
                   {/* Author */}
                   <div className="flex items-center space-x-3 pt-2">
-                    <img
-                      src={testimonial.image}
-                      alt={testimonial.name}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
+                   
                     <div>
                       <div className="font-semibold text-sm">{testimonial.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {testimonial.role}, {testimonial.company}
+                        {testimonial.role}
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        {testimonial.location}
-                      </div>
+                      
                     </div>
                   </div>
                 </div>
