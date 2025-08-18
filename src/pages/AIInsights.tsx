@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "sonner";
 import { 
   Brain, 
   TrendingUp, 
@@ -18,7 +19,6 @@ import {
   BarChart3,
   FileText,
   Share,
-  Bookmark,
   Plus,
   Loader2,
   CheckCircle,
@@ -56,6 +56,55 @@ const AIInsights = () => {
       regex.test(part) ? <span key={i} className="bg-yellow-200 font-semibold">{part}</span> : part
     );
   }
+
+  // Set up real-time updates with toast notifications
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('insights-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ai_insights',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('AI Insights real-time update:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newInsight = payload.new as any;
+            // Show toast when new insight is created (optimistic)
+            sonnerToast("⏳ Processing your insight...");
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedInsight = payload.new as any;
+            
+            // Show sentiment-based toast when AI processing completes
+            if (updatedInsight.summary && updatedInsight.priority) {
+              const priority = updatedInsight.priority.toLowerCase();
+              const confidence = ((updatedInsight.confidence_score || 0) * 100).toFixed(0);
+              
+              if (priority === 'high') {
+                sonnerToast(`⚠️ High priority insight detected! (${confidence}% confidence)`);
+              } else if (priority === 'medium') {
+                sonnerToast(`📊 Medium priority insight generated (${confidence}% confidence)`);
+              } else if (priority === 'low') {
+                sonnerToast(`✅ Low priority insight completed (${confidence}% confidence)`);
+              } else {
+                sonnerToast(`🔍 New insight generated (${confidence}% confidence)`);
+              }
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   // Filter insights based on search and filters
   useEffect(() => {
