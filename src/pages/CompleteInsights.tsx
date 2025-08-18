@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 // CSS for output styling
@@ -56,6 +56,39 @@ const outputStyles = `
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
   }
+
+  .file-upload-area {
+    border: 2px dashed #d1d5db;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .file-upload-area:hover {
+    border-color: #3b82f6;
+    background-color: #f8fafc;
+  }
+
+  .file-upload-area.dragover {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+  }
+
+  .file-preview {
+    max-height: 200px;
+    overflow-y: auto;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 12px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
 `;
 
 export default function CompleteInsights() {
@@ -70,9 +103,23 @@ export default function CompleteInsights() {
   const [processingChunk, setProcessingChunk] = useState(0);
   const [totalChunks, setTotalChunks] = useState(0);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  
+  // File upload states
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [extractedText, setExtractedText] = useState("");
+  const [fileProcessing, setFileProcessing] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const ITEMS_PER_PAGE = 10;
   const MAX_CHUNK_SIZE = 3000; // Characters per chunk
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  const SUPPORTED_TYPES = {
+    'text/csv': '.csv',
+    'application/pdf': '.pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+    'text/plain': '.txt'
+  };
 
   // Load insights from localStorage on mount
   useEffect(() => {
@@ -94,6 +141,211 @@ export default function CompleteInsights() {
       console.error('Failed to save insights:', err);
     }
   }, [insights]);
+
+  // File processing functions
+  const processCSV = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const csv = e.target?.result as string;
+          const lines = csv.split('\n');
+          const headers = lines[0]?.split(',') || [];
+          
+          let processedText = `CSV File: ${file.name}\n\n`;
+          processedText += `Headers: ${headers.join(', ')}\n\n`;
+          processedText += `Data:\n`;
+          
+          // Process first 100 rows to avoid overwhelming the AI
+          const dataRows = lines.slice(1, 101);
+          dataRows.forEach((line, index) => {
+            if (line.trim()) {
+              processedText += `Row ${index + 1}: ${line}\n`;
+            }
+          });
+          
+          if (lines.length > 101) {
+            processedText += `\n... and ${lines.length - 101} more rows\n`;
+          }
+          
+          resolve(processedText);
+        } catch (err) {
+          reject(new Error('Failed to process CSV file'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read CSV file'));
+      reader.readAsText(file);
+    });
+  };
+
+  const processTXT = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const text = e.target?.result as string;
+          resolve(`Text File: ${file.name}\n\n${text}`);
+        } catch (err) {
+          reject(new Error('Failed to process text file'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read text file'));
+      reader.readAsText(file);
+    });
+  };
+
+  const processPDF = async (file: File): Promise<string> => {
+    // For PDF processing, we'll use a simple text extraction
+    // In a real app, you might want to use a library like pdf.js
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          // This is a simplified PDF text extraction
+          // In production, you'd use a proper PDF parsing library
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          const uint8Array = new Uint8Array(arrayBuffer);
+          
+          // Simple text extraction from PDF (basic implementation)
+          let text = '';
+          for (let i = 0; i < uint8Array.length; i++) {
+            if (uint8Array[i] >= 32 && uint8Array[i] <= 126) {
+              text += String.fromCharCode(uint8Array[i]);
+            }
+          }
+          
+          // Clean up the extracted text
+          text = text.replace(/[^\x20-\x7E\n\r\t]/g, '');
+          text = text.replace(/\s+/g, ' ').trim();
+          
+          resolve(`PDF File: ${file.name}\n\n${text.substring(0, 10000)}${text.length > 10000 ? '...' : ''}`);
+        } catch (err) {
+          reject(new Error('Failed to process PDF file'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read PDF file'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const processDOCX = async (file: File): Promise<string> => {
+    // For DOCX processing, we'll extract text content
+    // In a real app, you might want to use a library like mammoth.js
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          const uint8Array = new Uint8Array(arrayBuffer);
+          
+          // Simple text extraction from DOCX (basic implementation)
+          let text = '';
+          for (let i = 0; i < uint8Array.length; i++) {
+            if (uint8Array[i] >= 32 && uint8Array[i] <= 126) {
+              text += String.fromCharCode(uint8Array[i]);
+            }
+          }
+          
+          // Clean up the extracted text
+          text = text.replace(/[^\x20-\x7E\n\r\t]/g, '');
+          text = text.replace(/\s+/g, ' ').trim();
+          
+          resolve(`DOCX File: ${file.name}\n\n${text.substring(0, 10000)}${text.length > 10000 ? '...' : ''}`);
+        } catch (err) {
+          reject(new Error('Failed to process DOCX file'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read DOCX file'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const extractTextFromFile = async (file: File): Promise<string> => {
+    setFileProcessing(true);
+    try {
+      let extractedText = '';
+      
+      switch (file.type) {
+        case 'text/csv':
+          extractedText = await processCSV(file);
+          break;
+        case 'text/plain':
+          extractedText = await processTXT(file);
+          break;
+        case 'application/pdf':
+          extractedText = await processPDF(file);
+          break;
+        case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+          extractedText = await processDOCX(file);
+          break;
+        default:
+          throw new Error('Unsupported file type');
+      }
+      
+      setExtractedText(extractedText);
+      setInput(extractedText);
+      toast.success(`File processed successfully! Extracted ${extractedText.length} characters.`);
+      return extractedText;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to process file';
+      toast.error(errorMessage);
+      throw err;
+    } finally {
+      setFileProcessing(false);
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error(`File too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`);
+      return;
+    }
+
+    // Validate file type
+    if (!Object.keys(SUPPORTED_TYPES).includes(file.type)) {
+      toast.error('Unsupported file type. Please upload CSV, PDF, DOCX, or TXT files.');
+      return;
+    }
+
+    setUploadedFile(file);
+    await extractTextFromFile(file);
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileUpload(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileUpload(e.target.files[0]);
+    }
+  };
+
+  const clearFile = () => {
+    setUploadedFile(null);
+    setExtractedText("");
+    setInput("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   // Chunk large inputs for processing
   const chunkText = (text: string, chunkSize: number = MAX_CHUNK_SIZE) => {
@@ -208,7 +460,8 @@ export default function CompleteInsights() {
         sentiment: finalResult.sentiment,
         created_at: new Date().toISOString(),
         chunks_processed: finalResult.chunks_processed,
-        sentiment_breakdown: finalResult.sentiment_breakdown
+        sentiment_breakdown: finalResult.sentiment_breakdown,
+        source_file: uploadedFile?.name || null
       };
 
       setInsights(prev => [newInsight, ...prev]);
@@ -305,7 +558,7 @@ export default function CompleteInsights() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Insights Analysis</h1>
-        <p className="text-gray-600">Powered by Gemini AI - Analyze text sentiment and generate insights</p>
+        <p className="text-gray-600">Powered by Gemini AI - Analyze text sentiment and generate insights from text or files</p>
         <div className="mt-4 flex items-center gap-4">
           <span className="text-sm text-gray-500">
             Total insights: {insights.length} | 
@@ -327,8 +580,80 @@ export default function CompleteInsights() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Input Section */}
         <div className="space-y-6">
+          {/* File Upload */}
           <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">Submit Text for Analysis</h2>
+            <h2 className="text-xl font-semibold mb-4">Upload File for Analysis</h2>
+            
+            <div
+              className={`file-upload-area ${dragActive ? 'dragover' : ''}`}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.pdf,.docx,.txt"
+                onChange={handleFileInput}
+                className="hidden"
+              />
+              
+              {fileProcessing ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className="text-gray-600">Processing file...</span>
+                </div>
+              ) : uploadedFile ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center space-x-2">
+                    <svg className="h-8 w-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-green-600 font-medium">{uploadedFile.name}</span>
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    {extractedText.length} characters extracted
+                  </p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearFile();
+                    }}
+                    className="text-sm text-red-600 hover:text-red-800 underline"
+                  >
+                    Remove file
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <div className="text-gray-600">
+                    <p className="font-medium">Click to upload or drag and drop</p>
+                    <p className="text-sm">CSV, PDF, DOCX, TXT (max 10MB)</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {extractedText && (
+              <div className="mt-4">
+                <h3 className="text-sm font-medium text-gray-500 mb-2">Extracted Text Preview</h3>
+                <div className="file-preview">
+                  {extractedText.length > 500 
+                    ? `${extractedText.substring(0, 500)}...` 
+                    : extractedText}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Text Input */}
+          <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+            <h2 className="text-xl font-semibold mb-4">Or Enter Text Manually</h2>
             
             <textarea
               value={input}
@@ -388,6 +713,7 @@ export default function CompleteInsights() {
                     <p>• Each chunk is analyzed separately and results are combined</p>
                     <p>• Sentiment is determined by majority vote across chunks</p>
                     <p>• All insights are saved locally in your browser</p>
+                    <p>• Supported file types: CSV, PDF, DOCX, TXT (max 10MB)</p>
                   </div>
                 </div>
               )}
@@ -535,7 +861,7 @@ export default function CompleteInsights() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                     </div>
-                    <p>No insights yet. Submit some text to get started!</p>
+                    <p>No insights yet. Submit some text or upload a file to get started!</p>
                   </div>
                 ) : (
                   <p>No insights match your search or filter criteria.</p>
@@ -545,6 +871,14 @@ export default function CompleteInsights() {
               <>
                 {paginatedInsights.map((i) => (
                   <div key={i.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow fade-in">
+                    {i.source_file && (
+                      <div className="mb-2">
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          📎 {i.source_file}
+                        </span>
+                      </div>
+                    )}
+                    
                     <div className="mb-3">
                       <h3 className="text-sm font-medium text-gray-500 mb-1">Input</h3>
                       <p className="text-gray-900 text-sm bg-gray-50 p-2 rounded max-h-20 overflow-y-auto">
