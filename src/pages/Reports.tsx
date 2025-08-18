@@ -73,18 +73,54 @@ export default function Reports() {
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
   const [exportingPDF, setExportingPDF] = useState(false);
 
-  // Load insights from localStorage
+  // Load insights from localStorage and Supabase
   useEffect(() => {
-    try {
-      const savedInsights = localStorage.getItem('insightsHistory');
-      if (savedInsights) {
-        const parsedInsights = JSON.parse(savedInsights);
-        setInsights(parsedInsights);
+    const loadInsights = async () => {
+      try {
+        // First try to load from localStorage for immediate display
+        const savedInsights = localStorage.getItem('insightsHistory');
+        if (savedInsights) {
+          const parsedInsights = JSON.parse(savedInsights);
+          setInsights(parsedInsights);
+        }
+
+        // Then try to load from Supabase if user is authenticated
+        if (user?.id) {
+          try {
+            const { data: supabaseInsights, error } = await supabase
+              .from('ai_insights')
+              .select('*')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false });
+
+            if (error) {
+              console.error('Error loading insights from Supabase:', error);
+            } else if (supabaseInsights && supabaseInsights.length > 0) {
+              // Transform Supabase data to match our Insight interface
+              const transformedInsights: Insight[] = supabaseInsights.map(item => ({
+                id: item.id,
+                summary: item.summary || item.insight_text || 'No summary available',
+                sentiment: item.sentiment || 'neutral',
+                key_themes: item.key_themes || item.themes || [],
+                suggested_actions: item.suggested_actions || item.actions || [],
+                created_at: item.created_at,
+                source_file: item.source_file || item.file_name
+              }));
+
+              console.log('Loaded insights from Supabase:', transformedInsights);
+              setInsights(transformedInsights);
+            }
+          } catch (supabaseError) {
+            console.error('Failed to load insights from Supabase:', supabaseError);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load insights:', err);
       }
-    } catch (err) {
-      console.error('Failed to load insights:', err);
-    }
-  }, []);
+    };
+
+    loadInsights();
+  }, [user?.id]);
 
   // Load user reports from localStorage (since we're using localStorage for now)
   useEffect(() => {
@@ -211,6 +247,44 @@ export default function Reports() {
         throw new Error('No insights data found for selected insights');
       }
 
+      // Aggregate sentiment data from insights
+      const sentimentCounts = { positive: 0, negative: 0, neutral: 0 };
+      selectedInsightsData.forEach(insight => {
+        if (insight.sentiment in sentimentCounts) {
+          sentimentCounts[insight.sentiment]++;
+        }
+      });
+
+      // Calculate sentiment percentages
+      const totalInsights = selectedInsightsData.length;
+      const sentimentBreakdown = {
+        positive: Math.round((sentimentCounts.positive / totalInsights) * 100),
+        negative: Math.round((sentimentCounts.negative / totalInsights) * 100),
+        neutral: Math.round((sentimentCounts.neutral / totalInsights) * 100)
+      };
+
+      // Extract and aggregate themes from insights
+      const themeCounts: { [key: string]: number } = {};
+      selectedInsightsData.forEach(insight => {
+        if (insight.key_themes && Array.isArray(insight.key_themes)) {
+          insight.key_themes.forEach(theme => {
+            themeCounts[theme] = (themeCounts[theme] || 0) + 1;
+          });
+        }
+      });
+
+      // Get top themes (top 5 by frequency)
+      const topThemes = Object.entries(themeCounts)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+        .map(([theme]) => theme);
+
+      console.log('Aggregated data for report:', {
+        insights_data: selectedInsightsData,
+        sentimentBreakdown,
+        topThemes
+      });
+
       // Call the generateReport Edge Function
       const response = await fetch(
         "https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/generateReport",
@@ -223,7 +297,9 @@ export default function Reports() {
           body: JSON.stringify({
             user_id: user.id,
             insights_ids: selectedInsights,
-            insights_data: selectedInsightsData, // Send actual insights data
+            insights_data: selectedInsightsData,
+            sentimentBreakdown,
+            topThemes,
             title: `AI Report - ${new Date().toLocaleDateString()}`,
             description: `Generated report based on ${selectedInsights.length} insights`
           })
@@ -240,13 +316,15 @@ export default function Reports() {
         throw new Error(result.error || 'Report generation failed');
       }
 
+      console.log('Generated report:', result.report);
+
       // Add the new report to the list
       setReports(prev => [result.report, ...prev]);
       setSelectedInsights([]);
       setShowInsightSelector(false);
       
       toast.success('Report generated successfully!', {
-        description: 'Your AI-powered report is ready.'
+        description: `AI report based on ${selectedInsights.length} insights is ready.`
       });
 
     } catch (error) {
@@ -527,6 +605,46 @@ export default function Reports() {
         >
           <Plus className="h-4 w-4" />
           Create Sample Report
+        </Button>
+
+        <Button 
+          onClick={async () => {
+            try {
+              if (user?.id) {
+                const { data: supabaseInsights, error } = await supabase
+                  .from('ai_insights')
+                  .select('*')
+                  .eq('user_id', user.id)
+                  .order('created_at', { ascending: false });
+
+                if (error) {
+                  toast.error('Failed to refresh insights');
+                } else if (supabaseInsights && supabaseInsights.length > 0) {
+                  const transformedInsights: Insight[] = supabaseInsights.map(item => ({
+                    id: item.id,
+                    summary: item.summary || item.insight_text || 'No summary available',
+                    sentiment: item.sentiment || 'neutral',
+                    key_themes: item.key_themes || item.themes || [],
+                    suggested_actions: item.suggested_actions || item.actions || [],
+                    created_at: item.created_at,
+                    source_file: item.source_file || item.file_name
+                  }));
+
+                  setInsights(transformedInsights);
+                  toast.success(`Refreshed ${transformedInsights.length} insights from database`);
+                } else {
+                  toast.info('No insights found in database');
+                }
+              }
+            } catch (error) {
+              toast.error('Failed to refresh insights');
+            }
+          }}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Refresh Insights
         </Button>
 
         <Button 
