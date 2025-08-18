@@ -17,6 +17,7 @@ import InsightsPage from "./pages/InsightsPage";
 import TestInsights from "./pages/TestInsights";
 import DemoInsights from "./pages/DemoInsights";
 import CompleteInsights from "./pages/CompleteInsights";
+import MockInsights from "./pages/MockInsights";
 import Reports from "./pages/Reports";
 import Analytics from "./pages/Analytics";
 import Billing from "./pages/Billing";
@@ -79,6 +80,13 @@ const App = () => (
               <ProtectedRoute>
                 <DashboardLayout>
                   <CompleteInsights />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/mock-insights" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <MockInsights />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
