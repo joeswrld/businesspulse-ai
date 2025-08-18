@@ -57,31 +57,35 @@ serve(async (req) => {
     const allThemes = insightsData.flatMap((i) => i.key_themes || []);
     const topThemes = [...new Set(allThemes)].slice(0, 10);
 
-    // === Step 3: Create grounded Gemini prompt ===
-    const prompt = `
-You are a senior business analyst. Generate a **professional, executive-level business report** based only on the provided insights and stats. 
-Do NOT invent sentiment percentages — use the provided breakdown.
+   // === Step 3: Create grounded Gemini prompt ===
+const prompt = `
+You are a senior business analyst. Generate a **professional, executive-level business report** strictly based on the provided data.  
+Do NOT invent or assume numbers — only use the exact stats provided.
 
+=== INPUT DATA ===
 User Insights Data:
 ${JSON.stringify(insightsData, null, 2)}
 
 Pre-aggregated Stats:
-Sentiment Breakdown = ${JSON.stringify(sentimentBreakdown)}
-Top Themes = ${JSON.stringify(topThemes)}
+- Sentiment Breakdown: ${JSON.stringify(sentimentBreakdown)}
+- Top Themes: ${JSON.stringify(topThemes)}
 
-Instructions:
-- Write a concise, professional report structured as JSON:
+=== OUTPUT REQUIREMENTS ===
+Return a single JSON object with this exact structure:
 {
-  "executive_summary": "...",
-  "key_insights": [...],
-  "trends": [...],
-  "recommended_actions": [...],
+  "executive_summary": "2–10 sentences summarizing sentiment, key themes, and strategic implications.",
+  "key_insights": ["Specific insights derived ONLY from the User Insights Data."],
+  "trends": ["Observed patterns or correlations in sentiment and themes."],
+  "recommended_actions": ["Business actions directly tied to the data (not generic advice)."],
   "sentiment_breakdown": ${JSON.stringify(sentimentBreakdown)},
   "top_themes": ${JSON.stringify(topThemes)}
 }
-- "executive_summary" should be 2–10 sentences, focused on user business context.
-- "key_insights", "trends", "recommended_actions" must be specific and derived only from the user’s actual insights.
-- Stay grounded in the provided data.
+
+=== RULES ===
+- Executive summary must be decision-focused, not descriptive fluff.  
+- Insights, trends, and actions must be **grounded only in the provided data**.  
+- Do NOT hallucinate or make up sentiment percentages.  
+- Keep output concise, structured, and strictly valid JSON.  
 `;
 
     // === Step 4: Call Gemini ===

@@ -36,25 +36,29 @@ serve(async (req) => {
       throw new Error('GEMINI_API_KEY not configured');
     }
 
-    // Call Gemini AI for analysis
-    const prompt = `
-    Analyze the following feedback:
-    "${text}"
+    // === Step: Call Gemini AI for analysis ===
+const prompt = `
+You are an AI assistant analyzing customer feedback.  
 
-    Respond in JSON with this format:
-    {
-      "summary": "A concise summary of the feedback",
-      "sentiment": "positive | negative | neutral"
-    }
+=== FEEDBACK ===
+"${text}"
 
-    Guidelines:
-    - Summary should be 1-10 sentences capturing the main points
-    - Sentiment should be:
-      * "positive" for praise, satisfaction, good experiences
-      * "negative" for complaints, dissatisfaction, problems
-      * "neutral" for factual statements, suggestions, or mixed feedback
-    - Be objective and accurate in your analysis
-    `;
+=== OUTPUT FORMAT ===
+Return a single JSON object in this exact structure:
+{
+  "summary": "1–5 sentence concise summary of the feedback",
+  "sentiment": "positive" | "negative" | "neutral"
+}
+
+=== RULES ===
+- "summary" must capture the main point(s) without adding extra opinions.  
+- "sentiment" classification:
+  * "positive" → praise, satisfaction, or good experiences.  
+  * "negative" → complaints, dissatisfaction, or problems.  
+  * "neutral" → factual statements, suggestions, or mixed/unclear sentiment.  
+- Be strictly objective and base analysis only on the feedback provided.  
+- Do NOT include any text outside the JSON object.  
+`;
 
     const geminiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent", {
       method: "POST",
