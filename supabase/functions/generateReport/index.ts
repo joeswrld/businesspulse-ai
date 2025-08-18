@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { insights_ids, user_id, title, description } = await req.json();
+    const { insights_ids, user_id, title, description, insights_data } = await req.json();
     
     if (!insights_ids || !Array.isArray(insights_ids) || insights_ids.length === 0) {
       throw new Error("No insights provided for report generation");
@@ -44,26 +44,13 @@ serve(async (req) => {
     // For now, we'll simulate the report creation
     const reportId = Date.now().toString();
 
-    // Prepare insights data for AI analysis
-    // In a real implementation, you would fetch these from Supabase
-    const insightsData = [
+    // Use the actual insights data provided by the user
+    const insightsData = insights_data || [
       {
-        summary: "Customer feedback shows positive sentiment about the new dashboard interface",
-        sentiment: "positive",
-        key_themes: ["dashboard", "user interface", "usability"],
-        suggested_actions: ["Continue UI improvements", "Monitor user adoption"]
-      },
-      {
-        summary: "Users report issues with mobile app performance and loading times",
-        sentiment: "negative",
-        key_themes: ["mobile app", "performance", "loading speed"],
-        suggested_actions: ["Optimize mobile performance", "Investigate loading issues"]
-      },
-      {
-        summary: "Mixed feedback on pricing structure with requests for more flexible options",
+        summary: "No insights data provided",
         sentiment: "neutral",
-        key_themes: ["pricing", "subscription", "flexibility"],
-        suggested_actions: ["Review pricing strategy", "Consider flexible plans"]
+        key_themes: ["general"],
+        suggested_actions: ["Gather more insights"]
       }
     ];
 

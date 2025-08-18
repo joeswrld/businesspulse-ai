@@ -86,123 +86,58 @@ export default function Reports() {
     }
   }, []);
 
-  // Mock reports data (replace with real Supabase queries)
+  // Load user reports from localStorage (since we're using localStorage for now)
   useEffect(() => {
     const fetchReports = async () => {
       try {
-        // Mock reports for demonstration
-        const mockReports: Report[] = [
-          {
-            id: '1',
-            user_id: user?.id || '',
-            title: 'Q4 Customer Feedback Analysis',
-            description: 'Comprehensive analysis of customer feedback from Q4 2024',
-            insights_ids: ['1', '2', '3'],
-            generated_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-            status: 'completed',
-            content: {
-              executive_summary: 'Customer feedback shows strong positive sentiment towards our new dashboard interface, with some concerns about mobile performance that need immediate attention.',
-              key_insights: [
-                'Dashboard interface receives 85% positive feedback',
-                'Mobile app performance issues affect 23% of users',
-                'Customer support satisfaction increased by 40%',
-                'Dark mode feature is highly requested'
-              ],
-              trends: [
-                'Positive sentiment trending upward over the last 30 days',
-                'Mobile-related complaints decreasing after recent updates',
-                'Feature requests for customization increasing',
-                'Support response times improving consistently'
-              ],
-              recommended_actions: [
-                'Prioritize mobile app performance optimization',
-                'Implement dark mode feature in next sprint',
-                'Continue dashboard improvements based on positive feedback',
-                'Maintain current support quality standards'
-              ],
-              sentiment_breakdown: {
-                positive: 65,
-                negative: 15,
-                neutral: 20
-              },
-              top_themes: ['dashboard', 'mobile app', 'customer support', 'dark mode']
-            }
-          },
-          {
-            id: '2',
-            user_id: user?.id || '',
-            title: 'Weekly Performance Review',
-            description: 'Weekly analysis of system performance and user feedback',
-            insights_ids: ['4', '5'],
-            generated_at: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-            status: 'processing',
-            insights_ids: ['4', '5']
-          },
-          {
-            id: '3',
-            user_id: user?.id || '',
-            title: 'Monthly Business Intelligence Report',
-            description: 'Monthly comprehensive business intelligence analysis',
-            insights_ids: ['6', '7', '8', '9'],
-            generated_at: new Date().toISOString(),
-            status: 'pending',
-            insights_ids: ['6', '7', '8', '9']
-          }
-        ];
-        
-        setReports(mockReports);
+        // For now, we'll use localStorage to store user reports
+        // In a real implementation, this would be Supabase queries
+        const savedReports = localStorage.getItem('userReports');
+        if (savedReports) {
+          const parsedReports = JSON.parse(savedReports);
+          // Filter reports for current user
+          const userReports = parsedReports.filter((report: Report) => report.user_id === user?.id);
+          setReports(userReports);
+        } else {
+          setReports([]);
+        }
       } catch (error) {
         console.error('Error fetching reports:', error);
         toast.error('Failed to load reports');
+        setReports([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchReports();
+    if (user) {
+      fetchReports();
+    }
   }, [user]);
 
-  // Mock real-time updates
+  // Save reports to localStorage when reports change
   useEffect(() => {
-    const interval = setInterval(() => {
-      // Simulate report status updates
-      setReports(prev => prev.map(report => {
-        if (report.status === 'processing' && Math.random() > 0.7) {
-          return {
-            ...report,
-            status: 'completed' as const,
-            content: {
-              executive_summary: 'Analysis completed successfully with actionable insights for business improvement.',
-              key_insights: [
-                'User engagement increased by 25%',
-                'Mobile performance issues resolved',
-                'Customer satisfaction scores improved'
-              ],
-              trends: [
-                'Positive trend in user feedback',
-                'Decreasing support tickets',
-                'Increasing feature adoption'
-              ],
-              recommended_actions: [
-                'Continue current improvement strategies',
-                'Monitor mobile performance metrics',
-                'Expand successful features'
-              ],
-              sentiment_breakdown: {
-                positive: 70,
-                negative: 10,
-                neutral: 20
-              },
-              top_themes: ['performance', 'user experience', 'features']
-            }
-          };
+    if (reports.length > 0) {
+      try {
+        // Get existing reports from localStorage
+        const existingReports = localStorage.getItem('userReports');
+        let allReports: Report[] = [];
+        
+        if (existingReports) {
+          allReports = JSON.parse(existingReports);
+          // Remove old reports for this user
+          allReports = allReports.filter((report: Report) => report.user_id !== user?.id);
         }
-        return report;
-      }));
-    }, 5000); // Check every 5 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+        
+        // Add current user's reports
+        allReports = [...allReports, ...reports];
+        
+        localStorage.setItem('userReports', JSON.stringify(allReports));
+      } catch (error) {
+        console.error('Error saving reports to localStorage:', error);
+      }
+    }
+  }, [reports, user?.id]);
 
   const handleGenerateReport = async () => {
     if (selectedInsights.length === 0) {
@@ -217,6 +152,15 @@ export default function Reports() {
 
     setGeneratingReport(true);
     try {
+      // Get the actual insights data for the selected insights
+      const selectedInsightsData = insights.filter(insight => 
+        selectedInsights.includes(insight.id)
+      );
+
+      if (selectedInsightsData.length === 0) {
+        throw new Error('No insights data found for selected insights');
+      }
+
       // Call the generateReport Edge Function
       const response = await fetch(
         "https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/generateReport",
@@ -229,6 +173,7 @@ export default function Reports() {
           body: JSON.stringify({
             user_id: user.id,
             insights_ids: selectedInsights,
+            insights_data: selectedInsightsData, // Send actual insights data
             title: `AI Report - ${new Date().toLocaleDateString()}`,
             description: `Generated report based on ${selectedInsights.length} insights`
           })
@@ -616,7 +561,14 @@ export default function Reports() {
             </div>
 
             <div className="max-h-60 overflow-y-auto space-y-2">
-              {insights.map((insight) => (
+              {insights.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Lightbulb className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm">No insights available</p>
+                  <p className="text-xs">Generate some insights first to create reports</p>
+                </div>
+              ) : (
+                insights.map((insight) => (
                 <div
                   key={insight.id}
                   className={`p-3 border rounded-lg cursor-pointer transition-colors ${
@@ -651,7 +603,8 @@ export default function Reports() {
                     </div>
                   </div>
                 </div>
-              ))}
+                ))
+              )}
             </div>
 
             <div className="mt-4 flex items-center justify-between">
@@ -690,12 +643,19 @@ export default function Reports() {
               <p className="text-gray-500 mb-4">
                 {searchTerm || statusFilter !== 'all' 
                   ? 'Try adjusting your search or filters'
-                  : 'Generate your first report to get started'
+                  : insights.length === 0 
+                    ? 'First, generate some insights to create reports'
+                    : 'Generate your first report from your insights'
                 }
               </p>
-              {!searchTerm && statusFilter === 'all' && (
+              {!searchTerm && statusFilter === 'all' && insights.length > 0 && (
                 <Button onClick={() => setShowInsightSelector(true)}>
                   Generate First Report
+                </Button>
+              )}
+              {!searchTerm && statusFilter === 'all' && insights.length === 0 && (
+                <Button onClick={() => window.location.href = '/insights'}>
+                  Go to Insights
                 </Button>
               )}
             </CardContent>
