@@ -65,33 +65,6 @@ const dashboardStyles = `
     color: #1e40af;
   }
 
-  .sentiment-meter {
-    width: 100%;
-    height: 8px;
-    background: #e5e7eb;
-    border-radius: 4px;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .sentiment-fill {
-    height: 100%;
-    border-radius: 4px;
-    transition: width 0.3s ease;
-  }
-
-  .sentiment-fill.positive {
-    background: linear-gradient(90deg, #10b981, #059669);
-  }
-
-  .sentiment-fill.negative {
-    background: linear-gradient(90deg, #ef4444, #dc2626);
-  }
-
-  .sentiment-fill.neutral {
-    background: linear-gradient(90deg, #6b7280, #4b5563);
-  }
-
   .trend-indicator {
     display: inline-flex;
     align-items: center;
@@ -117,6 +90,23 @@ const dashboardStyles = `
     color: #374151;
   }
 
+  .suggestion-card {
+    border-left: 4px solid;
+    transition: all 0.2s ease;
+  }
+
+  .suggestion-card.high {
+    border-left-color: #ef4444;
+  }
+
+  .suggestion-card.medium {
+    border-left-color: #f59e0b;
+  }
+
+  .suggestion-card.low {
+    border-left-color: #3b82f6;
+  }
+
   .metric-card {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -134,23 +124,6 @@ const dashboardStyles = `
   .metric-label {
     font-size: 0.875rem;
     opacity: 0.9;
-  }
-
-  .suggestion-card {
-    border-left: 4px solid;
-    transition: all 0.2s ease;
-  }
-
-  .suggestion-card.high {
-    border-left-color: #ef4444;
-  }
-
-  .suggestion-card.medium {
-    border-left-color: #f59e0b;
-  }
-
-  .suggestion-card.low {
-    border-left-color: #3b82f6;
   }
 
   .file-upload-area {
@@ -196,40 +169,26 @@ const dashboardStyles = `
   }
 `;
 
-interface Theme {
-  name: string;
-  frequency: number;
-  sentiment: "positive" | "negative" | "neutral";
-  examples: string[];
-}
-
-interface Suggestion {
-  action: string;
-  priority: "high" | "medium" | "low";
-  category: "feature" | "support" | "bug" | "improvement";
-  impact: "high" | "medium" | "low";
-}
-
-interface SentimentBreakdown {
-  positive: number;
-  negative: number;
-  neutral: number;
-}
-
 interface InsightsData {
   summary: string;
-  sentiment: {
-    overall: "positive" | "negative" | "neutral";
-    confidence: number;
-    breakdown: SentimentBreakdown;
-  };
-  themes: Theme[];
-  suggestions: Suggestion[];
-  trends: {
-    sentiment_trend: "improving" | "declining" | "stable";
+  sentiment: string;
+  themes?: Array<{
+    name: string;
+    frequency: number;
+    sentiment: string;
+    examples: string[];
+  }>;
+  suggestions?: Array<{
+    action: string;
+    priority: string;
+    category: string;
+    impact: string;
+  }>;
+  trends?: {
+    sentiment_trend: string;
     key_insights: string[];
   };
-  metrics: {
+  metrics?: {
     total_feedback_count: number;
     positive_ratio: number;
     negative_ratio: number;
@@ -518,13 +477,39 @@ export default function ActionableInsights() {
         throw new Error("Invalid response from analysis service.");
       }
 
-      setInsights(json.result);
+      // Handle both old and new response formats
+      let processedInsights: InsightsData;
+      
+      if (typeof json.result.sentiment === 'string') {
+        // Old format - convert to new format
+        processedInsights = {
+          summary: json.result.summary || "Analysis completed",
+          sentiment: json.result.sentiment || "neutral",
+          themes: [],
+          suggestions: [],
+          trends: {
+            sentiment_trend: "stable",
+            key_insights: ["Analysis completed successfully"]
+          },
+          metrics: {
+            total_feedback_count: 1,
+            positive_ratio: json.result.sentiment === "positive" ? 1 : 0,
+            negative_ratio: json.result.sentiment === "negative" ? 1 : 0,
+            neutral_ratio: json.result.sentiment === "neutral" ? 1 : 0
+          }
+        };
+      } else {
+        // New format - use as is
+        processedInsights = json.result;
+      }
+
+      setInsights(processedInsights);
       
       // Add to history
       const newInsight = {
         id: Date.now().toString(),
         input_text: input,
-        insights: json.result,
+        insights: processedInsights,
         created_at: new Date().toISOString(),
         source_file: uploadedFile?.name || null
       };
@@ -534,7 +519,7 @@ export default function ActionableInsights() {
       
       // Show success toast
       toast.success("🎯 Actionable insights generated!", {
-        description: `Found ${json.result.themes?.length || 0} themes and ${json.result.suggestions?.length || 0} suggestions.`
+        description: `Found ${processedInsights.themes?.length || 0} themes and ${processedInsights.suggestions?.length || 0} suggestions.`
       });
     } catch (err) {
       let errorMessage = "Analysis failed";
@@ -573,22 +558,6 @@ export default function ActionableInsights() {
     link.click();
     URL.revokeObjectURL(url);
     toast.success("Insights exported successfully!");
-  };
-
-  const getSentimentColor = (sentiment: string) => {
-    switch (sentiment) {
-      case 'positive': return '#10b981';
-      case 'negative': return '#ef4444';
-      default: return '#6b7280';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return '#ef4444';
-      case 'medium': return '#f59e0b';
-      default: return '#3b82f6';
-    }
   };
 
   return (
@@ -748,15 +717,15 @@ export default function ActionableInsights() {
                 
                 <div className="grid grid-cols-3 gap-4 mb-4">
                   <div className="metric-card">
-                    <div className="metric-value">{Math.round(insights.metrics.positive_ratio * 100)}%</div>
+                    <div className="metric-value">{Math.round((insights.metrics?.positive_ratio || 0) * 100)}%</div>
                     <div className="metric-label">Positive</div>
                   </div>
                   <div className="metric-card">
-                    <div className="metric-value">{Math.round(insights.metrics.negative_ratio * 100)}%</div>
+                    <div className="metric-value">{Math.round((insights.metrics?.negative_ratio || 0) * 100)}%</div>
                     <div className="metric-label">Negative</div>
                   </div>
                   <div className="metric-card">
-                    <div className="metric-value">{Math.round(insights.metrics.neutral_ratio * 100)}%</div>
+                    <div className="metric-value">{Math.round((insights.metrics?.neutral_ratio || 0) * 100)}%</div>
                     <div className="metric-label">Neutral</div>
                   </div>
                 </div>
@@ -765,19 +734,21 @@ export default function ActionableInsights() {
                   <div>
                     <span className="text-sm font-medium text-gray-500">Overall Sentiment:</span>
                     <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${
-                      insights.sentiment.overall === "positive" ? "bg-green-100 text-green-800" :
-                      insights.sentiment.overall === "negative" ? "bg-red-100 text-red-800" :
+                      insights.sentiment === "positive" ? "bg-green-100 text-green-800" :
+                      insights.sentiment === "negative" ? "bg-red-100 text-red-800" :
                       "bg-gray-100 text-gray-800"
                     }`}>
-                      {insights.sentiment.overall}
+                      {insights.sentiment}
                     </span>
                   </div>
-                  <div className="trend-indicator ${insights.trends.sentiment_trend}">
-                    {insights.trends.sentiment_trend === "improving" && "↗️"}
-                    {insights.trends.sentiment_trend === "declining" && "↘️"}
-                    {insights.trends.sentiment_trend === "stable" && "→"}
-                    {insights.trends.sentiment_trend}
-                  </div>
+                  {insights.trends && (
+                    <div className={`trend-indicator ${insights.trends.sentiment_trend}`}>
+                      {insights.trends.sentiment_trend === "improving" && "↗️"}
+                      {insights.trends.sentiment_trend === "declining" && "↘️"}
+                      {insights.trends.sentiment_trend === "stable" && "→"}
+                      {insights.trends.sentiment_trend}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -790,7 +761,7 @@ export default function ActionableInsights() {
                       <div key={index} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="font-medium text-gray-900">{theme.name}</h3>
-                          <span className="theme-tag ${theme.sentiment}">
+                          <span className={`theme-tag ${theme.sentiment}`}>
                             {theme.sentiment}
                           </span>
                         </div>
@@ -895,11 +866,11 @@ export default function ActionableInsights() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        item.insights.sentiment.overall === "positive" ? "bg-green-100 text-green-800" :
-                        item.insights.sentiment.overall === "negative" ? "bg-red-100 text-red-800" :
+                        item.insights.sentiment === "positive" ? "bg-green-100 text-green-800" :
+                        item.insights.sentiment === "negative" ? "bg-red-100 text-red-800" :
                         "bg-gray-100 text-gray-800"
                       }`}>
-                        {item.insights.sentiment.overall}
+                        {item.insights.sentiment}
                       </span>
                       <span className="text-xs text-gray-500">
                         {item.insights.themes?.length || 0} themes, {item.insights.suggestions?.length || 0} suggestions
