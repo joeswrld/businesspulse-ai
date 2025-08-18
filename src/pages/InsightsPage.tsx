@@ -99,9 +99,12 @@ export default function InsightsPage() {
       <button
         onClick={handleAnalyze}
         disabled={loading}
-        className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg"
+        className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
       >
-        {loading ? "Processing..." : "Analyze"}
+        {loading && (
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+        )}
+        <span>{loading ? "Processing..." : "Analyze"}</span>
       </button>
 
       <div className="mt-6 flex items-center gap-4">
@@ -139,32 +142,80 @@ export default function InsightsPage() {
       </div>
 
       <div className="mt-6 space-y-4">
-        {filteredInsights.map((i) => (
-          <div key={i.id} className="p-4 border rounded-lg shadow-sm">
-            <p className="text-gray-700"><b>Input:</b> {highlightMatch(i.input_text, search)}</p>
-            {i.summary ? (
-              <>
-                <p className="mt-2 text-blue-700"><b>Summary:</b> {highlightMatch(i.summary, search)}</p>
-                <p className="mt-1">
-                  <b>Sentiment:</b>{" "}
-                  <span
-                    className={
-                      i.sentiment === "positive"
-                        ? "text-green-600 font-semibold"
-                        : i.sentiment === "negative"
-                        ? "text-red-600 font-semibold"
-                        : "text-gray-600 font-semibold"
-                    }
-                  >
-                    {i.sentiment}
-                  </span>
-                </p>
-              </>
-            ) : (
-              <p className="mt-2 text-gray-500 italic">⏳ Analyzing...</p>
-            )}
+        {filteredInsights.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-gray-400 mb-4">
+              <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No insights found</h3>
+            <p className="text-gray-500">
+              {search || filter !== "all" 
+                ? "Try adjusting your search or filters."
+                : "Submit some text above to get started with AI analysis."
+              }
+            </p>
           </div>
-        ))}
+        ) : (
+          filteredInsights.map((i) => (
+            <div key={i.id} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+              <div className="p-6">
+                {/* Input Section */}
+                <div className="mb-4">
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Input Text</h3>
+                  <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
+                    {highlightMatch(i.input_text, search)}
+                  </p>
+                </div>
+
+                {/* Analysis Results */}
+                {i.summary ? (
+                  <div className="space-y-4">
+                    {/* Summary */}
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500 mb-2">AI Summary</h3>
+                      <p className="text-gray-900 bg-blue-50 p-3 rounded-md border-l-4 border-blue-400">
+                        {highlightMatch(i.summary, search)}
+                      </p>
+                    </div>
+
+                    {/* Sentiment */}
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500 mb-2">Sentiment Analysis</h3>
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                          i.sentiment === "positive"
+                            ? "bg-green-100 text-green-800"
+                            : i.sentiment === "negative"
+                            ? "bg-red-100 text-red-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {i.sentiment === "positive" && "🌞 "}
+                        {i.sentiment === "negative" && "⚠️ "}
+                        {i.sentiment === "neutral" && "😐 "}
+                        {i.sentiment}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2 text-gray-500">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <span>Analyzing with AI...</span>
+                  </div>
+                )}
+
+                {/* Timestamp */}
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-xs text-gray-400">
+                    Analyzed on {new Date(i.created_at).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
