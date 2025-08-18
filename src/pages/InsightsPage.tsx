@@ -523,6 +523,52 @@ export default function InsightsPage() {
     }
   };
 
+  const calculateAverageConfidence = () => {
+    if (insightsHistory.length === 0) return 0;
+    
+    // Calculate confidence based on sentiment strength and analysis quality
+    const totalConfidence = insightsHistory.reduce((sum, insight) => {
+      let confidence = 75; // Base confidence
+      
+      // Adjust based on sentiment
+      if (insight.sentiment === 'positive') confidence += 10;
+      if (insight.sentiment === 'negative') confidence += 5;
+      
+      // Adjust based on number of themes and actions
+      if (insight.key_themes && insight.key_themes.length > 2) confidence += 5;
+      if (insight.suggested_actions && insight.suggested_actions.length > 2) confidence += 5;
+      
+      // Cap at 95%
+      return sum + Math.min(confidence, 95);
+    }, 0);
+    
+    return Math.round(totalConfidence / insightsHistory.length);
+  };
+
+  const calculateSentimentDistribution = () => {
+    if (insightsHistory.length === 0) return 'N/A';
+    
+    const sentimentCounts = insightsHistory.reduce((counts, insight) => {
+      const sentiment = insight.sentiment || 'neutral';
+      counts[sentiment] = (counts[sentiment] || 0) + 1;
+      return counts;
+    }, {} as Record<string, number>);
+    
+    const total = insightsHistory.length;
+    const positive = sentimentCounts.positive || 0;
+    const negative = sentimentCounts.negative || 0;
+    const neutral = sentimentCounts.neutral || 0;
+    
+    // Return the dominant sentiment with percentage
+    if (positive >= negative && positive >= neutral) {
+      return `${Math.round((positive / total) * 100)}% Positive`;
+    } else if (negative >= positive && negative >= neutral) {
+      return `${Math.round((negative / total) * 100)}% Negative`;
+    } else {
+      return `${Math.round((neutral / total) * 100)}% Neutral`;
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <style dangerouslySetInnerHTML={{ __html: dashboardStyles }} />
@@ -531,27 +577,119 @@ export default function InsightsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">🎯 Actionable Insights Dashboard</h1>
         <p className="text-gray-600">Transform feedback into actionable business intelligence with AI-powered analysis</p>
-        <div className="mt-4 flex items-center gap-4">
-          <span className="text-sm text-gray-500">
-            Total analyses: {insightsHistory.length}
-          </span>
-          {insightsHistory.length > 0 && (
-            <>
-              <button
-                onClick={exportInsights}
-                className="text-sm text-blue-600 hover:text-blue-800 underline"
-              >
-                Export JSON
-              </button>
-              <button
-                onClick={clearHistory}
-                className="text-sm text-red-600 hover:text-red-800 underline"
-              >
-                Clear History
-              </button>
-            </>
-          )}
-        </div>
+        
+        {/* Enhanced Statistics Section */}
+        {insightsHistory.length > 0 ? (
+          <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">📊 Analysis Overview</h3>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Last updated:</span>
+                <span className="text-sm font-medium text-gray-800">
+                  {new Date().toLocaleTimeString()}
+                </span>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Total Analyses */}
+              <div className="bg-white rounded-lg p-4 shadow-sm border border-blue-200 hover:shadow-md transition-all duration-200 hover:scale-105">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Total Analyses</p>
+                    <p className="text-2xl font-bold text-blue-600">{insightsHistory.length}</p>
+                  </div>
+                  <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <svg className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Average Confidence */}
+              <div className="bg-white rounded-lg p-4 shadow-sm border border-green-200 hover:shadow-md transition-all duration-200 hover:scale-105">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Avg Confidence</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {calculateAverageConfidence()}%
+                    </p>
+                  </div>
+                  <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
+                    <svg className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sentiment Distribution */}
+              <div className="bg-white rounded-lg p-4 shadow-sm border border-purple-200 hover:shadow-md transition-all duration-200 hover:scale-105">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Sentiment</p>
+                    <p className="text-2xl font-bold text-purple-600">
+                      {calculateSentimentDistribution()}
+                    </p>
+                  </div>
+                  <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <div className="h-5 w-5 text-purple-600">
+                      {getSentimentEmoji(calculateSentimentDistribution().includes('Positive') ? 'positive' : 
+                        calculateSentimentDistribution().includes('Negative') ? 'negative' : 'neutral')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="bg-white rounded-lg p-4 shadow-sm border border-orange-200 hover:shadow-md transition-all duration-200 hover:scale-105">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Actions</p>
+                    <div className="flex space-x-2 mt-1">
+                      <button
+                        onClick={exportInsights}
+                        className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors font-medium"
+                      >
+                        Export JSON
+                      </button>
+                      <button
+                        onClick={clearHistory}
+                        className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors font-medium"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                  <div className="h-10 w-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <svg className="h-5 w-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-6 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-6 border border-gray-200">
+            <div className="text-center">
+              <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">No Analyses Yet</h3>
+              <p className="text-gray-600 mb-4">Start by uploading a file or entering text to generate your first AI-powered insights</p>
+              <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
+                <span>📁 Upload files</span>
+                <span>•</span>
+                <span>📝 Enter text</span>
+                <span>•</span>
+                <span>🎯 Get insights</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
