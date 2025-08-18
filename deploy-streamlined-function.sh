@@ -36,7 +36,7 @@ if [ $? -eq 0 ]; then
     
     echo ""
     echo "🎉 Streamlined function is ready!"
-    echo "Visit: http://localhost:5173/insights"
+    echo "Visit: http://localhost:5173/actionable-insights"
     echo ""
     echo "✨ Optimized Features:"
     echo "  - Clean, concise ChatGPT-style prompt"

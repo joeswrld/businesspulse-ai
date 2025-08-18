@@ -216,7 +216,7 @@ and the addition of dark mode.
 ### **Deploy the Upgraded Dashboard:**
 ```bash
 # The dashboard is already live at:
-http://localhost:5173/insights
+http://localhost:5173/actionable-insights
 ```
 
 ### **Usage Workflow:**
