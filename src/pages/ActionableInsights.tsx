@@ -171,7 +171,15 @@ const dashboardStyles = `
 
 interface InsightsData {
   summary: string;
-  sentiment: string;
+  sentiment: {
+    overall: string;
+    confidence: number;
+    breakdown: {
+      positive: number;
+      negative: number;
+      neutral: number;
+    };
+  };
   themes?: Array<{
     name: string;
     frequency: number;
@@ -183,6 +191,7 @@ interface InsightsData {
     priority: string;
     category: string;
     impact: string;
+    effort?: string;
   }>;
   trends?: {
     sentiment_trend: string;
@@ -193,6 +202,12 @@ interface InsightsData {
     positive_ratio: number;
     negative_ratio: number;
     neutral_ratio: number;
+  };
+  processing_metadata?: {
+    chunks_processed: number;
+    categories_detected: string[];
+    original_length: number;
+    normalized_length: number;
   };
 }
 
@@ -484,7 +499,15 @@ export default function ActionableInsights() {
         // Old format - convert to new format
         processedInsights = {
           summary: json.result.summary || "Analysis completed",
-          sentiment: json.result.sentiment || "neutral",
+          sentiment: {
+            overall: json.result.sentiment || "neutral",
+            confidence: 0.7,
+            breakdown: {
+              positive: json.result.sentiment === "positive" ? 1 : 0,
+              negative: json.result.sentiment === "negative" ? 1 : 0,
+              neutral: json.result.sentiment === "neutral" ? 1 : 0
+            }
+          },
           themes: [],
           suggestions: [],
           trends: {
@@ -730,26 +753,29 @@ export default function ActionableInsights() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-sm font-medium text-gray-500">Overall Sentiment:</span>
-                    <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${
-                      insights.sentiment === "positive" ? "bg-green-100 text-green-800" :
-                      insights.sentiment === "negative" ? "bg-red-100 text-red-800" :
-                      "bg-gray-100 text-gray-800"
-                    }`}>
-                      {insights.sentiment}
-                    </span>
-                  </div>
-                  {insights.trends && (
-                    <div className={`trend-indicator ${insights.trends.sentiment_trend}`}>
-                      {insights.trends.sentiment_trend === "improving" && "↗️"}
-                      {insights.trends.sentiment_trend === "declining" && "↘️"}
-                      {insights.trends.sentiment_trend === "stable" && "→"}
-                      {insights.trends.sentiment_trend}
+                                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">Overall Sentiment:</span>
+                      <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${
+                        insights.sentiment.overall === "positive" ? "bg-green-100 text-green-800" :
+                        insights.sentiment.overall === "negative" ? "bg-red-100 text-red-800" :
+                        "bg-gray-100 text-gray-800"
+                      }`}>
+                        {insights.sentiment.overall}
+                      </span>
+                      <span className="ml-2 text-sm text-gray-500">
+                        (Confidence: {Math.round(insights.sentiment.confidence * 100)}%)
+                      </span>
                     </div>
-                  )}
-                </div>
+                    {insights.trends && (
+                      <div className={`trend-indicator ${insights.trends.sentiment_trend}`}>
+                        {insights.trends.sentiment_trend === "improving" && "↗️"}
+                        {insights.trends.sentiment_trend === "declining" && "↘️"}
+                        {insights.trends.sentiment_trend === "stable" && "→"}
+                        {insights.trends.sentiment_trend}
+                      </div>
+                    )}
+                  </div>
               </div>
 
               {/* Themes Card */}
@@ -823,6 +849,31 @@ export default function ActionableInsights() {
                   </div>
                 </div>
               )}
+
+              {/* Processing Metadata */}
+              {insights.processing_metadata && (
+                <div className="insight-card p-6">
+                  <h2 className="text-xl font-semibold mb-4">🔧 Processing Details</h2>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium text-gray-500">Chunks Processed:</span>
+                      <span className="ml-2 text-gray-900">{insights.processing_metadata.chunks_processed}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Categories:</span>
+                      <span className="ml-2 text-gray-900">{insights.processing_metadata.categories_detected.join(', ')}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Original Length:</span>
+                      <span className="ml-2 text-gray-900">{insights.processing_metadata.original_length.toLocaleString()} chars</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Normalized Length:</span>
+                      <span className="ml-2 text-gray-900">{insights.processing_metadata.normalized_length.toLocaleString()} chars</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="insight-card p-6 text-center">
@@ -866,11 +917,11 @@ export default function ActionableInsights() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        item.insights.sentiment === "positive" ? "bg-green-100 text-green-800" :
-                        item.insights.sentiment === "negative" ? "bg-red-100 text-red-800" :
+                        (typeof item.insights.sentiment === 'string' ? item.insights.sentiment : item.insights.sentiment.overall) === "positive" ? "bg-green-100 text-green-800" :
+                        (typeof item.insights.sentiment === 'string' ? item.insights.sentiment : item.insights.sentiment.overall) === "negative" ? "bg-red-100 text-red-800" :
                         "bg-gray-100 text-gray-800"
                       }`}>
-                        {item.insights.sentiment}
+                        {typeof item.insights.sentiment === 'string' ? item.insights.sentiment : item.insights.sentiment.overall}
                       </span>
                       <span className="text-xs text-gray-500">
                         {item.insights.themes?.length || 0} themes, {item.insights.suggestions?.length || 0} suggestions
