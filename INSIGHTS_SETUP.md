@@ -64,13 +64,21 @@ ALTER PUBLICATION supabase_realtime ADD TABLE insights;
 
 ## ⚡ Edge Function Setup
 
-### 2. Deploy the Generate Insight Function
+### 2. Deploy the Insights Analysis Function
 
+**Option A: Using the deployment script**
+```bash
+./deploy-insights-function.sh
+```
+
+**Option B: Manual deployment**
 1. Go to your Supabase Dashboard
 2. Navigate to Edge Functions
-3. Create a new function called `generate-insight`
-4. Copy the code from `supabase/functions/generate-insight/index.ts`
+3. Create a new function called `insightsAnalysis`
+4. Copy the code from `supabase/functions/insightsAnalysis/index.ts`
 5. Deploy the function
+
+**Function URL:** `https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/insightsAnalysis`
 
 ### 3. Set Environment Variables
 

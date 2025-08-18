@@ -89,21 +89,31 @@ export default function InsightsPage() {
       }
 
       // Call edge function to generate insight
-      const response = await fetch("/functions/v1/generate-insight", {
+      const response = await fetch("/functions/v1/insightsAnalysis", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ 
-          text: input, 
-          user_id: user.id, 
-          insight_id: newRow.id 
+          data: input
         }),
       });
 
       if (!response.ok) {
         throw new Error("Failed to generate insight");
       }
+
+      const { result } = await response.json();
+      
+      // Update the insight with the AI results
+      await supabase
+        .from("insights")
+        .update({ 
+          summary: result.summary, 
+          sentiment: result.sentiment 
+        })
+        .eq("id", newRow.id)
+        .eq("user_id", user.id);
 
       setInput("");
       toast.info("⏳ Processing your insight...");
