@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { 
   FileText, 
   Plus, 
@@ -69,6 +71,7 @@ export default function Reports() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'processing' | 'completed' | 'failed'>('all');
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  const [exportingPDF, setExportingPDF] = useState(false);
 
   // Load insights from localStorage
   useEffect(() => {
@@ -275,6 +278,216 @@ export default function Reports() {
     );
   };
 
+  const exportToPDF = async (report: Report) => {
+    if (!report.content) {
+      toast.error('Report content not available for export');
+      return;
+    }
+
+    setExportingPDF(true);
+    try {
+      toast.info('Generating PDF...', {
+        description: 'Please wait while we create your report.'
+      });
+
+      // Create a temporary div for PDF generation
+      const pdfContainer = document.createElement('div');
+      pdfContainer.style.position = 'absolute';
+      pdfContainer.style.left = '-9999px';
+      pdfContainer.style.top = '0';
+      pdfContainer.style.width = '800px';
+      pdfContainer.style.backgroundColor = 'white';
+      pdfContainer.style.padding = '40px';
+      pdfContainer.style.fontFamily = 'Arial, sans-serif';
+      pdfContainer.style.color = '#333';
+      document.body.appendChild(pdfContainer);
+
+      // Generate PDF content
+      pdfContainer.innerHTML = `
+        <div style="margin-bottom: 30px;">
+          <h1 style="color: #1f2937; font-size: 28px; margin-bottom: 10px; border-bottom: 3px solid #3b82f6; padding-bottom: 10px;">
+            ${report.title}
+          </h1>
+          <p style="color: #6b7280; font-size: 14px; margin-bottom: 20px;">
+            Generated on ${new Date(report.generated_at).toLocaleDateString()} • 
+            Based on ${report.insights_ids.length} insights
+          </p>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 15px;">
+            Executive Summary
+          </h2>
+          <p style="font-size: 16px; line-height: 1.6; color: #374151;">
+            ${report.content.executive_summary}
+          </p>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #10b981; padding-left: 15px;">
+            Key Insights
+          </h2>
+          <ul style="font-size: 14px; line-height: 1.6; color: #374151; padding-left: 20px;">
+            ${report.content.key_insights.map(insight => 
+              `<li style="margin-bottom: 8px;">${insight}</li>`
+            ).join('')}
+          </ul>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #f59e0b; padding-left: 15px;">
+            Trends
+          </h2>
+          <ul style="font-size: 14px; line-height: 1.6; color: #374151; padding-left: 20px;">
+            ${report.content.trends.map(trend => 
+              `<li style="margin-bottom: 8px;">${trend}</li>`
+            ).join('')}
+          </ul>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #ef4444; padding-left: 15px;">
+            Recommended Actions
+          </h2>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            ${report.content.recommended_actions.map((action, index) => `
+              <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; background-color: #f9fafb;">
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                  <div style="width: 24px; height: 24px; background-color: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; margin-right: 10px;">
+                    ${index + 1}
+                  </div>
+                  <span style="font-weight: 600; color: #1f2937;">Action ${index + 1}</span>
+                </div>
+                <p style="font-size: 13px; line-height: 1.5; color: #374151; margin: 0;">
+                  ${action}
+                </p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #8b5cf6; padding-left: 15px;">
+            Sentiment Analysis
+          </h2>
+          <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+            <div style="text-align: center; flex: 1;">
+              <div style="width: 60px; height: 60px; background-color: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; color: white; font-weight: bold; font-size: 18px;">
+                ${report.content.sentiment_breakdown.positive}%
+              </div>
+              <p style="font-size: 14px; color: #10b981; font-weight: 600; margin: 0;">Positive</p>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div style="width: 60px; height: 60px; background-color: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; color: white; font-weight: bold; font-size: 18px;">
+                ${report.content.sentiment_breakdown.negative}%
+              </div>
+              <p style="font-size: 14px; color: #ef4444; font-weight: 600; margin: 0;">Negative</p>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div style="width: 60px; height: 60px; background-color: #6b7280; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; color: white; font-weight: bold; font-size: 18px;">
+                ${report.content.sentiment_breakdown.neutral}%
+              </div>
+              <p style="font-size: 14px; color: #6b7280; font-weight: 600; margin: 0;">Neutral</p>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #06b6d4; padding-left: 15px;">
+            Top Themes
+          </h2>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            ${report.content.top_themes.map(theme => 
+              `<span style="background-color: #e0e7ff; color: #3730a3; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">${theme}</span>`
+            ).join('')}
+          </div>
+        </div>
+
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 12px;">
+          <p>Generated by AI Insights Platform • ${new Date().toLocaleDateString()}</p>
+        </div>
+      `;
+
+      // Convert to canvas
+      const canvas = await html2canvas(pdfContainer, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      });
+
+      // Remove temporary container
+      document.body.removeChild(pdfContainer);
+
+      // Create PDF
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      // Save PDF
+      const fileName = `${report.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+
+      toast.success('PDF exported successfully!', {
+        description: `Report saved as ${fileName}`
+      });
+
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF');
+    } finally {
+      setExportingPDF(false);
+    }
+  };
+
+  const exportAllCompletedReports = async () => {
+    const completedReports = reports.filter(report => report.status === 'completed' && report.content);
+    
+    if (completedReports.length === 0) {
+      toast.error('No completed reports available for export');
+      return;
+    }
+
+    setExportingPDF(true);
+    try {
+      toast.info(`Generating ${completedReports.length} PDFs...`, {
+        description: 'Please wait while we create your reports.'
+      });
+
+      for (let i = 0; i < completedReports.length; i++) {
+        const report = completedReports[i];
+        await exportToPDF(report);
+        
+        // Small delay between exports to prevent browser overload
+        if (i < completedReports.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      toast.success(`Successfully exported ${completedReports.length} reports!`);
+    } catch (error) {
+      console.error('Error in bulk export:', error);
+      toast.error('Failed to export some reports');
+    } finally {
+      setExportingPDF(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800 border-green-200';
@@ -327,6 +540,25 @@ export default function Reports() {
         >
           <Plus className="h-4 w-4" />
           Generate New Report
+        </Button>
+
+        <Button 
+          onClick={exportAllCompletedReports}
+          variant="outline"
+          className="flex items-center gap-2"
+          disabled={exportingPDF || reports.filter(r => r.status === 'completed').length === 0}
+        >
+          {exportingPDF ? (
+            <>
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Exporting...
+            </>
+          ) : (
+            <>
+              <Download className="h-4 w-4" />
+              Export All Completed
+            </>
+          )}
         </Button>
 
         <div className="flex items-center gap-2">
@@ -608,9 +840,23 @@ export default function Reports() {
                   </div>
 
                   <div className="mt-6 flex justify-end">
-                    <Button variant="outline" className="flex items-center gap-2">
-                      <Download className="h-4 w-4" />
-                      Export Report
+                    <Button 
+                      variant="outline" 
+                      className="flex items-center gap-2"
+                      onClick={() => exportToPDF(report)}
+                      disabled={exportingPDF}
+                    >
+                      {exportingPDF ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          Generating PDF...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="h-4 w-4" />
+                          Export PDF
+                        </>
+                      )}
                     </Button>
                   </div>
                 </CardContent>
