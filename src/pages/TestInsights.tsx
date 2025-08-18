@@ -42,32 +42,90 @@ export default function TestInsights() {
   const [result, setResult] = useState<any>(null);
 
   const handleAnalyze = async () => {
+    // 1️⃣ Empty input validation
     if (!input.trim()) {
-      toast.error("Please provide some data");
+      toast.error("Please provide some data before analyzing.");
+      return;
+    }
+
+    // 2️⃣ Input length validation
+    if (input.length > 10000) {
+      toast.error("Input is too long. Please keep it under 10,000 characters.");
+      return;
+    }
+
+    // 3️⃣ Prevent double submission
+    if (loading) {
+      toast.error("Analysis already in progress. Please wait.");
       return;
     }
 
     setLoading(true);
+    
     try {
+      // 4️⃣ Network timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
       const res = await fetch(
         "https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/insightsAnalysis",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data: input }), // send your input state
+          body: JSON.stringify({ data: input }),
+          signal: controller.signal,
         }
       );
 
+      clearTimeout(timeoutId);
+
+      // 5️⃣ HTTP error handling
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error("Analysis service not found. Please check if the Edge Function is deployed.");
+        } else if (res.status === 500) {
+          throw new Error("Server error. Please try again later.");
+        } else if (res.status === 429) {
+          throw new Error("Too many requests. Please wait a moment before trying again.");
+        } else {
+          throw new Error(`Request failed with status ${res.status}`);
+        }
+      }
+
       const json = await res.json();
 
-      if (json.error) throw new Error(json.error); // handle errors from Edge Function
+      // 6️⃣ API error handling
+      if (json.error) {
+        throw new Error(json.error);
+      }
 
-      setResult(json.result); // render Gemini's analysis in your UI
+      // 7️⃣ Response validation
+      if (!json.result || !json.result.summary || !json.result.sentiment) {
+        throw new Error("Invalid response from analysis service.");
+      }
+
+      setResult(json.result);
       toast.success("✅ Analysis complete!");
     } catch (err) {
-      toast.error("Analysis failed: " + err.message); // user-friendly error
+      // 8️⃣ Comprehensive error handling
+      let errorMessage = "Analysis failed";
+      
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          errorMessage = "Request timed out. Please try again.";
+        } else if (err.message.includes('fetch')) {
+          errorMessage = "Network error. Please check your connection.";
+        } else {
+          errorMessage = err.message;
+        }
+      } else {
+        errorMessage = "An unexpected error occurred.";
+      }
+      
+      toast.error(errorMessage);
+      console.error("Analysis error:", err);
     } finally {
-      setLoading(false); // stop loading spinner
+      setLoading(false);
     }
   };
 

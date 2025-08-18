@@ -28,29 +28,71 @@ export default function InsightsPage() {
 
 
   const handleAnalyze = async () => {
+    // 1️⃣ Empty input validation
     if (!input.trim()) {
-      toast.error("Please provide some data");
+      toast.error("Please provide some data before analyzing.");
+      return;
+    }
+
+    // 2️⃣ Input length validation (prevent huge datasets)
+    if (input.length > 10000) {
+      toast.error("Input is too long. Please keep it under 10,000 characters.");
+      return;
+    }
+
+    // 3️⃣ Prevent double submission
+    if (loading) {
+      toast.error("Analysis already in progress. Please wait.");
       return;
     }
 
     setLoading(true);
+    
     try {
+      // 4️⃣ Network timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const res = await fetch(
         "https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/insightsAnalysis",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data: input }), // send your input state
+          body: JSON.stringify({ data: input }),
+          signal: controller.signal,
         }
       );
 
+      clearTimeout(timeoutId);
+
+      // 5️⃣ HTTP error handling
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error("Analysis service not found. Please check if the Edge Function is deployed.");
+        } else if (res.status === 500) {
+          throw new Error("Server error. Please try again later.");
+        } else if (res.status === 429) {
+          throw new Error("Too many requests. Please wait a moment before trying again.");
+        } else {
+          throw new Error(`Request failed with status ${res.status}`);
+        }
+      }
+
       const json = await res.json();
 
-      if (json.error) throw new Error(json.error); // handle errors from Edge Function
+      // 6️⃣ API error handling
+      if (json.error) {
+        throw new Error(json.error);
+      }
 
-      // Add the result to insights array
+      // 7️⃣ Response validation
+      if (!json.result || !json.result.summary || !json.result.sentiment) {
+        throw new Error("Invalid response from analysis service.");
+      }
+
+      // 8️⃣ Add the result to insights array
       const newInsight = {
-        id: Date.now().toString(), // temporary ID
+        id: Date.now().toString(),
         input_text: input,
         summary: json.result.summary,
         sentiment: json.result.sentiment,
@@ -60,7 +102,7 @@ export default function InsightsPage() {
       setInsights(prev => [newInsight, ...prev]);
       setInput("");
       
-      // Show sentiment-based toast
+      // 9️⃣ Show sentiment-based toast
       const sentiment = json.result.sentiment;
       if (sentiment === "positive") {
         toast.success("🌞 Positive feedback detected!");
@@ -70,9 +112,25 @@ export default function InsightsPage() {
         toast("😐 Neutral feedback logged", { description: "No strong sentiment." });
       }
     } catch (err) {
-      toast.error("Analysis failed: " + err.message); // user-friendly error
+      // 1️⃣0️⃣ Comprehensive error handling
+      let errorMessage = "Analysis failed";
+      
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          errorMessage = "Request timed out. Please try again.";
+        } else if (err.message.includes('fetch')) {
+          errorMessage = "Network error. Please check your connection.";
+        } else {
+          errorMessage = err.message;
+        }
+      } else {
+        errorMessage = "An unexpected error occurred.";
+      }
+      
+      toast.error(errorMessage);
+      console.error("Analysis error:", err);
     } finally {
-      setLoading(false); // stop loading spinner
+      setLoading(false);
     }
   };
 
