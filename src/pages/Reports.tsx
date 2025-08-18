@@ -139,6 +139,56 @@ export default function Reports() {
     }
   }, [reports, user?.id]);
 
+  // Debug: Log reports when they change
+  useEffect(() => {
+    console.log('Reports state updated:', reports);
+  }, [reports]);
+
+  // Debug: Log expandedReport when it changes
+  useEffect(() => {
+    console.log('expandedReport state changed to:', expandedReport);
+  }, [expandedReport]);
+
+  // Function to create sample report data for testing
+  const createSampleReport = () => {
+    const sampleReport: Report = {
+      id: `sample-${Date.now()}`,
+      user_id: user?.id || 'sample-user',
+      title: 'Sample AI Report',
+      description: 'This is a sample report for testing the preview functionality',
+      insights_ids: ['sample-insight-1', 'sample-insight-2'],
+      generated_at: new Date().toISOString(),
+      status: 'completed',
+      content: {
+        executive_summary: 'This is a comprehensive analysis of your data insights, providing actionable recommendations for improvement.',
+        key_insights: [
+          'Customer satisfaction has improved by 15% over the last quarter',
+          'Product usage patterns show increased engagement during evening hours',
+          'Support ticket resolution time has decreased by 20%'
+        ],
+        trends: [
+          'Growing adoption of mobile features',
+          'Seasonal variations in user activity',
+          'Increasing demand for premium features'
+        ],
+        recommended_actions: [
+          'Implement mobile-first design improvements',
+          'Optimize evening-time user experience',
+          'Expand premium feature offerings'
+        ],
+        sentiment_breakdown: {
+          positive: 65,
+          negative: 15,
+          neutral: 20
+        },
+        top_themes: ['User Experience', 'Mobile Optimization', 'Feature Development', 'Customer Support']
+      }
+    };
+    
+    setReports(prev => [sampleReport, ...prev]);
+    toast.success('Sample report created! Click the eye icon to preview it.');
+  };
+
   const handleGenerateReport = async () => {
     if (selectedInsights.length === 0) {
       toast.error('Please select at least one insight to include in the report');
@@ -298,14 +348,12 @@ export default function Reports() {
             ${report.content.recommended_actions.map((action, index) => `
               <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; background-color: #f9fafb;">
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                  <div style="width: 24px; height: 24px; background-color: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; margin-right: 10px;">
+                  <div style="width: 24px; height: 24px; background-color: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 12px;">
                     ${index + 1}
                   </div>
                   <span style="font-weight: 600; color: #1f2937;">Action ${index + 1}</span>
                 </div>
-                <p style="font-size: 13px; line-height: 1.5; color: #374151; margin: 0;">
-                  ${action}
-                </p>
+                <p style="color: #374151; line-height: 1.5;">${action}</p>
               </div>
             `).join('')}
           </div>
@@ -313,58 +361,43 @@ export default function Reports() {
 
         <div style="margin-bottom: 30px;">
           <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #8b5cf6; padding-left: 15px;">
-            Sentiment Analysis
-          </h2>
-          <div style="display: flex; gap: 20px; margin-bottom: 20px;">
-            <div style="text-align: center; flex: 1;">
-              <div style="width: 60px; height: 60px; background-color: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; color: white; font-weight: bold; font-size: 18px;">
-                ${report.content.sentiment_breakdown.positive}%
-              </div>
-              <p style="font-size: 14px; color: #10b981; font-weight: 600; margin: 0;">Positive</p>
-            </div>
-            <div style="text-align: center; flex: 1;">
-              <div style="width: 60px; height: 60px; background-color: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; color: white; font-weight: bold; font-size: 18px;">
-                ${report.content.sentiment_breakdown.negative}%
-              </div>
-              <p style="font-size: 14px; color: #ef4444; font-weight: 600; margin: 0;">Negative</p>
-            </div>
-            <div style="text-align: center; flex: 1;">
-              <div style="width: 60px; height: 60px; background-color: #6b7280; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; color: white; font-weight: bold; font-size: 18px;">
-                ${report.content.sentiment_breakdown.neutral}%
-              </div>
-              <p style="font-size: 14px; color: #6b7280; font-weight: 600; margin: 0;">Neutral</p>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-bottom: 30px;">
-          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #06b6d4; padding-left: 15px;">
             Top Themes
           </h2>
-          <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
             ${report.content.top_themes.map(theme => 
-              `<span style="background-color: #e0e7ff; color: #3730a3; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;">${theme}</span>`
+              `<span style="background-color: #f3f4f6; color: #374151; padding: 6px 12px; border-radius: 16px; font-size: 12px; border: 1px solid #d1d5db;">${theme}</span>`
             ).join('')}
           </div>
         </div>
 
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 12px;">
-          <p>Generated by NoteX • ${new Date().toLocaleDateString()}</p>
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #10b981; padding-left: 15px;">
+            Sentiment Breakdown
+          </h2>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+            <div style="text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: #10b981;">${report.content.sentiment_breakdown.positive}%</div>
+              <div style="color: #6b7280; font-size: 14px;">Positive</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: #ef4444;">${report.content.sentiment_breakdown.negative}%</div>
+              <div style="color: #6b7280; font-size: 14px;">Negative</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: #6b7280;">${report.content.sentiment_breakdown.neutral}%</div>
+              <div style="color: #6b7280; font-size: 14px;">Neutral</div>
+            </div>
+          </div>
         </div>
       `;
 
-      // Convert to canvas
+      // Convert to canvas and then to PDF
       const canvas = await html2canvas(pdfContainer, {
         scale: 2,
         useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
+        allowTaint: true
       });
 
-      // Remove temporary container
-      document.body.removeChild(pdfContainer);
-
-      // Create PDF
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgWidth = 210;
@@ -384,17 +417,17 @@ export default function Reports() {
         heightLeft -= pageHeight;
       }
 
-      // Save PDF
-      const fileName = `${report.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${new Date().toISOString().split('T')[0]}.pdf`;
-      pdf.save(fileName);
+      // Clean up
+      document.body.removeChild(pdfContainer);
 
-      toast.success('PDF exported successfully!', {
-        description: `Report saved as ${fileName}`
-      });
+      // Download the PDF
+      pdf.save(`${report.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${new Date().toISOString().split('T')[0]}.pdf`);
+
+      toast.success('PDF exported successfully!');
 
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast.error('Failed to generate PDF');
+      console.error('Error exporting PDF:', error);
+      toast.error('Failed to export PDF');
     } finally {
       setExportingPDF(false);
     }
@@ -488,6 +521,15 @@ export default function Reports() {
         </Button>
 
         <Button 
+          onClick={createSampleReport}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          Create Sample Report
+        </Button>
+
+        <Button 
           onClick={exportAllCompletedReports}
           variant="outline"
           className="flex items-center gap-2"
@@ -543,92 +585,102 @@ export default function Reports() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-2 mb-4">
-              <Button 
-                onClick={handleSelectAllInsights}
-                variant="outline"
-                size="sm"
-              >
-                Select All ({insights.length})
-              </Button>
-              <Button 
-                onClick={handleDeselectAllInsights}
-                variant="outline"
-                size="sm"
-              >
-                Deselect All
-              </Button>
-            </div>
-
-            <div className="max-h-60 overflow-y-auto space-y-2">
-              {insights.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Lightbulb className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm">No insights available</p>
-                  <p className="text-xs">Generate some insights first to create reports</p>
-                </div>
-              ) : (
-                insights.map((insight) => (
-                <div
-                  key={insight.id}
-                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                    selectedInsights.includes(insight.id)
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                  onClick={() => handleToggleInsight(insight.id)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900 mb-1">
-                        {insight.summary.substring(0, 100)}...
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <Badge className={insight.sentiment === 'positive' ? 'bg-green-100 text-green-800' : 
-                                        insight.sentiment === 'negative' ? 'bg-red-100 text-red-800' : 
-                                        'bg-gray-100 text-gray-800'}>
-                          {insight.sentiment}
-                        </Badge>
-                        <span className="text-xs text-gray-500">
-                          {new Date(insight.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="ml-2">
-                      {selectedInsights.includes(insight.id) ? (
-                        <CheckCircle className="h-5 w-5 text-blue-600" />
-                      ) : (
-                        <div className="h-5 w-5 border-2 border-gray-300 rounded-full" />
-                      )}
-                    </div>
+            {insights.length === 0 ? (
+              <div className="text-center py-8">
+                <Lightbulb className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500 mb-4">No insights available</p>
+                <p className="text-xs">Generate some insights first to create reports</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={handleSelectAllInsights}>
+                      Select All
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleDeselectAllInsights}>
+                      Deselect All
+                    </Button>
                   </div>
+                  <span className="text-sm text-gray-600">
+                    {selectedInsights.length} of {insights.length} insights selected
+                  </span>
                 </div>
-                ))
-              )}
-            </div>
 
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm text-gray-600">
-                {selectedInsights.length} of {insights.length} insights selected
-              </p>
-              <Button 
-                onClick={handleGenerateReport}
-                disabled={generatingReport || selectedInsights.length === 0}
-                className="flex items-center gap-2"
-              >
-                {generatingReport ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="h-4 w-4" />
-                    Generate Report
-                  </>
-                )}
-              </Button>
-            </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+                  {insights.map((insight) => (
+                    <Card 
+                      key={insight.id} 
+                      className={`cursor-pointer transition-all ${
+                        selectedInsights.includes(insight.id) 
+                          ? 'ring-2 ring-blue-500 bg-blue-50' 
+                          : 'hover:shadow-md'
+                      }`}
+                      onClick={() => handleToggleInsight(insight.id)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedInsights.includes(insight.id)}
+                            onChange={() => handleToggleInsight(insight.id)}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-700 line-clamp-3">
+                              {insight.summary}
+                            </p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Badge 
+                                variant="secondary" 
+                                className={`text-xs ${
+                                  insight.sentiment === 'positive' ? 'bg-green-100 text-green-800' :
+                                  insight.sentiment === 'negative' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}
+                              >
+                                {insight.sentiment}
+                              </Badge>
+                              {insight.source_file && (
+                                <span className="text-xs text-gray-500">
+                                  {insight.source_file}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowInsightSelector(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleGenerateReport}
+                    disabled={generatingReport || selectedInsights.length === 0}
+                    className="flex items-center gap-2"
+                  >
+                    {generatingReport ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-4 w-4" />
+                        Generate Report
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
@@ -692,7 +744,16 @@ export default function Reports() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setExpandedReport(expandedReport === report.id ? null : report.id)}
+                      onClick={() => {
+                        console.log('Eye icon clicked for report:', report.id);
+                        console.log('Report data:', report);
+                        console.log('Report content:', report.content);
+                        console.log('Current expandedReport:', expandedReport);
+                        
+                        const newExpandedState = expandedReport === report.id ? null : report.id;
+                        console.log('Setting expandedReport to:', newExpandedState);
+                        setExpandedReport(newExpandedState);
+                      }}
                     >
                       {expandedReport === report.id ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
@@ -700,125 +761,165 @@ export default function Reports() {
                 </div>
               </CardHeader>
 
-              {expandedReport === report.id && report.content && (
+              {expandedReport === report.id && (
                 <CardContent className="border-t pt-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Executive Summary */}
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                        <BarChart3 className="h-4 w-4" />
-                        Executive Summary
-                      </h4>
-                      <p className="text-gray-700 text-sm leading-relaxed">
-                        {report.content.executive_summary}
+                  {!report.content ? (
+                    <div className="text-center py-8">
+                      <div className="text-gray-400 mb-4">
+                        <BarChart3 className="h-16 w-16 mx-auto" />
+                      </div>
+                      <h4 className="text-lg font-medium text-gray-900 mb-2">Report Content Not Available</h4>
+                      <p className="text-gray-600 text-sm mb-4">
+                        This report doesn't have content yet or the content structure is incomplete.
                       </p>
-                    </div>
-
-                    {/* Sentiment Breakdown */}
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4" />
-                        Sentiment Breakdown
-                      </h4>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-green-600">Positive</span>
-                          <span className="text-sm font-medium">{report.content.sentiment_breakdown.positive}%</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-red-600">Negative</span>
-                          <span className="text-sm font-medium">{report.content.sentiment_breakdown.negative}%</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Neutral</span>
-                          <span className="text-sm font-medium">{report.content.sentiment_breakdown.neutral}%</span>
-                        </div>
+                      <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg">
+                        <p className="mb-2"><strong>Report ID:</strong> {report.id}</p>
+                        <p className="mb-2"><strong>Status:</strong> {report.status}</p>
+                        <p className="mb-2"><strong>Generated:</strong> {new Date(report.generated_at).toLocaleDateString()}</p>
+                        <p><strong>Insights Count:</strong> {report.insights_ids.length}</p>
                       </div>
                     </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Executive Summary */}
+                        <div>
+                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4" />
+                            Executive Summary
+                          </h4>
+                          <p className="text-gray-700 text-sm leading-relaxed">
+                            {report.content.executive_summary || 'No executive summary available'}
+                          </p>
+                        </div>
 
-                    {/* Key Insights */}
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                        <Lightbulb className="h-4 w-4" />
-                        Key Insights
-                      </h4>
-                      <ul className="space-y-1">
-                        {report.content.key_insights.map((insight, index) => (
-                          <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
-                            <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
-                            {insight}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    {/* Trends */}
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4" />
-                        Trends
-                      </h4>
-                      <ul className="space-y-1">
-                        {report.content.trends.map((trend, index) => (
-                          <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
-                            <div className="w-1.5 h-1.5 bg-green-600 rounded-full mt-2 flex-shrink-0"></div>
-                            {trend}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    {/* Recommended Actions */}
-                    <div className="lg:col-span-2">
-                      <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                        <Target className="h-4 w-4" />
-                        Recommended Actions
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {report.content.recommended_actions.map((action, index) => (
-                          <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border">
-                            <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-                              <span className="text-blue-600 text-sm font-bold">{index + 1}</span>
+                        {/* Sentiment Breakdown */}
+                        <div>
+                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4" />
+                            Sentiment Breakdown
+                          </h4>
+                          {report.content.sentiment_breakdown ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-green-600">Positive</span>
+                                <span className="text-sm font-medium">{report.content.sentiment_breakdown.positive || 0}%</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-red-600">Negative</span>
+                                <span className="text-sm font-medium">{report.content.sentiment_breakdown.negative || 0}%</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">Neutral</span>
+                                <span className="text-sm font-medium">{report.content.sentiment_breakdown.neutral || 0}%</span>
+                              </div>
                             </div>
-                            <span className="text-sm text-gray-700">{action}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                          ) : (
+                            <p className="text-gray-500 text-sm">Sentiment data not available</p>
+                          )}
+                        </div>
 
-                    {/* Top Themes */}
-                    <div className="lg:col-span-2">
-                      <h4 className="font-semibold text-gray-900 mb-2">Top Themes</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {report.content.top_themes.map((theme, index) => (
-                          <Badge key={index} variant="secondary" className="bg-purple-100 text-purple-800">
-                            {theme}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                        {/* Key Insights */}
+                        <div>
+                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                            <Lightbulb className="h-4 w-4" />
+                            Key Insights
+                          </h4>
+                          {report.content.key_insights && report.content.key_insights.length > 0 ? (
+                            <ul className="space-y-1">
+                              {report.content.key_insights.map((insight, index) => (
+                                <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
+                                  <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                                  {insight}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-gray-500 text-sm">No key insights available</p>
+                          )}
+                        </div>
 
-                  <div className="mt-6 flex justify-end">
-                    <Button 
-                      variant="outline" 
-                      className="flex items-center gap-2"
-                      onClick={() => exportToPDF(report)}
-                      disabled={exportingPDF}
-                    >
-                      {exportingPDF ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 animate-spin" />
-                          Generating PDF...
-                        </>
-                      ) : (
-                        <>
-                          <Download className="h-4 w-4" />
-                          Export PDF
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                        {/* Trends */}
+                        <div>
+                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4" />
+                            Trends
+                          </h4>
+                          {report.content.trends && report.content.trends.length > 0 ? (
+                            <ul className="space-y-1">
+                              {report.content.trends.map((trend, index) => (
+                                <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
+                                  <div className="w-1.5 h-1.5 bg-green-600 rounded-full mt-2 flex-shrink-0"></div>
+                                  {trend}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-gray-500 text-sm">No trends data available</p>
+                          )}
+                        </div>
+
+                        {/* Recommended Actions */}
+                        <div className="lg:col-span-2">
+                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                            <Target className="h-4 w-4" />
+                            Recommended Actions
+                          </h4>
+                          {report.content.recommended_actions && report.content.recommended_actions.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {report.content.recommended_actions.map((action, index) => (
+                                <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border">
+                                  <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <span className="text-blue-600 text-sm font-bold">{index + 1}</span>
+                                  </div>
+                                  <span className="text-sm text-gray-700">{action}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-gray-500 text-sm">No recommended actions available</p>
+                          )}
+                        </div>
+
+                        {/* Top Themes */}
+                        <div className="lg:col-span-2">
+                          <h4 className="font-semibold text-gray-900 mb-2">Top Themes</h4>
+                          {report.content.top_themes && report.content.top_themes.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {report.content.top_themes.map((theme, index) => (
+                                <Badge key={index} variant="secondary" className="bg-purple-100 text-purple-800">
+                                  {theme}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-gray-500 text-sm">No themes data available</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-6 flex justify-end">
+                        <Button 
+                          variant="outline" 
+                          className="flex items-center gap-2"
+                          onClick={() => exportToPDF(report)}
+                          disabled={exportingPDF}
+                        >
+                          {exportingPDF ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                              Generating PDF...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4" />
+                              Export PDF
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               )}
             </Card>
