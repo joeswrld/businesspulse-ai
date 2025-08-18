@@ -49,13 +49,6 @@ const App = () => (
                 </DashboardLayout>
               </ProtectedRoute>
             } />
-            <Route path="/insights" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <AIInsights />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
             <Route path="/insights-simple" element={
               <ProtectedRoute>
                 <DashboardLayout>

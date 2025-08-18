@@ -23,7 +23,7 @@ You are a senior product analyst and insights expert. Analyze user feedback care
 
 Step 1: Identify key themes.
 Step 2: Determine overall sentiment.
-Step 3: Suggest 2-5 actionable steps.
+Step 3: Suggest 2-10 actionable steps.
 Step 4: Provide a concise 1-3 sentence summary.
 
 Strictly return JSON only, with this structure:

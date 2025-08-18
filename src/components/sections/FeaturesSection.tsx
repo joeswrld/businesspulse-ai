@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Brain, Zap, FileText, BarChart3, Users, Shield, Globe, Download } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +20,7 @@ const FeaturesSection = () => {
     {
       icon: FileText,
       title: "Multi-format Support",
-      description: "Upload documents, CSVs, connect APIs, or input text directly. We handle all your data sources.",
+      description: "Upload documents, CSVs, or input text directly. We handle all your data sources.",
       badge: "Flexible"
     },
     {
@@ -112,7 +113,7 @@ const FeaturesSection = () => {
               Join hundreds of businesses already using NoteX to make smarter, data-driven decisions every day.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="inline-flex items-center justify-center gap-2 h-11 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 bg-gradient-primary text-primary-foreground hover:shadow-glow transform hover:scale-105 shadow-medium">
+              <button className="inline-flex items-center justify-center gap-2 h-11 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 bg-gradient-primary text-primary-foreground hover:shadow-glow transform hover:scale-105 shadow-medium" >
                 Start Your Free Trial
               </button>
             </div>

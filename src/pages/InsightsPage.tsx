@@ -433,7 +433,7 @@ export default function InsightsPage() {
       return;
     }
 
-    if (input.length > 10000) {
+    if (input.length > 500000) {
       toast.error("Input is too long. Please keep it under 10,000 characters.");
       return;
     }
@@ -597,7 +597,7 @@ export default function InsightsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
-            <h1 className="text-4xl font-bold ai-text ai-neon-text">AI Insights Engine</h1>
+            <h1 className="text-4xl font-bold ai-text ai-neon-text">AI Insights </h1>
           </div>
           <p className="ai-text-secondary text-lg">Advanced AI analysis for actionable business intelligence</p>
           
@@ -697,11 +697,6 @@ export default function InsightsPage() {
                         Clear
                       </button>
                     </div>
-                  </div>
-                  <div className="h-12 w-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
-                    </svg>
                   </div>
                 </div>
               </div>
@@ -843,7 +838,7 @@ export default function InsightsPage() {
             />
             
             <div className="mt-2 ai-text-muted text-sm">
-              {input.length}/10,000 characters
+              {input.length}/500,000 characters
             </div>
             
             <button 

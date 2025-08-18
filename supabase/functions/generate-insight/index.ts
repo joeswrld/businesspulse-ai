@@ -48,7 +48,7 @@ serve(async (req) => {
     }
 
     Guidelines:
-    - Summary should be 1-2 sentences capturing the main points
+    - Summary should be 1-10 sentences capturing the main points
     - Sentiment should be:
       * "positive" for praise, satisfaction, good experiences
       * "negative" for complaints, dissatisfaction, problems

@@ -1,3 +1,5 @@
+
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Play, Star, TrendingUp, Zap, Brain } from "lucide-react";
@@ -33,9 +35,9 @@ const HeroSection = () => {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button variant="hero" size="lg" className="w-full sm:w-auto">
-                Start 8-Day Free Trial
-                <ArrowRight className="h-5 w-5 ml-2" />
+              <Button variant="hero" size="lg" className="w-full sm:w-auto" asChild>
+              <Link to="/auth">Start Free Trial <ArrowRight className="h-5 w-5 ml-2" /></Link>
+                
               </Button>
             </div>
 

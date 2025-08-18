@@ -28,7 +28,7 @@ if [ $? -eq 0 ]; then
     
     echo ""
     echo "🎉 Professional function is ready!"
-    echo "Visit: http://localhost:5173/insights"
+    echo "Visit: http://localhost:5173/insights-page"
     echo ""
     echo "📊 Expected Output Structure:"
     echo "  - summary: Professional analysis summary"

@@ -62,10 +62,10 @@ ${JSON.stringify(insightsData, null, 2)}
 
 Please create a professional report that includes:
 
-1. **Executive Summary**: A concise 2-3 sentence overview of the main findings
-2. **Key Insights**: 4-6 most important insights extracted from the data
-3. **Trends**: 3-4 patterns or trends identified across the insights
-4. **Recommended Actions**: 4-6 actionable recommendations for the business
+1. **Executive Summary**: A concise 2-10 sentence overview of the main findings
+2. **Key Insights**: 4-10 most important insights extracted from the data
+3. **Trends**: 3-10 patterns or trends identified across the insights
+4. **Recommended Actions**: 4-10 actionable recommendations for the business
 5. **Sentiment Breakdown**: Calculate the percentage breakdown of positive, negative, and neutral sentiment
 6. **Top Themes**: Extract the most common themes from the insights
 

@@ -215,7 +215,7 @@ INSTRUCTIONS:
 5. Provide confidence scores (0-100) based on data quality and insight reliability
 
 OUTPUT FORMAT:
-Generate 3-5 insights in this exact JSON format:
+Generate 3-10 insights in this exact JSON format:
 [
   {
     "title": "Clear, actionable insight title",

@@ -153,11 +153,11 @@ Generate 3-5 unique, actionable business insights. For each insight, provide:
 2. Category (one of: business_opportunity, risk_alert, trend_analysis, operational_insight, customer_feedback, performance_metric)
 3. Priority (High, Medium, or Low)
 4. Confidence score (0.0 to 1.0)
-5. Summary (1-2 sentences)
-6. Key findings (2-4 specific, quantified points)
-7. Actionable recommendations (2-3 specific steps)
+5. Summary (1-10 sentences)
+6. Key findings (2-10 specific, quantified points)
+7. Actionable recommendations (2-10 specific steps)
 8. Projected impact (quantified benefit or outcome)
-9. Relevant tags (3-5 keywords)
+9. Relevant tags (3-10 keywords)
 
 Return your response as a JSON array of insights in this exact format:
 [
