@@ -13,6 +13,7 @@ import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
 import DataUpload from "./pages/DataUpload";
 import AIInsights from "./pages/AIInsights";
+import InsightsPage from "./pages/InsightsPage";
 import Reports from "./pages/Reports";
 import Analytics from "./pages/Analytics";
 import Billing from "./pages/Billing";
@@ -47,6 +48,13 @@ const App = () => (
               <ProtectedRoute>
                 <DashboardLayout>
                   <AIInsights />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/insights-simple" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <InsightsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             } />

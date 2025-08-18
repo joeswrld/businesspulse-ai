@@ -29,6 +29,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "AI Insights", href: "/insights", icon: Brain },
+    { name: "Insights Simple", href: "/insights-simple", icon: Brain },
     { name: "Reports", href: "/reports", icon: FileText },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
     { name: "Billing", href: "/billing", icon: CreditCard },
