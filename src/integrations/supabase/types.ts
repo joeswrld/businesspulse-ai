@@ -447,6 +447,59 @@ export type Database = {
           },
         ]
       }
+      ai_jobs: {
+        Row: {
+          id: string
+          user_id: string
+          data_source_id: string | null
+          job_type: string
+          status: string
+          progress: number | null
+          result: Json
+          error_message: string | null
+          started_at: string | null
+          completed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          data_source_id?: string | null
+          job_type: string
+          status?: string
+          progress?: number | null
+          result?: Json
+          error_message?: string | null
+          started_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          data_source_id?: string | null
+          job_type?: string
+          status?: string
+          progress?: number | null
+          result?: Json
+          error_message?: string | null
+          started_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_jobs_data_source_id_fkey"
+            columns: ["data_source_id"]
+            isOneToOne: false
+            referencedRelation: "data_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_preferences: {
         Row: {
           ai_tone: string | null
