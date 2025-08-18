@@ -11,8 +11,8 @@ interface InsightsData {
 
 export default function InsightsPage() {
   const [input, setInput] = useState("");
+  const [result, setResult] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [insights, setInsights] = useState<InsightsData | null>(null);
   const [insightsHistory, setInsightsHistory] = useState<Array<InsightsData & { id: string; timestamp: string }>>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +37,7 @@ export default function InsightsPage() {
     }
   }, [insightsHistory]);
 
-  const analyzeInsights = async () => {
+  const handleAnalyze = async () => {
     if (!input.trim()) {
       toast.error("Please provide some feedback to analyze.");
       return;
@@ -52,7 +52,7 @@ export default function InsightsPage() {
     setError(null);
 
     try {
-      const response = await fetch(
+      const res = await fetch(
         "https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/insightsAnalysis",
         {
           method: "POST",
@@ -64,25 +64,22 @@ export default function InsightsPage() {
         }
       );
 
-      if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`);
+      if (!res.ok) {
+        throw new Error(`Request failed with status ${res.status}`);
       }
 
-      const data = await response.json();
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      if (!data.result) {
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      
+      if (!json.result) {
         throw new Error("Invalid response from analysis service.");
       }
 
-      setInsights(data.result);
+      setResult(json.result);
       
       // Add to history
       const newInsight = {
-        ...data.result,
+        ...json.result,
         id: Date.now().toString(),
         timestamp: new Date().toISOString()
       };
@@ -91,11 +88,11 @@ export default function InsightsPage() {
       setInput("");
 
       // Show success toast with sentiment
-      const sentimentEmoji = data.result.sentiment === "positive" ? "😊" : 
-                            data.result.sentiment === "negative" ? "😔" : "😐";
+      const sentimentEmoji = json.result.sentiment === "positive" ? "😊" : 
+                            json.result.sentiment === "negative" ? "😔" : "😐";
       
       toast.success(`${sentimentEmoji} Analysis Complete!`, {
-        description: `Found ${data.result.key_themes.length} themes and ${data.result.suggested_actions.length} actionable items.`
+        description: `Found ${json.result.key_themes.length} themes and ${json.result.suggested_actions.length} actionable items.`
       });
 
     } catch (err) {
@@ -120,7 +117,7 @@ export default function InsightsPage() {
   const clearHistory = () => {
     if (window.confirm("Are you sure you want to clear all insights history? This cannot be undone.")) {
       setInsightsHistory([]);
-      setInsights(null);
+      setResult(null);
       toast.success("Insights history cleared.");
     }
   };
@@ -138,11 +135,9 @@ export default function InsightsPage() {
   };
 
   const getSentimentColor = (sentiment: string) => {
-    switch (sentiment) {
-      case 'positive': return 'bg-green-100 text-green-800 border-green-200';
-      case 'negative': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
+    if (sentiment === "positive") return "bg-green-200 text-green-800 border-green-300";
+    if (sentiment === "negative") return "bg-red-200 text-red-800 border-red-300";
+    return "bg-gray-200 text-gray-800 border-gray-300";
   };
 
   const getSentimentEmoji = (sentiment: string) => {
@@ -154,10 +149,10 @@ export default function InsightsPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="max-w-6xl mx-auto p-6">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">🎯 Professional Insights Dashboard</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">🎯 Insights Dashboard</h1>
         <p className="text-gray-600">Transform feedback into actionable business intelligence</p>
         <div className="mt-4 flex items-center gap-4">
           <span className="text-sm text-gray-500">
@@ -191,7 +186,7 @@ export default function InsightsPage() {
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Paste your customer feedback, reviews, or any text data here for professional analysis..."
+              placeholder="Paste your user feedback here for professional analysis..."
               className="w-full p-4 border border-gray-300 rounded-lg min-h-[200px] resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={loading}
             />
@@ -200,8 +195,8 @@ export default function InsightsPage() {
               {input.length}/10,000 characters
             </div>
             
-            <button 
-              onClick={analyzeInsights} 
+            <button
+              onClick={handleAnalyze}
               disabled={loading || !input.trim()}
               className="mt-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg disabled:opacity-50 flex items-center space-x-2 hover:from-blue-700 hover:to-purple-700 transition-all w-full justify-center font-semibold"
             >
@@ -212,7 +207,7 @@ export default function InsightsPage() {
                 </>
               ) : (
                 <>
-                  <span>🔍 Generate Professional Insights</span>
+                  <span>🔍 Generate Insights</span>
                 </>
               )}
             </button>
@@ -225,33 +220,35 @@ export default function InsightsPage() {
           </div>
         </div>
 
-        {/* Insights Dashboard */}
+        {/* Results Dashboard */}
         <div className="space-y-6">
-          {insights ? (
+          {result ? (
             <div className="space-y-6 animate-fade-in">
               {/* Summary Card */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 className="text-xl font-semibold mb-4">📊 Analysis Summary</h2>
-                <p className="text-gray-700 mb-4 leading-relaxed">{insights.summary}</p>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getSentimentColor(insights.sentiment)}`}>
-                      {getSentimentEmoji(insights.sentiment)} {insights.sentiment}
-                    </span>
-                  </div>
+                <h2 className="text-xl font-semibold mb-4">📊 Summary</h2>
+                <p className="text-gray-700 leading-relaxed">{result.summary}</p>
+              </div>
+
+              {/* Sentiment Card */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 className="text-xl font-semibold mb-4">🎭 Sentiment</h2>
+                <div className="flex items-center gap-3">
+                  <span className={`px-4 py-2 rounded-full text-sm font-medium border ${getSentimentColor(result.sentiment)}`}>
+                    {getSentimentEmoji(result.sentiment)} {result.sentiment}
+                  </span>
                 </div>
               </div>
 
               {/* Key Themes Card */}
-              {insights.key_themes && insights.key_themes.length > 0 && (
+              {result.key_themes && result.key_themes.length > 0 && (
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <h2 className="text-xl font-semibold mb-4">🎯 Key Themes</h2>
                   <div className="flex flex-wrap gap-2">
-                    {insights.key_themes.map((theme, index) => (
+                    {result.key_themes.map((theme, index) => (
                       <span
                         key={index}
-                        className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium border border-blue-200"
+                        className="px-3 py-2 bg-blue-50 text-blue-700 rounded-full text-sm font-medium border border-blue-200 hover:bg-blue-100 transition-colors"
                       >
                         {theme}
                       </span>
@@ -261,12 +258,12 @@ export default function InsightsPage() {
               )}
 
               {/* Suggested Actions Card */}
-              {insights.suggested_actions && insights.suggested_actions.length > 0 && (
+              {result.suggested_actions && result.suggested_actions.length > 0 && (
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <h2 className="text-xl font-semibold mb-4">✅ Suggested Actions</h2>
                   <div className="space-y-3">
-                    {insights.suggested_actions.map((action, index) => (
-                      <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                    {result.suggested_actions.map((action, index) => (
+                      <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
                           <span className="text-green-600 text-sm font-bold">{index + 1}</span>
                         </div>
