@@ -21,109 +21,60 @@ export default function InsightsPage() {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user) return;
-    
-    fetchInsights();
+    // Initialize with empty insights array
+    setInsights([]);
+  }, []);
 
-    const channel = supabase
-      .channel("insights-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "insights" },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            setInsights((prev) => [payload.new, ...prev]);
-          }
-          if (payload.eventType === "UPDATE") {
-            setInsights((prev) =>
-              prev.map((i) => (i.id === payload.new.id ? payload.new : i))
-            );
-            const s = payload.new.sentiment;
-            if (s === "positive") toast.success("🌞 Positive feedback detected!");
-            else if (s === "negative") toast.error("⚠️ Negative feedback detected!");
-            else toast("😐 Neutral feedback logged", { description: "No strong sentiment." });
-          }
-        }
-      )
-      .subscribe();
 
-    return () => supabase.removeChannel(channel);
-  }, [user]);
 
-  async function fetchInsights() {
-    if (!user) return;
-    
-    const { data } = await supabase
-      .from("insights")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-    setInsights(data || []);
-  }
-
-  async function generateInsight() {
-    if (!user) {
-      toast.error("Please log in to generate insights");
-      return;
-    }
-    
+  const handleAnalyze = async () => {
     if (!input.trim()) {
-      toast.error("Please enter some text to analyze");
+      toast.error("Please provide some data");
       return;
     }
 
     setLoading(true);
-
     try {
-      // Optimistic insert with placeholder summary/sentiment
-      const { data: newRow, error: insertError } = await supabase
-        .from("insights")
-        .insert([
-          { user_id: user.id, input_text: input, summary: null, sentiment: null }
-        ])
-        .select()
-        .single();
+      const res = await fetch(
+        "https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/insightsAnalysis",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data: input }), // send your input state
+        }
+      );
 
-      if (insertError) {
-        throw insertError;
-      }
+      const json = await res.json();
 
-      // Call edge function to generate insight
-      const response = await fetch("/functions/v1/insightsAnalysis", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ 
-          data: input
-        }),
-      });
+      if (json.error) throw new Error(json.error); // handle errors from Edge Function
 
-      if (!response.ok) {
-        throw new Error("Failed to generate insight");
-      }
+      // Add the result to insights array
+      const newInsight = {
+        id: Date.now().toString(), // temporary ID
+        input_text: input,
+        summary: json.result.summary,
+        sentiment: json.result.sentiment,
+        created_at: new Date().toISOString()
+      };
 
-      const { result } = await response.json();
-      
-      // Update the insight with the AI results
-      await supabase
-        .from("insights")
-        .update({ 
-          summary: result.summary, 
-          sentiment: result.sentiment 
-        })
-        .eq("id", newRow.id)
-        .eq("user_id", user.id);
-
+      setInsights(prev => [newInsight, ...prev]);
       setInput("");
-      toast.info("⏳ Processing your insight...");
-    } catch (error) {
-      console.error("Error generating insight:", error);
-      toast.error("Failed to generate insight. Please try again.");
+      
+      // Show sentiment-based toast
+      const sentiment = json.result.sentiment;
+      if (sentiment === "positive") {
+        toast.success("🌞 Positive feedback detected!");
+      } else if (sentiment === "negative") {
+        toast.error("⚠️ Negative feedback detected!");
+      } else {
+        toast("😐 Neutral feedback logged", { description: "No strong sentiment." });
+      }
+    } catch (err) {
+      toast.error("Analysis failed: " + err.message); // user-friendly error
     } finally {
-      setLoading(false);
+      setLoading(false); // stop loading spinner
     }
-  }
+  };
 
   const filteredInsights = insights.filter((i) => {
     const matchesSentiment = filter === "all" ? true : i.sentiment === filter;
@@ -140,17 +91,17 @@ export default function InsightsPage() {
 
       <textarea
         className="w-full p-3 border rounded-lg"
-        placeholder="Paste feedback or text..."
+        placeholder="Paste your data here..."
         value={input}
         onChange={(e) => setInput(e.target.value)}
       />
 
       <button
-        onClick={generateInsight}
+        onClick={handleAnalyze}
         disabled={loading}
         className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg"
       >
-        {loading ? "Processing..." : "Generate Insight"}
+        {loading ? "Processing..." : "Analyze"}
       </button>
 
       <div className="mt-6 flex items-center gap-4">
