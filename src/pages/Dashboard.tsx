@@ -104,8 +104,9 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [growthRateUpdating, setGrowthRateUpdating] = useState(false);
+  const [weeklyInsightsUpdating, setWeeklyInsightsUpdating] = useState(false);
 
-  // Calculate derived stats with real-time growth rate
+  // Calculate derived stats with real-time growth rate and weekly tracking
   const calculateStats = (insights: AIInsight[], dataSources: DataSource[], aiJobs: AIJob[], teamMembers: TeamMember[]) => {
     const now = new Date();
     
@@ -121,11 +122,23 @@ const Dashboard: React.FC = () => {
     const weekStart = new Date(now);
     weekStart.setDate(now.getDate() - now.getDay());
     weekStart.setHours(0, 0, 0, 0);
+    
+    // Calculate previous week for comparison
+    const previousWeekStart = new Date(weekStart);
+    previousWeekStart.setDate(weekStart.getDate() - 7);
+    const previousWeekEnd = new Date(weekStart);
+    previousWeekEnd.setDate(weekStart.getDate() - 1);
+    previousWeekEnd.setHours(23, 59, 59, 999);
 
     // Filter insights by time periods
     const thisWeekInsights = insights.filter(i => {
       const insightDate = new Date(i.created_at);
       return insightDate >= weekStart && insightDate <= currentMonthEnd;
+    }).length;
+
+    const lastWeekInsights = insights.filter(i => {
+      const insightDate = new Date(i.created_at);
+      return insightDate >= previousWeekStart && insightDate <= previousWeekEnd;
     }).length;
 
     const thisMonthInsights = insights.filter(i => {
@@ -138,13 +151,21 @@ const Dashboard: React.FC = () => {
       return insightDate >= previousMonthStart && insightDate <= previousMonthEnd;
     }).length;
 
-    // Calculate real-time growth rate
+    // Calculate real-time growth rates
     let growthRate = 0;
     if (lastMonthInsights > 0) {
       growthRate = Math.round(((thisMonthInsights - lastMonthInsights) / lastMonthInsights) * 100);
     } else if (thisMonthInsights > 0) {
       // If no insights last month but we have some this month, it's 100% growth
       growthRate = 100;
+    }
+
+    // Calculate weekly growth rate
+    let weeklyGrowthRate = 0;
+    if (lastWeekInsights > 0) {
+      weeklyGrowthRate = Math.round(((thisWeekInsights - lastWeekInsights) / lastWeekInsights) * 100);
+    } else if (thisWeekInsights > 0) {
+      weeklyGrowthRate = 100;
     }
 
     // Calculate sentiment breakdown
@@ -160,10 +181,12 @@ const Dashboard: React.FC = () => {
       dataSources: dataSources.length,
       teamMembers: teamMembers.length,
       growthRate,
+      weeklyGrowthRate,
       processingJobs,
       syncStatus: 'healthy' as const,
       reportsStatus: 'available' as const,
       thisWeekInsights,
+      lastWeekInsights,
       thisMonthInsights,
       positiveSentiment,
       negativeSentiment,
@@ -287,14 +310,35 @@ const Dashboard: React.FC = () => {
         
         setInsights(prev => [newInsight, ...prev]);
         
-        // Show growth rate update animation
+        // Show update animations
         setGrowthRateUpdating(true);
-        setTimeout(() => setGrowthRateUpdating(false), 2000);
+        setWeeklyInsightsUpdating(true);
+        setTimeout(() => {
+          setGrowthRateUpdating(false);
+          setWeeklyInsightsUpdating(false);
+        }, 2000);
         
-        // Show growth rate update notification
+        // Calculate new stats
         const newStats = calculateStats([newInsight, ...insights], dataSources, aiJobs, teamMembers);
-        toast.success('Growth Rate Updated! 📈', {
-          description: `New insight added. Growth rate: ${newStats.growthRate > 0 ? '+' : ''}${newStats.growthRate}% vs last month.`
+        
+        // Show detailed update notification
+        const weekChange = newStats.thisWeekInsights - stats.thisWeekInsights;
+        const weeklyGrowthChange = newStats.weeklyGrowthRate - stats.weeklyGrowthRate;
+        const growthChange = newStats.growthRate - stats.growthRate;
+        
+        let notificationMessage = `New ${newInsight.sentiment} insight added`;
+        if (weekChange > 0) {
+          notificationMessage += ` • +${weekChange} this week`;
+        }
+        if (weeklyGrowthChange !== 0) {
+          notificationMessage += ` • Weekly: ${newStats.weeklyGrowthRate > 0 ? '+' : ''}${newStats.weeklyGrowthRate}%`;
+        }
+        if (growthChange !== 0) {
+          notificationMessage += ` • Monthly: ${newStats.growthRate > 0 ? '+' : ''}${newStats.growthRate}%`;
+        }
+        
+        toast.success('📊 Dashboard Updated!', {
+          description: notificationMessage
         });
       }
     }, 8000); // Check every 8 seconds for more frequent updates
@@ -375,15 +419,30 @@ const Dashboard: React.FC = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card>
+        <Card className={weeklyInsightsUpdating ? 'ring-2 ring-blue-500 ring-opacity-50 transition-all duration-300' : ''}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Insights</CardTitle>
-            <Lightbulb className="h-4 w-4 text-blue-600" />
+            <div className="flex items-center gap-2">
+              <Lightbulb className={`h-4 w-4 ${weeklyInsightsUpdating ? 'text-blue-500 animate-bounce' : 'text-blue-600'}`} />
+              <div className={`w-2 h-2 bg-blue-500 rounded-full ${weeklyInsightsUpdating ? 'animate-ping' : 'animate-pulse'}`}></div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalInsights}</div>
-            <p className="text-xs text-muted-foreground">
-              +{stats.thisWeekInsights} this week
+            <div className={`text-2xl font-bold ${weeklyInsightsUpdating ? 'scale-105 transition-transform duration-300' : ''}`}>
+              {stats.totalInsights}
+            </div>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <span className={`${weeklyInsightsUpdating ? 'text-blue-600 font-medium' : 'text-muted-foreground'}`}>
+                +{stats.thisWeekInsights} this week
+              </span>
+              {stats.weeklyGrowthRate !== 0 && (
+                <span className={`text-xs ${stats.weeklyGrowthRate > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  ({stats.weeklyGrowthRate > 0 ? '+' : ''}{stats.weeklyGrowthRate}% vs last week)
+                </span>
+              )}
+              {weeklyInsightsUpdating && (
+                <span className="text-blue-600 animate-pulse">• Live</span>
+              )}
             </p>
           </CardContent>
         </Card>
