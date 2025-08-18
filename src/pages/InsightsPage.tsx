@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
-// Futuristic AI Tech Styling
+// Light Platform Styling
 const dashboardStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
   
@@ -10,115 +10,79 @@ const dashboardStyles = `
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
-  .ai-gradient-bg {
-    background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #533483 100%);
-    min-height: 100vh;
-  }
-
   .ai-card {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
   }
 
   .ai-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-    border-color: rgba(99, 102, 241, 0.3);
-  }
-
-  .ai-glow {
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
-  }
-
-  .ai-glow:hover {
-    box-shadow: 0 0 30px rgba(99, 102, 241, 0.5);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-color: #d1d5db;
   }
 
   .ai-button {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
     border: none;
-    border-radius: 12px;
+    border-radius: 8px;
     color: white;
     font-weight: 600;
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .ai-button::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.5s;
-  }
-
-  .ai-button:hover::before {
-    left: 100%;
+    transition: all 0.2s ease;
   }
 
   .ai-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
   }
 
   .ai-input {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    color: white;
-    backdrop-filter: blur(10px);
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    color: #374151;
   }
 
   .ai-input:focus {
-    border-color: rgba(99, 102, 241, 0.5);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    outline: none;
   }
 
   .ai-input::placeholder {
-    color: rgba(255, 255, 255, 0.5);
+    color: #9ca3af;
   }
 
   .ai-text {
-    color: rgba(255, 255, 255, 0.9);
+    color: #111827;
   }
 
   .ai-text-secondary {
-    color: rgba(255, 255, 255, 0.6);
+    color: #6b7280;
   }
 
   .ai-text-muted {
-    color: rgba(255, 255, 255, 0.4);
-  }
-
-  .ai-border {
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #9ca3af;
   }
 
   .ai-border-glow {
-    border: 1px solid rgba(99, 102, 241, 0.3);
-    box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
   .ai-metric-card {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
-    border: 1px solid rgba(99, 102, 241, 0.2);
-    border-radius: 16px;
-    backdrop-filter: blur(20px);
-    transition: all 0.3s ease;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    transition: all 0.2s ease;
   }
 
   .ai-metric-card:hover {
-    transform: translateY(-4px) scale(1.02);
-    border-color: rgba(99, 102, 241, 0.4);
-    box-shadow: 0 15px 35px rgba(99, 102, 241, 0.2);
+    transform: translateY(-2px);
+    border-color: #d1d5db;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 
   .ai-pulse {
@@ -130,18 +94,8 @@ const dashboardStyles = `
     50% { opacity: 0.7; }
   }
 
-  .ai-typing {
-    border-right: 2px solid #6366f1;
-    animation: ai-typing 1s infinite;
-  }
-
-  @keyframes ai-typing {
-    0%, 50% { border-color: transparent; }
-    51%, 100% { border-color: #6366f1; }
-  }
-
   .ai-scanner {
-    background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.3), transparent);
+    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.2), transparent);
     animation: ai-scan 2s infinite;
   }
 
@@ -150,22 +104,12 @@ const dashboardStyles = `
     100% { transform: translateX(100%); }
   }
 
-  .ai-grid {
-    background-image: 
-      radial-gradient(circle at 1px 1px, rgba(99, 102, 241, 0.1) 1px, transparent 0);
-    background-size: 20px 20px;
-  }
-
   .ai-neon-text {
-    text-shadow: 0 0 10px rgba(99, 102, 241, 0.8);
-  }
-
-  .ai-neon-border {
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+    color: #1f2937;
   }
 
   .ai-loading {
-    background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.2), transparent);
+    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.2), transparent);
     background-size: 200% 100%;
     animation: ai-loading 1.5s infinite;
   }
@@ -176,68 +120,67 @@ const dashboardStyles = `
   }
 
   .ai-file-upload {
-    border: 2px dashed rgba(99, 102, 241, 0.3);
-    background: rgba(99, 102, 241, 0.05);
-    transition: all 0.3s ease;
+    border: 2px dashed #d1d5db;
+    background: #f9fafb;
+    transition: all 0.2s ease;
   }
 
   .ai-file-upload:hover {
-    border-color: rgba(99, 102, 241, 0.6);
-    background: rgba(99, 102, 241, 0.1);
+    border-color: #3b82f6;
+    background: #eff6ff;
   }
 
   .ai-file-upload.dragover {
-    border-color: #6366f1;
-    background: rgba(99, 102, 241, 0.15);
-    transform: scale(1.02);
+    border-color: #3b82f6;
+    background: #dbeafe;
+    transform: scale(1.01);
   }
 
   .ai-theme-tag {
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
-    border: 1px solid rgba(99, 102, 241, 0.3);
-    color: #e0e7ff;
-    border-radius: 20px;
+    background: #eff6ff;
+    border: 1px solid #dbeafe;
+    color: #1e40af;
+    border-radius: 16px;
     padding: 4px 12px;
     font-size: 12px;
     font-weight: 500;
     margin: 2px;
-    backdrop-filter: blur(10px);
   }
 
   .ai-sentiment-positive {
-    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%);
-    border-color: rgba(34, 197, 94, 0.4);
-    color: #86efac;
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    color: #166534;
   }
 
   .ai-sentiment-negative {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%);
-    border-color: rgba(239, 68, 68, 0.4);
-    color: #fca5a5;
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #991b1b;
   }
 
   .ai-sentiment-neutral {
-    background: linear-gradient(135deg, rgba(107, 114, 128, 0.2) 0%, rgba(75, 85, 99, 0.2) 100%);
-    border-color: rgba(107, 114, 128, 0.4);
-    color: #d1d5db;
+    background: #f9fafb;
+    border-color: #e5e7eb;
+    color: #6b7280;
   }
 
   .ai-priority-high {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%);
-    border-color: rgba(239, 68, 68, 0.4);
-    color: #fca5a5;
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #991b1b;
   }
 
   .ai-priority-medium {
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.2) 100%);
-    border-color: rgba(245, 158, 11, 0.4);
-    color: #fcd34d;
+    background: #fffbeb;
+    border-color: #fed7aa;
+    color: #92400e;
   }
 
   .ai-priority-low {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%);
-    border-color: rgba(59, 130, 246, 0.4);
-    color: #93c5fd;
+    background: #eff6ff;
+    border-color: #dbeafe;
+    color: #1e40af;
   }
 `;
 
@@ -642,28 +585,25 @@ export default function InsightsPage() {
   };
 
   return (
-    <div className="ai-gradient-bg min-h-screen">
+    <div className="min-h-screen bg-gray-50">
       <style dangerouslySetInnerHTML={{ __html: dashboardStyles }} />
       
-      {/* AI Grid Background */}
-      <div className="ai-grid absolute inset-0 opacity-20"></div>
-      
-      <div className="relative z-10 p-6 max-w-7xl mx-auto">
+      <div className="p-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-4">
             <div className="ai-pulse">
-              <svg className="h-8 w-8 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
             <h1 className="text-4xl font-bold ai-text ai-neon-text">AI Insights Engine</h1>
           </div>
-          <p className="ai-text-secondary text-lg">Advanced neural network analysis for actionable business intelligence</p>
+          <p className="ai-text-secondary text-lg">Advanced AI analysis for actionable business intelligence</p>
           
           {/* AI Status Indicator */}
           <div className="flex items-center space-x-2 mt-3">
-            <div className="w-2 h-2 bg-green-400 rounded-full ai-pulse"></div>
+            <div className="w-2 h-2 bg-green-500 rounded-full ai-pulse"></div>
             <span className="ai-text-muted text-sm">AI Engine Online • Ready for Analysis</span>
           </div>
         </div>
@@ -673,12 +613,12 @@ export default function InsightsPage() {
           <div className="mt-6 ai-card p-6 ai-border-glow">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-3">
-                <div className="ai-scanner w-1 h-6 bg-indigo-400 rounded-full"></div>
-                <h3 className="text-xl font-semibold ai-text ai-neon-text">Neural Analysis Metrics</h3>
+                <div className="ai-scanner w-1 h-6 bg-blue-500 rounded-full"></div>
+                <h3 className="text-xl font-semibold ai-text ai-neon-text">Analysis Metrics</h3>
               </div>
               <div className="flex items-center space-x-3">
                 <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-indigo-400 rounded-full ai-pulse"></div>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full ai-pulse"></div>
                   <span className="ai-text-muted text-sm">Live Data</span>
                 </div>
                 <span className="ai-text-muted text-sm">•</span>
@@ -695,7 +635,7 @@ export default function InsightsPage() {
                     <p className="text-sm font-medium ai-text-muted">Total Analyses</p>
                     <p className="text-3xl font-bold ai-text ai-neon-text">{insightsHistory.length}</p>
                   </div>
-                  <div className="h-12 w-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center ai-glow">
+                  <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
                     <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
@@ -708,11 +648,11 @@ export default function InsightsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium ai-text-muted">AI Confidence</p>
-                    <p className="text-3xl font-bold text-green-400 ai-neon-text">
+                    <p className="text-3xl font-bold text-green-600 ai-neon-text">
                       {calculateAverageConfidence()}%
                     </p>
                   </div>
-                  <div className="h-12 w-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center ai-glow">
+                  <div className="h-12 w-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
                     <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -725,11 +665,11 @@ export default function InsightsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium ai-text-muted">Sentiment</p>
-                    <p className="text-3xl font-bold text-purple-400 ai-neon-text">
+                    <p className="text-3xl font-bold text-purple-600 ai-neon-text">
                       {calculateSentimentDistribution()}
                     </p>
                   </div>
-                  <div className="h-12 w-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center ai-glow">
+                  <div className="h-12 w-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
                     <div className="text-2xl">
                       {getSentimentEmoji(calculateSentimentDistribution().includes('Positive') ? 'positive' : 
                         calculateSentimentDistribution().includes('Negative') ? 'negative' : 'neutral')}
@@ -758,7 +698,7 @@ export default function InsightsPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="h-12 w-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center ai-glow">
+                  <div className="h-12 w-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
                     <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
                     </svg>
@@ -770,26 +710,26 @@ export default function InsightsPage() {
         ) : (
           <div className="mt-6 ai-card p-8 ai-border-glow">
             <div className="text-center">
-              <div className="h-20 w-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 ai-glow">
+              <div className="h-20 w-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold ai-text ai-neon-text mb-3">Neural Network Ready</h3>
-              <p className="ai-text-secondary text-lg mb-6">Upload data or enter text to initiate AI-powered neural analysis</p>
+              <h3 className="text-2xl font-bold ai-text ai-neon-text mb-3">AI Analysis Ready</h3>
+              <p className="ai-text-secondary text-lg mb-6">Upload data or enter text to initiate AI-powered analysis</p>
               <div className="flex items-center justify-center space-x-4 text-sm ai-text-muted">
                 <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-indigo-400 rounded-full ai-pulse"></div>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full ai-pulse"></div>
                   <span>Upload Files</span>
                 </div>
                 <span>•</span>
                 <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-purple-400 rounded-full ai-pulse"></div>
+                  <div className="w-2 h-2 bg-purple-500 rounded-full ai-pulse"></div>
                   <span>Enter Text</span>
                 </div>
                 <span>•</span>
                 <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full ai-pulse"></div>
+                  <div className="w-2 h-2 bg-green-500 rounded-full ai-pulse"></div>
                   <span>Get Insights</span>
                 </div>
               </div>
@@ -804,12 +744,12 @@ export default function InsightsPage() {
             {/* File Upload */}
             <div className="ai-card p-6">
               <div className="flex items-center space-x-3 mb-6">
-                <div className="h-8 w-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                   <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
                 </div>
-                <h2 className="text-xl font-semibold ai-text">Neural Data Input</h2>
+                <h2 className="text-xl font-semibold ai-text">Data Input</h2>
               </div>
             
                           <div
@@ -831,12 +771,12 @@ export default function InsightsPage() {
               {fileProcessing ? (
                 <div className="flex items-center justify-center space-x-3">
                   <div className="ai-loading w-6 h-6 rounded-full"></div>
-                  <span className="ai-text-secondary">Processing neural data...</span>
+                  <span className="ai-text-secondary">Processing data...</span>
                 </div>
               ) : uploadedFile ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-center space-x-3">
-                    <div className="h-10 w-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center ai-glow">
+                    <div className="h-10 w-10 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center">
                       <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -851,20 +791,20 @@ export default function InsightsPage() {
                       e.stopPropagation();
                       clearFile();
                     }}
-                    className="text-sm text-red-400 hover:text-red-300 underline transition-colors"
+                    className="text-sm text-red-500 hover:text-red-600 underline transition-colors"
                   >
                     Remove file
                   </button>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="h-16 w-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mx-auto ai-glow">
+                  <div className="h-16 w-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto">
                     <svg className="h-8 w-8 text-white" stroke="currentColor" fill="none" viewBox="0 0 48 48">
                       <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                   <div className="ai-text">
-                    <p className="font-medium text-lg">Upload Neural Data</p>
+                    <p className="font-medium text-lg">Upload Data</p>
                     <p className="ai-text-muted text-sm mt-1">CSV, PDF, DOCX, TXT (max 10MB)</p>
                   </div>
                 </div>
@@ -886,18 +826,18 @@ export default function InsightsPage() {
           {/* Text Input */}
           <div className="ai-card p-6">
             <div className="flex items-center space-x-3 mb-6">
-              <div className="h-8 w-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+              <div className="h-8 w-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
               </div>
-              <h2 className="text-xl font-semibold ai-text">Neural Text Processing</h2>
+              <h2 className="text-xl font-semibold ai-text">Text Processing</h2>
             </div>
             
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Enter neural data for AI analysis..."
+              placeholder="Enter text for AI analysis..."
               className="w-full p-4 ai-input rounded-xl min-h-[120px] resize-none focus:outline-none"
               disabled={loading}
             />
@@ -918,7 +858,7 @@ export default function InsightsPage() {
                 </>
               ) : (
                 <>
-                  <span>🚀 Generate Neural Insights</span>
+                  <span>🚀 Generate AI Insights</span>
                 </>
               )}
             </button>
@@ -938,12 +878,12 @@ export default function InsightsPage() {
               {/* Summary Card */}
               <div className="ai-card p-6 ai-border-glow">
                 <div className="flex items-center space-x-3 mb-6">
-                  <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center">
+                  <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                     <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                   </div>
-                  <h2 className="text-xl font-semibold ai-text ai-neon-text">Neural Analysis Summary</h2>
+                  <h2 className="text-xl font-semibold ai-text ai-neon-text">Analysis Summary</h2>
                 </div>
                 <p className="ai-text-secondary text-lg mb-6 leading-relaxed">{result.summary}</p>
                 
@@ -964,12 +904,12 @@ export default function InsightsPage() {
               {result.key_themes && result.key_themes.length > 0 && (
                 <div className="ai-card p-6 ai-border-glow">
                   <div className="flex items-center space-x-3 mb-6">
-                    <div className="h-8 w-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                    <div className="h-8 w-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
                       <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                       </svg>
                     </div>
-                    <h2 className="text-xl font-semibold ai-text ai-neon-text">Neural Pattern Recognition</h2>
+                    <h2 className="text-xl font-semibold ai-text ai-neon-text">Key Themes</h2>
                   </div>
                   <div className="flex flex-wrap gap-3">
                     {result.key_themes.map((theme, index) => (
@@ -988,35 +928,35 @@ export default function InsightsPage() {
               {result.suggested_actions && result.suggested_actions.length > 0 && (
                 <div className="ai-card p-6 ai-border-glow">
                   <div className="flex items-center space-x-3 mb-6">
-                    <div className="h-8 w-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                    <div className="h-8 w-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
                       <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
-                    <h2 className="text-xl font-semibold ai-text ai-neon-text">AI-Generated Actions</h2>
+                    <h2 className="text-xl font-semibold ai-text ai-neon-text">Suggested Actions</h2>
                   </div>
                   <div className="space-y-4">
-                    {result.suggested_actions.map((action, index) => (
-                      <div key={index} className="flex items-start space-x-4 p-4 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-xl border border-indigo-500/20">
-                        <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center ai-glow">
-                          <span className="text-white text-sm font-bold">{index + 1}</span>
+                                          {result.suggested_actions.map((action, index) => (
+                        <div key={index} className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                          <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+                            <span className="text-white text-sm font-bold">{index + 1}</span>
+                          </div>
+                          <span className="ai-text-secondary leading-relaxed">{action}</span>
                         </div>
-                        <span className="ai-text-secondary leading-relaxed">{action}</span>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 </div>
               )}
             </div>
           ) : (
             <div className="ai-card p-8 text-center ai-border-glow">
-              <div className="h-20 w-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 ai-glow">
+              <div className="h-20 w-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold ai-text ai-neon-text mb-3">Neural Analysis Ready</h3>
-              <p className="ai-text-secondary text-lg">Upload data or enter text to initiate AI-powered neural analysis</p>
+              <h3 className="text-2xl font-bold ai-text ai-neon-text mb-3">AI Analysis Ready</h3>
+              <p className="ai-text-secondary text-lg">Upload data or enter text to initiate AI-powered analysis</p>
             </div>
           )}
         </div>
@@ -1032,45 +972,45 @@ export default function InsightsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h2 className="text-xl font-semibold ai-text ai-neon-text">Neural Analysis History</h2>
+              <h2 className="text-xl font-semibold ai-text ai-neon-text">Analysis History</h2>
             </div>
             <div className="space-y-4 max-h-96 overflow-y-auto">
-              {insightsHistory.map((item) => (
-                <div key={item.id} className="ai-card p-4 hover:scale-105 transition-transform">
-                  {item.source_file && (
-                    <div className="mb-3">
-                      <span className="ai-theme-tag text-xs">
-                        📎 {item.source_file}
-                      </span>
+                              {insightsHistory.map((item) => (
+                  <div key={item.id} className="ai-card p-4 hover:scale-105 transition-transform">
+                    {item.source_file && (
+                      <div className="mb-3">
+                        <span className="ai-theme-tag text-xs">
+                          📎 {item.source_file}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="mb-4">
+                      <h3 className="text-sm font-medium ai-text-muted mb-2">Summary</h3>
+                      <p className="ai-text-secondary text-sm bg-blue-50 p-3 rounded-xl border border-blue-200">
+                        {item.summary}
+                      </p>
                     </div>
-                  )}
-                  
-                  <div className="mb-4">
-                    <h3 className="text-sm font-medium ai-text-muted mb-2">Neural Summary</h3>
-                    <p className="ai-text-secondary text-sm bg-gradient-to-r from-indigo-500/10 to-purple-500/10 p-3 rounded-xl border border-indigo-500/20">
-                      {item.summary}
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ai-theme-tag ${
-                        item.sentiment === "positive" ? "ai-sentiment-positive" :
-                        item.sentiment === "negative" ? "ai-sentiment-negative" :
-                        "ai-sentiment-neutral"
-                      }`}>
-                        {item.sentiment}
-                      </span>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ai-theme-tag ${
+                          item.sentiment === "positive" ? "ai-sentiment-positive" :
+                          item.sentiment === "negative" ? "ai-sentiment-negative" :
+                          "ai-sentiment-neutral"
+                        }`}>
+                          {item.sentiment}
+                        </span>
+                        <span className="ai-text-muted text-xs">
+                          {item.key_themes.length} themes, {item.suggested_actions.length} actions
+                        </span>
+                      </div>
                       <span className="ai-text-muted text-xs">
-                        {item.key_themes.length} patterns, {item.suggested_actions.length} actions
+                        {new Date(item.timestamp).toLocaleTimeString()}
                       </span>
                     </div>
-                    <span className="ai-text-muted text-xs">
-                      {new Date(item.timestamp).toLocaleTimeString()}
-                    </span>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           </div>
         </div>
