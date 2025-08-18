@@ -45,8 +45,17 @@ const AIInsights = () => {
   const [dragActive, setDragActive] = useState(false);
   
   const { toast } = useToast();
-  const { insights, loading, stats, filterInsights, bookmarkInsight } = useAIInsights();
+  const { insights, loading, stats, filterInsights } = useAIInsights();
   const { user } = useAuth();
+
+  // Helper function for keyword highlighting
+  function highlightMatch(text: string, query: string) {
+    if (!query) return text;
+    const regex = new RegExp(`(${query})`, "gi");
+    return text.split(regex).map((part, i) =>
+      regex.test(part) ? <span key={i} className="bg-yellow-200 font-semibold">{part}</span> : part
+    );
+  }
 
   // Filter insights based on search and filters
   useEffect(() => {
@@ -376,6 +385,14 @@ const AIInsights = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-800"
+            >
+              ❌
+            </button>
+          )}
         </div>
         <div className="flex gap-2">
           <select
@@ -448,12 +465,12 @@ const AIInsights = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Bookmarked</p>
+                <p className="text-sm text-muted-foreground">Actionable</p>
                 <p className="text-2xl font-bold">
-                  {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : stats.bookmarkedCount}
+                  {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : insights.filter(i => i.is_actionable).length}
                 </p>
               </div>
-              <Bookmark className="h-8 w-8 text-warning" />
+              <CheckCircle className="h-8 w-8 text-success" />
             </div>
           </CardContent>
         </Card>
@@ -502,43 +519,26 @@ const AIInsights = () => {
               <Card key={insight.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
-                    <h2 className="text-lg font-semibold">{insight.title}</h2>
+                    <h2 className="text-lg font-semibold">{highlightMatch(insight.title, searchTerm)}</h2>
                     <div className={`p-2 rounded-full ${getPriorityColor(insight.priority)}`}>
                       {getPriorityIcon(insight.priority)}
                     </div>
                   </div>
                   
                   <p className="text-sm text-gray-500 mb-3">
-                    Confidence: {((insight.confidence || 0) * 100).toFixed(0)}% | {insight.summary}
+                    Confidence: {((insight.confidence_score || 0) * 100).toFixed(0)}% | {highlightMatch(insight.summary || "No summary available", searchTerm)}
                   </p>
 
-                  {insight.key_findings && insight.key_findings.length > 0 && (
+                  {insight.content && (
                     <div className="mb-3">
-                      <h3 className="font-medium text-sm mb-2">Key Findings</h3>
-                      <ul className="list-disc ml-5 text-sm space-y-1">
-                        {insight.key_findings.map((finding: string, i: number) => (
-                          <li key={i} className="text-gray-600">{finding}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {insight.recommendations && insight.recommendations.length > 0 && (
-                    <div className="mb-3">
-                      <h3 className="text-sm mb-2">Recommendations</h3>
-                      <ul className="list-disc ml-5 text-sm space-y-1">
-                        {insight.recommendations.map((rec: string, i: number) => (
-                          <li key={i} className="text-gray-600">{rec}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {insight.projected_impact && (
-                    <div className="mt-3 pt-3 border-t">
-                      <p className="text-sm italic text-gray-600">
-                        {insight.projected_impact}
-                      </p>
+                      <h3 className="font-medium text-sm mb-2">Details</h3>
+                      <div className="text-sm text-gray-600">
+                        {typeof insight.content === 'object' ? (
+                          <pre className="whitespace-pre-wrap text-xs bg-gray-50 p-2 rounded">{JSON.stringify(insight.content, null, 2)}</pre>
+                        ) : (
+                          <p>{highlightMatch(String(insight.content), searchTerm)}</p>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -547,26 +547,15 @@ const AIInsights = () => {
                       {new Date(insight.created_at).toLocaleDateString()}
                     </span>
                     <div className="flex items-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => bookmarkInsight(insight.id, !insight.tags?.includes('bookmarked'))}
-                        className="p-1 h-auto"
-                      >
-                        <Bookmark 
-                          className={`h-4 w-4 ${
-                            insight.tags?.includes('bookmarked') 
-                              ? 'text-yellow-500 fill-current' 
-                              : 'text-gray-400'
-                          }`} 
-                        />
-                      </Button>
                       <Badge variant="outline" className="text-xs">
-                        {insight.category}
+                        {insight.industry_category}
                       </Badge>
-                      {insight.source && (
-                        <Badge variant="secondary" className="text-xs">
-                          {insight.source}
+                      <Badge variant="secondary" className="text-xs">
+                        {insight.insight_type}
+                      </Badge>
+                      {insight.is_actionable && (
+                        <Badge variant="default" className="text-xs bg-green-100 text-green-700">
+                          Actionable
                         </Badge>
                       )}
                     </div>
