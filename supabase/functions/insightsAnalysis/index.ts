@@ -17,46 +17,35 @@ serve(async (req) => {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
-    // ChatGPT-style, professional prompt with few-shot examples
     const prompt = `
-You are a senior product analyst and insights expert. Analyze user feedback carefully.
-
-Step 1: Identify key themes.
-Step 2: Determine overall sentiment.
-Step 3: Suggest 2-10 actionable steps.
-Step 4: Provide a concise 1-3 sentence summary.
-
-Strictly return JSON only, with this structure:
-{
-  "summary": "Concise summary of main points",
-  "sentiment": "positive | negative | neutral",
-  "key_themes": ["theme1", "theme2", ...],
-  "suggested_actions": ["action1", "action2", ...]
-}
-
-Example 1:
-Feedback: "I love the dashboard, but the loading is slow."
-JSON:
-{
-  "summary": "Users appreciate the dashboard design but notice slow loading times.",
-  "sentiment": "neutral",
-  "key_themes": ["dashboard design", "loading speed"],
-  "suggested_actions": ["Optimize dashboard performance", "Monitor loading times"]
-}
-
-Example 2:
-Feedback: "Customer support was unhelpful and delayed my issue resolution."
-JSON:
-{
-  "summary": "Users are frustrated with customer support delays and unhelpfulness.",
-  "sentiment": "negative",
-  "key_themes": ["customer support", "response time"],
-  "suggested_actions": ["Improve support training", "Reduce response times"]
-}
-
-Now analyze this feedback:
-"${data}"
-`;
+    You are a senior business insights analyst. Analyze the following dataset of multiple user feedback entries. 
+    Your job is to discover trends, patterns, and actionable insights across the entire dataset.
+    
+    Steps to follow:
+    1. Identify the top recurring themes or issues across all entries (group them into clear categories).
+    2. Determine the overall sentiment distribution (count how many are positive, negative, neutral).
+    3. Suggest 3–10 high-impact, actionable steps to improve business performance based on trends in the data.
+    4. Provide a concise executive summary (2–10 sentences) that captures the key insights and recommendations.
+    
+    Important rules:
+    - Focus only on the provided dataset.
+    - Do not invent or assume data.
+    - Respond only in valid JSON using this structure:
+    {
+      "summary": "Executive summary based on aggregated dataset",
+      "sentiment_overview": {
+        "positive": number,
+        "negative": number,
+        "neutral": number
+      },
+      "key_themes": ["theme1", "theme2", ...],
+      "suggested_actions": ["action1", "action2", ...]
+    }
+    
+    Now analyze this dataset:
+    ${JSON.stringify(data)}
+    `
+    
 
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
