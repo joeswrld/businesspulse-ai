@@ -103,29 +103,56 @@ const Dashboard: React.FC = () => {
   
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [growthRateUpdating, setGrowthRateUpdating] = useState(false);
 
-  // Calculate derived stats
+  // Calculate derived stats with real-time growth rate
   const calculateStats = (insights: AIInsight[], dataSources: DataSource[], aiJobs: AIJob[], teamMembers: TeamMember[]) => {
     const now = new Date();
-    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    
+    // Calculate current month (from 1st of current month to now)
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthEnd = now;
+    
+    // Calculate previous month (full previous month)
+    const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const previousMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    
+    // Calculate current week (from start of week to now)
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay());
+    weekStart.setHours(0, 0, 0, 0);
 
-    const thisWeekInsights = insights.filter(i => new Date(i.created_at) >= weekStart).length;
-    const thisMonthInsights = insights.filter(i => new Date(i.created_at) >= monthStart).length;
-    const lastMonthInsights = insights.filter(i => {
-      const date = new Date(i.created_at);
-      return date >= lastMonthStart && date < monthStart;
+    // Filter insights by time periods
+    const thisWeekInsights = insights.filter(i => {
+      const insightDate = new Date(i.created_at);
+      return insightDate >= weekStart && insightDate <= currentMonthEnd;
     }).length;
 
-    const growthRate = lastMonthInsights > 0 
-      ? Math.round(((thisMonthInsights - lastMonthInsights) / lastMonthInsights) * 100)
-      : thisMonthInsights > 0 ? 100 : 0;
+    const thisMonthInsights = insights.filter(i => {
+      const insightDate = new Date(i.created_at);
+      return insightDate >= currentMonthStart && insightDate <= currentMonthEnd;
+    }).length;
 
+    const lastMonthInsights = insights.filter(i => {
+      const insightDate = new Date(i.created_at);
+      return insightDate >= previousMonthStart && insightDate <= previousMonthEnd;
+    }).length;
+
+    // Calculate real-time growth rate
+    let growthRate = 0;
+    if (lastMonthInsights > 0) {
+      growthRate = Math.round(((thisMonthInsights - lastMonthInsights) / lastMonthInsights) * 100);
+    } else if (thisMonthInsights > 0) {
+      // If no insights last month but we have some this month, it's 100% growth
+      growthRate = 100;
+    }
+
+    // Calculate sentiment breakdown
     const positiveSentiment = insights.filter(i => i.sentiment === 'positive').length;
     const negativeSentiment = insights.filter(i => i.sentiment === 'negative').length;
     const neutralSentiment = insights.filter(i => i.sentiment === 'neutral').length;
 
+    // Calculate processing jobs
     const processingJobs = aiJobs.filter(j => j.status === 'processing').length;
 
     return {
@@ -212,25 +239,65 @@ const Dashboard: React.FC = () => {
 
     window.addEventListener('storage', handleStorageChange);
 
-    // Mock real-time updates for demonstration
+    // Mock real-time updates for demonstration with realistic growth patterns
     const interval = setInterval(() => {
-      // Simulate new insights being added
-      if (Math.random() > 0.95) { // 5% chance every interval
+      // Simulate new insights being added with varying sentiment
+      if (Math.random() > 0.92) { // 8% chance every interval for more frequent updates
+        const sentiments: ('positive' | 'negative' | 'neutral')[] = ['positive', 'negative', 'neutral'];
+        const randomSentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
+        
+        const insightTemplates = [
+          {
+            summary: 'Customer feedback shows positive sentiment about the new dashboard interface.',
+            themes: ['dashboard', 'user interface', 'usability'],
+            actions: ['Continue UI improvements', 'Monitor user adoption']
+          },
+          {
+            summary: 'Users report issues with mobile app performance and loading times.',
+            themes: ['mobile app', 'performance', 'loading speed'],
+            actions: ['Optimize mobile performance', 'Investigate loading issues']
+          },
+          {
+            summary: 'Mixed feedback on pricing structure with requests for more flexible options.',
+            themes: ['pricing', 'subscription', 'flexibility'],
+            actions: ['Review pricing strategy', 'Consider flexible plans']
+          },
+          {
+            summary: 'Excellent feedback on customer support response times and helpfulness.',
+            themes: ['customer support', 'response time', 'helpfulness'],
+            actions: ['Maintain support quality', 'Document best practices']
+          },
+          {
+            summary: 'Feature requests for dark mode and additional customization options.',
+            themes: ['dark mode', 'customization', 'feature requests'],
+            actions: ['Prioritize dark mode', 'Plan customization features']
+          }
+        ];
+        
+        const randomTemplate = insightTemplates[Math.floor(Math.random() * insightTemplates.length)];
+        
         const newInsight: AIInsight = {
           id: Date.now().toString(),
-          summary: 'New customer feedback analyzed with positive sentiment about product features.',
-          sentiment: 'positive',
-          key_themes: ['product features', 'user experience'],
-          suggested_actions: ['Continue feature development', 'Gather more feedback'],
+          summary: randomTemplate.summary,
+          sentiment: randomSentiment,
+          key_themes: randomTemplate.themes,
+          suggested_actions: randomTemplate.actions,
           created_at: new Date().toISOString()
         };
         
         setInsights(prev => [newInsight, ...prev]);
-        toast.success('New insight generated!', {
-          description: 'Real-time update: New analysis completed.'
+        
+        // Show growth rate update animation
+        setGrowthRateUpdating(true);
+        setTimeout(() => setGrowthRateUpdating(false), 2000);
+        
+        // Show growth rate update notification
+        const newStats = calculateStats([newInsight, ...insights], dataSources, aiJobs, teamMembers);
+        toast.success('Growth Rate Updated! 📈', {
+          description: `New insight added. Growth rate: ${newStats.growthRate > 0 ? '+' : ''}${newStats.growthRate}% vs last month.`
         });
       }
-    }, 10000); // Check every 10 seconds
+    }, 8000); // Check every 8 seconds for more frequent updates
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
@@ -321,13 +388,16 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={growthRateUpdating ? 'ring-2 ring-green-500 ring-opacity-50 transition-all duration-300' : ''}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Growth Rate</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600" />
+            <div className="flex items-center gap-2">
+              <TrendingUp className={`h-4 w-4 ${growthRateUpdating ? 'text-green-500 animate-bounce' : 'text-green-600'}`} />
+              <div className={`w-2 h-2 bg-green-500 rounded-full ${growthRateUpdating ? 'animate-ping' : 'animate-pulse'}`}></div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold flex items-center gap-1">
+            <div className={`text-2xl font-bold flex items-center gap-1 ${growthRateUpdating ? 'scale-105 transition-transform duration-300' : ''}`}>
               {stats.growthRate > 0 ? (
                 <ArrowUpRight className="h-4 w-4 text-green-600" />
               ) : (
@@ -336,7 +406,7 @@ const Dashboard: React.FC = () => {
               {Math.abs(stats.growthRate)}%
             </div>
             <p className="text-xs text-muted-foreground">
-              vs last month
+              vs last month • {growthRateUpdating ? 'Updating...' : 'Updates in real-time'}
             </p>
           </CardContent>
         </Card>
