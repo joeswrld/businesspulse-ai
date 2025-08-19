@@ -107,11 +107,16 @@ const Analytics: React.FC = () => {
 
   // Fetch insights data from Supabase
   const fetchInsightsData = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('No user found, cannot fetch insights');
+      return;
+    }
 
     try {
       setLoading(true);
       setError(null);
+      
+      console.log('Fetching insights for user:', user.id, user.email);
       
       const { data, error: fetchError } = await supabase
         .from('ai_insights')
@@ -120,9 +125,11 @@ const Analytics: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (fetchError) {
+        console.error('Supabase fetch error:', fetchError);
         throw new Error(`Failed to fetch insights: ${fetchError.message}`);
       }
 
+      console.log('Raw insights data from Supabase:', data);
       setInsightsData(data || []);
       setLastUpdated(new Date());
       console.log('Fetched insights data:', data?.length || 0, 'records');
@@ -130,10 +137,53 @@ const Analytics: React.FC = () => {
       // Process data for charts
       processChartData(data || []);
       
+      // If no data from Supabase, try localStorage as fallback
+      if (!data || data.length === 0) {
+        console.log('No Supabase data, checking localStorage...');
+        const savedInsights = localStorage.getItem('insightsHistory');
+        if (savedInsights) {
+          try {
+            const parsedInsights = JSON.parse(savedInsights);
+            const userInsights = parsedInsights.filter((insight: any) => 
+              insight.user_id === user.id
+            );
+            if (userInsights.length > 0) {
+              console.log('Found insights in localStorage:', userInsights.length);
+              setInsightsData(userInsights);
+              processChartData(userInsights);
+              toast.info('Loaded insights from local storage', {
+                description: 'No data found in database, using local insights'
+              });
+            }
+          } catch (error) {
+            console.error('Error parsing localStorage insights:', error);
+          }
+        }
+      }
+      
     } catch (error) {
       console.error('Error fetching insights data:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch insights data');
       toast.error('Failed to load insights data');
+      
+      // Try localStorage as fallback on error
+      try {
+        const savedInsights = localStorage.getItem('insightsHistory');
+        if (savedInsights) {
+          const parsedInsights = JSON.parse(savedInsights);
+          const userInsights = parsedInsights.filter((insight: any) => 
+            insight.user_id === user.id
+          );
+          if (userInsights.length > 0) {
+            console.log('Fallback: Using localStorage insights:', userInsights.length);
+            setInsightsData(userInsights);
+            processChartData(userInsights);
+            setError(null); // Clear error since we have fallback data
+          }
+        }
+      } catch (localError) {
+        console.error('Fallback localStorage also failed:', localError);
+      }
     } finally {
       setLoading(false);
     }
@@ -366,6 +416,95 @@ const Analytics: React.FC = () => {
     }
   };
 
+  // Create sample insights data for testing
+  const createSampleInsights = async () => {
+    if (!user) return;
+    
+    try {
+      setGeneratingAI(true);
+      
+      const sampleInsights: InsightData[] = [
+        {
+          id: `sample-${Date.now()}-1`,
+          user_id: user.id,
+          summary: "Customer feedback analysis shows positive sentiment towards new product features",
+          sentiment: 'positive',
+          key_themes: [
+            { theme: "Product Features", confidence: 0.9, frequency: "High", description: "New features well received" },
+            { theme: "User Experience", confidence: 0.8, frequency: "Medium", description: "Interface improvements noted" }
+          ],
+          suggested_actions: [
+            { action: "Continue feature development", priority: "High", confidence: 0.9, impact: "High" },
+            { action: "Gather more user feedback", priority: "Medium", confidence: 0.7, impact: "Medium" }
+          ],
+          created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          source_file: "customer_survey.csv"
+        },
+        {
+          id: `sample-${Date.now()}-2`,
+          user_id: user.id,
+          summary: "Support ticket analysis reveals areas for improvement in customer service",
+          sentiment: 'negative',
+          key_themes: [
+            { theme: "Customer Service", confidence: 0.8, frequency: "High", description: "Response time issues" },
+            { theme: "Technical Issues", confidence: 0.7, frequency: "Medium", description: "Product bugs reported" }
+          ],
+          suggested_actions: [
+            { action: "Improve response times", priority: "High", confidence: 0.9, impact: "High" },
+            { action: "Fix reported bugs", priority: "High", confidence: 0.8, impact: "High" }
+          ],
+          created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+          source_file: "support_tickets.csv"
+        },
+        {
+          id: `sample-${Date.now()}-3`,
+          user_id: user.id,
+          summary: "Market analysis indicates strong competition in the current sector",
+          sentiment: 'neutral',
+          key_themes: [
+            { theme: "Market Competition", confidence: 0.9, frequency: "High", description: "Competitive landscape analysis" },
+            { theme: "Industry Trends", confidence: 0.8, frequency: "Medium", description: "Emerging market patterns" }
+          ],
+          suggested_actions: [
+            { action: "Monitor competitor activities", priority: "Medium", confidence: 0.8, impact: "Medium" },
+            { action: "Analyze market opportunities", priority: "Medium", confidence: 0.7, impact: "Medium" }
+          ],
+          created_at: new Date().toISOString(),
+          source_file: "market_research.pdf"
+        }
+      ];
+
+      // Save to localStorage
+      const existingInsights = localStorage.getItem('insightsHistory');
+      let allInsights = [];
+      if (existingInsights) {
+        try {
+          allInsights = JSON.parse(existingInsights);
+        } catch (error) {
+          console.error('Error parsing existing insights:', error);
+        }
+      }
+      
+      const updatedInsights = [...sampleInsights, ...allInsights];
+      localStorage.setItem('insightsHistory', JSON.stringify(updatedInsights));
+      
+      // Update state
+      setInsightsData(sampleInsights);
+      processChartData(sampleInsights);
+      setLastUpdated(new Date());
+      
+      toast.success('Sample insights created!', {
+        description: 'You can now generate AI analytics'
+      });
+      
+    } catch (error) {
+      console.error('Error creating sample insights:', error);
+      toast.error('Failed to create sample insights');
+    } finally {
+      setGeneratingAI(false);
+    }
+  };
+
   // Refresh data
   const refreshData = async () => {
     setRefreshing(true);
@@ -451,6 +590,36 @@ const Analytics: React.FC = () => {
             >
               Dismiss
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Debug Information - Only show in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="text-sm text-blue-900">Debug Information</CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs text-blue-800 space-y-2">
+            <div>User ID: {user?.id || 'Not authenticated'}</div>
+            <div>User Email: {user?.email || 'Not available'}</div>
+            <div>Total Insights: {totalInsights}</div>
+            <div>Loading: {loading.toString()}</div>
+            <div>Last Updated: {lastUpdated.toLocaleString()}</div>
+            <div>Real-time Active: {isRealTimeActive.toString()}</div>
+            <div className="pt-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  console.log('Current insights data:', insightsData);
+                  console.log('localStorage insights:', localStorage.getItem('insightsHistory'));
+                }}
+                className="text-xs"
+              >
+                Log Data to Console
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -688,23 +857,63 @@ const Analytics: React.FC = () => {
                     : 'No insights data available for analysis'
                   }
                 </p>
-                <Button 
-                  onClick={generateAIAnalytics}
-                  disabled={generatingAI || totalInsights === 0}
-                  className="w-full md:w-auto"
-                >
-                  {generatingAI ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Analyzing your business performance...
-                    </>
-                  ) : (
-                    <>
-                      <Lightbulb className="h-4 w-4 mr-2" />
-                      Generate AI Analytics
-                    </>
-                  )}
-                </Button>
+                
+                {totalInsights === 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      To get started, you can either:
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                      <Button 
+                        onClick={createSampleInsights}
+                        disabled={generatingAI}
+                        variant="outline"
+                        className="w-full sm:w-auto"
+                      >
+                        {generatingAI ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Create Sample Data
+                          </>
+                        )}
+                      </Button>
+                      <Button 
+                        onClick={() => window.open('/insights', '_blank')}
+                        variant="outline"
+                        className="w-full sm:w-auto"
+                      >
+                        <Lightbulb className="h-4 w-4 mr-2" />
+                        Go to Insights Page
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Sample data will be created locally for testing purposes
+                    </p>
+                  </div>
+                ) : (
+                  <Button 
+                    onClick={generateAIAnalytics}
+                    disabled={generatingAI}
+                    className="w-full md:w-auto"
+                  >
+                    {generatingAI ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Analyzing your business performance...
+                      </>
+                    ) : (
+                      <>
+                        <Lightbulb className="h-4 w-4 mr-2" />
+                        Generate AI Analytics
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="space-y-6">
