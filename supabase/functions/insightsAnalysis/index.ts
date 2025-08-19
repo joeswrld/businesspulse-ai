@@ -30,8 +30,8 @@ serve(async (req) => {
     CRITICAL: Analyze ONLY the provided data. Do not invent or assume information.
     
     Respond in this EXACT JSON structure:
-    {
-      "summary": "2-3 sentence executive summary of key findings",
+    {      "summary": "2-5 sentence executive summary of key findings",
+
       "sentiment": "positive|negative|neutral",
       "sentiment_confidence": 85,
       "sentiment_reasoning": "Brief explanation of sentiment classification",
@@ -66,7 +66,6 @@ serve(async (req) => {
     Now analyze this dataset:
     ${JSON.stringify(data)}
     `
-    
 
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",

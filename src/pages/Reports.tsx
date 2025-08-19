@@ -322,13 +322,13 @@ export default function Reports() {
           },
           body: JSON.stringify({
             user_id: user.id,
-            insights_ids: selectedInsights,
-            insights_data: selectedInsightsData,
-            sentimentBreakdown,
-            topThemes,
-            strategicMetrics,
-            title: `Strategic Executive Report - ${new Date().toLocaleDateString()}`,
-            description: `Strategic intelligence report based on ${selectedInsights.length} insights - Transforming data into executive decision-making insights`
+            insights_ids: selectedInsights,insights_data: selectedInsightsData, // Send actual insights data
+sentimentBreakdown,
+topThemes,
+strategicMetrics,
+title: `Strategic Executive Report - ${new Date().toLocaleDateString()}`,
+description: `Strategic intelligence report based on ${selectedInsights.length} insights - Transforming data into executive decision-making insights`,
+
           })
         }
       );
@@ -755,14 +755,7 @@ export default function Reports() {
           Generate New Report
         </Button>
 
-        <Button 
-          onClick={createSampleReport}
-          variant="outline"
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Create Sample Report
-        </Button>
+        
 
         <Button 
           onClick={async () => {
