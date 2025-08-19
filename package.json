@@ -88,5 +88,30 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
     "vite": "^5.4.19"
+  },
+  "notex-feedback-widget": {
+    "name": "notex-feedback-widget",
+    "version": "1.0.0",
+    "description": "Professional feedback widget for websites",
+    "main": "dist/widget.js",
+    "module": "dist/widget.esm.js",
+    "types": "dist/widget.d.ts",
+    "files": [
+      "dist",
+      "README.md"
+    ],
+    "scripts": {
+      "build": "rollup -c",
+      "dev": "rollup -c -w",
+      "types": "tsc --declaration --emitDeclarationOnly --outDir dist"
+    },
+    "keywords": ["feedback", "widget", "customer-support", "notex"],
+    "author": "NoteX",
+    "license": "MIT",
+    "devDependencies": {
+      "rollup": "^3.29.4",
+      "rollup-plugin-terser": "^7.0.2",
+      "typescript": "^5.0.0"
+    }
   }
 }
