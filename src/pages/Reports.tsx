@@ -224,7 +224,7 @@ export default function Reports() {
             user_id: user.id,
             insights_ids: selectedInsights,
             insights_data: selectedInsightsData, // Send actual insights data
-            title: `AI Report - ${new Date().toLocaleDateString()}`,
+            title: `Report - ${new Date().toLocaleDateString()}`,
             description: `Generated report based on ${selectedInsights.length} insights`
           })
         }
