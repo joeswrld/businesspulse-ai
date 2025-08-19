@@ -85,19 +85,52 @@ const Feedback = () => {
     if (!user) return;
 
     try {
+      // First, check if the feedback table exists by trying to query it
       const { data, error } = await supabase
+        .from('feedback')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        // If table doesn't exist, create it or show helpful message
+        if (error.code === '42P01') { // Table doesn't exist
+          console.log('Feedback table does not exist. Please run database migrations first.');
+          toast.error('Database not set up. Please contact administrator.');
+          setFeedback([]);
+          calculateStats([]);
+          return;
+        }
+        throw error;
+      }
+
+      // If no error, fetch all data
+      const { data: allData, error: fetchError } = await supabase
         .from('feedback')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
 
-      setFeedback(data || []);
-      calculateStats(data || []);
+      setFeedback(allData || []);
+      calculateStats(allData || []);
     } catch (error) {
       console.error('Error fetching feedback:', error);
-      toast.error('Failed to load feedback');
+      
+      // Provide more specific error messages
+      if (error.code === '42501') {
+        toast.error('Access denied. Please check your permissions.');
+      } else if (error.code === '42P01') {
+        toast.error('Database tables not found. Please run migrations.');
+      } else {
+        toast.error('Failed to load feedback. Please try again.');
+      }
+      
+      // Set empty data to prevent UI errors
+      setFeedback([]);
+      calculateStats([]);
     } finally {
       setLoading(false);
     }
@@ -115,10 +148,20 @@ const Feedback = () => {
         .order('sent_at', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
+      if (error) {
+        // If notifications table doesn't exist, just set empty array
+        if (error.code === '42P01') {
+          console.log('Notifications table does not exist yet.');
+          setNotifications([]);
+          return;
+        }
+        throw error;
+      }
       setNotifications(data || []);
     } catch (error) {
       console.error('Error fetching notifications:', error);
+      // Set empty array to prevent UI errors
+      setNotifications([]);
     }
   };
 

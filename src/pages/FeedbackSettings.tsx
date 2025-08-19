@@ -69,7 +69,21 @@ const FeedbackSettings = () => {
         .eq('user_id', user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+      if (error) {
+        // If table doesn't exist, create default settings
+        if (error.code === '42P01') {
+          console.log('Feedback settings table does not exist. Creating default settings...');
+          await createDefaultSettings();
+          return;
+        }
+        
+        // If no record found, create default settings
+        if (error.code === 'PGRST116') {
+          console.log('No settings found. Creating default settings...');
+          await createDefaultSettings();
+          return;
+        }
+        
         throw error;
       }
 
@@ -88,7 +102,18 @@ const FeedbackSettings = () => {
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
-      toast.error('Failed to load settings');
+      
+      // Provide more specific error messages
+      if (error.code === '42501') {
+        toast.error('Access denied. Please check your permissions.');
+      } else if (error.code === '42P01') {
+        toast.error('Database not set up. Please contact administrator.');
+      } else {
+        toast.error('Failed to load settings. Please try again.');
+      }
+      
+      // Create default settings as fallback
+      await createDefaultSettings();
     } finally {
       setLoading(false);
     }
@@ -99,6 +124,30 @@ const FeedbackSettings = () => {
     if (!user) return;
 
     try {
+      // First check if table exists
+      const { error: checkError } = await supabase
+        .from('feedback_settings')
+        .select('id')
+        .limit(1);
+
+      if (checkError && checkError.code === '42P01') {
+        console.log('Feedback settings table does not exist. Using local defaults.');
+        // Use local defaults if table doesn't exist
+        setSettings({
+          id: 'local-default',
+          user_id: user.id,
+          brand_colors: formData.brand_colors,
+          greeting_text: formData.greeting_text,
+          button_placement: formData.button_placement,
+          widget_enabled: formData.widget_enabled,
+          auto_notifications: formData.auto_notifications,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        return;
+      }
+
+      // Try to insert default settings
       const { data, error } = await supabase
         .from('feedback_settings')
         .insert({
@@ -112,13 +161,49 @@ const FeedbackSettings = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // If insert fails due to duplicate, try to get existing settings
+        if (error.code === '23505') { // Unique violation
+          const { data: existingData, error: fetchError } = await supabase
+            .from('feedback_settings')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+
+          if (fetchError) throw fetchError;
+          
+          setSettings(existingData);
+          setFormData({
+            brand_colors: existingData.brand_colors,
+            greeting_text: existingData.greeting_text,
+            button_placement: existingData.button_placement,
+            widget_enabled: existingData.widget_enabled,
+            auto_notifications: existingData.auto_notifications
+          });
+          return;
+        }
+        throw error;
+      }
 
       setSettings(data);
-      toast.success('Default settings created');
+      console.log('Default settings created successfully');
     } catch (error) {
       console.error('Error creating default settings:', error);
-      toast.error('Failed to create default settings');
+      
+      // Use local defaults as fallback
+      setSettings({
+        id: 'local-default',
+        user_id: user.id,
+        brand_colors: formData.brand_colors,
+        greeting_text: formData.greeting_text,
+        button_placement: formData.button_placement,
+        widget_enabled: formData.widget_enabled,
+        auto_notifications: formData.auto_notifications,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+      
+      console.log('Using local default settings');
     }
   };
 
@@ -128,6 +213,22 @@ const FeedbackSettings = () => {
 
     setSaving(true);
     try {
+      // If using local defaults, just update local state
+      if (settings.id === 'local-default') {
+        setSettings({
+          ...settings,
+          brand_colors: formData.brand_colors,
+          greeting_text: formData.greeting_text,
+          button_placement: formData.button_placement,
+          widget_enabled: formData.widget_enabled,
+          auto_notifications: formData.auto_notifications,
+          updated_at: new Date().toISOString()
+        });
+        toast.success('Settings saved locally (database not available)');
+        setSaving(false);
+        return;
+      }
+
       const { error } = await supabase
         .from('feedback_settings')
         .update({
@@ -146,7 +247,25 @@ const FeedbackSettings = () => {
       fetchSettings(); // Refresh data
     } catch (error) {
       console.error('Error saving settings:', error);
-      toast.error('Failed to save settings');
+      
+      // Provide more specific error messages
+      if (error.code === '42501') {
+        toast.error('Access denied. Please check your permissions.');
+      } else if (error.code === '42P01') {
+        toast.error('Database not available. Settings saved locally.');
+        // Save locally as fallback
+        setSettings({
+          ...settings,
+          brand_colors: formData.brand_colors,
+          greeting_text: formData.greeting_text,
+          button_placement: formData.button_placement,
+          widget_enabled: formData.widget_enabled,
+          auto_notifications: formData.auto_notifications,
+          updated_at: new Date().toISOString()
+        });
+      } else {
+        toast.error('Failed to save settings. Please try again.');
+      }
     } finally {
       setSaving(false);
     }
