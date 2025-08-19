@@ -160,9 +160,10 @@ const dashboardStyles = `
   }
 
   .ai-sentiment-neutral {
-    background: #f9fafb;
-    border-color: #e5e7eb;
-    color: #6b7280;
+    background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+    border: 1px solid #d1d5db;
+    color: #4b5563;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   }
 
   .ai-priority-high {
@@ -1010,120 +1011,170 @@ export default function InsightsPage() {
                 
                 {/* AI Confidence Metrics */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-blue-700">Overall Confidence</span>
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200 shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-blue-700 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                        Overall Confidence
+                      </span>
                       <span className={`text-lg font-bold ${getConfidenceColor(result.overall_confidence || 0)}`}>
                         {result.overall_confidence || 0}%
                       </span>
                     </div>
-                    <div className="mt-2">
-                      <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div className="mt-3">
+                      <div className="w-full bg-blue-200 rounded-full h-3 shadow-inner">
                         <div 
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
+                          className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-700 ease-out shadow-sm" 
                           style={{ width: `${result.overall_confidence || 0}%` }}
                         ></div>
                       </div>
-                      <span className="text-xs text-blue-600 mt-1 block">
-                        {getConfidenceText(result.overall_confidence || 0)} Confidence
-                      </span>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-blue-600">
+                          {getConfidenceText(result.overall_confidence || 0)} Confidence
+                        </span>
+                        <span className="text-xs text-blue-500 font-medium">
+                          {result.overall_confidence || 0}/100
+                        </span>
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-green-700">Sentiment Confidence</span>
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200 shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-green-700 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        Sentiment Confidence
+                      </span>
                       <span className={`text-lg font-bold ${getConfidenceColor(result.sentiment_confidence || 0)}`}>
                         {result.sentiment_confidence || 0}%
                       </span>
                     </div>
-                    <div className="mt-2">
-                      <div className="w-full bg-green-200 rounded-full h-2">
+                    <div className="mt-3">
+                      <div className="w-full bg-green-200 rounded-full h-3 shadow-inner">
                         <div 
-                          className="bg-green-600 h-2 rounded-full transition-all duration-500" 
+                          className="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full transition-all duration-700 ease-out shadow-sm" 
                           style={{ width: `${result.sentiment_confidence || 0}%` }}
                         ></div>
                       </div>
-                      <span className="text-xs text-green-600 mt-1 block">
-                        {getConfidenceText(result.sentiment_confidence || 0)} Confidence
-                      </span>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-green-600">
+                          {getConfidenceText(result.sentiment_confidence || 0)} Confidence
+                        </span>
+                        <span className="text-xs text-green-500 font-medium">
+                          {result.sentiment_confidence || 0}/100
+                        </span>
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-purple-700">Data Quality</span>
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200 shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-purple-700 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                        Data Quality
+                      </span>
                       <span className={`text-lg font-bold ${getConfidenceColor(result.data_quality_score || 0)}`}>
                         {result.data_quality_score || 0}%
                       </span>
                     </div>
-                    <div className="mt-2">
-                      <div className="w-full bg-purple-200 rounded-full h-2">
+                    <div className="mt-3">
+                      <div className="w-full bg-purple-200 rounded-full h-3 shadow-inner">
                         <div 
-                          className="bg-purple-600 h-2 rounded-full transition-all duration-500" 
+                          className="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-700 ease-out shadow-sm" 
                           style={{ width: `${result.data_quality_score || 0}%` }}
                         ></div>
                       </div>
-                      <span className="text-xs text-purple-600 mt-1 block">
-                        {getConfidenceText(result.data_quality_score || 0)} Quality
-                      </span>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-purple-600">
+                          {getConfidenceText(result.data_quality_score || 0)} Quality
+                        </span>
+                        <span className="text-xs text-purple-500 font-medium">
+                          {result.data_quality_score || 0}/100
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
                 
                 {/* Sentiment and Feedback Classification */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <span className={`px-4 py-2 rounded-full text-sm font-medium ai-theme-tag ${
-                      result.sentiment === 'positive' ? 'ai-sentiment-positive' : 
-                      result.sentiment === 'negative' ? 'ai-sentiment-negative' : 
-                      'ai-sentiment-neutral'
-                    }`}>
-                      {getSentimentEmoji(result.sentiment)} {result.sentiment}
-                    </span>
-                    {result.sentiment_reasoning && (
-                      <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                        {result.sentiment_reasoning}
-                      </span>
-                    )}
-                  </div>
-                  
-                  {/* User Feedback Classification */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700">Your Classification:</span>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => setUserFeedbackClassification('good')}
-                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                          userFeedbackClassification === 'good' 
-                            ? 'bg-green-500 text-white' 
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        👍 Good
-                      </button>
-                      <button
-                        onClick={() => setUserFeedbackClassification('neutral')}
-                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                          userFeedbackClassification === 'neutral' 
-                            ? 'bg-yellow-500 text-white' 
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        😐 Neutral
-                      </button>
-                      <button
-                        onClick={() => setUserFeedbackClassification('bad')}
-                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                          userFeedbackClassification === 'bad' 
-                            ? 'bg-red-500 text-white' 
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        👎 Bad
-                      </button>
+                <div className="bg-gradient-to-r from-gray-50 to-blue-50 p-4 rounded-lg border border-gray-200 mb-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    {/* AI Sentiment Analysis */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-700">AI Analysis:</span>
+                        <span className={`px-4 py-2 rounded-full text-sm font-medium ai-theme-tag ${
+                          result.sentiment === 'positive' ? 'ai-sentiment-positive' : 
+                          result.sentiment === 'negative' ? 'ai-sentiment-negative' : 
+                          'ai-sentiment-neutral'
+                        }`}>
+                          {getSentimentEmoji(result.sentiment)} {result.sentiment.charAt(0).toUpperCase() + result.sentiment.slice(1)}
+                        </span>
+                      </div>
+                      {result.sentiment_reasoning && (
+                        <span className="text-sm text-gray-600 bg-white px-3 py-1 rounded-full border border-gray-200 shadow-sm">
+                          💭 {result.sentiment_reasoning}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* User Feedback Classification */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                      <span className="text-sm font-medium text-gray-700">Your Feedback:</span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setUserFeedbackClassification('good')}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 ${
+                            userFeedbackClassification === 'good' 
+                              ? 'bg-green-500 text-white shadow-lg shadow-green-200' 
+                              : 'bg-white text-gray-600 hover:bg-green-50 border border-gray-200 hover:border-green-300'
+                          }`}
+                        >
+                          👍 Good
+                        </button>
+                        <button
+                          onClick={() => setUserFeedbackClassification('neutral')}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 ${
+                            userFeedbackClassification === 'neutral' 
+                              ? 'bg-yellow-500 text-white shadow-lg shadow-yellow-200' 
+                              : 'bg-white text-gray-600 hover:bg-yellow-50 border border-gray-200 hover:border-yellow-300'
+                          }`}
+                        >
+                          😐 Neutral
+                        </button>
+                        <button
+                          onClick={() => setUserFeedbackClassification('bad')}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 ${
+                            userFeedbackClassification === 'bad' 
+                              ? 'bg-red-500 text-white shadow-lg shadow-red-200' 
+                              : 'bg-white text-gray-600 hover:bg-red-50 border border-gray-200 hover:border-red-300'
+                          }`}
+                        >
+                          👎 Bad
+                        </button>
+                      </div>
                     </div>
                   </div>
+                  
+                  {/* Feedback Status */}
+                  {userFeedbackClassification && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-700">Status:</span>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          userFeedbackClassification === 'good' 
+                            ? 'bg-green-100 text-green-800 border border-green-200' 
+                            : userFeedbackClassification === 'neutral'
+                            ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                            : 'bg-red-100 text-red-800 border border-red-200'
+                        }`}>
+                          {userFeedbackClassification === 'good' ? '✅ Feedback Recorded' : 
+                           userFeedbackClassification === 'neutral' ? '⚠️ Feedback Recorded' : 
+                           '❌ Feedback Recorded'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Analysis Notes */}
