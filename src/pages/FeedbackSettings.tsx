@@ -883,7 +883,7 @@ widget.toggle();`}
                       <div>
                         <p className="text-sm font-medium">Add configuration script</p>
                         <p className="text-xs text-gray-600">Add this in your HTML &lt;head&gt; section:</p>
-                        <code className="text-xs bg-gray-200 px-2 py-1 rounded mt-1 block">window.NoteXConfig = { userId: 'your-user-id' };</code>
+                        <code className="text-xs bg-gray-200 px-2 py-1 rounded mt-1 block">window.NoteXConfig = {'{'} userId: 'your-user-id' {'}'};</code>
                       </div>
                     </div>
                     <div className="flex items-start space-x-3">
