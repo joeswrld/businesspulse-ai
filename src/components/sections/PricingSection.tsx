@@ -15,11 +15,14 @@ const PricingSection = () => {
       badge: "Start Here",
       badgeVariant: "default" as const,
       features: [
-        "AI-powered data analytics",
-        "Basic BI dashboard & insights",
-        "Up to 10 data source connections",
-        "Standard email support",
-        "Export to PDF/CSV",
+        "AI Insights → up to 20 insights total",
+        "Data Sources → 1 source (CSV/Excel upload only)",
+        "Team Members → 1 user (owner only)",
+        "AI Reports → 2 executive reports",
+        "Business Analytics → Basic metrics (static dashboards)",
+        "Upload business data (CSV/Excel, DOCX, TXT, PDF)",
+        "Generate simple insights (summaries, patterns)",
+        "Limited visualization (basic charts only)",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "hero" as const,
@@ -29,18 +32,21 @@ const PricingSection = () => {
       name: "Pro",
       price: "₦35,000",
       period: "/month",
-      description: "For growing businesses and startups",
+      description: "For SMBs and growing startups",
       icon: Star,
       badge: "Most Popular",
       badgeVariant: "default" as const,
       features: [
-        "Everything in Free Trial",
-        "Unlimited data pipeline connections",
-        "Advanced AI analytics & forecasting",
-        "Real-time BI updates",
-        "Team collaboration (up to 5 users)",
-        "Priority email support",
-        "Custom branding on executive reports",
+        "AI Insights → up to 500 per month",
+        "Data Sources → 5 sources (CSV/Excel, Google Sheets, DOCX, TXT, PDF)",
+        "Team Members → up to 5 users",
+        "AI Reports → 20 per month (executive summaries, trend detection)",
+        "Business Analytics → Real-time dashboards + export to PDF/CSV",
+        "Multi-source data sync (auto-refresh)",
+        "AI insights generator (trends, anomalies, opportunities)",
+        "Forecasting (short-term predictions)",
+        "Visual dashboards (charts, KPIs)",
+        "Data drill-down (filter/slice insights by category)",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "hero" as const,
@@ -50,18 +56,22 @@ const PricingSection = () => {
       name: "Business",
       price: "₦53,000",
       period: "/month",
-      description: "For enterprises and larger teams",
+      description: "For enterprises and large teams",
       icon: Crown,
       badge: "Enterprise",
       badgeVariant: "secondary" as const,
       features: [
+        "AI Insights → Unlimited",
+        "Data Sources → Unlimited (databases, CRMs, ERPs, APIs)",
+        "Team Members → Unlimited (with role-based access)",
+        "AI Reports → Unlimited (weekly & on-demand reports)",
+        "Business Analytics → Enterprise-grade real-time + predictive analytics",
         "Everything in Pro",
-        "Unlimited team members",
-        "Advanced BI analytics & predictive modeling",
-        "White-label executive reports",
-        "24/7 chat support",
-        "Advanced security & compliance",
-        "SLA guarantee"
+        "White-label dashboards (brand it as your own)",
+        "Predictive forecasting (AI-powered trend projection)",
+        "Automated alerts (Teams, Email when KPIs shift)",
+        "Dedicated support & SLA",
+        "Compliance (GDPR, SOC2)",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "premium" as const,
@@ -75,14 +85,14 @@ const PricingSection = () => {
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <Badge variant="outline" className="mb-4">
-            Enterprise Pricing
+            Transparent Pricing
           </Badge>
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Choose the Perfect Plan for{" "}
-            <span className="gradient-text">Your Enterprise</span>
+            Transform Your Business Data Into{" "}
+            <span className="gradient-text">Actionable Insights</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            Start with our 8-day free trial, then choose a plan that scales with your business intelligence needs. No hidden fees, cancel anytime.
+            Start with our 8-day free trial to experience AI-powered BI, then choose a plan that scales with your data intelligence needs. No hidden fees, cancel anytime.
           </p>
         </div>
 
