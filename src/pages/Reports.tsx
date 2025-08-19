@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useUsageTracking } from '@/hooks/useUsageTracking';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +24,17 @@ import {
   BarChart3,
   RefreshCw,
   Eye,
-  EyeOff
+  EyeOff,
+  Brain,
+  BarChart,
+  TrendingDown,
+  DollarSign,
+  Users,
+  Building,
+  Globe,
+  Rocket,
+  Shield,
+  Award
 } from 'lucide-react';
 
 interface Report {
@@ -60,6 +71,7 @@ interface Insight {
 
 export default function Reports() {
   const { user } = useAuth();
+  const { checkUsage, incrementUsage, usage } = useUsageTracking();
   
   // State management
   const [reports, setReports] = useState<Report[]>([]);
@@ -236,6 +248,13 @@ export default function Reports() {
       return;
     }
 
+    // Check usage limits before proceeding
+    const canGenerateReport = await checkUsage('ai_reports', 1);
+    if (!canGenerateReport) {
+      toast.error("AI Reports limit reached. Please upgrade your plan to continue generating strategic executive reports.");
+      return;
+    }
+
     setGeneratingReport(true);
     try {
       // Get the actual insights data for the selected insights
@@ -279,13 +298,20 @@ export default function Reports() {
         .slice(0, 5)
         .map(([theme]) => theme);
 
-      console.log('Aggregated data for report:', {
-        insights_data: selectedInsightsData,
+      // Enhanced strategic analysis
+      const strategicMetrics = {
+        totalInsights,
         sentimentBreakdown,
-        topThemes
-      });
+        topThemes,
+        businessImpact: calculateBusinessImpact(selectedInsightsData),
+        strategicValue: calculateStrategicValue(selectedInsightsData),
+        riskAssessment: assessRiskLevel(selectedInsightsData),
+        opportunityScore: calculateOpportunityScore(selectedInsightsData)
+      };
 
-      // Call the generateReport Edge Function
+      console.log('Strategic data for executive report:', strategicMetrics);
+
+      // Call the generateReport Edge Function with enhanced strategic data
       const response = await fetch(
         "https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/generateReport",
         {
@@ -300,23 +326,27 @@ export default function Reports() {
             insights_data: selectedInsightsData,
             sentimentBreakdown,
             topThemes,
-            title: `AI Report - ${new Date().toLocaleDateString()}`,
-            description: `Generated report based on ${selectedInsights.length} insights`
+            strategicMetrics,
+            title: `Strategic Executive Report - ${new Date().toLocaleDateString()}`,
+            description: `Strategic intelligence report based on ${selectedInsights.length} insights - Transforming data into executive decision-making insights`
           })
         }
       );
 
       if (!response.ok) {
-        throw new Error(`Report generation failed: ${response.status}`);
+        throw new Error(`Strategic report generation failed: ${response.status}`);
       }
 
       const result = await response.json();
       
       if (!result.success) {
-        throw new Error(result.error || 'Report generation failed');
+        throw new Error(result.error || 'Strategic report generation failed');
       }
 
-      console.log('Generated report:', result.report);
+      // Increment usage after successful report generation
+      await incrementUsage('ai_reports', 1);
+
+      console.log('Generated strategic report:', result.report);
 
       // Add the new report to the list
       setReports(prev => [result.report, ...prev]);
@@ -333,6 +363,83 @@ export default function Reports() {
     } finally {
       setGeneratingReport(false);
     }
+  };
+
+  // Helper functions for strategic analysis
+  const calculateBusinessImpact = (insights: Insight[]): 'high' | 'medium' | 'low' => {
+    let impact = 0;
+    
+    insights.forEach(insight => {
+      // Sentiment impact
+      if (insight.sentiment === 'positive') impact += 3;
+      else if (insight.sentiment === 'negative') impact += 2; // Negative insights can be valuable for risk mitigation
+      else impact += 1;
+      
+      // Theme complexity impact
+      if (insight.key_themes && insight.key_themes.length > 3) impact += 2;
+      else if (insight.key_themes && insight.key_themes.length > 1) impact += 1;
+      
+      // Action impact
+      if (insight.suggested_actions && insight.suggested_actions.length > 2) impact += 2;
+      else if (insight.suggested_actions && insight.suggested_actions.length > 0) impact += 1;
+    });
+    
+    const averageImpact = impact / insights.length;
+    if (averageImpact >= 6) return 'high';
+    if (averageImpact >= 3) return 'medium';
+    return 'low';
+  };
+
+  const calculateStrategicValue = (insights: Insight[]): number => {
+    let value = 0;
+    
+    insights.forEach(insight => {
+      // Base value from sentiment
+      if (insight.sentiment === 'positive') value += 25;
+      else if (insight.sentiment === 'negative') value += 20;
+      else value += 15;
+      
+      // Value from themes
+      if (insight.key_themes && insight.key_themes.length > 0) {
+        value += Math.min(insight.key_themes.length * 8, 40);
+      }
+      
+      // Value from actions
+      if (insight.suggested_actions && insight.suggested_actions.length > 0) {
+        value += Math.min(insight.suggested_actions.length * 6, 30);
+      }
+    });
+    
+    return Math.min(Math.round(value / insights.length), 100);
+  };
+
+  const assessRiskLevel = (insights: Insight[]): 'low' | 'medium' | 'high' => {
+    const negativeCount = insights.filter(insight => insight.sentiment === 'negative').length;
+    const negativePercentage = (negativeCount / insights.length) * 100;
+    
+    if (negativePercentage >= 60) return 'high';
+    if (negativePercentage >= 30) return 'medium';
+    return 'low';
+  };
+
+  const calculateOpportunityScore = (insights: Insight[]): number => {
+    let score = 0;
+    
+    insights.forEach(insight => {
+      // Positive sentiment opportunities
+      if (insight.sentiment === 'positive') score += 30;
+      
+      // Theme diversity opportunities
+      if (insight.key_themes && insight.key_themes.length > 2) score += 20;
+      
+      // Actionable insights opportunities
+      if (insight.suggested_actions && insight.suggested_actions.length > 1) score += 25;
+      
+      // Balanced insights (mix of positive/negative) can indicate growth opportunities
+      if (insight.sentiment === 'neutral') score += 15;
+    });
+    
+    return Math.min(Math.round(score / insights.length), 100);
   };
 
   const handleSelectAllInsights = () => {
@@ -584,8 +691,58 @@ export default function Reports() {
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">📊 AI Reports</h1>
-        <p className="text-gray-600">Generate comprehensive reports from your insights using AI</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">🚀 Strategic Executive Reports</h1>
+        <p className="text-gray-600">Transform insights into strategic intelligence with AI-powered executive reports</p>
+        
+        {/* Real-Time Usage Indicator */}
+        {user && (
+          <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="h-8 w-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-purple-900">AI Reports Usage</h4>
+                  <p className="text-sm text-purple-700">
+                    {usage.ai_reports.current} of {usage.ai_reports.limit === -1 ? '∞' : usage.ai_reports.limit} reports generated
+                    {usage.ai_reports.limit !== -1 && (
+                      <span className="ml-2 text-xs">
+                        ({Math.round((usage.ai_reports.current / usage.ai_reports.limit) * 100)}%)
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-xs text-purple-600 font-medium">Real-time</span>
+              </div>
+            </div>
+            {usage.ai_reports.limit !== -1 && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between text-xs text-purple-600 mb-1">
+                  <span>Usage Progress</span>
+                  <span>{usage.ai_reports.remaining} remaining</span>
+                </div>
+                <div className="w-full bg-purple-200 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      usage.ai_reports.current / usage.ai_reports.limit >= 0.9 
+                        ? 'bg-red-500' 
+                        : usage.ai_reports.current / usage.ai_reports.limit >= 0.75 
+                          ? 'bg-yellow-500' 
+                          : 'bg-purple-500'
+                    }`}
+                    style={{ 
+                      width: `${Math.min((usage.ai_reports.current / usage.ai_reports.limit) * 100, 100)}%` 
+                    }}
+                  ></div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Controls */}

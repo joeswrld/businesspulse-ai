@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
 
 // Light Platform Styling
 const dashboardStyles = `
@@ -254,6 +256,9 @@ interface InsightsData {
 }
 
 export default function InsightsPage() {
+  const { user } = useAuth();
+  const { checkUsage, incrementUsage, usage } = useUsageTracking();
+  
   const [input, setInput] = useState("");
   const [result, setResult] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -501,10 +506,36 @@ export default function InsightsPage() {
       return;
     }
 
+    // Check usage limits before proceeding
+    if (user) {
+      const canAnalyze = await checkUsage('ai_insights', 1);
+      if (!canAnalyze) {
+        toast.error("AI Insights limit reached. Please upgrade your plan to continue generating strategic intelligence.");
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
 
     try {
+      // Enhanced prompt for strategic business intelligence
+      const enhancedInput = `Transform this raw business data into strategic intelligence:
+
+${input}
+
+Please analyze this data and provide:
+1. Executive Summary with strategic implications
+2. Key Business Insights with actionable recommendations
+3. Risk Assessment and opportunities
+4. Strategic Action Plan with priority levels
+5. Performance Metrics and KPIs to track
+6. Competitive Intelligence insights
+7. Market Trend Analysis
+8. Resource Allocation recommendations
+
+Focus on transforming raw data into strategic business intelligence that drives decision-making.`;
+
       const res = await fetch(
         "https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/insightsAnalysis",
         {
@@ -513,7 +544,7 @@ export default function InsightsPage() {
             "Content-Type": "application/json",
             "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84"
           },
-          body: JSON.stringify({ data: input }),
+          body: JSON.stringify({ data: enhancedInput }),
         }
       );
 
@@ -528,6 +559,11 @@ export default function InsightsPage() {
         throw new Error("Invalid response from analysis service.");
       }
 
+      // Increment usage after successful analysis
+      if (user) {
+        await incrementUsage('ai_insights', 1);
+      }
+
       setResult(json.result);
       
       // Set confidence metrics for real-time display
@@ -540,28 +576,30 @@ export default function InsightsPage() {
       // Reset user feedback classification
       setUserFeedbackClassification(null);
       
-      // Add to history
+      // Add to history with strategic intelligence metadata
       const newInsight = {
         ...json.result,
         id: Date.now().toString(),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        strategic_value: calculateStrategicValue(json.result),
+        business_impact: assessBusinessImpact(json.result)
       };
 
       setInsightsHistory(prev => [newInsight, ...prev]);
       setInput("");
 
-      // Show success toast with sentiment and confidence
-      const sentimentEmoji = json.result.sentiment === "positive" ? "😊" : 
-                            json.result.sentiment === "negative" ? "😔" : "😐";
+      // Show success toast with strategic intelligence summary
+      const sentimentEmoji = json.result.sentiment === "positive" ? "🚀" : 
+                            json.result.sentiment === "negative" ? "⚠️" : "📊";
       const confidenceLevel = json.result.overall_confidence || 0;
       const confidenceText = confidenceLevel >= 80 ? "High" : confidenceLevel >= 60 ? "Medium" : "Low";
       
-      toast.success(`${sentimentEmoji} Analysis Complete! (${confidenceText} Confidence)`, {
-        description: `Found ${json.result.key_themes.length} themes and ${json.result.suggested_actions.length} actionable items. Overall confidence: ${confidenceLevel}%`
+      toast.success(`${sentimentEmoji} Strategic Intelligence Generated! (${confidenceText} Confidence)`, {
+        description: `Transformed raw data into ${json.result.key_themes.length} strategic themes and ${json.result.suggested_actions.length} actionable recommendations. Overall confidence: ${confidenceLevel}%`
       });
 
     } catch (err) {
-      let errorMessage = "Analysis failed";
+      let errorMessage = "Strategic analysis failed";
       
       if (err instanceof Error) {
         if (err.message.includes('fetch')) {
@@ -577,6 +615,37 @@ export default function InsightsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper functions for strategic intelligence
+  const calculateStrategicValue = (insight: InsightsData): number => {
+    let value = 0;
+    
+    // Base value from confidence
+    value += (insight.overall_confidence || 0) * 0.3;
+    
+    // Value from themes (more themes = higher value)
+    const themeCount = Array.isArray(insight.key_themes) ? insight.key_themes.length : 0;
+    value += Math.min(themeCount * 10, 50);
+    
+    // Value from actions (more actions = higher value)
+    const actionCount = Array.isArray(insight.suggested_actions) ? insight.suggested_actions.length : 0;
+    value += Math.min(actionCount * 8, 40);
+    
+    // Sentiment bonus
+    if (insight.sentiment === 'positive') value += 15;
+    else if (insight.sentiment === 'negative') value += 10; // Negative insights can be valuable for risk mitigation
+    else value += 5;
+    
+    return Math.min(Math.round(value), 100);
+  };
+
+  const assessBusinessImpact = (insight: InsightsData): 'high' | 'medium' | 'low' => {
+    const strategicValue = calculateStrategicValue(insight);
+    
+    if (strategicValue >= 70) return 'high';
+    if (strategicValue >= 40) return 'medium';
+    return 'low';
   };
 
   const clearHistory = () => {
@@ -696,15 +765,65 @@ export default function InsightsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
-            <h1 className="text-4xl font-bold ai-text ai-neon-text">AI Insights </h1>
+            <h1 className="text-4xl font-bold ai-text ai-neon-text">Strategic Intelligence Hub</h1>
           </div>
-          <p className="ai-text-secondary text-lg">Advanced AI analysis for actionable business intelligence</p>
+          <p className="ai-text-secondary text-lg">Transform raw business data into strategic intelligence with AI-powered analysis</p>
           
           {/* AI Status Indicator */}
           <div className="flex items-center space-x-2 mt-3">
             <div className="w-2 h-2 bg-green-500 rounded-full ai-pulse"></div>
             <span className="ai-text-muted text-sm">AI Engine Online • Ready for Analysis</span>
           </div>
+          
+          {/* Real-Time Usage Indicator */}
+          {user && (
+            <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                    <Brain className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-blue-900">AI Insights Usage</h4>
+                    <p className="text-sm text-blue-700">
+                      {usage.ai_insights.current} of {usage.ai_insights.limit === -1 ? '∞' : usage.ai_insights.limit} insights used
+                      {usage.ai_insights.limit !== -1 && (
+                        <span className="ml-2 text-xs">
+                          ({Math.round((usage.ai_insights.current / usage.ai_insights.limit) * 100)}%)
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-blue-600 font-medium">Real-time</span>
+                </div>
+              </div>
+              {usage.ai_insights.limit !== -1 && (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-blue-600 mb-1">
+                    <span>Usage Progress</span>
+                    <span>{usage.ai_insights.remaining} remaining</span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        usage.ai_insights.current / usage.ai_insights.limit >= 0.9 
+                          ? 'bg-red-500' 
+                          : usage.ai_insights.current / usage.ai_insights.limit >= 0.75 
+                            ? 'bg-yellow-500' 
+                            : 'bg-blue-500'
+                      }`}
+                      style={{ 
+                        width: `${Math.min((usage.ai_insights.current / usage.ai_insights.limit) * 100, 100)}%` 
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         
         {/* Enhanced Statistics Section */}
@@ -979,7 +1098,7 @@ export default function InsightsPage() {
                 </>
               ) : (
                 <>
-                  <span>🚀 Generate AI Insights</span>
+                  <span>🚀 Generate Strategic Intelligence</span>
                 </>
               )}
             </button>

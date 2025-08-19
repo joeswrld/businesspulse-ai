@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useUsageTracking } from '@/hooks/useUsageTracking';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +26,17 @@ import {
   Activity,
   Zap,
   Clock,
-  Database
+  Database,
+  BarChart,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  DollarSign,
+  Building,
+  Globe,
+  Rocket,
+  Shield,
+  Award,
+  PieChart as PieChartIcon
 } from 'lucide-react';
 
 import {
@@ -90,6 +101,7 @@ interface CategoryData {
 
 const Analytics: React.FC = () => {
   const { user } = useAuth();
+  const { checkUsage, incrementUsage, usage } = useUsageTracking();
   
   // State for real-time data
   const [insightsData, setInsightsData] = useState<InsightData[]>([]);
@@ -365,10 +377,17 @@ const Analytics: React.FC = () => {
     };
   }, [user, insightsData.length, processChartData]);
 
-  // Generate AI Analytics using Gemini
+  // Generate Strategic Business Intelligence using AI
   const generateAIAnalytics = async () => {
     if (!user || !insightsData.length) {
-      toast.error('No insights data available for analysis');
+      toast.error('No insights data available for strategic analysis');
+      return;
+    }
+
+    // Check usage limits before proceeding
+    const canGenerateAnalytics = await checkUsage('business_analytics', 1);
+    if (!canGenerateAnalytics) {
+      toast.error("Business Analytics limit reached. Please upgrade your plan to continue generating strategic intelligence.");
       return;
     }
     
@@ -376,20 +395,33 @@ const Analytics: React.FC = () => {
     setError(null);
     
     try {
-      // Call the Supabase Edge Function for Gemini analytics
-      const { data, error } = await supabase.functions.invoke('generateAnalytics', {
-        body: {
-          user_id: user.id,
-          insights_data: insightsData
+      // Enhanced strategic analysis request
+      const enhancedRequest = {
+        user_id: user.id,
+        insights_data: insightsData,
+        strategic_focus: {
+          business_intelligence: true,
+          competitive_analysis: true,
+          market_trends: true,
+          risk_assessment: true,
+          opportunity_identification: true,
+          strategic_recommendations: true,
+          performance_optimization: true,
+          growth_strategy: true
         }
+      };
+
+      // Call the Supabase Edge Function for strategic business intelligence
+      const { data, error } = await supabase.functions.invoke('generateAnalytics', {
+        body: enhancedRequest
       });
 
       if (error) {
-        throw new Error(`Edge Function error: ${error.message}`);
+        throw new Error(`Strategic analysis error: ${error.message}`);
       }
 
       if (!data) {
-        throw new Error('No response from AI analytics service');
+        throw new Error('No response from strategic intelligence service');
       }
 
       // Check if the response has the expected structure
@@ -405,16 +437,19 @@ const Analytics: React.FC = () => {
         throw new Error(`Invalid response structure. Missing fields: ${missingFields.join(', ')}`);
       }
 
+      // Increment usage after successful analytics generation
+      await incrementUsage('business_analytics', 1);
+
       setGeminiAnalytics(data);
-      toast.success('AI Analytics Generated!', {
-        description: 'Your business performance insights are ready'
+      toast.success('Strategic Business Intelligence Generated! 🚀', {
+        description: 'Your strategic insights and business intelligence are ready for executive decision-making'
       });
       
     } catch (error) {
-      console.error('Error generating AI analytics:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate AI analytics';
+      console.error('Error generating strategic business intelligence:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate strategic business intelligence';
       setError(errorMessage);
-      toast.error('Failed to generate AI analytics', {
+      toast.error('Failed to generate strategic business intelligence', {
         description: errorMessage
       });
     } finally {
@@ -547,8 +582,8 @@ const Analytics: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Business Analytics</h1>
-          <p className="text-muted-foreground">Real-time insights from your AI analysis</p>
+          <h1 className="text-3xl font-bold text-foreground">Strategic Business Intelligence</h1>
+          <p className="text-muted-foreground">Transform raw data into strategic insights with AI-powered analytics</p>
           <div className="flex items-center gap-2 mt-1">
             <div className={`flex items-center gap-1 text-xs ${isRealTimeActive ? 'text-green-600' : 'text-gray-500'}`}>
               <div className={`w-2 h-2 rounded-full ${isRealTimeActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
@@ -558,6 +593,56 @@ const Analytics: React.FC = () => {
               Last updated: {lastUpdated.toLocaleTimeString()}
             </span>
           </div>
+          
+          {/* Real-Time Usage Indicator */}
+          {user && (
+            <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="h-8 w-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                    <BarChart className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-green-900">Business Analytics Usage</h4>
+                    <p className="text-sm text-green-700">
+                      {usage.business_analytics.current} of {usage.business_analytics.limit === -1 ? '∞' : usage.business_analytics.limit} analytics generated
+                      {usage.business_analytics.limit !== -1 && (
+                        <span className="ml-2 text-xs">
+                          ({Math.round((usage.business_analytics.current / usage.business_analytics.limit) * 100)}%)
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-green-600 font-medium">Real-time</span>
+                </div>
+              </div>
+              {usage.business_analytics.limit !== -1 && (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-green-600 mb-1">
+                    <span>Usage Progress</span>
+                    <span>{usage.business_analytics.remaining} remaining</span>
+                  </div>
+                  <div className="w-full bg-green-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        usage.business_analytics.current / usage.business_analytics.limit >= 0.9 
+                          ? 'bg-red-500' 
+                          : usage.business_analytics.current / usage.business_analytics.limit >= 0.75 
+                            ? 'bg-yellow-500' 
+                            : 'bg-green-500'
+                      }`}
+                      style={{ 
+                        width: `${Math.min((usage.business_analytics.current / usage.business_analytics.limit) * 100, 100)}%` 
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex space-x-2">
           <Button 
@@ -845,10 +930,10 @@ const Analytics: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center">
             <Sparkles className="h-5 w-5 mr-2 text-yellow-500" />
-            AI-Powered Business Intelligence
+            Strategic Business Intelligence Engine
           </CardTitle>
           <CardDescription>
-            Generate comprehensive analytics insights using Gemini AI
+            Transform raw data into strategic insights using AI-powered business intelligence
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -856,11 +941,11 @@ const Analytics: React.FC = () => {
             {!geminiAnalytics ? (
               <div className="text-center py-8">
                 <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-medium mb-2">Ready to Generate AI Insights</h3>
+                <h3 className="text-lg font-medium mb-2">Ready to Generate Strategic Intelligence</h3>
                 <p className="text-muted-foreground mb-4">
                   {totalInsights > 0 
-                    ? `Analyze ${totalInsights} insights with AI`
-                    : 'No insights data available for analysis'
+                    ? `Transform ${totalInsights} insights into strategic business intelligence`
+                    : 'No insights data available for strategic analysis'
                   }
                 </p>
                 
