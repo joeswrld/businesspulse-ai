@@ -60,9 +60,14 @@ const FeedbackSettings = () => {
 
   // Fetch settings
   const fetchSettings = async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     try {
+      console.log('Fetching settings for user:', user.id);
+      
       const { data, error } = await supabase
         .from('feedback_settings')
         .select('*')
@@ -70,6 +75,8 @@ const FeedbackSettings = () => {
         .single();
 
       if (error) {
+        console.log('Error fetching settings:', error);
+        
         // If table doesn't exist, create default settings
         if (error.code === '42P01') {
           console.log('Feedback settings table does not exist. Creating default settings...');
@@ -84,32 +91,37 @@ const FeedbackSettings = () => {
           return;
         }
         
-        throw error;
+        // For other errors, show message but continue with defaults
+        console.error('Database error:', error);
+        toast.error('Database connection issue. Using default settings.');
+        await createDefaultSettings();
+        return;
       }
 
       if (data) {
+        console.log('Settings loaded successfully:', data);
         setSettings(data);
         setFormData({
-          brand_colors: data.brand_colors,
-          greeting_text: data.greeting_text,
-          button_placement: data.button_placement,
-          widget_enabled: data.widget_enabled,
-          auto_notifications: data.auto_notifications
+          brand_colors: data.brand_colors || { primary: '#3b82f6', secondary: '#1e40af' },
+          greeting_text: data.greeting_text || 'How was your experience?',
+          button_placement: data.button_placement || 'bottom',
+          widget_enabled: data.widget_enabled !== undefined ? data.widget_enabled : true,
+          auto_notifications: data.auto_notifications !== undefined ? data.auto_notifications : true
         });
       } else {
-        // Create default settings
+        console.log('No settings data returned, creating defaults');
         await createDefaultSettings();
       }
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      console.error('Error in fetchSettings:', error);
       
       // Provide more specific error messages
       if (error.code === '42501') {
         toast.error('Access denied. Please check your permissions.');
       } else if (error.code === '42P01') {
-        toast.error('Database not set up. Please contact administrator.');
+        toast.error('Database not set up. Using local defaults.');
       } else {
-        toast.error('Failed to load settings. Please try again.');
+        toast.error('Failed to load settings. Using local defaults.');
       }
       
       // Create default settings as fallback
@@ -124,6 +136,8 @@ const FeedbackSettings = () => {
     if (!user) return;
 
     try {
+      console.log('Creating default settings for user:', user.id);
+      
       // First check if table exists
       const { error: checkError } = await supabase
         .from('feedback_settings')
@@ -133,7 +147,7 @@ const FeedbackSettings = () => {
       if (checkError && checkError.code === '42P01') {
         console.log('Feedback settings table does not exist. Using local defaults.');
         // Use local defaults if table doesn't exist
-        setSettings({
+        const localSettings = {
           id: 'local-default',
           user_id: user.id,
           brand_colors: formData.brand_colors,
@@ -143,7 +157,9 @@ const FeedbackSettings = () => {
           auto_notifications: formData.auto_notifications,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        });
+        };
+        setSettings(localSettings);
+        console.log('Local settings created:', localSettings);
         return;
       }
 
@@ -162,36 +178,46 @@ const FeedbackSettings = () => {
         .single();
 
       if (error) {
+        console.log('Insert error:', error);
+        
         // If insert fails due to duplicate, try to get existing settings
         if (error.code === '23505') { // Unique violation
+          console.log('Duplicate settings found, fetching existing...');
           const { data: existingData, error: fetchError } = await supabase
             .from('feedback_settings')
             .select('*')
             .eq('user_id', user.id)
             .single();
 
-          if (fetchError) throw fetchError;
+          if (fetchError) {
+            console.error('Error fetching existing settings:', fetchError);
+            throw fetchError;
+          }
           
+          console.log('Existing settings found:', existingData);
           setSettings(existingData);
           setFormData({
-            brand_colors: existingData.brand_colors,
-            greeting_text: existingData.greeting_text,
-            button_placement: existingData.button_placement,
-            widget_enabled: existingData.widget_enabled,
-            auto_notifications: existingData.auto_notifications
+            brand_colors: existingData.brand_colors || formData.brand_colors,
+            greeting_text: existingData.greeting_text || formData.greeting_text,
+            button_placement: existingData.button_placement || formData.button_placement,
+            widget_enabled: existingData.widget_enabled !== undefined ? existingData.widget_enabled : formData.widget_enabled,
+            auto_notifications: existingData.auto_notifications !== undefined ? existingData.auto_notifications : formData.auto_notifications
           });
           return;
         }
+        
+        // For other errors, use local defaults
+        console.error('Insert error, using local defaults:', error);
         throw error;
       }
 
+      console.log('Default settings created successfully:', data);
       setSettings(data);
-      console.log('Default settings created successfully');
     } catch (error) {
       console.error('Error creating default settings:', error);
       
       // Use local defaults as fallback
-      setSettings({
+      const localSettings = {
         id: 'local-default',
         user_id: user.id,
         brand_colors: formData.brand_colors,
@@ -201,9 +227,10 @@ const FeedbackSettings = () => {
         auto_notifications: formData.auto_notifications,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      });
+      };
       
-      console.log('Using local default settings');
+      setSettings(localSettings);
+      console.log('Using local default settings:', localSettings);
     }
   };
 
@@ -325,8 +352,58 @@ const FeedbackSettings = () => {
   };
 
   useEffect(() => {
-    fetchSettings();
+    if (user) {
+      fetchSettings();
+    } else {
+      setLoading(false);
+    }
   }, [user]);
+
+  // Manual database setup function
+  const setupDatabase = async () => {
+    if (!user) return;
+    
+    setSaving(true);
+    try {
+      // Try to create the feedback_settings table manually
+      const { error } = await supabase.rpc('setup_feedback_tables');
+      
+      if (error) {
+        console.log('Manual setup failed, trying direct insert...');
+        // Try direct insert
+        const { data, error: insertError } = await supabase
+          .from('feedback_settings')
+          .insert({
+            user_id: user.id,
+            brand_colors: formData.brand_colors,
+            greeting_text: formData.greeting_text,
+            button_placement: formData.button_placement,
+            widget_enabled: formData.widget_enabled,
+            auto_notifications: formData.auto_notifications
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('Direct insert failed:', insertError);
+          toast.error('Database setup failed. Please run the SQL setup script.');
+        } else {
+          console.log('Direct insert successful:', data);
+          setSettings(data);
+          toast.success('Database setup completed!');
+        }
+      } else {
+        console.log('Manual setup successful');
+        toast.success('Database setup completed!');
+        fetchSettings(); // Refresh settings
+      }
+    } catch (error) {
+      console.error('Setup error:', error);
+      toast.error('Setup failed. Please check console for details.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -354,19 +431,27 @@ const FeedbackSettings = () => {
             Customize your feedback widget appearance and behavior
           </p>
         </div>
-        <Button onClick={saveSettings} disabled={saving}>
-          {saving ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              Saving...
-            </>
-          ) : (
-            <>
+        <div className="flex items-center space-x-2">
+          {settings?.id === 'local-default' && (
+            <Button onClick={setupDatabase} variant="outline" disabled={saving}>
               <SettingsIcon className="h-4 w-4 mr-2" />
-              Save Settings
-            </>
+              Setup Database
+            </Button>
           )}
-        </Button>
+          <Button onClick={saveSettings} disabled={saving}>
+            {saving ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Saving...
+              </>
+            ) : (
+              <>
+                <SettingsIcon className="h-4 w-4 mr-2" />
+                Save Settings
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
