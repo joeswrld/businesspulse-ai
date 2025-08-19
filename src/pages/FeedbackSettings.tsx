@@ -680,6 +680,36 @@ const FeedbackSettings = () => {
                 </p>
               </div>
 
+              {/* Simple Widget Embed Code */}
+              <div>
+                <Label htmlFor="simple-embed-code">Simple Widget (Recommended)</Label>
+                <div className="relative mt-2">
+                  <Textarea
+                    id="simple-embed-code"
+                    value={`<script src="https://notex.com.ng/widget-simple.js" data-user-id="${user?.id}"></script>`}
+                    readOnly
+                    className="font-mono text-sm"
+                    rows={2}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="absolute top-2 right-2"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`<script src="https://notex.com.ng/widget-simple.js" data-user-id="${user?.id}"></script>`);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                      toast.success('Simple widget code copied!');
+                    }}
+                  >
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Simplified version that works immediately without configuration.
+                </p>
+              </div>
+
               {/* NPM Package */}
               <div>
                 <Label>NPM Package (Recommended)</Label>
