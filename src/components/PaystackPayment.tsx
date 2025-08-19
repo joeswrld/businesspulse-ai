@@ -3,9 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 import { toast } from 'sonner';
-import { Loader2, CreditCard, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, CreditCard } from 'lucide-react';
 
 interface PaystackPaymentProps {
   plan: 'pro' | 'business';
@@ -29,7 +29,6 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
   onCancel
 }) => {
   const [loading, setLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank'>('card');
   const [email, setEmail] = useState('');
   const [amount, setAmount] = useState(plan === 'pro' ? 3500000 : 5300000); // Amount in kobo
 
@@ -109,43 +108,6 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
     }
   };
 
-  const handleBankTransfer = async () => {
-    if (!email) {
-      toast.error('Please enter your email address');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      // Create subscription for bank transfer
-      const response = await fetch('/api/create-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email,
-          plan: plan,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to create subscription');
-      }
-
-      toast.success('Subscription created! Please complete your bank transfer to activate your plan.');
-      onSuccess(data.subscription);
-
-    } catch (error) {
-      console.error('Subscription creation error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to create subscription');
-      setLoading(false);
-    }
-  };
-
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
@@ -167,50 +129,16 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label>Payment Method</Label>
-          <Select value={paymentMethod} onValueChange={(value: 'card' | 'bank') => setPaymentMethod(value)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="card">
-                <div className="flex items-center space-x-2">
-                  <CreditCard className="h-4 w-4" />
-                  <span>Credit/Debit Card</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="bank">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="h-4 w-4" />
-                  <span>Bank Transfer</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="p-4 bg-blue-50 rounded-lg">
+          <div className="flex items-center space-x-2 text-sm text-blue-700">
+            <CreditCard className="h-4 w-4" />
+            <span>Secure payment powered by Paystack</span>
+          </div>
         </div>
-
-        {paymentMethod === 'card' && (
-          <div className="p-4 bg-blue-50 rounded-lg">
-            <div className="flex items-center space-x-2 text-sm text-blue-700">
-              <CreditCard className="h-4 w-4" />
-              <span>Secure payment powered by Paystack</span>
-            </div>
-          </div>
-        )}
-
-        {paymentMethod === 'bank' && (
-          <div className="p-4 bg-yellow-50 rounded-lg">
-            <div className="flex items-center space-x-2 text-sm text-yellow-700">
-              <AlertCircle className="h-4 w-4" />
-              <span>You'll receive bank transfer details after subscription creation</span>
-            </div>
-          </div>
-        )}
 
         <div className="space-y-2">
           <Button
-            onClick={paymentMethod === 'card' ? handlePayment : handleBankTransfer}
+            onClick={handlePayment}
             disabled={loading || !email}
             className="w-full"
           >
