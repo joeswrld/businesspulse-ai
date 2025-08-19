@@ -29,6 +29,9 @@
     <link rel="dns-prefetch" href="https://js.paystack.co" />
     <link rel="preconnect" href="https://js.paystack.co" crossorigin />
     <script src="https://js.paystack.co/v1/inline.js" async></script>
+
+    <!-- Wallet conflict handler - load early to prevent Web3 extension conflicts -->
+    <script src="/wallet-conflict-handler.js"></script>
   </head>
 
   <body>
