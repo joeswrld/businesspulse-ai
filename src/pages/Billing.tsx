@@ -197,11 +197,10 @@ const Billing = () => {
     
     // Track successful upgrade
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
       await supabase.from('analytics_events').insert({
         user_id: user?.id,
         event_type: 'upgrade_success',
-        event_data: { plan: selectedPlan, subscription_id: subscriptionData.subscription_code }
+        event_data: { plan: selectedPlan, subscription_ref: subscriptionData.reference }
       });
     } catch (error) {
       console.error('Error tracking upgrade success:', error);
