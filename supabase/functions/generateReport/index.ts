@@ -52,11 +52,11 @@ Top Themes = ${JSON.stringify(topThemes)}
 
 Instructions:
 - Return a JSON object with this EXACT structure:
-{
-  "executive_summary": "2-10 sentences summarizing the key findings from the insights",
-  "key_insights": ["extract 3-10 key points directly from the insights_data"],
-  "trends": ["identify 2-10 patterns or trends from the insights_data"],
-  "recommended_actions": ["suggest 3-10 actionable steps based on the insights_data"],
+{  "executive_summary": "2-5 sentences summarizing the key findings from the insights",
+  "key_insights": ["extract 3-7 key points directly from the insights_data"],
+  "trends": ["identify 2-5 patterns or trends from the insights_data"],
+  "recommended_actions": ["suggest 3-6 actionable steps based on the insights_data"],
+
   "sentiment_breakdown": ${JSON.stringify(sentimentBreakdown)},
   "top_themes": ${JSON.stringify(topThemes)}
 }
@@ -68,7 +68,8 @@ Requirements:
 - Recommended actions: Based on the actual insights, not generic advice
 - Use the exact sentiment breakdown provided
 - Use the exact top themes provided
-- Keep each array item concise (1-10 sentences max)
+- Keep each array item concise (1-3 sentences max)
+
 - Ensure all content is grounded in the provided insights data
 `;
 

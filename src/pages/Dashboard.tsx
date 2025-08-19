@@ -46,8 +46,18 @@ interface AIInsight {
   id: string;
   summary: string;
   sentiment: 'positive' | 'negative' | 'neutral';
-  key_themes: string[];
-  suggested_actions: string[];
+  key_themes: Array<{
+    theme: string;
+    confidence: number;
+    frequency: string;
+    description: string;
+  } | string>;
+  suggested_actions: Array<{
+    action: string;
+    priority: string;
+    confidence: number;
+    impact: string;
+  } | string>;
   created_at: string;
   source_file?: string;
 }
@@ -80,6 +90,52 @@ interface TeamMember {
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
+  
+  // Custom dashboard styles
+  const dashboardStyles = `
+    .dashboard-card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s ease;
+    }
+    
+    .dashboard-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      border-color: #d1d5db;
+    }
+    
+    .stat-number {
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    
+    .stat-label {
+      font-size: 0.875rem;
+      color: #6b7280;
+      font-weight: 500;
+    }
+    
+    .sentiment-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+    }
+    
+    .live-indicator {
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  `;
   
   // Real-time state
   const [insights, setInsights] = useState<AIInsight[]>([]);
@@ -196,25 +252,58 @@ const Dashboard: React.FC = () => {
 
   // Fetch initial data
   const fetchInitialData = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log("No user found in fetchInitialData");
+      return;
+    }
 
     try {
+      console.log("Fetching dashboard data for user:", user.email);
+      
       // Fetch user profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
 
-      if (profile) {
-        setUserProfile(profile);
+        if (profileError) {
+          console.warn('Profile fetch warning:', profileError);
+        } else if (profile) {
+          setUserProfile(profile);
+        }
+      } catch (profileError) {
+        console.warn('Profile fetch error:', profileError);
       }
 
       // Fetch insights from localStorage (since we're using localStorage for insights)
-      const savedInsights = localStorage.getItem('insightsHistory');
-      if (savedInsights) {
-        const parsedInsights = JSON.parse(savedInsights);
-        setInsights(parsedInsights);
+      try {
+        const savedInsights = localStorage.getItem('insightsHistory');
+        if (savedInsights) {
+          const parsedInsights = JSON.parse(savedInsights);
+          // Validate and clean the insights data
+          const validInsights = parsedInsights.filter((insight: any) => {
+            return insight && 
+                   typeof insight === 'object' && 
+                   insight.id && 
+                   insight.summary && 
+                   insight.sentiment &&
+                   Array.isArray(insight.key_themes) &&
+                   Array.isArray(insight.suggested_actions);
+          });
+          setInsights(validInsights);
+          console.log('Loaded insights from localStorage:', validInsights.length);
+          if (validInsights.length !== parsedInsights.length) {
+            console.warn(`Filtered out ${parsedInsights.length - validInsights.length} invalid insights`);
+          }
+        } else {
+          console.log('No insights found in localStorage');
+        }
+      } catch (insightsError) {
+        console.error('Error parsing insights from localStorage:', insightsError);
+        // Set empty array as fallback
+        setInsights([]);
       }
 
       // Mock data for demonstration (replace with real Supabase queries)
@@ -235,6 +324,8 @@ const Dashboard: React.FC = () => {
       ];
       setTeamMembers(mockTeamMembers);
 
+      console.log('Dashboard data loaded successfully');
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Failed to load dashboard data');
@@ -245,109 +336,122 @@ const Dashboard: React.FC = () => {
 
   // Set up real-time subscriptions
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      console.log("No user in useEffect, skipping setup");
+      return;
+    }
 
+    console.log("Setting up real-time subscriptions for user:", user.email);
     fetchInitialData();
 
     // Set up real-time subscriptions for insights (localStorage-based)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'insightsHistory' && e.newValue) {
-        const newInsights = JSON.parse(e.newValue);
-        setInsights(newInsights);
-        toast.success('New insight generated!', {
-          description: 'Your dashboard has been updated with the latest analysis.'
-        });
+        try {
+          const newInsights = JSON.parse(e.newValue);
+          setInsights(newInsights);
+          toast.success('New insight generated!', {
+            description: 'Your dashboard has been updated with the latest analysis.'
+          });
+        } catch (error) {
+          console.error('Error parsing storage change:', error);
+        }
       }
     };
 
     window.addEventListener('storage', handleStorageChange);
 
-    // Mock real-time updates for demonstration with realistic growth patterns
+        // Mock real-time updates for demonstration with realistic growth patterns
     const interval = setInterval(() => {
-      // Simulate new insights being added with varying sentiment
-      if (Math.random() > 0.92) { // 8% chance every interval for more frequent updates
-        const sentiments: ('positive' | 'negative' | 'neutral')[] = ['positive', 'negative', 'neutral'];
-        const randomSentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
-        
-        const insightTemplates = [
-          {
-            summary: 'Customer feedback shows positive sentiment about the new dashboard interface.',
-            themes: ['dashboard', 'user interface', 'usability'],
-            actions: ['Continue UI improvements', 'Monitor user adoption']
-          },
-          {
-            summary: 'Users report issues with mobile app performance and loading times.',
-            themes: ['mobile app', 'performance', 'loading speed'],
-            actions: ['Optimize mobile performance', 'Investigate loading issues']
-          },
-          {
-            summary: 'Mixed feedback on pricing structure with requests for more flexible options.',
-            themes: ['pricing', 'subscription', 'flexibility'],
-            actions: ['Review pricing strategy', 'Consider flexible plans']
-          },
-          {
-            summary: 'Excellent feedback on customer support response times and helpfulness.',
-            themes: ['customer support', 'response time', 'helpfulness'],
-            actions: ['Maintain support quality', 'Document best practices']
-          },
-          {
-            summary: 'Feature requests for dark mode and additional customization options.',
-            themes: ['dark mode', 'customization', 'feature requests'],
-            actions: ['Prioritize dark mode', 'Plan customization features']
+      try {
+        // Simulate new insights being added with varying sentiment
+        if (Math.random() > 0.92) { // 8% chance every interval for more frequent updates
+          const sentiments: ('positive' | 'negative' | 'neutral')[] = ['positive', 'negative', 'neutral'];
+          const randomSentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
+          
+          const insightTemplates = [
+            {
+              summary: 'Customer feedback shows positive sentiment about the new dashboard interface.',
+              themes: ['dashboard', 'user interface', 'usability'],
+              actions: ['Continue UI improvements', 'Monitor user adoption']
+            },
+            {
+              summary: 'Users report issues with mobile app performance and loading times.',
+              themes: ['mobile app', 'performance', 'loading speed'],
+              actions: ['Optimize mobile performance', 'Investigate loading issues']
+            },
+            {
+              summary: 'Mixed feedback on pricing structure with requests for more flexible options.',
+              themes: ['pricing', 'subscription', 'flexibility'],
+              actions: ['Review pricing strategy', 'Consider flexible plans']
+            },
+            {
+              summary: 'Excellent feedback on customer support response times and helpfulness.',
+              themes: ['customer support', 'response time', 'helpfulness'],
+              actions: ['Maintain support quality', 'Document best practices']
+            },
+            {
+              summary: 'Feature requests for dark mode and additional customization options.',
+              themes: ['dark mode', 'customization', 'feature requests'],
+              actions: ['Prioritize dark mode', 'Plan customization features']
+            }
+          ];
+          
+          const randomTemplate = insightTemplates[Math.floor(Math.random() * insightTemplates.length)];
+          
+          const newInsight: AIInsight = {
+            id: Date.now().toString(),
+            summary: randomTemplate.summary,
+            sentiment: randomSentiment,
+            key_themes: randomTemplate.themes,
+            suggested_actions: randomTemplate.actions,
+            created_at: new Date().toISOString()
+          };
+          
+          setInsights(prev => [newInsight, ...prev]);
+          
+          // Show update animations
+          setGrowthRateUpdating(true);
+          setWeeklyInsightsUpdating(true);
+          setTimeout(() => {
+            setGrowthRateUpdating(false);
+            setWeeklyInsightsUpdating(false);
+          }, 2000);
+          
+          // Calculate new stats
+          const newStats = calculateStats([newInsight, ...insights], dataSources, aiJobs, teamMembers);
+          
+          // Show detailed update notification
+          const weekChange = newStats.thisWeekInsights - stats.thisWeekInsights;
+          const weeklyGrowthChange = newStats.weeklyGrowthRate - stats.weeklyGrowthRate;
+          const growthChange = newStats.growthRate - stats.growthRate;
+          
+          let notificationMessage = `New ${newInsight.sentiment} insight added`;
+          if (weekChange > 0) {
+            notificationMessage += ` • +${weekChange} this week`;
           }
-        ];
-        
-        const randomTemplate = insightTemplates[Math.floor(Math.random() * insightTemplates.length)];
-        
-        const newInsight: AIInsight = {
-          id: Date.now().toString(),
-          summary: randomTemplate.summary,
-          sentiment: randomSentiment,
-          key_themes: randomTemplate.themes,
-          suggested_actions: randomTemplate.actions,
-          created_at: new Date().toISOString()
-        };
-        
-        setInsights(prev => [newInsight, ...prev]);
-        
-        // Show update animations
-        setGrowthRateUpdating(true);
-        setWeeklyInsightsUpdating(true);
-        setTimeout(() => {
-          setGrowthRateUpdating(false);
-          setWeeklyInsightsUpdating(false);
-        }, 2000);
-        
-        // Calculate new stats
-        const newStats = calculateStats([newInsight, ...insights], dataSources, aiJobs, teamMembers);
-        
-        // Show detailed update notification
-        const weekChange = newStats.thisWeekInsights - stats.thisWeekInsights;
-        const weeklyGrowthChange = newStats.weeklyGrowthRate - stats.weeklyGrowthRate;
-        const growthChange = newStats.growthRate - stats.growthRate;
-        
-        let notificationMessage = `New ${newInsight.sentiment} insight added`;
-        if (weekChange > 0) {
-          notificationMessage += ` • +${weekChange} this week`;
+          if (weeklyGrowthChange !== 0) {
+            notificationMessage += ` • Weekly: ${newStats.weeklyGrowthRate > 0 ? '+' : ''}${newStats.weeklyGrowthRate}%`;
+          }
+          if (growthChange !== 0) {
+            notificationMessage += ` • Monthly: ${newStats.growthRate > 0 ? '+' : ''}${newStats.growthRate}%`;
+          }
+          
+          toast.success('📊 Dashboard Updated!', {
+            description: notificationMessage
+          });
         }
-        if (weeklyGrowthChange !== 0) {
-          notificationMessage += ` • Weekly: ${newStats.weeklyGrowthRate > 0 ? '+' : ''}${newStats.weeklyGrowthRate}%`;
-        }
-        if (growthChange !== 0) {
-          notificationMessage += ` • Monthly: ${newStats.growthRate > 0 ? '+' : ''}${newStats.growthRate}%`;
-        }
-        
-        toast.success('📊 Dashboard Updated!', {
-          description: notificationMessage
-        });
+      } catch (error) {
+        console.error('Error in real-time update simulation:', error);
       }
     }, 8000); // Check every 8 seconds for more frequent updates
 
     return () => {
+      console.log("Cleaning up real-time subscriptions");
       window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
     };
-  }, [user]);
+  }, [user, insights, dataSources, aiJobs, teamMembers, stats]);
 
   // Update stats when data changes
   useEffect(() => {
@@ -391,17 +495,66 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // Helper functions to safely extract data from insights
+  const getThemeText = (theme: any): string => {
+    if (typeof theme === 'string') return theme;
+    if (theme && typeof theme === 'object' && theme.theme) return theme.theme;
+    return 'Unknown theme';
+  };
+
+  const getActionText = (action: any): string => {
+    if (typeof action === 'string') return action;
+    if (action && typeof action === 'object' && action.action) return action.action;
+    return 'Unknown action';
+  };
+
+  // Safe array access helper
+  const safeArraySlice = (arr: any[], start: number, end: number) => {
+    if (!Array.isArray(arr)) return [];
+    try {
+      return arr.slice(start, end);
+    } catch (error) {
+      console.error('Error slicing array:', error);
+      return [];
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2">Loading dashboard...</span>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <span className="text-gray-600">Loading dashboard...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Required</h2>
+          <p className="text-gray-600 mb-4">Please log in to access the dashboard.</p>
+          <button 
+            onClick={() => window.location.href = '/auth'} 
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Go to Login
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      <style dangerouslySetInnerHTML={{ __html: dashboardStyles }} />
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -570,33 +723,45 @@ const Dashboard: React.FC = () => {
           <CardContent>
             {insights.length > 0 ? (
               <div className="space-y-4 max-h-96 overflow-y-auto">
-                {insights.slice(0, 5).map((insight) => (
-                  <div key={insight.id} className="border rounded-lg p-4 hover:shadow-sm transition-shadow">
-                    <div className="flex items-start justify-between mb-2">
-                      <Badge className={getSentimentColor(insight.sentiment)}>
-                        {insight.sentiment}
-                      </Badge>
-                      <span className="text-xs text-gray-500">
-                        {new Date(insight.created_at).toLocaleTimeString()}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-700 mb-2">{insight.summary}</p>
-                    {insight.key_themes.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {insight.key_themes.slice(0, 3).map((theme, index) => (
-                          <span key={index} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                            {theme}
+                {safeArraySlice(insights, 0, 5).map((insight) => {
+                  try {
+                    return (
+                      <div key={insight.id || `insight-${Date.now()}`} className="border rounded-lg p-4 hover:shadow-sm transition-shadow">
+                        <div className="flex items-start justify-between mb-2">
+                          <Badge className={getSentimentColor(insight.sentiment || 'neutral')}>
+                            {insight.sentiment || 'neutral'}
+                          </Badge>
+                          <span className="text-xs text-gray-500">
+                            {insight.created_at ? new Date(insight.created_at).toLocaleTimeString() : 'Unknown time'}
                           </span>
-                        ))}
+                        </div>
+                        <p className="text-sm text-gray-700 mb-2">{insight.summary || 'No summary available'}</p>
+                        {insight.key_themes && Array.isArray(insight.key_themes) && insight.key_themes.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {safeArraySlice(insight.key_themes, 0, 3).map((theme, index) => (
+                              <span key={index} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                {getThemeText(theme)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {insight.source_file && (
+                          <div className="text-xs text-gray-500">
+                            📎 {insight.source_file}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {insight.source_file && (
-                      <div className="text-xs text-gray-500">
-                        📎 {insight.source_file}
+                    );
+                  } catch (error) {
+                    console.error('Error rendering insight:', error, insight);
+                    return (
+                      <div key={`error-${Date.now()}`} className="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <p className="text-sm text-red-600">Error displaying insight</p>
+                        <p className="text-xs text-red-500 mt-1">ID: {insight.id || 'Unknown'}</p>
                       </div>
-                    )}
-                  </div>
-                ))}
+                    );
+                  }
+                })}
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">

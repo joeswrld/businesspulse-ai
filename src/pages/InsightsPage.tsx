@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
 
 // Light Platform Styling
 const dashboardStyles = `
@@ -160,9 +162,10 @@ const dashboardStyles = `
   }
 
   .ai-sentiment-neutral {
-    background: #f9fafb;
-    border-color: #e5e7eb;
-    color: #6b7280;
+    background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+    border: 1px solid #d1d5db;
+    color: #4b5563;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   }
 
   .ai-priority-high {
@@ -182,22 +185,87 @@ const dashboardStyles = `
     border-color: #dbeafe;
     color: #1e40af;
   }
+
+  .fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .ai-file-upload {
+    border: 2px dashed #d1d5db;
+    background: #f9fafb;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+
+  .ai-file-upload:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+  }
+
+  .ai-file-upload.dragover {
+    border-color: #3b82f6;
+    background: #dbeafe;
+    transform: scale(1.01);
+  }
+
+  .file-preview {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px;
+    font-family: monospace;
+    font-size: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
 `;
 
 interface InsightsData {
   summary: string;
   sentiment: "positive" | "negative" | "neutral";
-  key_themes: string[];
-  suggested_actions: string[];
+  sentiment_confidence?: number;
+  sentiment_reasoning?: string;
+  key_themes: Array<{
+    theme: string;
+    confidence: number;
+    frequency: string;
+    description: string;
+  } | string>;
+  suggested_actions: Array<{
+    action: string;
+    priority: string;
+    confidence: number;
+    impact: string;
+  } | string>;
+  overall_confidence?: number;
+  data_quality_score?: number;
+  analysis_notes?: string;
   source_file?: string; // Added for file upload history
 }
 
 export default function InsightsPage() {
+  const { user } = useAuth();
+  const { checkUsage, incrementUsage, usage } = useUsageTracking();
+  
   const [input, setInput] = useState("");
   const [result, setResult] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [insightsHistory, setInsightsHistory] = useState<Array<InsightsData & { id: string; timestamp: string }>>([]);
   const [error, setError] = useState<string | null>(null);
+  const [userFeedbackClassification, setUserFeedbackClassification] = useState<'good' | 'bad' | 'neutral' | null>(null);
+  const [confidenceMetrics, setConfidenceMetrics] = useState<any>(null);
   
   // File upload states
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -438,10 +506,36 @@ export default function InsightsPage() {
       return;
     }
 
+    // Check usage limits before proceeding
+    if (user) {
+      const canAnalyze = await checkUsage('ai_insights', 1);
+      if (!canAnalyze) {
+        toast.error("AI Insights limit reached. Please upgrade your plan to continue generating strategic intelligence.");
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
 
     try {
+      // Enhanced prompt for strategic business intelligence
+      const enhancedInput = `Transform this raw business data into strategic intelligence:
+
+${input}
+
+Please analyze this data and provide:
+1. Executive Summary with strategic implications
+2. Key Business Insights with actionable recommendations
+3. Risk Assessment and opportunities
+4. Strategic Action Plan with priority levels
+5. Performance Metrics and KPIs to track
+6. Competitive Intelligence insights
+7. Market Trend Analysis
+8. Resource Allocation recommendations
+
+Focus on transforming raw data into strategic business intelligence that drives decision-making.`;
+
       const res = await fetch(
         "https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/insightsAnalysis",
         {
@@ -450,7 +544,7 @@ export default function InsightsPage() {
             "Content-Type": "application/json",
             "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84"
           },
-          body: JSON.stringify({ data: input }),
+          body: JSON.stringify({ data: enhancedInput }),
         }
       );
 
@@ -465,28 +559,47 @@ export default function InsightsPage() {
         throw new Error("Invalid response from analysis service.");
       }
 
+      // Increment usage after successful analysis
+      if (user) {
+        await incrementUsage('ai_insights', 1);
+      }
+
       setResult(json.result);
       
-      // Add to history
+      // Set confidence metrics for real-time display
+      setConfidenceMetrics({
+        overall: json.result.overall_confidence || 0,
+        sentiment: json.result.sentiment_confidence || 0,
+        dataQuality: json.result.data_quality_score || 0
+      });
+      
+      // Reset user feedback classification
+      setUserFeedbackClassification(null);
+      
+      // Add to history with strategic intelligence metadata
       const newInsight = {
         ...json.result,
         id: Date.now().toString(),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        strategic_value: calculateStrategicValue(json.result),
+        business_impact: assessBusinessImpact(json.result)
       };
 
       setInsightsHistory(prev => [newInsight, ...prev]);
       setInput("");
 
-      // Show success toast with sentiment
-      const sentimentEmoji = json.result.sentiment === "positive" ? "😊" : 
-                            json.result.sentiment === "negative" ? "😔" : "😐";
+      // Show success toast with strategic intelligence summary
+      const sentimentEmoji = json.result.sentiment === "positive" ? "🚀" : 
+                            json.result.sentiment === "negative" ? "⚠️" : "📊";
+      const confidenceLevel = json.result.overall_confidence || 0;
+      const confidenceText = confidenceLevel >= 80 ? "High" : confidenceLevel >= 60 ? "Medium" : "Low";
       
-      toast.success(`${sentimentEmoji} Analysis Complete!`, {
-        description: `Found ${json.result.key_themes.length} themes and ${json.result.suggested_actions.length} actionable items.`
+      toast.success(`${sentimentEmoji} Strategic Intelligence Generated! (${confidenceText} Confidence)`, {
+        description: `Transformed raw data into ${json.result.key_themes.length} strategic themes and ${json.result.suggested_actions.length} actionable recommendations. Overall confidence: ${confidenceLevel}%`
       });
 
     } catch (err) {
-      let errorMessage = "Analysis failed";
+      let errorMessage = "Strategic analysis failed";
       
       if (err instanceof Error) {
         if (err.message.includes('fetch')) {
@@ -502,6 +615,37 @@ export default function InsightsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper functions for strategic intelligence
+  const calculateStrategicValue = (insight: InsightsData): number => {
+    let value = 0;
+    
+    // Base value from confidence
+    value += (insight.overall_confidence || 0) * 0.3;
+    
+    // Value from themes (more themes = higher value)
+    const themeCount = Array.isArray(insight.key_themes) ? insight.key_themes.length : 0;
+    value += Math.min(themeCount * 10, 50);
+    
+    // Value from actions (more actions = higher value)
+    const actionCount = Array.isArray(insight.suggested_actions) ? insight.suggested_actions.length : 0;
+    value += Math.min(actionCount * 8, 40);
+    
+    // Sentiment bonus
+    if (insight.sentiment === 'positive') value += 15;
+    else if (insight.sentiment === 'negative') value += 10; // Negative insights can be valuable for risk mitigation
+    else value += 5;
+    
+    return Math.min(Math.round(value), 100);
+  };
+
+  const assessBusinessImpact = (insight: InsightsData): 'high' | 'medium' | 'low' => {
+    const strategicValue = calculateStrategicValue(insight);
+    
+    if (strategicValue >= 70) return 'high';
+    if (strategicValue >= 40) return 'medium';
+    return 'low';
   };
 
   const clearHistory = () => {
@@ -528,6 +672,30 @@ export default function InsightsPage() {
     if (sentiment === "positive") return "bg-green-200 text-green-800 border-green-300";
     if (sentiment === "negative") return "bg-red-200 text-red-800 border-red-300";
     return "bg-gray-200 text-gray-800 border-gray-300";
+  };
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 80) return "text-green-600";
+    if (confidence >= 60) return "text-yellow-600";
+    return "text-red-600";
+  };
+
+  const getConfidenceText = (confidence: number) => {
+    if (confidence >= 80) return "High";
+    if (confidence >= 60) return "Medium";
+    return "Low";
+  };
+
+  const getPriorityColor = (priority: string) => {
+    if (priority === "high") return "bg-red-100 text-red-800 border-red-300";
+    if (priority === "medium") return "bg-yellow-100 text-yellow-800 border-yellow-300";
+    return "bg-blue-100 text-blue-800 border-blue-300";
+  };
+
+  const getFrequencyColor = (frequency: string) => {
+    if (frequency === "high") return "bg-purple-100 text-purple-800 border-purple-300";
+    if (frequency === "medium") return "bg-blue-100 text-blue-800 border-blue-300";
+    return "bg-gray-100 text-gray-800 border-gray-300";
   };
 
   const getSentimentEmoji = (sentiment: string) => {
@@ -597,15 +765,65 @@ export default function InsightsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
-            <h1 className="text-4xl font-bold ai-text ai-neon-text">AI Insights </h1>
+            <h1 className="text-4xl font-bold ai-text ai-neon-text">Strategic Intelligence Hub</h1>
           </div>
-          <p className="ai-text-secondary text-lg">Advanced AI analysis for actionable business intelligence</p>
+          <p className="ai-text-secondary text-lg">Transform raw business data into strategic intelligence with AI-powered analysis</p>
           
           {/* AI Status Indicator */}
           <div className="flex items-center space-x-2 mt-3">
             <div className="w-2 h-2 bg-green-500 rounded-full ai-pulse"></div>
             <span className="ai-text-muted text-sm">AI Engine Online • Ready for Analysis</span>
           </div>
+          
+          {/* Real-Time Usage Indicator */}
+          {user && (
+            <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                    <Brain className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-blue-900">AI Insights Usage</h4>
+                    <p className="text-sm text-blue-700">
+                      {usage.ai_insights.current} of {usage.ai_insights.limit === -1 ? '∞' : usage.ai_insights.limit} insights used
+                      {usage.ai_insights.limit !== -1 && (
+                        <span className="ml-2 text-xs">
+                          ({Math.round((usage.ai_insights.current / usage.ai_insights.limit) * 100)}%)
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-blue-600 font-medium">Real-time</span>
+                </div>
+              </div>
+              {usage.ai_insights.limit !== -1 && (
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-blue-600 mb-1">
+                    <span>Usage Progress</span>
+                    <span>{usage.ai_insights.remaining} remaining</span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        usage.ai_insights.current / usage.ai_insights.limit >= 0.9 
+                          ? 'bg-red-500' 
+                          : usage.ai_insights.current / usage.ai_insights.limit >= 0.75 
+                            ? 'bg-yellow-500' 
+                            : 'bg-blue-500'
+                      }`}
+                      style={{ 
+                        width: `${Math.min((usage.ai_insights.current / usage.ai_insights.limit) * 100, 100)}%` 
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         
         {/* Enhanced Statistics Section */}
@@ -841,6 +1059,33 @@ export default function InsightsPage() {
               {input.length}/500,000 characters
             </div>
             
+            {/* Real-time Confidence Indicator */}
+            {loading && (
+              <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-blue-700">AI Analysis in Progress</span>
+                  <div className="flex items-center gap-2">
+                    <div className="ai-loading w-4 h-4 rounded-full"></div>
+                    <span className="text-xs text-blue-600">Processing...</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600">Sentiment Analysis</span>
+                    <span className="text-blue-600">Analyzing...</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600">Theme Extraction</span>
+                    <span className="text-blue-600">Identifying...</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600">Action Generation</span>
+                    <span className="text-blue-600">Generating...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <button 
               onClick={handleAnalyze} 
               disabled={loading || !input.trim()}
@@ -853,7 +1098,7 @@ export default function InsightsPage() {
                 </>
               ) : (
                 <>
-                  <span>🚀 Generate AI Insights</span>
+                  <span>🚀 Generate Strategic Intelligence</span>
                 </>
               )}
             </button>
@@ -880,19 +1125,184 @@ export default function InsightsPage() {
                   </div>
                   <h2 className="text-xl font-semibold ai-text ai-neon-text">Analysis Summary</h2>
                 </div>
+                
                 <p className="ai-text-secondary text-lg mb-6 leading-relaxed">{result.summary}</p>
                 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className={`px-4 py-2 rounded-full text-sm font-medium ai-theme-tag ${
-                      result.sentiment === 'positive' ? 'ai-sentiment-positive' : 
-                      result.sentiment === 'negative' ? 'ai-sentiment-negative' : 
-                      'ai-sentiment-neutral'
-                    }`}>
-                      {getSentimentEmoji(result.sentiment)} {result.sentiment}
-                    </span>
+                {/* AI Confidence Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200 shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-blue-700 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                        Overall Confidence
+                      </span>
+                      <span className={`text-lg font-bold ${getConfidenceColor(result.overall_confidence || 0)}`}>
+                        {result.overall_confidence || 0}%
+                      </span>
+                    </div>
+                    <div className="mt-3">
+                      <div className="w-full bg-blue-200 rounded-full h-3 shadow-inner">
+                        <div 
+                          className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-700 ease-out shadow-sm" 
+                          style={{ width: `${result.overall_confidence || 0}%` }}
+                        ></div>
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-blue-600">
+                          {getConfidenceText(result.overall_confidence || 0)} Confidence
+                        </span>
+                        <span className="text-xs text-blue-500 font-medium">
+                          {result.overall_confidence || 0}/100
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200 shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-green-700 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        Sentiment Confidence
+                      </span>
+                      <span className={`text-lg font-bold ${getConfidenceColor(result.sentiment_confidence || 0)}`}>
+                        {result.sentiment_confidence || 0}%
+                      </span>
+                    </div>
+                    <div className="mt-3">
+                      <div className="w-full bg-green-200 rounded-full h-3 shadow-inner">
+                        <div 
+                          className="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full transition-all duration-700 ease-out shadow-sm" 
+                          style={{ width: `${result.sentiment_confidence || 0}%` }}
+                        ></div>
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-green-600">
+                          {getConfidenceText(result.sentiment_confidence || 0)} Confidence
+                        </span>
+                        <span className="text-xs text-green-500 font-medium">
+                          {result.sentiment_confidence || 0}/100
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200 shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-purple-700 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                        Data Quality
+                      </span>
+                      <span className={`text-lg font-bold ${getConfidenceColor(result.data_quality_score || 0)}`}>
+                        {result.data_quality_score || 0}%
+                      </span>
+                    </div>
+                    <div className="mt-3">
+                      <div className="w-full bg-purple-200 rounded-full h-3 shadow-inner">
+                        <div 
+                          className="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full transition-all duration-700 ease-out shadow-sm" 
+                          style={{ width: `${result.data_quality_score || 0}%` }}
+                        ></div>
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-purple-600">
+                          {getConfidenceText(result.data_quality_score || 0)} Quality
+                        </span>
+                        <span className="text-xs text-purple-500 font-medium">
+                          {result.data_quality_score || 0}/100
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
+                
+                {/* Sentiment and Feedback Classification */}
+                <div className="bg-gradient-to-r from-gray-50 to-blue-50 p-4 rounded-lg border border-gray-200 mb-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    {/* AI Sentiment Analysis */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-700">AI Analysis:</span>
+                        <span className={`px-4 py-2 rounded-full text-sm font-medium ai-theme-tag ${
+                          result.sentiment === 'positive' ? 'ai-sentiment-positive' : 
+                          result.sentiment === 'negative' ? 'ai-sentiment-negative' : 
+                          'ai-sentiment-neutral'
+                        }`}>
+                          {getSentimentEmoji(result.sentiment)} {result.sentiment.charAt(0).toUpperCase() + result.sentiment.slice(1)}
+                        </span>
+                      </div>
+                      {result.sentiment_reasoning && (
+                        <span className="text-sm text-gray-600 bg-white px-3 py-1 rounded-full border border-gray-200 shadow-sm">
+                          💭 {result.sentiment_reasoning}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* User Feedback Classification */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                      <span className="text-sm font-medium text-gray-700">Your Feedback:</span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setUserFeedbackClassification('good')}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 ${
+                            userFeedbackClassification === 'good' 
+                              ? 'bg-green-500 text-white shadow-lg shadow-green-200' 
+                              : 'bg-white text-gray-600 hover:bg-green-50 border border-gray-200 hover:border-green-300'
+                          }`}
+                        >
+                          👍 Good
+                        </button>
+                        <button
+                          onClick={() => setUserFeedbackClassification('neutral')}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 ${
+                            userFeedbackClassification === 'neutral' 
+                              ? 'bg-yellow-500 text-white shadow-lg shadow-yellow-200' 
+                              : 'bg-white text-gray-600 hover:bg-yellow-50 border border-gray-200 hover:border-yellow-300'
+                          }`}
+                        >
+                          😐 Neutral
+                        </button>
+                        <button
+                          onClick={() => setUserFeedbackClassification('bad')}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 ${
+                            userFeedbackClassification === 'bad' 
+                              ? 'bg-red-500 text-white shadow-lg shadow-red-200' 
+                              : 'bg-white text-gray-600 hover:bg-red-50 border border-gray-200 hover:border-red-300'
+                          }`}
+                        >
+                          👎 Bad
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Feedback Status */}
+                  {userFeedbackClassification && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-700">Status:</span>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          userFeedbackClassification === 'good' 
+                            ? 'bg-green-100 text-green-800 border border-green-200' 
+                            : userFeedbackClassification === 'neutral'
+                            ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                            : 'bg-red-100 text-red-800 border border-red-200'
+                        }`}>
+                          {userFeedbackClassification === 'good' ? '✅ Feedback Recorded' : 
+                           userFeedbackClassification === 'neutral' ? '⚠️ Feedback Recorded' : 
+                           '❌ Feedback Recorded'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Analysis Notes */}
+                {result.analysis_notes && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <span className="text-sm font-medium text-blue-700">Analysis Notes:</span>
+                    <p className="text-sm text-blue-600 mt-1">{result.analysis_notes}</p>
+                  </div>
+                )}
               </div>
 
               {/* Key Themes Card */}
@@ -906,15 +1316,28 @@ export default function InsightsPage() {
                     </div>
                     <h2 className="text-xl font-semibold ai-text ai-neon-text">Key Themes</h2>
                   </div>
-                  <div className="flex flex-wrap gap-3">
-                    {result.key_themes.map((theme, index) => (
-                      <span
-                        key={index}
-                        className="ai-theme-tag"
-                      >
-                        {theme}
-                      </span>
-                    ))}
+                  <div className="space-y-3">
+                    {result.key_themes.map((theme, index) => {
+                      const themeData = typeof theme === 'string' ? { theme, confidence: 70, frequency: 'medium', description: 'Theme identified' } : theme;
+                      return (
+                        <div key={index} className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+                          <div className="flex items-start justify-between mb-2">
+                            <span className="font-medium text-purple-800">{themeData.theme}</span>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getFrequencyColor(themeData.frequency)}`}>
+                                {themeData.frequency} frequency
+                              </span>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getConfidenceColor(themeData.confidence)}`}>
+                                {themeData.confidence}% confidence
+                              </span>
+                            </div>
+                          </div>
+                          {themeData.description && (
+                            <p className="text-sm text-purple-600">{themeData.description}</p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -931,14 +1354,34 @@ export default function InsightsPage() {
                     <h2 className="text-xl font-semibold ai-text ai-neon-text">Suggested Actions</h2>
                   </div>
                   <div className="space-y-4">
-                                          {result.suggested_actions.map((action, index) => (
-                        <div key={index} className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                          <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                            <span className="text-white text-sm font-bold">{index + 1}</span>
+                    {result.suggested_actions.map((action, index) => {
+                      const actionData = typeof action === 'string' ? { action, priority: 'medium', confidence: 70, impact: 'Expected to improve user experience' } : action;
+                      return (
+                        <div key={index} className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
+                          <div className="flex items-start space-x-4">
+                            <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center">
+                              <span className="text-white text-sm font-bold">{index + 1}</span>
+                            </div>
+                            <div className="flex-1">
+                              <p className="ai-text-secondary leading-relaxed mb-2">{actionData.action}</p>
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(actionData.priority)}`}>
+                                  {actionData.priority} priority
+                                </span>
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getConfidenceColor(actionData.confidence)}`}>
+                                  {actionData.confidence}% confidence
+                                </span>
+                              </div>
+                              {actionData.impact && (
+                                <p className="text-xs text-green-600 mt-2 bg-green-50 px-2 py-1 rounded">
+                                  💡 {actionData.impact}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <span className="ai-text-secondary leading-relaxed">{action}</span>
                         </div>
-                      ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

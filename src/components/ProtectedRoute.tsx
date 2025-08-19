@@ -12,15 +12,20 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
       </div>
     );
   }
 
   if (!user) {
+    console.log("No user found, redirecting to auth");
     return <Navigate to="/auth" replace />;
   }
 
+  console.log("User authenticated:", user.email);
   return <>{children}</>;
 };
 

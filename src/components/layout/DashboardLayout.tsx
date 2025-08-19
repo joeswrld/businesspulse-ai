@@ -6,49 +6,45 @@ import {
   FileText, 
   Brain, 
   BarChart3, 
-  CreditCard, 
   Settings, 
-  HelpCircle, 
-  Upload,
   Menu,
   X,
-  Zap,
   LogOut,
-  User
+  User,
+  CreditCard,
+  Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { toast } = useToast();
+
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "AI Insights", href: "/insights-simple", icon: Brain },
-    { name: "Reports", href: "/reports", icon: FileText },
-    { name: "Analytics", href: "/analytics", icon: BarChart3 },
-    { name: "Billing", href: "/billing", icon: CreditCard },
+    { name: "AI Analytics", href: "/insights-simple", icon: Brain },
+    { name: "Executive Reports", href: "/reports", icon: FileText },
+    { name: "Business Intelligence", href: "/analytics", icon: BarChart3 },
+    { name: "Usage & Billing", href: "/billing", icon: CreditCard },
+    { name: "Teams", href: "/teams", icon: Users, comingSoon: true },
     { name: "Settings", href: "/settings", icon: Settings },
-    { name: "Teams", href: "/teams", icon: HelpCircle },
+    { name: "Profile", href: "/profile", icon: User },
   ];
 
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
-      toast({
-        title: "Signed out successfully",
+      toast.success("Signed out successfully", {
         description: "You've been logged out of your account.",
       });
       navigate("/");
     } catch (error) {
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Failed to sign out. Please try again.",
-        variant: "destructive",
       });
     }
   };
@@ -72,7 +68,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           {/* Logo */}
           <div className="flex items-center justify-between p-4 border-b border-border">
             <Link to="/dashboard" className="flex items-center space-x-2">
-            <img src="/favicon.ico" alt="Notex" />
+              <img src="/favicon.ico" alt="NoteX BI" className="h-8 w-8" />
+              <span className="text-xl font-bold text-primary">NoteX BI</span>
             </Link>
             <button 
               className="lg:hidden p-1"
@@ -86,21 +83,34 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           <nav className="flex-1 p-4 space-y-2">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
+              const isComingSoon = item.comingSoon;
+              
               return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={cn(
-                    "flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-soft"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                <div key={item.name} className="relative">
+                  {isComingSoon ? (
+                    <div className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground cursor-not-allowed opacity-60">
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.name}</span>
+                      <span className="ml-auto text-xs bg-muted px-2 py-1 rounded-full text-muted-foreground">
+                        Coming Soon
+                      </span>
+                    </div>
+                  ) : (
+                    <Link
+                      to={item.href}
+                      className={cn(
+                        "flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-soft"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      )}
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.name}</span>
+                    </Link>
                   )}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.name}</span>
-                </Link>
+                </div>
               );
             })}
           </nav>
@@ -140,9 +150,10 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
             <div className="flex-1" />
             
             <div className="flex items-center space-x-3">
-              <Button variant="outline" size="sm">
-                Upgrade Plan
-              </Button>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span>System Online</span>
+              </div>
             </div>
           </div>
         </header>

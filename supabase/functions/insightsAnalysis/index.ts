@@ -30,8 +30,8 @@ serve(async (req) => {
     CRITICAL: Analyze ONLY the provided data. Do not invent or assume information.
     
     Respond in this EXACT JSON structure:
-    {
-      "summary": "2-10 sentence executive summary of key findings",
+    {      "summary": "2-5 sentence executive summary of key findings",
+
       "sentiment": "positive|negative|neutral",
       "sentiment_confidence": 85,
       "sentiment_reasoning": "Brief explanation of sentiment classification",
