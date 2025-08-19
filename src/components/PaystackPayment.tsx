@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -31,21 +31,68 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
-  const [amount, setAmount] = useState(plan === 'pro' ? 3500000 : 5300000); // Amount in kobo
-  const [paystackReady, setPaystackReady] = useState(false);
+  const [amount] = useState(plan === 'pro' ? 3500000 : 5300000); // Amount in kobo
+  const [paystackReady, setPaystackReady] = useState<boolean>(typeof window !== 'undefined' && !!window.PaystackPop);
+  const handlerRef = useRef<any>(null);
 
+  const planCode = plan === 'pro' ? 'PLN_4z2wpgmw41w2k7r' : 'PLN_esryg99ztsy9xc8';
+  const publicKey = (import.meta as any)?.env?.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_a5122beb6fd90a988ae6e180b2010fd093a59152';
+
+  // Detect Paystack script readiness (it is included in index.html)
   useEffect(() => {
-    // Load Paystack script
-    const script = document.createElement('script');
-    script.src = 'https://js.paystack.co/v1/inline.js';
-    script.async = true;
-    script.onload = () => setPaystackReady(true);
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
+    if (window.PaystackPop) {
+      setPaystackReady(true);
+      return;
+    }
+    const started = Date.now();
+    const maxWait = 8000;
+    const poll = setInterval(() => {
+      if (window.PaystackPop) {
+        setPaystackReady(true);
+        clearInterval(poll);
+      } else if (Date.now() - started > maxWait) {
+        clearInterval(poll);
+      }
+    }, 100);
+    return () => clearInterval(poll);
   }, []);
+
+  // Pre-initialize handler for faster popup
+  useEffect(() => {
+    if (!paystackReady) return;
+    if (!email || !email.includes('@')) return;
+    if (handlerRef.current) return;
+    try {
+      handlerRef.current = window.PaystackPop.setup({
+        key: publicKey,
+        email,
+        amount: plan === 'pro' ? 3500000 : 5300000,
+        currency: 'NGN',
+        plan: planCode,
+        callback: (response: any) => {
+          if (response && response.status === 'success') {
+            toast.success('Payment successful! Activating your subscription...');
+            (async () => {
+              try {
+                await supabase.from('analytics_events').insert({
+                  event_type: 'upgrade_success',
+                  event_data: { plan, email, reference: response.reference },
+                });
+              } catch {}
+            })();
+            onSuccess({ reference: response.reference, plan });
+          } else {
+            toast.error('Payment failed. Please try again.');
+          }
+          setLoading(false);
+        },
+        onClose: () => {
+          toast.info('Payment window closed');
+          setLoading(false);
+        }
+      });
+    } catch {}
+  }, [paystackReady, email, plan, planCode, publicKey]);
 
   const handlePayment = async () => {
     if (!email) {
@@ -66,8 +113,6 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
         setLoading(false);
         return;
       }
-      // Map selected plan to Paystack plan code
-      const planCode = plan === 'pro' ? 'PLN_4z2wpgmw41w2k7r' : 'PLN_esryg99ztsy9xc8';
 
       // Optional: track upgrade attempt
       try {
@@ -77,41 +122,42 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
         });
       } catch {}
 
-      // Resolve public key from env with fallback to provided key
-      const publicKey = (import.meta as any)?.env?.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_a5122beb6fd90a988ae6e180b2010fd093a59152';
-
-      // Initialize Paystack payment with plan code. Paystack will create the subscription upon successful charge
-      const handler = window.PaystackPop.setup({
-        key: publicKey,
-        email: email,
-        amount: amount, // Plan amount in kobo (overridden by plan, but kept for clarity)
-        currency: 'NGN',
-        plan: planCode,
-        callback: function(response: any) {
-          if (response && response.status === 'success') {
-            toast.success('Payment successful! Activating your subscription...');
-            // Fire-and-forget async tracking
-            (async () => {
-              try {
-                await supabase.from('analytics_events').insert({
-                  event_type: 'upgrade_success',
-                  event_data: { plan, email, reference: response.reference },
-                });
-              } catch {}
-            })();
-            onSuccess({ reference: response.reference, plan });
-          } else {
-            toast.error('Payment failed. Please try again.');
+      // Use pre-initialized handler if available for instant popup
+      if (handlerRef.current) {
+        handlerRef.current.openIframe();
+      } else {
+        // Fallback: create now
+        const handler = window.PaystackPop.setup({
+          key: publicKey,
+          email,
+          amount: plan === 'pro' ? 3500000 : 5300000,
+          currency: 'NGN',
+          plan: planCode,
+          callback: (response: any) => {
+            if (response && response.status === 'success') {
+              toast.success('Payment successful! Activating your subscription...');
+              (async () => {
+                try {
+                  await supabase.from('analytics_events').insert({
+                    event_type: 'upgrade_success',
+                    event_data: { plan, email, reference: response.reference },
+                  });
+                } catch {}
+              })();
+              onSuccess({ reference: response.reference, plan });
+            } else {
+              toast.error('Payment failed. Please try again.');
+            }
+            setLoading(false);
+          },
+          onClose: () => {
+            toast.info('Payment window closed');
+            setLoading(false);
           }
-          setLoading(false);
-        },
-        onClose: function() {
-          toast.info('Payment window closed');
-          setLoading(false);
-        }
-      });
-
-      handler.openIframe();
+        });
+        handlerRef.current = handler;
+        handler.openIframe();
+      }
     } catch (error) {
       console.error('Payment error:', error);
       toast.error(error instanceof Error ? error.message : 'Payment failed');
