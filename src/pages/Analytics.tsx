@@ -3,19 +3,37 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { toast } from 'sonner';
 import {
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
+  BarChart3,
+  Brain,
+  FileText,
+  Loader2,
+  RefreshCw,
+  Sparkles,
+  Lightbulb,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  AlertTriangle,
+  CheckCircle,
+  Target,
+  ArrowUpRight,
+  Users,
+  Activity,
+  Zap,
+  Clock,
+  Database
+} from 'lucide-react';
+
+import {
   BarChart,
   Bar,
   PieChart,
-  Pie,
   Cell,
+  Pie,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -23,49 +41,28 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-import {
-  TrendingUp,
-  TrendingDown,
-  BarChart3,
-  PieChart as PieChartIcon,
-  Users,
-  DollarSign,
-  Brain,
-  FileText,
-  Loader2,
-  RefreshCw,
-  Zap,
-  Target,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  Activity,
-  Sparkles,
-  Lightbulb,
-  ArrowUpRight,
-  ArrowDownRight,
-  Minus
-} from 'lucide-react';
 
-interface GeminiAnalytics {
-  overall_sentiment: 'positive' | 'negative' | 'neutral';
-  top_themes: string[];
+interface FeedbackData {
+  id: string;
+  user_id: string;
+  feedback_text: string;
+  sentiment: 'positive' | 'negative' | 'neutral';
+  category: string;
+  priority: 'high' | 'medium' | 'low';
+  created_at: string;
+  updated_at: string;
+}
+
+interface GeminiAnalyticsResponse {
+  executive_summary: string;
+  key_insights: string[];
+  trends: string[];
+  performance_metrics: {
+    positive: number;
+    negative: number;
+    neutral: number;
+  };
   recommended_actions: string[];
-  kpis: {
-    total_insights: number;
-    reports_generated: number;
-    growth_rate: string;
-    team_members: number;
-    active_ai_jobs: number;
-    data_sources_count: number;
-  };
-  trends: {
-    sentiment_trend: 'improving' | 'declining' | 'stable';
-    activity_trend: 'increasing' | 'decreasing' | 'stable';
-    priority_distribution: Record<string, number>;
-  };
-  insights_summary: string;
-  business_recommendations: string[];
 }
 
 interface SentimentData {
@@ -75,98 +72,82 @@ interface SentimentData {
   neutral: number;
 }
 
-interface ThemeData {
-  theme: string;
+interface CategoryData {
+  category: string;
   count: number;
   percentage: number;
-}
-
-interface ReportData {
-  week: string;
-  completed: number;
-  inProgress: number;
 }
 
 const Analytics: React.FC = () => {
   const { user } = useAuth();
   
   // State for real-time data
-  const [insights, setInsights] = useState<any[]>([]);
-  const [reports, setReports] = useState<any[]>([]);
-  const [dataSources, setDataSources] = useState<any[]>([]);
-  const [aiJobs, setAiJobs] = useState<any[]>([]);
-  const [teamMembers, setTeamMembers] = useState<any[]>([]);
-  
-  // State for analytics
-  const [geminiAnalytics, setGeminiAnalytics] = useState<GeminiAnalytics | null>(null);
+  const [feedbackData, setFeedbackData] = useState<FeedbackData[]>([]);
+  const [geminiAnalytics, setGeminiAnalytics] = useState<GeminiAnalyticsResponse | null>(null);
   const [sentimentData, setSentimentData] = useState<SentimentData[]>([]);
-  const [themeData, setThemeData] = useState<ThemeData[]>([]);
-  const [reportData, setReportData] = useState<ReportData[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
   
   // UI state
   const [loading, setLoading] = useState(true);
   const [generatingAI, setGeneratingAI] = useState(false);
-  const [timeRange, setTimeRange] = useState('7d');
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch initial data
-  const fetchInitialData = useCallback(async () => {
+  // Fetch feedback data from Supabase
+  const fetchFeedbackData = useCallback(async () => {
     if (!user) return;
 
     try {
       setLoading(true);
+      setError(null);
       
-      // Fetch all data in parallel
-      const [insightsRes, reportsRes, dataSourcesRes, aiJobsRes, teamMembersRes] = await Promise.all([
-        supabase.from('ai_insights').select('*').eq('user_id', user.id),
-        supabase.from('reports').select('*').eq('user_id', user.id),
-        supabase.from('data_sources').select('*').eq('user_id', user.id),
-        supabase.from('ai_jobs').select('*').eq('user_id', user.id),
-        supabase.from('team_members').select('*').eq('user_id', user.id)
-      ]);
+      const { data, error: fetchError } = await supabase
+        .from('feedback')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-      setInsights(insightsRes.data || []);
-      setReports(reportsRes.data || []);
-      setDataSources(dataSourcesRes.data || []);
-      setAiJobs(aiJobsRes.data || []);
-      setTeamMembers(teamMembersRes.data || []);
+      if (fetchError) {
+        throw new Error(`Failed to fetch feedback: ${fetchError.message}`);
+      }
 
-      // Process chart data
-      processChartData(
-        insightsRes.data || [],
-        reportsRes.data || [],
-        timeRange
-      );
-
+      setFeedbackData(data || []);
+      console.log('Fetched feedback data:', data?.length || 0, 'records');
+      
+      // Process data for charts
+      processChartData(data || []);
+      
     } catch (error) {
-      console.error('Error fetching initial data:', error);
+      console.error('Error fetching feedback data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch feedback data');
+      toast.error('Failed to load feedback data');
     } finally {
       setLoading(false);
     }
-  }, [user, timeRange]);
+  }, [user]);
 
   // Process data for charts
-  const processChartData = useCallback((insightsData: any[], reportsData: any[], range: string) => {
-    const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
-    
-    // Process sentiment data
+  const processChartData = useCallback((feedback: FeedbackData[]) => {
+    if (!feedback.length) {
+      setSentimentData([]);
+      setCategoryData([]);
+      return;
+    }
+
+    // Process sentiment data for last 7 days
     const sentiment: SentimentData[] = [];
-    for (let i = days - 1; i >= 0; i--) {
+    for (let i = 6; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
       const dateStr = date.toISOString().split('T')[0];
       
-      const dayInsights = insightsData.filter(insight => 
-        insight.created_at.startsWith(dateStr)
+      const dayFeedback = feedback.filter(item => 
+        item.created_at.startsWith(dateStr)
       );
       
-      const positive = dayInsights.filter(insight => 
-        insight.priority === 'High' || insight.confidence_score > 0.8
-      ).length;
-      const negative = dayInsights.filter(insight => 
-        insight.priority === 'Low' || insight.confidence_score < 0.5
-      ).length;
-      const neutral = dayInsights.length - positive - negative;
+      const positive = dayFeedback.filter(item => item.sentiment === 'positive').length;
+      const negative = dayFeedback.filter(item => item.sentiment === 'negative').length;
+      const neutral = dayFeedback.filter(item => item.sentiment === 'neutral').length;
       
       sentiment.push({
         date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -177,189 +158,83 @@ const Analytics: React.FC = () => {
     }
     setSentimentData(sentiment);
 
-    // Process theme data
-    const themeCounts: Record<string, number> = {};
-    insightsData.forEach(insight => {
-      const category = insight.insight_type || 'General';
-      themeCounts[category] = (themeCounts[category] || 0) + 1;
+    // Process category data
+    const categoryCounts: Record<string, number> = {};
+    feedback.forEach(item => {
+      const category = item.category || 'Uncategorized';
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
     });
     
-    const themes = Object.entries(themeCounts)
-      .map(([theme, count]) => ({
-        theme,
+    const categories = Object.entries(categoryCounts)
+      .map(([category, count]) => ({
+        category,
         count,
-        percentage: (count / insightsData.length) * 100
+        percentage: (count / feedback.length) * 100
       }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
     
-    setThemeData(themes);
-
-    // Process report data
-    const reportCounts: Record<string, { completed: number; inProgress: number }> = {};
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const weekStart = new Date(date);
-      weekStart.setDate(date.getDate() - date.getDay());
-      const weekKey = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      
-      if (!reportCounts[weekKey]) {
-        reportCounts[weekKey] = { completed: 0, inProgress: 0 };
-      }
-    }
-    
-    reportsData.forEach(report => {
-      const reportDate = new Date(report.created_at);
-      const weekStart = new Date(reportDate);
-      weekStart.setDate(reportDate.getDate() - reportDate.getDay());
-      const weekKey = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      
-      if (reportCounts[weekKey]) {
-        if (report.status === 'completed') {
-          reportCounts[weekKey].completed++;
-        } else {
-          reportCounts[weekKey].inProgress++;
-        }
-      }
-    });
-    
-    const reports = Object.entries(reportCounts)
-      .map(([week, counts]) => ({
-        week,
-        completed: counts.completed,
-        inProgress: counts.inProgress
-      }))
-      .sort((a, b) => new Date(a.week).getTime() - new Date(b.week).getTime());
-    
-    setReportData(reports);
+    setCategoryData(categories);
   }, []);
 
-  // Set up real-time subscriptions
+  // Set up Supabase Realtime subscription
   useEffect(() => {
     if (!user) return;
 
-    const channels = [
-      supabase
-        .channel('insights-changes')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'ai_insights',
-          filter: `user_id=eq.${user.id}`
-        }, (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setInsights(prev => [payload.new, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setInsights(prev => prev.map(item => 
-              item.id === payload.new.id ? payload.new : item
-            ));
-          } else if (payload.eventType === 'DELETE') {
-            setInsights(prev => prev.filter(item => item.id !== payload.old.id));
-          }
-          processChartData(insights, reports, timeRange);
-        })
-        .subscribe(),
-
-      supabase
-        .channel('reports-changes')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'reports',
-          filter: `user_id=eq.${user.id}`
-        }, (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setReports(prev => [payload.new, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setReports(prev => prev.map(item => 
-              item.id === payload.new.id ? payload.new : item
-            ));
-          } else if (payload.eventType === 'DELETE') {
-            setReports(prev => prev.filter(item => item.id !== payload.old.id));
-          }
-          processChartData(insights, reports, timeRange);
-        })
-        .subscribe(),
-
-      supabase
-        .channel('data-sources-changes')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'data_sources',
-          filter: `user_id=eq.${user.id}`
-        }, (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setDataSources(prev => [payload.new, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setDataSources(prev => prev.map(item => 
-              item.id === payload.new.id ? payload.new : item
-            ));
-          } else if (payload.eventType === 'DELETE') {
-            setDataSources(prev => prev.filter(item => item.id !== payload.old.id));
-          }
-        })
-        .subscribe(),
-
-      supabase
-        .channel('ai-jobs-changes')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'ai_jobs',
-          filter: `user_id=eq.${user.id}`
-        }, (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setAiJobs(prev => [payload.new, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setAiJobs(prev => prev.map(item => 
-              item.id === payload.new.id ? payload.new : item
-            ));
-          } else if (payload.eventType === 'DELETE') {
-            setAiJobs(prev => prev.filter(item => item.id !== payload.old.id));
-          }
-        })
-        .subscribe(),
-
-      supabase
-        .channel('team-members-changes')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'team_members',
-          filter: `user_id=eq.${user.id}`
-        }, (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setTeamMembers(prev => [payload.new, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setTeamMembers(prev => prev.map(item => 
-              item.id === payload.new.id ? payload.new : item
-            ));
-          } else if (payload.eventType === 'DELETE') {
-            setTeamMembers(prev => prev.filter(item => item.id !== payload.old.id));
-          }
-        })
-        .subscribe()
-    ];
+    console.log('Setting up real-time subscription for user:', user.id);
+    
+    const channel = supabase
+      .channel('feedback-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'feedback',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        console.log('Real-time feedback change:', payload);
+        
+        if (payload.eventType === 'INSERT') {
+          setFeedbackData(prev => [payload.new as FeedbackData, ...prev]);
+          toast.success('New feedback received!', {
+            description: 'Analytics updated in real-time'
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          setFeedbackData(prev => prev.map(item => 
+            item.id === payload.new.id ? payload.new as FeedbackData : item
+          ));
+        } else if (payload.eventType === 'DELETE') {
+          setFeedbackData(prev => prev.filter(item => item.id !== payload.old.id));
+        }
+        
+        // Reprocess chart data
+        processChartData(feedbackData);
+      })
+      .subscribe();
 
     return () => {
-      channels.forEach(channel => supabase.removeChannel(channel));
+      console.log('Cleaning up real-time subscription');
+      supabase.removeChannel(channel);
     };
-  }, [user, insights, reports, timeRange, processChartData]);
+  }, [user, feedbackData, processChartData]);
 
   // Fetch initial data on mount
   useEffect(() => {
-    fetchInitialData();
-  }, [fetchInitialData]);
+    fetchFeedbackData();
+  }, [fetchFeedbackData]);
 
-  // Generate AI Analytics
+  // Generate AI Analytics using Gemini
   const generateAIAnalytics = async () => {
-    if (!user) return;
+    if (!user || !feedbackData.length) {
+      toast.error('No feedback data available for analysis');
+      return;
+    }
     
     setGeneratingAI(true);
+    setError(null);
+    
     try {
-      const response = await fetch('/functions/v1/geminiAnalytics', {
+      // Call the Gemini analytics API
+      const response = await fetch('/api/generate-analytics', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -367,24 +242,32 @@ const Analytics: React.FC = () => {
         },
         body: JSON.stringify({
           user_id: user.id,
-          insights,
-          reports,
-          data_sources: dataSources,
-          ai_jobs: aiJobs,
-          team_members: teamMembers
+          feedback_data: feedbackData
         })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate AI analytics');
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
       }
 
       const result = await response.json();
-      if (result.success) {
-        setGeminiAnalytics(result.result);
+      
+      if (result.error) {
+        throw new Error(result.error);
       }
+
+      setGeminiAnalytics(result);
+      toast.success('AI Analytics Generated!', {
+        description: 'Your business performance insights are ready'
+      });
+      
     } catch (error) {
       console.error('Error generating AI analytics:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate AI analytics';
+      setError(errorMessage);
+      toast.error('Failed to generate AI analytics', {
+        description: errorMessage
+      });
     } finally {
       setGeneratingAI(false);
     }
@@ -393,19 +276,19 @@ const Analytics: React.FC = () => {
   // Refresh data
   const refreshData = async () => {
     setRefreshing(true);
-    await fetchInitialData();
+    await fetchFeedbackData();
     setRefreshing(false);
   };
 
-  // Calculate KPIs
-  const totalInsights = insights.length;
-  const totalReports = reports.length;
-  const activeAIJobs = aiJobs.filter(job => job.status === 'processing').length;
-  const teamSize = teamMembers.length;
-  const dataSourcesCount = dataSources.length;
+  // Calculate KPIs from feedback data
+  const totalFeedback = feedbackData.length;
+  const positiveFeedback = feedbackData.filter(item => item.sentiment === 'positive').length;
+  const negativeFeedback = feedbackData.filter(item => item.sentiment === 'negative').length;
+  const neutralFeedback = feedbackData.filter(item => item.sentiment === 'neutral').length;
   
-  // Calculate growth rate (mock calculation for now)
-  const growthRate = totalInsights > 10 ? "15%" : totalInsights > 5 ? "8%" : "0%";
+  const positivePercentage = totalFeedback > 0 ? Math.round((positiveFeedback / totalFeedback) * 100) : 0;
+  const negativePercentage = totalFeedback > 0 ? Math.round((negativeFeedback / totalFeedback) * 100) : 0;
+  const neutralPercentage = totalFeedback > 0 ? Math.round((neutralFeedback / totalFeedback) * 100) : 0;
 
   // Chart colors
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316'];
@@ -427,19 +310,9 @@ const Analytics: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Business Analytics</h1>
-          <p className="text-muted-foreground">Real-time insights and AI-powered business intelligence</p>
+          <p className="text-muted-foreground">Real-time insights from your customer feedback</p>
         </div>
         <div className="flex space-x-2">
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="90d">Last 90 days</SelectItem>
-            </SelectContent>
-          </Select>
           <Button 
             variant="outline" 
             onClick={refreshData}
@@ -451,21 +324,42 @@ const Analytics: React.FC = () => {
         </div>
       </div>
 
+      {/* Error Display */}
+      {error && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              <span className="font-medium">Error</span>
+            </div>
+            <p className="text-red-600 mt-2">{error}</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setError(null)}
+              className="mt-3"
+            >
+              Dismiss
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="border-l-4 border-l-blue-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Insights
+              Total Feedback
             </CardTitle>
-            <Brain className="h-5 w-5 text-blue-500" />
+            <FileText className="h-5 w-5 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{totalInsights}</div>
+            <div className="text-2xl font-bold text-foreground">{totalFeedback}</div>
             <div className="flex items-center text-xs text-muted-foreground">
-              <TrendingUp className="h-3 w-3 mr-1 text-green-500" />
-              <span className="text-green-500">+{growthRate}</span>
-              <span className="ml-1">from last period</span>
+              <Activity className="h-3 w-3 mr-1 text-blue-500" />
+              <span className="text-blue-500">Real-time</span>
+              <span className="ml-1">data</span>
             </div>
           </CardContent>
         </Card>
@@ -473,50 +367,47 @@ const Analytics: React.FC = () => {
         <Card className="border-l-4 border-l-green-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Reports Generated
+              Positive Sentiment
             </CardTitle>
-            <FileText className="h-5 w-5 text-green-500" />
+            <TrendingUp className="h-5 w-5 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{totalReports}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <Activity className="h-3 w-3 mr-1 text-blue-500" />
-              <span className="text-blue-500">Active</span>
-              <span className="ml-1">documentation</span>
+            <div className="text-2xl font-bold text-foreground">{positivePercentage}%</div>
+            <Progress value={positivePercentage} className="mt-2" />
+            <div className="flex items-center text-xs text-muted-foreground mt-1">
+              <span className="text-green-500">{positiveFeedback} responses</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-orange-500">
+        <Card className="border-l-4 border-l-red-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active AI Jobs
+              Negative Sentiment
             </CardTitle>
-            <Zap className="h-5 w-5 text-orange-500" />
+            <TrendingDown className="h-5 w-5 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{activeAIJobs}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <Clock className="h-3 w-3 mr-1 text-orange-500" />
-              <span className="text-orange-500">Processing</span>
-              <span className="ml-1">in background</span>
+            <div className="text-2xl font-bold text-foreground">{negativePercentage}%</div>
+            <Progress value={negativePercentage} className="mt-2" />
+            <div className="flex items-center text-xs text-muted-foreground mt-1">
+              <span className="text-red-500">{negativeFeedback} responses</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-purple-500">
+        <Card className="border-l-4 border-l-gray-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Team Members
+              Neutral Sentiment
             </CardTitle>
-            <Users className="h-5 w-5 text-purple-500" />
+            <Minus className="h-5 w-5 text-gray-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{teamSize}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <Target className="h-3 w-3 mr-1 text-purple-500" />
-              <span className="text-purple-500">Collaboration</span>
-              <span className="ml-1">enabled</span>
+            <div className="text-2xl font-bold text-foreground">{neutralPercentage}%</div>
+            <Progress value={neutralPercentage} className="mt-2" />
+            <div className="flex items-center text-xs text-muted-foreground mt-1">
+              <span className="text-gray-500">{neutralFeedback} responses</span>
             </div>
           </CardContent>
         </Card>
@@ -529,75 +420,71 @@ const Analytics: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <TrendingUp className="h-5 w-5 mr-2 text-blue-500" />
-              Sentiment Trends
+              Sentiment Trends (Last 7 Days)
             </CardTitle>
-            <CardDescription>Sentiment analysis over time</CardDescription>
+            <CardDescription>Daily sentiment analysis from feedback</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={sentimentData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="positive" stroke="#10b981" strokeWidth={2} name="Positive" />
-                  <Line type="monotone" dataKey="neutral" stroke="#6b7280" strokeWidth={2} name="Neutral" />
-                  <Line type="monotone" dataKey="negative" stroke="#ef4444" strokeWidth={2} name="Negative" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            {sentimentData.length > 0 ? (
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={sentimentData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="positive" fill="#10b981" name="Positive" />
+                    <Bar dataKey="neutral" fill="#6b7280" name="Neutral" />
+                    <Bar dataKey="negative" fill="#ef4444" name="Negative" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                No sentiment data available
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Key Themes Bar Chart */}
+        {/* Category Distribution Pie Chart */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <BarChart3 className="h-5 w-5 mr-2 text-green-500" />
-              Key Themes
+              <PieChart className="h-5 w-5 mr-2 text-green-500" />
+              Feedback Categories
             </CardTitle>
-            <CardDescription>Most frequent insight categories</CardDescription>
+            <CardDescription>Distribution of feedback by category</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={themeData} layout="horizontal">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="theme" type="category" width={80} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#10b981" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Reports Completed Area Chart */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <AreaChart className="h-5 w-5 mr-2 text-purple-500" />
-              Reports Progress
-            </CardTitle>
-            <CardDescription>Weekly report completion status</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={reportData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="week" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Area type="monotone" dataKey="completed" stackId="1" stroke="#10b981" fill="#10b981" name="Completed" />
-                  <Area type="monotone" dataKey="inProgress" stackId="1" stroke="#f59e0b" fill="#f59e0b" name="In Progress" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            {categoryData.length > 0 ? (
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categoryData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="count"
+                      label={({ category, percentage }) => `${category} ${percentage.toFixed(1)}%`}
+                    >
+                      {categoryData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                No category data available
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -615,168 +502,171 @@ const Analytics: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <Button 
-              onClick={generateAIAnalytics}
-              disabled={generatingAI}
-              className="w-full md:w-auto"
-            >
-              {generatingAI ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating AI Analytics...
-                </>
-              ) : (
-                <>
-                  <Lightbulb className="h-4 w-4 mr-2" />
-                  Generate AI Analytics
-                </>
-              )}
-            </Button>
+            {!geminiAnalytics ? (
+              <div className="text-center py-8">
+                <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">Ready to Generate AI Insights</h3>
+                <p className="text-muted-foreground mb-4">
+                  {totalFeedback > 0 
+                    ? `Analyze ${totalFeedback} feedback responses with AI`
+                    : 'No feedback data available for analysis'
+                  }
+                </p>
+                <Button 
+                  onClick={generateAIAnalytics}
+                  disabled={generatingAI || totalFeedback === 0}
+                  className="w-full md:w-auto"
+                >
+                  {generatingAI ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Analyzing your business performance...
+                    </>
+                  ) : (
+                    <>
+                      <Lightbulb className="h-4 w-4 mr-2" />
+                      Generate AI Analytics
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Executive Summary */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Target className="h-5 w-5 mr-2 text-blue-500" />
+                      Executive Summary
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-foreground leading-relaxed">
+                      {geminiAnalytics.executive_summary}
+                    </p>
+                  </CardContent>
+                </Card>
 
-            {geminiAnalytics && (
-              <>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {/* Sentiment and Trends */}
-                  <div className="space-y-4">
-                    <div className="p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
-                      <h4 className="font-medium text-blue-900 flex items-center">
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Overall Sentiment
-                      </h4>
-                      <Badge 
-                        variant={geminiAnalytics.overall_sentiment === 'positive' ? 'default' : 
-                                geminiAnalytics.overall_sentiment === 'negative' ? 'destructive' : 'secondary'}
-                        className="mt-2"
-                      >
-                        {geminiAnalytics.overall_sentiment.charAt(0).toUpperCase() + geminiAnalytics.overall_sentiment.slice(1)}
-                      </Badge>
-                      <p className="text-blue-700 text-sm mt-2">
-                        {geminiAnalytics.insights_summary}
-                      </p>
-                    </div>
-
-                    <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
-                      <h4 className="font-medium text-green-900 flex items-center">
-                        <TrendingUp className="h-4 w-4 mr-2" />
-                        Activity Trend
-                      </h4>
-                      <Badge 
-                        variant={geminiAnalytics.trends.activity_trend === 'increasing' ? 'default' : 
-                                geminiAnalytics.trends.activity_trend === 'decreasing' ? 'destructive' : 'secondary'}
-                        className="mt-2"
-                      >
-                        {geminiAnalytics.trends.activity_trend.charAt(0).toUpperCase() + geminiAnalytics.trends.activity_trend.slice(1)}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* Top Themes and Actions */}
-                  <div className="space-y-4">
-                    <div className="p-4 bg-purple-50 rounded-lg border-l-4 border-purple-500">
-                      <h4 className="font-medium text-purple-900 flex items-center">
-                        <Target className="h-4 w-4 mr-2" />
-                        Top Themes
-                      </h4>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {geminiAnalytics.top_themes.map((theme, index) => (
-                          <Badge key={index} variant="outline" className="text-xs">
-                            {theme}
-                          </Badge>
-                        ))}
+                {/* Performance Metrics */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <BarChart3 className="h-5 w-5 mr-2 text-green-500" />
+                      Performance Metrics
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">
+                          {geminiAnalytics.performance_metrics.positive}%
+                        </div>
+                        <div className="text-xs text-muted-foreground">Positive</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-red-600">
+                          {geminiAnalytics.performance_metrics.negative}%
+                        </div>
+                        <div className="text-xs text-muted-foreground">Negative</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-gray-600">
+                          {geminiAnalytics.performance_metrics.neutral}%
+                        </div>
+                        <div className="text-xs text-muted-foreground">Neutral</div>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
 
-                    <div className="p-4 bg-orange-50 rounded-lg border-l-4 border-orange-500">
-                      <h4 className="font-medium text-orange-900 flex items-center">
-                        <AlertTriangle className="h-4 w-4 mr-2" />
-                        Recommended Actions
-                      </h4>
-                      <ul className="text-orange-700 text-sm mt-2 space-y-1">
-                        {geminiAnalytics.recommended_actions.map((action, index) => (
+                {/* Key Insights and Trends */}
+                <div className="grid gap-6 md:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <Lightbulb className="h-5 w-5 mr-2 text-yellow-500" />
+                        Key Insights
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-2">
+                        {geminiAnalytics.key_insights.map((insight, index) => (
                           <li key={index} className="flex items-start">
-                            <ArrowUpRight className="h-3 w-3 mr-2 mt-0.5 flex-shrink-0" />
-                            {action}
+                            <CheckCircle className="h-4 w-4 mr-2 mt-0.5 text-green-500 flex-shrink-0" />
+                            <span className="text-sm">{insight}</span>
                           </li>
                         ))}
                       </ul>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <TrendingUp className="h-5 w-5 mr-2 text-purple-500" />
+                        Trends
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-2">
+                        {geminiAnalytics.trends.map((trend, index) => (
+                          <li key={index} className="flex items-start">
+                            <ArrowUpRight className="h-4 w-4 mr-2 mt-0.5 text-blue-500 flex-shrink-0" />
+                            <span className="text-sm">{trend}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
                 </div>
 
-                {/* KPI Snapshot */}
-                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium text-gray-900 mb-3">KPI Snapshot</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{geminiAnalytics.kpis.total_insights}</div>
-                      <div className="text-xs text-gray-600">Total Insights</div>
+                {/* Recommended Actions */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Zap className="h-5 w-5 mr-2 text-orange-500" />
+                      Recommended Actions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {geminiAnalytics.recommended_actions.map((action, index) => (
+                        <div key={index} className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+                          <div className="flex items-start">
+                            <Target className="h-4 w-4 mr-2 mt-0.5 text-orange-500 flex-shrink-0" />
+                            <span className="text-sm text-orange-800">{action}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{geminiAnalytics.kpis.reports_generated}</div>
-                      <div className="text-xs text-gray-600">Reports</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-600">{geminiAnalytics.kpis.growth_rate}</div>
-                      <div className="text-xs text-gray-600">Growth Rate</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-orange-600">{geminiAnalytics.kpis.team_members}</div>
-                      <div className="text-xs text-gray-600">Team Members</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-red-600">{geminiAnalytics.kpis.active_ai_jobs}</div>
-                      <div className="text-xs text-gray-600">Active AI Jobs</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-indigo-600">{geminiAnalytics.kpis.data_sources_count}</div>
-                      <div className="text-xs text-gray-600">Data Sources</div>
-                    </div>
-                  </div>
+                  </CardContent>
+                </Card>
+
+                {/* Regenerate Button */}
+                <div className="text-center">
+                  <Button 
+                    onClick={generateAIAnalytics}
+                    disabled={generatingAI}
+                    variant="outline"
+                  >
+                    {generatingAI ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Regenerating...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Regenerate Analytics
+                      </>
+                    )}
+                  </Button>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </CardContent>
       </Card>
-
-      {/* Priority Distribution - Only show when AI analytics are available */}
-      {geminiAnalytics && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <PieChartIcon className="h-5 w-5 mr-2 text-indigo-500" />
-              Priority Distribution
-            </CardTitle>
-            <CardDescription>Insights categorized by priority level</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={Object.entries(geminiAnalytics.trends.priority_distribution).map(([priority, count]) => ({
-                      name: priority,
-                      value: count
-                    }))}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {Object.entries(geminiAnalytics.trends.priority_distribution).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };
