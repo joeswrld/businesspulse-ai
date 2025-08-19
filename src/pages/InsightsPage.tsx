@@ -187,8 +187,23 @@ const dashboardStyles = `
 interface InsightsData {
   summary: string;
   sentiment: "positive" | "negative" | "neutral";
-  key_themes: string[];
-  suggested_actions: string[];
+  sentiment_confidence?: number;
+  sentiment_reasoning?: string;
+  key_themes: Array<{
+    theme: string;
+    confidence: number;
+    frequency: string;
+    description: string;
+  } | string>;
+  suggested_actions: Array<{
+    action: string;
+    priority: string;
+    confidence: number;
+    impact: string;
+  } | string>;
+  overall_confidence?: number;
+  data_quality_score?: number;
+  analysis_notes?: string;
   source_file?: string; // Added for file upload history
 }
 
@@ -198,6 +213,8 @@ export default function InsightsPage() {
   const [loading, setLoading] = useState(false);
   const [insightsHistory, setInsightsHistory] = useState<Array<InsightsData & { id: string; timestamp: string }>>([]);
   const [error, setError] = useState<string | null>(null);
+  const [userFeedbackClassification, setUserFeedbackClassification] = useState<'good' | 'bad' | 'neutral' | null>(null);
+  const [confidenceMetrics, setConfidenceMetrics] = useState<any>(null);
   
   // File upload states
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -467,6 +484,16 @@ export default function InsightsPage() {
 
       setResult(json.result);
       
+      // Set confidence metrics for real-time display
+      setConfidenceMetrics({
+        overall: json.result.overall_confidence || 0,
+        sentiment: json.result.sentiment_confidence || 0,
+        dataQuality: json.result.data_quality_score || 0
+      });
+      
+      // Reset user feedback classification
+      setUserFeedbackClassification(null);
+      
       // Add to history
       const newInsight = {
         ...json.result,
@@ -477,12 +504,14 @@ export default function InsightsPage() {
       setInsightsHistory(prev => [newInsight, ...prev]);
       setInput("");
 
-      // Show success toast with sentiment
+      // Show success toast with sentiment and confidence
       const sentimentEmoji = json.result.sentiment === "positive" ? "😊" : 
                             json.result.sentiment === "negative" ? "😔" : "😐";
+      const confidenceLevel = json.result.overall_confidence || 0;
+      const confidenceText = confidenceLevel >= 80 ? "High" : confidenceLevel >= 60 ? "Medium" : "Low";
       
-      toast.success(`${sentimentEmoji} Analysis Complete!`, {
-        description: `Found ${json.result.key_themes.length} themes and ${json.result.suggested_actions.length} actionable items.`
+      toast.success(`${sentimentEmoji} Analysis Complete! (${confidenceText} Confidence)`, {
+        description: `Found ${json.result.key_themes.length} themes and ${json.result.suggested_actions.length} actionable items. Overall confidence: ${confidenceLevel}%`
       });
 
     } catch (err) {
@@ -528,6 +557,30 @@ export default function InsightsPage() {
     if (sentiment === "positive") return "bg-green-200 text-green-800 border-green-300";
     if (sentiment === "negative") return "bg-red-200 text-red-800 border-red-300";
     return "bg-gray-200 text-gray-800 border-gray-300";
+  };
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 80) return "text-green-600";
+    if (confidence >= 60) return "text-yellow-600";
+    return "text-red-600";
+  };
+
+  const getConfidenceText = (confidence: number) => {
+    if (confidence >= 80) return "High";
+    if (confidence >= 60) return "Medium";
+    return "Low";
+  };
+
+  const getPriorityColor = (priority: string) => {
+    if (priority === "high") return "bg-red-100 text-red-800 border-red-300";
+    if (priority === "medium") return "bg-yellow-100 text-yellow-800 border-yellow-300";
+    return "bg-blue-100 text-blue-800 border-blue-300";
+  };
+
+  const getFrequencyColor = (frequency: string) => {
+    if (frequency === "high") return "bg-purple-100 text-purple-800 border-purple-300";
+    if (frequency === "medium") return "bg-blue-100 text-blue-800 border-blue-300";
+    return "bg-gray-100 text-gray-800 border-gray-300";
   };
 
   const getSentimentEmoji = (sentiment: string) => {
@@ -841,6 +894,33 @@ export default function InsightsPage() {
               {input.length}/500,000 characters
             </div>
             
+            {/* Real-time Confidence Indicator */}
+            {loading && (
+              <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-blue-700">AI Analysis in Progress</span>
+                  <div className="flex items-center gap-2">
+                    <div className="ai-loading w-4 h-4 rounded-full"></div>
+                    <span className="text-xs text-blue-600">Processing...</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600">Sentiment Analysis</span>
+                    <span className="text-blue-600">Analyzing...</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600">Theme Extraction</span>
+                    <span className="text-blue-600">Identifying...</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600">Action Generation</span>
+                    <span className="text-blue-600">Generating...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <button 
               onClick={handleAnalyze} 
               disabled={loading || !input.trim()}
@@ -880,9 +960,74 @@ export default function InsightsPage() {
                   </div>
                   <h2 className="text-xl font-semibold ai-text ai-neon-text">Analysis Summary</h2>
                 </div>
+                
                 <p className="ai-text-secondary text-lg mb-6 leading-relaxed">{result.summary}</p>
                 
-                <div className="flex items-center justify-between">
+                {/* AI Confidence Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-blue-700">Overall Confidence</span>
+                      <span className={`text-lg font-bold ${getConfidenceColor(result.overall_confidence || 0)}`}>
+                        {result.overall_confidence || 0}%
+                      </span>
+                    </div>
+                    <div className="mt-2">
+                      <div className="w-full bg-blue-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
+                          style={{ width: `${result.overall_confidence || 0}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-xs text-blue-600 mt-1 block">
+                        {getConfidenceText(result.overall_confidence || 0)} Confidence
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-green-700">Sentiment Confidence</span>
+                      <span className={`text-lg font-bold ${getConfidenceColor(result.sentiment_confidence || 0)}`}>
+                        {result.sentiment_confidence || 0}%
+                      </span>
+                    </div>
+                    <div className="mt-2">
+                      <div className="w-full bg-green-200 rounded-full h-2">
+                        <div 
+                          className="bg-green-600 h-2 rounded-full transition-all duration-500" 
+                          style={{ width: `${result.sentiment_confidence || 0}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-xs text-green-600 mt-1 block">
+                        {getConfidenceText(result.sentiment_confidence || 0)} Confidence
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-purple-700">Data Quality</span>
+                      <span className={`text-lg font-bold ${getConfidenceColor(result.data_quality_score || 0)}`}>
+                        {result.data_quality_score || 0}%
+                      </span>
+                    </div>
+                    <div className="mt-2">
+                      <div className="w-full bg-purple-200 rounded-full h-2">
+                        <div 
+                          className="bg-purple-600 h-2 rounded-full transition-all duration-500" 
+                          style={{ width: `${result.data_quality_score || 0}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-xs text-purple-600 mt-1 block">
+                        {getConfidenceText(result.data_quality_score || 0)} Quality
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Sentiment and Feedback Classification */}
+                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <span className={`px-4 py-2 rounded-full text-sm font-medium ai-theme-tag ${
                       result.sentiment === 'positive' ? 'ai-sentiment-positive' : 
@@ -891,8 +1036,58 @@ export default function InsightsPage() {
                     }`}>
                       {getSentimentEmoji(result.sentiment)} {result.sentiment}
                     </span>
+                    {result.sentiment_reasoning && (
+                      <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                        {result.sentiment_reasoning}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* User Feedback Classification */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">Your Classification:</span>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setUserFeedbackClassification('good')}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                          userFeedbackClassification === 'good' 
+                            ? 'bg-green-500 text-white' 
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        👍 Good
+                      </button>
+                      <button
+                        onClick={() => setUserFeedbackClassification('neutral')}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                          userFeedbackClassification === 'neutral' 
+                            ? 'bg-yellow-500 text-white' 
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        😐 Neutral
+                      </button>
+                      <button
+                        onClick={() => setUserFeedbackClassification('bad')}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                          userFeedbackClassification === 'bad' 
+                            ? 'bg-red-500 text-white' 
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        👎 Bad
+                      </button>
+                    </div>
                   </div>
                 </div>
+                
+                {/* Analysis Notes */}
+                {result.analysis_notes && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <span className="text-sm font-medium text-blue-700">Analysis Notes:</span>
+                    <p className="text-sm text-blue-600 mt-1">{result.analysis_notes}</p>
+                  </div>
+                )}
               </div>
 
               {/* Key Themes Card */}
@@ -906,15 +1101,28 @@ export default function InsightsPage() {
                     </div>
                     <h2 className="text-xl font-semibold ai-text ai-neon-text">Key Themes</h2>
                   </div>
-                  <div className="flex flex-wrap gap-3">
-                    {result.key_themes.map((theme, index) => (
-                      <span
-                        key={index}
-                        className="ai-theme-tag"
-                      >
-                        {theme}
-                      </span>
-                    ))}
+                  <div className="space-y-3">
+                    {result.key_themes.map((theme, index) => {
+                      const themeData = typeof theme === 'string' ? { theme, confidence: 70, frequency: 'medium', description: 'Theme identified' } : theme;
+                      return (
+                        <div key={index} className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+                          <div className="flex items-start justify-between mb-2">
+                            <span className="font-medium text-purple-800">{themeData.theme}</span>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getFrequencyColor(themeData.frequency)}`}>
+                                {themeData.frequency} frequency
+                              </span>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getConfidenceColor(themeData.confidence)}`}>
+                                {themeData.confidence}% confidence
+                              </span>
+                            </div>
+                          </div>
+                          {themeData.description && (
+                            <p className="text-sm text-purple-600">{themeData.description}</p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -931,14 +1139,34 @@ export default function InsightsPage() {
                     <h2 className="text-xl font-semibold ai-text ai-neon-text">Suggested Actions</h2>
                   </div>
                   <div className="space-y-4">
-                                          {result.suggested_actions.map((action, index) => (
-                        <div key={index} className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                          <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                            <span className="text-white text-sm font-bold">{index + 1}</span>
+                    {result.suggested_actions.map((action, index) => {
+                      const actionData = typeof action === 'string' ? { action, priority: 'medium', confidence: 70, impact: 'Expected to improve user experience' } : action;
+                      return (
+                        <div key={index} className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
+                          <div className="flex items-start space-x-4">
+                            <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center">
+                              <span className="text-white text-sm font-bold">{index + 1}</span>
+                            </div>
+                            <div className="flex-1">
+                              <p className="ai-text-secondary leading-relaxed mb-2">{actionData.action}</p>
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(actionData.priority)}`}>
+                                  {actionData.priority} priority
+                                </span>
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getConfidenceColor(actionData.confidence)}`}>
+                                  {actionData.confidence}% confidence
+                                </span>
+                              </div>
+                              {actionData.impact && (
+                                <p className="text-xs text-green-600 mt-2 bg-green-50 px-2 py-1 rounded">
+                                  💡 {actionData.impact}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <span className="ai-text-secondary leading-relaxed">{action}</span>
                         </div>
-                      ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

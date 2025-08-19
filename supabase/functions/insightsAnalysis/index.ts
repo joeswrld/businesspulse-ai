@@ -18,29 +18,50 @@ serve(async (req) => {
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
     const prompt = `
-    You are a senior business insights analyst. Analyze the following dataset of multiple user feedback entries. 
-    Your job is to discover trends, patterns, and actionable insights across the entire dataset.
+    You are a senior business insights analyst with expertise in sentiment analysis and pattern recognition. 
+    Analyze the following dataset and provide comprehensive insights with confidence scoring.
     
-    Steps to follow:
-    1. Identify the top recurring themes or issues across all entries (group them into clear categories).
-    2. Determine the overall sentiment distribution (count how many are positive, negative, neutral).
-    3. Suggest 3–10 high-impact, actionable steps to improve business performance based on trends in the data.
-    4. Provide a concise executive summary (2–10 sentences) that captures the key insights and recommendations.
+    Your analysis should include:
+    1. **Sentiment Analysis**: Classify the overall sentiment and provide confidence level
+    2. **Theme Extraction**: Identify key themes with confidence scores
+    3. **Actionable Insights**: Suggest improvements with implementation priority
+    4. **Confidence Metrics**: Rate your confidence in each analysis component
     
-    Important rules:
-    - Focus only on the provided dataset.
-    - Do not invent or assume data.
-    - Respond only in valid JSON using this structure:
+    CRITICAL: Analyze ONLY the provided data. Do not invent or assume information.
+    
+    Respond in this EXACT JSON structure:
     {
-      "summary": "Executive summary based on aggregated dataset",
-      "sentiment_overview": {
-        "positive": number,
-        "negative": number,
-        "neutral": number
-      },
-      "key_themes": ["theme1", "theme2", ...],
-      "suggested_actions": ["action1", "action2", ...]
+      "summary": "2-3 sentence executive summary of key findings",
+      "sentiment": "positive|negative|neutral",
+      "sentiment_confidence": 85,
+      "sentiment_reasoning": "Brief explanation of sentiment classification",
+      "key_themes": [
+        {
+          "theme": "theme name",
+          "confidence": 90,
+          "frequency": "high|medium|low",
+          "description": "Brief description of the theme"
+        }
+      ],
+      "suggested_actions": [
+        {
+          "action": "action description",
+          "priority": "high|medium|low",
+          "confidence": 85,
+          "impact": "expected business impact"
+        }
+      ],
+      "overall_confidence": 87,
+      "data_quality_score": 92,
+      "analysis_notes": "Any important notes about the analysis quality or limitations"
     }
+    
+    Confidence scoring guide:
+    - 90-100: Very high confidence, clear patterns
+    - 70-89: High confidence, good patterns
+    - 50-69: Moderate confidence, some patterns
+    - 30-49: Low confidence, unclear patterns
+    - 0-29: Very low confidence, insufficient data
     
     Now analyze this dataset:
     ${JSON.stringify(data)}
@@ -78,23 +99,82 @@ serve(async (req) => {
     let parsed = {
       summary: "Analysis failed",
       sentiment: "neutral",
+      sentiment_confidence: 50,
+      sentiment_reasoning: "Analysis could not be completed",
       key_themes: [],
-      suggested_actions: []
+      suggested_actions: [],
+      overall_confidence: 50,
+      data_quality_score: 50,
+      analysis_notes: "Analysis failed - using fallback data"
     };
 
     try {
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
-      parsed.summary ??= "No summary available";
-      parsed.sentiment ??= "neutral";
-      parsed.key_themes ??= [];
-      parsed.suggested_actions ??= [];
-    } catch {
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+        
+        // Ensure all required fields exist with fallbacks
+        parsed.summary ??= "No summary available";
+        parsed.sentiment ??= "neutral";
+        parsed.sentiment_confidence ??= 50;
+        parsed.sentiment_reasoning ??= "Sentiment analysis completed";
+        parsed.key_themes ??= [];
+        parsed.suggested_actions ??= [];
+        parsed.overall_confidence ??= 50;
+        parsed.data_quality_score ??= 50;
+        parsed.analysis_notes ??= "Analysis completed successfully";
+        
+        // Ensure key_themes and suggested_actions have proper structure
+        if (Array.isArray(parsed.key_themes)) {
+          parsed.key_themes = parsed.key_themes.map(theme => {
+            if (typeof theme === 'string') {
+              return {
+                theme: theme,
+                confidence: 70,
+                frequency: "medium",
+                description: "Theme identified from analysis"
+              };
+            }
+            return {
+              theme: theme.theme || "Unknown theme",
+              confidence: theme.confidence || 70,
+              frequency: theme.frequency || "medium",
+              description: theme.description || "Theme identified from analysis"
+            };
+          });
+        }
+        
+        if (Array.isArray(parsed.suggested_actions)) {
+          parsed.suggested_actions = parsed.suggested_actions.map(action => {
+            if (typeof action === 'string') {
+              return {
+                action: action,
+                priority: "medium",
+                confidence: 70,
+                impact: "Expected to improve user experience"
+              };
+            }
+            return {
+              action: action.action || action,
+              priority: action.priority || "medium",
+              confidence: action.confidence || 70,
+              impact: action.impact || "Expected to improve user experience"
+            };
+          });
+        }
+      }
+    } catch (parseError) {
+      console.error("JSON parsing error:", parseError);
       parsed = {
-        summary: rawText,
+        summary: "Analysis failed - could not parse response",
         sentiment: "neutral",
+        sentiment_confidence: 30,
+        sentiment_reasoning: "Unable to determine sentiment",
         key_themes: [],
-        suggested_actions: []
+        suggested_actions: [],
+        overall_confidence: 30,
+        data_quality_score: 30,
+        analysis_notes: "Critical error in analysis processing"
       };
     }
 
