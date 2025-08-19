@@ -81,6 +81,52 @@ interface TeamMember {
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   
+  // Custom dashboard styles
+  const dashboardStyles = `
+    .dashboard-card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s ease;
+    }
+    
+    .dashboard-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      border-color: #d1d5db;
+    }
+    
+    .stat-number {
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    
+    .stat-label {
+      font-size: 0.875rem;
+      color: #6b7280;
+      font-weight: 500;
+    }
+    
+    .sentiment-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+    }
+    
+    .live-indicator {
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  `;
+  
   // Real-time state
   const [insights, setInsights] = useState<AIInsight[]>([]);
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
@@ -402,6 +448,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      <style dangerouslySetInnerHTML={{ __html: dashboardStyles }} />
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
