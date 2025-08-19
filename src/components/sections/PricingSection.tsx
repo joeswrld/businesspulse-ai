@@ -10,14 +10,14 @@ const PricingSection = () => {
       name: "Free Trial",
       price: "₦0",
       period: "8 days",
-      description: "Perfect for testing our platform",
+      description: "Perfect for testing our BI platform",
       icon: Zap,
       badge: "Start Here",
       badgeVariant: "default" as const,
       features: [
-        "AI-powered document analysis",
-        "Basic dashboard & insights",
-        "Up to 10 document uploads",
+        "AI-powered data analytics",
+        "Basic BI dashboard & insights",
+        "Up to 10 data source connections",
         "Standard email support",
         "Export to PDF/CSV",
       ],
@@ -35,12 +35,12 @@ const PricingSection = () => {
       badgeVariant: "default" as const,
       features: [
         "Everything in Free Trial",
-        "Unlimited document uploads",
-        "Advanced AI insights & recommendations",
-        "Real-time data sync",
+        "Unlimited data pipeline connections",
+        "Advanced AI analytics & forecasting",
+        "Real-time BI updates",
         "Team collaboration (up to 5 users)",
         "Priority email support",
-        "Custom branding on reports",
+        "Custom branding on executive reports",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "hero" as const,
@@ -57,8 +57,8 @@ const PricingSection = () => {
       features: [
         "Everything in Pro",
         "Unlimited team members",
-        "Advanced analytics & forecasting",
-        "White-label reports",
+        "Advanced BI analytics & predictive modeling",
+        "White-label executive reports",
         "24/7 chat support",
         "Advanced security & compliance",
         "SLA guarantee"
@@ -75,14 +75,14 @@ const PricingSection = () => {
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <Badge variant="outline" className="mb-4">
-            Simple Pricing
+            Enterprise Pricing
           </Badge>
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
             Choose the Perfect Plan for{" "}
-            <span className="gradient-text">Your Business</span>
+            <span className="gradient-text">Your Enterprise</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            Start with our 8-day free trial, then choose a plan that scales with your business. No hidden fees, cancel anytime.
+            Start with our 8-day free trial, then choose a plan that scales with your business intelligence needs. No hidden fees, cancel anytime.
           </p>
         </div>
 

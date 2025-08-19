@@ -35,12 +35,12 @@ const CTASection = () => {
 
             {/* Headline */}
             <h2 className="text-3xl md:text-5xl font-bold leading-tight">
-              Ready to Transform Your Business with AI-Powered Insights?
+              Ready to Transform Your Business Intelligence with AI-Powered Analytics?
             </h2>
 
             {/* Subheadline */}
             <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
-              Join hundreds of successful businesses using NoteX to make smarter decisions. Start your free trial today and see the difference AI can make.
+              Join hundreds of successful enterprises using NoteX BI to build data-driven strategies. Start your free trial today and see the difference AI-powered BI can make.
             </p>
 
             {/* Benefits */}
@@ -73,14 +73,17 @@ const CTASection = () => {
                 ✓ Cancel anytime
               </div>
               <div className="text-sm">
-                ✓ GDPR & SOC 2 compliant
+                ✓ Enterprise-grade security
+              </div>
+              <div className="text-sm">
+                ✓ SOC 2 Type II compliant
               </div>
             </div>
 
             {/* Urgency */}
             <div className="pt-4">
               <p className="text-sm text-white/70">
-                🔥🔥🔥 Over 50 businesses signed up this week
+                🔥🔥🔥 Over 50 enterprises deployed this week
               </p>
             </div>
           </div>

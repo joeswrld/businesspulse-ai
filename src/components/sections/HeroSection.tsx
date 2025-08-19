@@ -18,18 +18,18 @@ const HeroSection = () => {
             {/* Announcement Badge */}
             <Badge variant="secondary" className="w-fit px-4 py-2 text-sm font-medium">
               <Zap className="h-4 w-4 mr-2" />
-              AI-Powered Business Intelligence Platform
+              Enterprise Business Intelligence + AI Platform
             </Badge>
 
             {/* Main Headline */}
             <div className="space-y-4">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
-                Transform Your{" "}
+                Transform Raw{" "}
                 <span className="gradient-text">Business Data</span> Into
-                Actionable Insights
+                Strategic Intelligence
               </h1>
               <p className="text-lg text-muted-foreground leading-relaxed max-w-xl">
-                NoteX automatically analyzes your company documents, feedback, and data to produce intelligent business insights, trends, and opportunities using advanced AI.
+                NoteX is a comprehensive BI platform that processes your data pipelines, documents, and business metrics to deliver AI-powered insights, predictive analytics, and executive reports that drive strategic decisions.
               </p>
             </div>
 
@@ -69,8 +69,8 @@ const HeroSection = () => {
                 <div className="flex items-center space-x-2">
                   <TrendingUp className="h-5 w-5 text-success" />
                   <div>
-                    <div className="text-xs font-medium">Revenue Growth</div>
-                    <div className="text-lg font-bold text-success">+24.5%</div>
+                    <div className="text-xs font-medium">Data Pipeline</div>
+                    <div className="text-lg font-bold text-success">Active</div>
                   </div>
                 </div>
               </div>
@@ -79,7 +79,7 @@ const HeroSection = () => {
                 <div className="flex items-center space-x-2">
                   <Brain className="h-5 w-5 text-primary" />
                   <div>
-                    <div className="text-xs font-medium">AI Insights</div>
+                    <div className="text-xs font-medium">AI Analytics</div>
                     <div className="text-lg font-bold text-primary">Live</div>
                   </div>
                 </div>
@@ -87,7 +87,7 @@ const HeroSection = () => {
               
               <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-medium">
                 <div className="text-xs font-medium text-center">
-                  Real-time Business Analytics
+                  Real-time BI Dashboard
                 </div>
               </div>
             </div>

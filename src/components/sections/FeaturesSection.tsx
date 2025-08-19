@@ -7,50 +7,50 @@ const FeaturesSection = () => {
   const features = [
     {
       icon: Brain,
-      title: "AI-Powered Analysis",
-      description: "Advanced AI automatically analyzes your business documents and data to extract meaningful insights and trends.",
+      title: "AI-Powered Analytics",
+      description: "Advanced AI processes your data pipelines and business metrics to generate predictive insights and strategic recommendations.",
       badge: "Core Feature"
     },
     {
       icon: Zap,
-      title: "Real-time Insights",
-      description: "Get instant business intelligence updates as soon as new data is uploaded or changes occur.",
+      title: "Real-time BI",
+      description: "Get instant business intelligence updates as soon as new data flows through your pipelines or systems change.",
       badge: "Live Updates"
     },
     {
       icon: FileText,
-      title: "Multi-format Support",
-      description: "Upload documents, CSVs, or input text directly. We handle all your data sources.",
-      badge: "Flexible"
+      title: "Data Pipeline Integration",
+      description: "Connect to databases, APIs, cloud storage, or upload documents. We handle all your data sources seamlessly.",
+      badge: "Enterprise"
     },
     {
       icon: BarChart3,
-      title: "Smart Dashboards",
-      description: "Interactive dashboards that automatically organize and visualize your key business metrics.",
+      title: "Executive Dashboards",
+      description: "Interactive BI dashboards that automatically organize and visualize your key performance indicators and business metrics.",
       badge: "Visual"
     },
     {
       icon: Users,
       title: "Team Collaboration",
-      description: "Share insights with your team, add comments, and make data-driven decisions together.",
+      description: "Share insights with your team, add annotations, and make data-driven strategic decisions together.",
       badge: "Teamwork"
     },
     {
       icon: Shield,
       title: "Enterprise Security",
-      description: "Bank-level encryption, GDPR compliance, and secure data handling for peace of mind.",
+      description: "Bank-level encryption, SOC2 compliance, and secure data handling for enterprise peace of mind.",
       badge: "Secure"
     },
     {
       icon: Globe,
-      title: "Industry-Specific",
-      description: "Pre-built templates and recommendations tailored for different industries and business types.",
+      title: "Industry Templates",
+      description: "Pre-built BI templates and analytics models tailored for different industries and business verticals.",
       badge: "Customized"
     },
     {
       icon: Download,
-      title: "Export & Reports",
-      description: "Generate beautiful PDF reports and export data in multiple formats for presentations.",
+      title: "Executive Reports",
+      description: "Generate comprehensive PDF reports and export data in multiple formats for board presentations and strategic planning.",
       badge: "Professional"
     }
   ];
@@ -61,14 +61,14 @@ const FeaturesSection = () => {
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <Badge variant="outline" className="mb-4">
-            Platform Features
+            BI Platform Features
           </Badge>
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
             Everything You Need for{" "}
-            <span className="gradient-text">Smarter Business Decisions</span>
+            <span className="gradient-text">Strategic Business Intelligence</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            Our comprehensive AI-powered platform gives you all the tools to transform your raw business data into actionable insights that drive growth.
+            Our comprehensive BI platform powered by AI gives you all the tools to transform your data pipelines into strategic insights that drive enterprise growth.
           </p>
         </div>
 
@@ -107,10 +107,10 @@ const FeaturesSection = () => {
         <div className="text-center mt-16">
           <div className="bg-background rounded-2xl p-8 shadow-soft border">
             <h3 className="text-2xl font-bold mb-4">
-              Ready to see NoteX in action?
+              Ready to transform your business intelligence?
             </h3>
             <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
-              Join hundreds of businesses already using NoteX to make smarter, data-driven decisions every day.
+              Join hundreds of enterprises already using NoteX to build data-driven strategies and make informed strategic decisions every day.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button className="inline-flex items-center justify-center gap-2 h-11 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 bg-gradient-primary text-primary-foreground hover:shadow-glow transform hover:scale-105 shadow-medium" >

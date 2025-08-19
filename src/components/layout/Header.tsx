@@ -19,7 +19,8 @@ const Header = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-          <img src="/favicon.ico" alt="Notex" />
+            <img src="/favicon.ico" alt="NoteX BI" className="h-8 w-8" />
+            <span className="text-xl font-bold text-primary">NoteX BI</span>
           </Link>
 
           {/* Desktop Navigation */}

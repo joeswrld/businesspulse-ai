@@ -51,10 +51,11 @@ const Footer = () => {
             {/* Brand Section */}
             <div className="lg:col-span-2 space-y-6">
               <div className="flex items-center space-x-2">
-              <img src="/favicon.ico" alt="Notex" />
+                <img src="/favicon.ico" alt="NoteX BI" className="h-8 w-8" />
+                <span className="text-xl font-bold text-white">NoteX BI</span>
               </div>
               <p className="text-secondary-foreground/80 max-w-md">
-                AI-powered Business Intelligence platform that transforms your data into actionable insights. Make smarter decisions with real-time analytics.
+                Enterprise Business Intelligence platform powered by AI that transforms your data pipelines into strategic insights. Build data-driven strategies with real-time BI analytics.
               </p>
               
               {/* Contact Info */}
@@ -161,7 +162,7 @@ const Footer = () => {
         <div className="py-6 border-t border-secondary-foreground/20">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-secondary-foreground/80">
-              ©  NoteX. All rights reserved.
+              ©  NoteX BI. All rights reserved.
             </div>
             
             {/* Social Links */}
