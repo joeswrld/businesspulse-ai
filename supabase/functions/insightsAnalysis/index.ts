@@ -190,14 +190,3 @@ serve(async (req) => {
     );
   }
 });
-Step 2: Set Environment Variable
-In Supabase Dashboard → Settings → Edge Functions → Environment Variables:
-
-Key: GEMINI_API_KEY
-Value: Your Gemini AI API key
-Step 3: Deploy
-Click Deploy in the Edge Function editor.
-
-🎯 What You'll See Now
-Real-time AI Confidence - Shows confidence building during analysis
-Interactive Feedback Classification - Users can cla
