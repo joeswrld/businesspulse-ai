@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUsageTracking, type UsageData } from "@/hooks/useUsageTracking";
 import PaystackPayment from "@/components/PaystackPayment";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SubscriptionPlan {
   id: string;
@@ -219,26 +220,24 @@ const Billing = () => {
     }
 
     try {
-      const response = await fetch('/api/manage-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('manage-subscription', {
+        body: {
           action: 'cancel',
           subscription_id: subscription.subscription_id,
           email: user.email
-        }),
+        }
       });
 
-      const data = await response.json();
+      if (error) {
+        throw error;
+      }
 
-      if (data.success) {
+      if (data?.success) {
         toast.success("Subscription cancelled successfully");
         toast.info("Your subscription will be cancelled at the end of the current billing period.");
         await refreshUsage(); // Refresh to show updated status
       } else {
-        toast.error(data.error || "Failed to cancel subscription");
+        toast.error(data?.error || "Failed to cancel subscription");
       }
     } catch (error) {
       console.error('Error cancelling subscription:', error);

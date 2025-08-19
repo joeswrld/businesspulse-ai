@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 
 import { toast } from 'sonner';
 import { Loader2, CreditCard } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PaystackPaymentProps {
   plan: 'pro' | 'business';
@@ -58,49 +59,49 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
     setLoading(true);
 
     try {
-      // Create subscription via our Supabase function
-      const response = await fetch('/api/create-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email,
-          plan: plan,
-        }),
-      });
+      // Map selected plan to Paystack plan code
+      const planCode = plan === 'pro' ? 'PLN_4z2wpgmw41w2k7r' : 'PLN_esryg99ztsy9xc8';
 
-      const data = await response.json();
+      // Optional: track upgrade attempt
+      try {
+        await supabase.from('analytics_events').insert({
+          event_type: 'upgrade_attempt',
+          event_data: { plan, email },
+        });
+      } catch {}
 
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to create subscription');
-      }
-
-      // Initialize Paystack payment
+      // Initialize Paystack payment with plan code. Paystack will create the subscription upon successful charge
       const handler = window.PaystackPop.setup({
-        key: 'pk_test_a5122beb6fd90a988ae6e180b2010fd093a59152', // Your Paystack public key
+        key: 'pk_test_a5122beb6fd90a988ae6e180b2010fd093a59152',
         email: email,
-        amount: amount,
+        amount: amount, // Plan amount in kobo (overridden by plan, but kept for clarity)
         currency: 'NGN',
-        plan: data.subscription.subscription_code,
+        plan: planCode,
         callback: async function(response: any) {
           if (response.status === 'success') {
-            // Payment successful
-            toast.success('Payment successful! Your subscription is now active.');
-            onSuccess(data.subscription);
+            toast.success('Payment successful! Activating your subscription...');
+
+            // Let webhook finalize DB state; optimistically refresh usage/limits
+            try {
+              await supabase.from('analytics_events').insert({
+                event_type: 'upgrade_success',
+                event_data: { plan, email, reference: response.reference },
+              });
+            } catch {}
+
+            onSuccess({ reference: response.reference, plan });
           } else {
             toast.error('Payment failed. Please try again.');
-            setLoading(false);
           }
+          setLoading(false);
         },
         onClose: function() {
-          toast.info('Payment cancelled');
+          toast.info('Payment window closed');
           setLoading(false);
         }
       });
 
       handler.openIframe();
-
     } catch (error) {
       console.error('Payment error:', error);
       toast.error(error instanceof Error ? error.message : 'Payment failed');
