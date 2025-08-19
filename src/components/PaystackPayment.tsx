@@ -70,9 +70,12 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
         });
       } catch {}
 
+      // Resolve public key from env with fallback to provided key
+      const publicKey = (import.meta as any)?.env?.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_a5122beb6fd90a988ae6e180b2010fd093a59152';
+
       // Initialize Paystack payment with plan code. Paystack will create the subscription upon successful charge
       const handler = window.PaystackPop.setup({
-        key: 'pk_test_a5122beb6fd90a988ae6e180b2010fd093a59152',
+        key: publicKey,
         email: email,
         amount: amount, // Plan amount in kobo (overridden by plan, but kept for clarity)
         currency: 'NGN',
