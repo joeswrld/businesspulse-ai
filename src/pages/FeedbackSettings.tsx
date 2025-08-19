@@ -68,6 +68,33 @@ const FeedbackSettings = () => {
     try {
       console.log('Fetching settings for user:', user.id);
       
+      // First check if the table exists
+      const { error: tableCheckError } = await supabase
+        .from('feedback_settings')
+        .select('id')
+        .limit(1);
+
+      if (tableCheckError && tableCheckError.code === '42P01') {
+        console.log('Feedback settings table does not exist. Please run database setup first.');
+        toast.error('Database not set up. Please run the database setup script first.');
+        
+        // Use local defaults
+        const localSettings = {
+          id: 'local-default',
+          user_id: user.id,
+          brand_colors: formData.brand_colors,
+          greeting_text: formData.greeting_text,
+          button_placement: formData.button_placement,
+          widget_enabled: formData.widget_enabled,
+          auto_notifications: formData.auto_notifications,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setSettings(localSettings);
+        setLoading(false);
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('feedback_settings')
         .select('*')
@@ -76,13 +103,6 @@ const FeedbackSettings = () => {
 
       if (error) {
         console.log('Error fetching settings:', error);
-        
-        // If table doesn't exist, create default settings
-        if (error.code === '42P01') {
-          console.log('Feedback settings table does not exist. Creating default settings...');
-          await createDefaultSettings();
-          return;
-        }
         
         // If no record found, create default settings
         if (error.code === 'PGRST116') {
