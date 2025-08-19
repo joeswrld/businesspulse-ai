@@ -46,8 +46,18 @@ interface AIInsight {
   id: string;
   summary: string;
   sentiment: 'positive' | 'negative' | 'neutral';
-  key_themes: string[];
-  suggested_actions: string[];
+  key_themes: Array<{
+    theme: string;
+    confidence: number;
+    frequency: string;
+    description: string;
+  } | string>;
+  suggested_actions: Array<{
+    action: string;
+    priority: string;
+    confidence: number;
+    impact: string;
+  } | string>;
   created_at: string;
   source_file?: string;
 }
@@ -272,8 +282,21 @@ const Dashboard: React.FC = () => {
         const savedInsights = localStorage.getItem('insightsHistory');
         if (savedInsights) {
           const parsedInsights = JSON.parse(savedInsights);
-          setInsights(parsedInsights);
-          console.log('Loaded insights from localStorage:', parsedInsights.length);
+          // Validate and clean the insights data
+          const validInsights = parsedInsights.filter((insight: any) => {
+            return insight && 
+                   typeof insight === 'object' && 
+                   insight.id && 
+                   insight.summary && 
+                   insight.sentiment &&
+                   Array.isArray(insight.key_themes) &&
+                   Array.isArray(insight.suggested_actions);
+          });
+          setInsights(validInsights);
+          console.log('Loaded insights from localStorage:', validInsights.length);
+          if (validInsights.length !== parsedInsights.length) {
+            console.warn(`Filtered out ${parsedInsights.length - validInsights.length} invalid insights`);
+          }
         } else {
           console.log('No insights found in localStorage');
         }
@@ -469,6 +492,30 @@ const Dashboard: React.FC = () => {
       case 'pending': return 'text-yellow-600 bg-yellow-100';
       case 'failed': return 'text-red-600 bg-red-100';
       default: return 'text-gray-600 bg-gray-100';
+    }
+  };
+
+  // Helper functions to safely extract data from insights
+  const getThemeText = (theme: any): string => {
+    if (typeof theme === 'string') return theme;
+    if (theme && typeof theme === 'object' && theme.theme) return theme.theme;
+    return 'Unknown theme';
+  };
+
+  const getActionText = (action: any): string => {
+    if (typeof action === 'string') return action;
+    if (action && typeof action === 'object' && action.action) return action.action;
+    return 'Unknown action';
+  };
+
+  // Safe array access helper
+  const safeArraySlice = (arr: any[], start: number, end: number) => {
+    if (!Array.isArray(arr)) return [];
+    try {
+      return arr.slice(start, end);
+    } catch (error) {
+      console.error('Error slicing array:', error);
+      return [];
     }
   };
 
@@ -676,33 +723,45 @@ const Dashboard: React.FC = () => {
           <CardContent>
             {insights.length > 0 ? (
               <div className="space-y-4 max-h-96 overflow-y-auto">
-                {insights.slice(0, 5).map((insight) => (
-                  <div key={insight.id} className="border rounded-lg p-4 hover:shadow-sm transition-shadow">
-                    <div className="flex items-start justify-between mb-2">
-                      <Badge className={getSentimentColor(insight.sentiment)}>
-                        {insight.sentiment}
-                      </Badge>
-                      <span className="text-xs text-gray-500">
-                        {new Date(insight.created_at).toLocaleTimeString()}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-700 mb-2">{insight.summary}</p>
-                    {insight.key_themes.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {insight.key_themes.slice(0, 3).map((theme, index) => (
-                          <span key={index} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                            {theme}
+                {safeArraySlice(insights, 0, 5).map((insight) => {
+                  try {
+                    return (
+                      <div key={insight.id || `insight-${Date.now()}`} className="border rounded-lg p-4 hover:shadow-sm transition-shadow">
+                        <div className="flex items-start justify-between mb-2">
+                          <Badge className={getSentimentColor(insight.sentiment || 'neutral')}>
+                            {insight.sentiment || 'neutral'}
+                          </Badge>
+                          <span className="text-xs text-gray-500">
+                            {insight.created_at ? new Date(insight.created_at).toLocaleTimeString() : 'Unknown time'}
                           </span>
-                        ))}
+                        </div>
+                        <p className="text-sm text-gray-700 mb-2">{insight.summary || 'No summary available'}</p>
+                        {insight.key_themes && Array.isArray(insight.key_themes) && insight.key_themes.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {safeArraySlice(insight.key_themes, 0, 3).map((theme, index) => (
+                              <span key={index} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                {getThemeText(theme)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {insight.source_file && (
+                          <div className="text-xs text-gray-500">
+                            📎 {insight.source_file}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {insight.source_file && (
-                      <div className="text-xs text-gray-500">
-                        📎 {insight.source_file}
+                    );
+                  } catch (error) {
+                    console.error('Error rendering insight:', error, insight);
+                    return (
+                      <div key={`error-${Date.now()}`} className="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <p className="text-sm text-red-600">Error displaying insight</p>
+                        <p className="text-xs text-red-500 mt-1">ID: {insight.id || 'Unknown'}</p>
                       </div>
-                    )}
-                  </div>
-                ))}
+                    );
+                  }
+                })}
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">

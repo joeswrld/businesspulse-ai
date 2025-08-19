@@ -46,9 +46,7 @@ const App = () => (
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <ErrorBoundary>
-                    <Dashboard />
-                  </ErrorBoundary>
+                  <Dashboard />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
