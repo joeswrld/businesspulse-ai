@@ -28,6 +28,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUsageTracking, type UsageData } from "@/hooks/useUsageTracking";
+import PaystackPayment from "@/components/PaystackPayment";
 
 interface SubscriptionPlan {
   id: string;
@@ -59,6 +60,8 @@ const Billing = () => {
   } = useUsageTracking();
   
   const [refreshing, setRefreshing] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'pro' | 'business' | null>(null);
 
   // Default to Free Trial plan
   const defaultPlan: SubscriptionPlan = {
@@ -177,27 +180,70 @@ const Billing = () => {
   ];
 
   const handleUpgrade = async (planName: string) => {
-    // In a real app, this would integrate with Paystack
-    toast.success(`Upgrade initiated for ${planName} plan`);
+    const plan = planName.toLowerCase() as 'pro' | 'business';
+    setSelectedPlan(plan);
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentSuccess = async (subscriptionData: any) => {
+    setShowPaymentModal(false);
+    setSelectedPlan(null);
     
-    // Simulate Paystack integration
-    console.log(`Upgrading to ${planName} plan`);
+    toast.success('Subscription activated successfully!');
     
-    // Track upgrade attempt
+    // Refresh usage data to reflect new plan limits
+    await refreshUsage();
+    
+    // Track successful upgrade
     try {
+      const { supabase } = await import('@/integrations/supabase/client');
       await supabase.from('analytics_events').insert({
         user_id: user?.id,
-        event_type: 'upgrade_attempt',
-        event_data: { plan: planName }
+        event_type: 'upgrade_success',
+        event_data: { plan: selectedPlan, subscription_id: subscriptionData.subscription_code }
       });
     } catch (error) {
-      console.error('Error tracking upgrade:', error);
+      console.error('Error tracking upgrade success:', error);
     }
   };
 
+  const handlePaymentCancel = () => {
+    setShowPaymentModal(false);
+    setSelectedPlan(null);
+  };
+
   const handleCancelSubscription = async () => {
-    toast.success("Cancellation initiated");
-    toast.info("Your subscription will be cancelled at the end of the current billing period.");
+    if (!user?.email || !subscription?.subscription_id) {
+      toast.error("Unable to cancel subscription. Please contact support.");
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/manage-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'cancel',
+          subscription_id: subscription.subscription_id,
+          email: user.email
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success("Subscription cancelled successfully");
+        toast.info("Your subscription will be cancelled at the end of the current billing period.");
+        await refreshUsage(); // Refresh to show updated status
+      } else {
+        toast.error(data.error || "Failed to cancel subscription");
+      }
+    } catch (error) {
+      console.error('Error cancelling subscription:', error);
+      toast.error("Failed to cancel subscription. Please try again or contact support.");
+    }
   };
 
   if (loading) {
@@ -636,6 +682,21 @@ const Billing = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Paystack Payment Modal */}
+      {showPaymentModal && selectedPlan && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <PaystackPayment
+              plan={selectedPlan}
+              planName={selectedPlan === 'pro' ? 'Pro' : 'Business'}
+              planPrice={selectedPlan === 'pro' ? '₦35,000' : '₦53,000'}
+              onSuccess={handlePaymentSuccess}
+              onCancel={handlePaymentCancel}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
