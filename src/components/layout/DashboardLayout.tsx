@@ -10,7 +10,9 @@ import {
   Menu,
   X,
   LogOut,
-  User
+  User,
+  CreditCard,
+  Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +29,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     { name: "AI Insights", href: "/insights-simple", icon: Brain },
     { name: "Reports", href: "/reports", icon: FileText },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
+    { name: "Usage & Billing", href: "/billing", icon: CreditCard },
+    { name: "Teams", href: "/teams", icon: Users, comingSoon: true },
     { name: "Settings", href: "/settings", icon: Settings },
     { name: "Profile", href: "/profile", icon: User },
   ];
@@ -79,21 +83,34 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           <nav className="flex-1 p-4 space-y-2">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
+              const isComingSoon = item.comingSoon;
+              
               return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={cn(
-                    "flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-soft"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                <div key={item.name} className="relative">
+                  {isComingSoon ? (
+                    <div className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground cursor-not-allowed opacity-60">
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.name}</span>
+                      <span className="ml-auto text-xs bg-muted px-2 py-1 rounded-full text-muted-foreground">
+                        Coming Soon
+                      </span>
+                    </div>
+                  ) : (
+                    <Link
+                      to={item.href}
+                      className={cn(
+                        "flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-soft"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      )}
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.name}</span>
+                    </Link>
                   )}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.name}</span>
-                </Link>
+                </div>
               );
             })}
           </nav>
