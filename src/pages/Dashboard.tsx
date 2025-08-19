@@ -242,25 +242,45 @@ const Dashboard: React.FC = () => {
 
   // Fetch initial data
   const fetchInitialData = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log("No user found in fetchInitialData");
+      return;
+    }
 
     try {
+      console.log("Fetching dashboard data for user:", user.email);
+      
       // Fetch user profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
 
-      if (profile) {
-        setUserProfile(profile);
+        if (profileError) {
+          console.warn('Profile fetch warning:', profileError);
+        } else if (profile) {
+          setUserProfile(profile);
+        }
+      } catch (profileError) {
+        console.warn('Profile fetch error:', profileError);
       }
 
       // Fetch insights from localStorage (since we're using localStorage for insights)
-      const savedInsights = localStorage.getItem('insightsHistory');
-      if (savedInsights) {
-        const parsedInsights = JSON.parse(savedInsights);
-        setInsights(parsedInsights);
+      try {
+        const savedInsights = localStorage.getItem('insightsHistory');
+        if (savedInsights) {
+          const parsedInsights = JSON.parse(savedInsights);
+          setInsights(parsedInsights);
+          console.log('Loaded insights from localStorage:', parsedInsights.length);
+        } else {
+          console.log('No insights found in localStorage');
+        }
+      } catch (insightsError) {
+        console.error('Error parsing insights from localStorage:', insightsError);
+        // Set empty array as fallback
+        setInsights([]);
       }
 
       // Mock data for demonstration (replace with real Supabase queries)
@@ -281,6 +301,8 @@ const Dashboard: React.FC = () => {
       ];
       setTeamMembers(mockTeamMembers);
 
+      console.log('Dashboard data loaded successfully');
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Failed to load dashboard data');
@@ -291,109 +313,122 @@ const Dashboard: React.FC = () => {
 
   // Set up real-time subscriptions
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      console.log("No user in useEffect, skipping setup");
+      return;
+    }
 
+    console.log("Setting up real-time subscriptions for user:", user.email);
     fetchInitialData();
 
     // Set up real-time subscriptions for insights (localStorage-based)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'insightsHistory' && e.newValue) {
-        const newInsights = JSON.parse(e.newValue);
-        setInsights(newInsights);
-        toast.success('New insight generated!', {
-          description: 'Your dashboard has been updated with the latest analysis.'
-        });
+        try {
+          const newInsights = JSON.parse(e.newValue);
+          setInsights(newInsights);
+          toast.success('New insight generated!', {
+            description: 'Your dashboard has been updated with the latest analysis.'
+          });
+        } catch (error) {
+          console.error('Error parsing storage change:', error);
+        }
       }
     };
 
     window.addEventListener('storage', handleStorageChange);
 
-    // Mock real-time updates for demonstration with realistic growth patterns
+        // Mock real-time updates for demonstration with realistic growth patterns
     const interval = setInterval(() => {
-      // Simulate new insights being added with varying sentiment
-      if (Math.random() > 0.92) { // 8% chance every interval for more frequent updates
-        const sentiments: ('positive' | 'negative' | 'neutral')[] = ['positive', 'negative', 'neutral'];
-        const randomSentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
-        
-        const insightTemplates = [
-          {
-            summary: 'Customer feedback shows positive sentiment about the new dashboard interface.',
-            themes: ['dashboard', 'user interface', 'usability'],
-            actions: ['Continue UI improvements', 'Monitor user adoption']
-          },
-          {
-            summary: 'Users report issues with mobile app performance and loading times.',
-            themes: ['mobile app', 'performance', 'loading speed'],
-            actions: ['Optimize mobile performance', 'Investigate loading issues']
-          },
-          {
-            summary: 'Mixed feedback on pricing structure with requests for more flexible options.',
-            themes: ['pricing', 'subscription', 'flexibility'],
-            actions: ['Review pricing strategy', 'Consider flexible plans']
-          },
-          {
-            summary: 'Excellent feedback on customer support response times and helpfulness.',
-            themes: ['customer support', 'response time', 'helpfulness'],
-            actions: ['Maintain support quality', 'Document best practices']
-          },
-          {
-            summary: 'Feature requests for dark mode and additional customization options.',
-            themes: ['dark mode', 'customization', 'feature requests'],
-            actions: ['Prioritize dark mode', 'Plan customization features']
+      try {
+        // Simulate new insights being added with varying sentiment
+        if (Math.random() > 0.92) { // 8% chance every interval for more frequent updates
+          const sentiments: ('positive' | 'negative' | 'neutral')[] = ['positive', 'negative', 'neutral'];
+          const randomSentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
+          
+          const insightTemplates = [
+            {
+              summary: 'Customer feedback shows positive sentiment about the new dashboard interface.',
+              themes: ['dashboard', 'user interface', 'usability'],
+              actions: ['Continue UI improvements', 'Monitor user adoption']
+            },
+            {
+              summary: 'Users report issues with mobile app performance and loading times.',
+              themes: ['mobile app', 'performance', 'loading speed'],
+              actions: ['Optimize mobile performance', 'Investigate loading issues']
+            },
+            {
+              summary: 'Mixed feedback on pricing structure with requests for more flexible options.',
+              themes: ['pricing', 'subscription', 'flexibility'],
+              actions: ['Review pricing strategy', 'Consider flexible plans']
+            },
+            {
+              summary: 'Excellent feedback on customer support response times and helpfulness.',
+              themes: ['customer support', 'response time', 'helpfulness'],
+              actions: ['Maintain support quality', 'Document best practices']
+            },
+            {
+              summary: 'Feature requests for dark mode and additional customization options.',
+              themes: ['dark mode', 'customization', 'feature requests'],
+              actions: ['Prioritize dark mode', 'Plan customization features']
+            }
+          ];
+          
+          const randomTemplate = insightTemplates[Math.floor(Math.random() * insightTemplates.length)];
+          
+          const newInsight: AIInsight = {
+            id: Date.now().toString(),
+            summary: randomTemplate.summary,
+            sentiment: randomSentiment,
+            key_themes: randomTemplate.themes,
+            suggested_actions: randomTemplate.actions,
+            created_at: new Date().toISOString()
+          };
+          
+          setInsights(prev => [newInsight, ...prev]);
+          
+          // Show update animations
+          setGrowthRateUpdating(true);
+          setWeeklyInsightsUpdating(true);
+          setTimeout(() => {
+            setGrowthRateUpdating(false);
+            setWeeklyInsightsUpdating(false);
+          }, 2000);
+          
+          // Calculate new stats
+          const newStats = calculateStats([newInsight, ...insights], dataSources, aiJobs, teamMembers);
+          
+          // Show detailed update notification
+          const weekChange = newStats.thisWeekInsights - stats.thisWeekInsights;
+          const weeklyGrowthChange = newStats.weeklyGrowthRate - stats.weeklyGrowthRate;
+          const growthChange = newStats.growthRate - stats.growthRate;
+          
+          let notificationMessage = `New ${newInsight.sentiment} insight added`;
+          if (weekChange > 0) {
+            notificationMessage += ` • +${weekChange} this week`;
           }
-        ];
-        
-        const randomTemplate = insightTemplates[Math.floor(Math.random() * insightTemplates.length)];
-        
-        const newInsight: AIInsight = {
-          id: Date.now().toString(),
-          summary: randomTemplate.summary,
-          sentiment: randomSentiment,
-          key_themes: randomTemplate.themes,
-          suggested_actions: randomTemplate.actions,
-          created_at: new Date().toISOString()
-        };
-        
-        setInsights(prev => [newInsight, ...prev]);
-        
-        // Show update animations
-        setGrowthRateUpdating(true);
-        setWeeklyInsightsUpdating(true);
-        setTimeout(() => {
-          setGrowthRateUpdating(false);
-          setWeeklyInsightsUpdating(false);
-        }, 2000);
-        
-        // Calculate new stats
-        const newStats = calculateStats([newInsight, ...insights], dataSources, aiJobs, teamMembers);
-        
-        // Show detailed update notification
-        const weekChange = newStats.thisWeekInsights - stats.thisWeekInsights;
-        const weeklyGrowthChange = newStats.weeklyGrowthRate - stats.weeklyGrowthRate;
-        const growthChange = newStats.growthRate - stats.growthRate;
-        
-        let notificationMessage = `New ${newInsight.sentiment} insight added`;
-        if (weekChange > 0) {
-          notificationMessage += ` • +${weekChange} this week`;
+          if (weeklyGrowthChange !== 0) {
+            notificationMessage += ` • Weekly: ${newStats.weeklyGrowthRate > 0 ? '+' : ''}${newStats.weeklyGrowthRate}%`;
+          }
+          if (growthChange !== 0) {
+            notificationMessage += ` • Monthly: ${newStats.growthRate > 0 ? '+' : ''}${newStats.growthRate}%`;
+          }
+          
+          toast.success('📊 Dashboard Updated!', {
+            description: notificationMessage
+          });
         }
-        if (weeklyGrowthChange !== 0) {
-          notificationMessage += ` • Weekly: ${newStats.weeklyGrowthRate > 0 ? '+' : ''}${newStats.weeklyGrowthRate}%`;
-        }
-        if (growthChange !== 0) {
-          notificationMessage += ` • Monthly: ${newStats.growthRate > 0 ? '+' : ''}${newStats.growthRate}%`;
-        }
-        
-        toast.success('📊 Dashboard Updated!', {
-          description: notificationMessage
-        });
+      } catch (error) {
+        console.error('Error in real-time update simulation:', error);
       }
     }, 8000); // Check every 8 seconds for more frequent updates
 
     return () => {
+      console.log("Cleaning up real-time subscriptions");
       window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
     };
-  }, [user]);
+  }, [user, insights, dataSources, aiJobs, teamMembers, stats]);
 
   // Update stats when data changes
   useEffect(() => {
@@ -440,8 +475,32 @@ const Dashboard: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2">Loading dashboard...</span>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <span className="text-gray-600">Loading dashboard...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Required</h2>
+          <p className="text-gray-600 mb-4">Please log in to access the dashboard.</p>
+          <button 
+            onClick={() => window.location.href = '/auth'} 
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Go to Login
+          </button>
+        </div>
       </div>
     );
   }
