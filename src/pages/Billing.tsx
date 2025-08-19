@@ -26,33 +26,8 @@ import {
   Info
 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-
-interface UsageData {
-  ai_insights: {
-    current: number;
-    limit: number;
-    reset_date: string;
-  };
-  data_sources: {
-    current: number;
-    limit: number;
-  };
-  team_members: {
-    current: number;
-    limit: number;
-  };
-  ai_reports: {
-    current: number;
-    limit: number;
-    reset_date: string;
-  };
-  business_analytics: {
-    current: number;
-    limit: number;
-  };
-}
+import { useUsageTracking, type UsageData } from "@/hooks/useUsageTracking";
 
 interface SubscriptionPlan {
   id: string;
@@ -74,16 +49,15 @@ interface SubscriptionPlan {
 
 const Billing = () => {
   const { user } = useAuth();
+  const { 
+    usage, 
+    loading, 
+    subscription, 
+    refreshUsage: hookRefreshUsage, 
+    getUsagePercentage, 
+    getUsageStatus 
+  } = useUsageTracking();
   
-  const [subscription, setSubscription] = useState<SubscriptionPlan | null>(null);
-  const [usage, setUsage] = useState<UsageData>({
-    ai_insights: { current: 0, limit: 20, reset_date: '' },
-    data_sources: { current: 0, limit: 1 },
-    team_members: { current: 1, limit: 1 },
-    ai_reports: { current: 0, limit: 2, reset_date: '' },
-    business_analytics: { current: 0, limit: 1 }
-  });
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // Default to Free Trial plan
@@ -104,81 +78,15 @@ const Billing = () => {
     }
   };
 
-  useEffect(() => {
-    if (user) {
-      fetchSubscriptionData();
-      fetchUsageData();
-    }
-  }, [user]);
 
-  const fetchSubscriptionData = async () => {
-    if (!user) return;
 
-    try {
-      // In a real app, this would fetch from Supabase
-      // For now, we'll use the default trial plan
-      setSubscription(defaultPlan);
-    } catch (error) {
-      console.error('Error fetching subscription:', error);
-      // Fallback to trial plan
-      setSubscription(defaultPlan);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const fetchUsageData = async () => {
-    if (!user) return;
 
-    try {
-      // Get AI insights count from localStorage (since we're using that for now)
-      const savedInsights = localStorage.getItem('insightsHistory');
-      const insightsCount = savedInsights ? JSON.parse(savedInsights).length : 0;
 
-      // Get reports count (placeholder for now)
-      const reportsCount = 0;
-
-      // Get data sources count (placeholder for now)
-      const sourcesCount = 0;
-
-      // Get team members count (placeholder for now)
-      const teamCount = 1;
-
-      // Get analytics count (placeholder for now)
-      const analyticsCount = 0;
-
-      setUsage({
-        ai_insights: { 
-          current: insightsCount, 
-          limit: subscription?.limits.ai_insights || 20,
-          reset_date: subscription?.trial_end || ''
-        },
-        data_sources: { 
-          current: sourcesCount, 
-          limit: subscription?.limits.data_sources || 1 
-        },
-        team_members: { 
-          current: teamCount, 
-          limit: subscription?.limits.team_members || 1 
-        },
-        ai_reports: { 
-          current: reportsCount, 
-          limit: subscription?.limits.ai_reports || 2,
-          reset_date: subscription?.trial_end || ''
-        },
-        business_analytics: { 
-          current: analyticsCount, 
-          limit: subscription?.limits.business_analytics || 1 
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching usage:', error);
-    }
-  };
 
   const refreshUsage = async () => {
     setRefreshing(true);
-    await fetchUsageData();
+    await hookRefreshUsage();
     setRefreshing(false);
     toast.success("Usage data refreshed");
   };
@@ -192,33 +100,7 @@ const Billing = () => {
     return Math.max(0, diffDays);
   };
 
-  const getUsagePercentage = (used: number, limit: number) => {
-    if (limit === 0) return 0;
-    return Math.min((used / limit) * 100, 100);
-  };
 
-  const getUsageStatus = (used: number, limit: number) => {
-    const percentage = getUsagePercentage(used, limit);
-    if (percentage >= 90) return 'critical';
-    if (percentage >= 75) return 'warning';
-    return 'normal';
-  };
-
-  const getUsageColor = (status: string) => {
-    switch (status) {
-      case 'critical': return 'text-red-600';
-      case 'warning': return 'text-orange-600';
-      default: return 'text-green-600';
-    }
-  };
-
-  const getUsageBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'critical': return 'destructive';
-      case 'warning': return 'secondary';
-      default: return 'default';
-    }
-  };
 
   const plans = [
     {
@@ -406,7 +288,7 @@ const Billing = () => {
                       </span>
                       <span>{usage.ai_insights.current} / {usage.ai_insights.limit}</span>
                     </div>
-                    <Progress value={getUsagePercentage(usage.ai_insights.current, usage.ai_insights.limit)} />
+                    <Progress value={getUsagePercentage('ai_insights')} />
                   </div>
                   
                   <div>
@@ -417,7 +299,7 @@ const Billing = () => {
                       </span>
                       <span>{usage.data_sources.current} / {usage.data_sources.limit}</span>
                     </div>
-                    <Progress value={getUsagePercentage(usage.data_sources.current, usage.data_sources.limit)} />
+                    <Progress value={getUsagePercentage('data_sources')} />
                   </div>
                   
                   <div>
@@ -428,7 +310,7 @@ const Billing = () => {
                       </span>
                       <span>{usage.team_members.current} / {usage.team_members.limit}</span>
                     </div>
-                    <Progress value={getUsagePercentage(usage.team_members.current, usage.team_members.limit)} />
+                    <Progress value={getUsagePercentage('team_members')} />
                   </div>
                 </div>
               </div>
@@ -460,49 +342,49 @@ const Billing = () => {
                 <div className="p-4 border rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <Brain className="h-5 w-5 text-blue-600" />
-                    <Badge variant={getUsageBadgeVariant(getUsageStatus(usage.ai_insights.current, usage.ai_insights.limit))}>
-                      {getUsageStatus(usage.ai_insights.current, usage.ai_insights.limit)}
+                    <Badge variant={getUsageStatus('ai_insights') === 'critical' ? 'destructive' : getUsageStatus('ai_insights') === 'warning' ? 'secondary' : 'default'}>
+                      {getUsageStatus('ai_insights')}
                     </Badge>
                   </div>
                   <div className="text-2xl font-bold">{usage.ai_insights.current}</div>
                   <div className="text-sm text-muted-foreground">of {usage.ai_insights.limit} AI Insights</div>
-                  <Progress value={getUsagePercentage(usage.ai_insights.current, usage.ai_insights.limit)} className="mt-2" />
+                  <Progress value={getUsagePercentage('ai_insights')} className="mt-2" />
                 </div>
                 
                 <div className="p-4 border rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <Database className="h-5 w-5 text-green-600" />
-                    <Badge variant={getUsageBadgeVariant(getUsageStatus(usage.data_sources.current, usage.data_sources.limit))}>
-                      {getUsageStatus(usage.data_sources.current, usage.data_sources.limit)}
+                    <Badge variant={getUsageStatus('data_sources') === 'critical' ? 'destructive' : getUsageStatus('data_sources') === 'warning' ? 'secondary' : 'default'}>
+                      {getUsageStatus('data_sources')}
                     </Badge>
                   </div>
                   <div className="text-2xl font-bold">{usage.data_sources.current}</div>
                   <div className="text-sm text-muted-foreground">of {usage.data_sources.limit} Data Sources</div>
-                  <Progress value={getUsagePercentage(usage.data_sources.current, usage.data_sources.limit)} className="mt-2" />
+                  <Progress value={getUsagePercentage('data_sources')} className="mt-2" />
                 </div>
                 
                 <div className="p-4 border rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <Users className="h-5 w-5 text-purple-600" />
-                    <Badge variant={getUsageBadgeVariant(getUsageStatus(usage.team_members.current, usage.team_members.limit))}>
-                      {getUsageStatus(usage.team_members.current, usage.team_members.limit)}
+                    <Badge variant={getUsageStatus('team_members') === 'critical' ? 'destructive' : getUsageStatus('team_members') === 'warning' ? 'secondary' : 'default'}>
+                      {getUsageStatus('team_members')}
                     </Badge>
                   </div>
                   <div className="text-2xl font-bold">{usage.team_members.current}</div>
                   <div className="text-sm text-muted-foreground">of {usage.team_members.limit} Team Members</div>
-                  <Progress value={getUsagePercentage(usage.team_members.current, usage.team_members.limit)} className="mt-2" />
+                  <Progress value={getUsagePercentage('team_members')} className="mt-2" />
                 </div>
                 
                 <div className="p-4 border rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <FileText className="h-5 w-5 text-orange-600" />
-                    <Badge variant={getUsageBadgeVariant(getUsageStatus(usage.ai_reports.current, usage.ai_reports.limit))}>
-                      {getUsageStatus(usage.ai_reports.current, usage.ai_reports.limit)}
+                    <Badge variant={getUsageStatus('ai_reports') === 'critical' ? 'destructive' : getUsageStatus('ai_reports') === 'warning' ? 'secondary' : 'default'}>
+                      {getUsageStatus('ai_reports')}
                     </Badge>
                   </div>
                   <div className="text-2xl font-bold">{usage.ai_reports.current}</div>
                   <div className="text-sm text-muted-foreground">of {usage.ai_reports.limit} AI Reports</div>
-                  <Progress value={getUsagePercentage(usage.ai_reports.current, usage.ai_reports.limit)} className="mt-2" />
+                  <Progress value={getUsagePercentage('ai_reports')} className="mt-2" />
                 </div>
               </div>
             </TabsContent>
@@ -520,9 +402,9 @@ const Billing = () => {
                     <span>Current Usage</span>
                     <span className="font-semibold">{usage.ai_insights.current} / {usage.ai_insights.limit}</span>
                   </div>
-                  <Progress value={getUsagePercentage(usage.ai_insights.current, usage.ai_insights.limit)} />
+                  <Progress value={getUsagePercentage('ai_insights')} />
                   <div className="text-sm text-muted-foreground">
-                    {usage.ai_insights.limit - usage.ai_insights.current} insights remaining
+                    {usage.ai_insights.remaining} insights remaining
                   </div>
                 </div>
               </div>
@@ -536,9 +418,9 @@ const Billing = () => {
                     <span>Connected Sources</span>
                     <span className="font-semibold">{usage.data_sources.current} / {usage.data_sources.limit}</span>
                   </div>
-                  <Progress value={getUsagePercentage(usage.data_sources.current, usage.data_sources.limit)} />
+                  <Progress value={getUsagePercentage('data_sources')} />
                   <div className="text-sm text-muted-foreground">
-                    {usage.data_sources.limit - usage.data_sources.current} sources remaining
+                    {usage.data_sources.remaining} sources remaining
                   </div>
                 </div>
               </div>
@@ -557,9 +439,9 @@ const Billing = () => {
                     <span>Generated Reports</span>
                     <span className="font-semibold">{usage.ai_reports.current} / {usage.ai_reports.limit}</span>
                   </div>
-                  <Progress value={getUsagePercentage(usage.ai_reports.current, usage.ai_reports.limit)} />
+                  <Progress value={getUsagePercentage('ai_reports')} />
                   <div className="text-sm text-muted-foreground">
-                    {usage.ai_reports.limit - usage.ai_reports.current} reports remaining
+                    {usage.ai_reports.remaining} reports remaining
                   </div>
                 </div>
               </div>
@@ -573,9 +455,9 @@ const Billing = () => {
                     <span>Analytics Generated</span>
                     <span className="font-semibold">{usage.business_analytics.current} / {usage.business_analytics.limit}</span>
                   </div>
-                  <Progress value={getUsagePercentage(usage.business_analytics.current, usage.business_analytics.limit)} />
+                  <Progress value={getUsagePercentage('business_analytics')} />
                   <div className="text-sm text-muted-foreground">
-                    {usage.business_analytics.limit - usage.business_analytics.current} analytics remaining
+                    {usage.business_analytics.remaining} analytics remaining
                   </div>
                 </div>
               </div>
