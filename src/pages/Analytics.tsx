@@ -42,15 +42,25 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
-interface FeedbackData {
+interface InsightData {
   id: string;
   user_id: string;
-  feedback_text: string;
+  summary: string;
   sentiment: 'positive' | 'negative' | 'neutral';
-  category: string;
-  priority: 'high' | 'medium' | 'low';
+  key_themes: Array<{
+    theme: string;
+    confidence: number;
+    frequency: string;
+    description: string;
+  } | string>;
+  suggested_actions: Array<{
+    action: string;
+    priority: string;
+    confidence: number;
+    impact: string;
+  } | string>;
   created_at: string;
-  updated_at: string;
+  source_file?: string;
 }
 
 interface GeminiAnalyticsResponse {
@@ -82,7 +92,7 @@ const Analytics: React.FC = () => {
   const { user } = useAuth();
   
   // State for real-time data
-  const [feedbackData, setFeedbackData] = useState<FeedbackData[]>([]);
+  const [insightsData, setInsightsData] = useState<InsightData[]>([]);
   const [geminiAnalytics, setGeminiAnalytics] = useState<GeminiAnalyticsResponse | null>(null);
   const [sentimentData, setSentimentData] = useState<SentimentData[]>([]);
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
@@ -93,8 +103,8 @@ const Analytics: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch feedback data from Supabase
-  const fetchFeedbackData = useCallback(async () => {
+  // Fetch insights data from Supabase
+  const fetchInsightsData = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -102,33 +112,33 @@ const Analytics: React.FC = () => {
       setError(null);
       
       const { data, error: fetchError } = await supabase
-        .from('feedback')
+        .from('ai_insights')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (fetchError) {
-        throw new Error(`Failed to fetch feedback: ${fetchError.message}`);
+        throw new Error(`Failed to fetch insights: ${fetchError.message}`);
       }
 
-      setFeedbackData(data || []);
-      console.log('Fetched feedback data:', data?.length || 0, 'records');
+      setInsightsData(data || []);
+      console.log('Fetched insights data:', data?.length || 0, 'records');
       
       // Process data for charts
       processChartData(data || []);
       
     } catch (error) {
-      console.error('Error fetching feedback data:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch feedback data');
-      toast.error('Failed to load feedback data');
+      console.error('Error fetching insights data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch insights data');
+      toast.error('Failed to load insights data');
     } finally {
       setLoading(false);
     }
   }, [user]);
 
   // Process data for charts
-  const processChartData = useCallback((feedback: FeedbackData[]) => {
-    if (!feedback.length) {
+  const processChartData = useCallback((insights: InsightData[]) => {
+    if (!insights.length) {
       setSentimentData([]);
       setCategoryData([]);
       return;
@@ -141,13 +151,13 @@ const Analytics: React.FC = () => {
       date.setDate(date.getDate() - i);
       const dateStr = date.toISOString().split('T')[0];
       
-      const dayFeedback = feedback.filter(item => 
+      const dayInsights = insights.filter(item => 
         item.created_at.startsWith(dateStr)
       );
       
-      const positive = dayFeedback.filter(item => item.sentiment === 'positive').length;
-      const negative = dayFeedback.filter(item => item.sentiment === 'negative').length;
-      const neutral = dayFeedback.filter(item => item.sentiment === 'neutral').length;
+      const positive = dayInsights.filter(item => item.sentiment === 'positive').length;
+      const negative = dayInsights.filter(item => item.sentiment === 'negative').length;
+      const neutral = dayInsights.filter(item => item.sentiment === 'neutral').length;
       
       sentiment.push({
         date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -158,23 +168,29 @@ const Analytics: React.FC = () => {
     }
     setSentimentData(sentiment);
 
-    // Process category data
-    const categoryCounts: Record<string, number> = {};
-    feedback.forEach(item => {
-      const category = item.category || 'Uncategorized';
-      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+    // Process theme data from insights
+    const themeCounts: Record<string, number> = {};
+    insights.forEach(item => {
+      if (Array.isArray(item.key_themes)) {
+        item.key_themes.forEach(theme => {
+          const themeText = typeof theme === 'string' ? theme : theme.theme;
+          if (themeText) {
+            themeCounts[themeText] = (themeCounts[themeText] || 0) + 1;
+          }
+        });
+      }
     });
     
-    const categories = Object.entries(categoryCounts)
-      .map(([category, count]) => ({
-        category,
+    const themes = Object.entries(themeCounts)
+      .map(([theme, count]) => ({
+        category: theme,
         count,
-        percentage: (count / feedback.length) * 100
+        percentage: (count / insights.length) * 100
       }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
     
-    setCategoryData(categories);
+    setCategoryData(themes);
   }, []);
 
   // Set up Supabase Realtime subscription
@@ -184,30 +200,30 @@ const Analytics: React.FC = () => {
     console.log('Setting up real-time subscription for user:', user.id);
     
     const channel = supabase
-      .channel('feedback-changes')
+      .channel('insights-changes')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'feedback',
+        table: 'ai_insights',
         filter: `user_id=eq.${user.id}`
       }, (payload) => {
-        console.log('Real-time feedback change:', payload);
+        console.log('Real-time insights change:', payload);
         
         if (payload.eventType === 'INSERT') {
-          setFeedbackData(prev => [payload.new as FeedbackData, ...prev]);
-          toast.success('New feedback received!', {
+          setInsightsData(prev => [payload.new as InsightData, ...prev]);
+          toast.success('New insight received!', {
             description: 'Analytics updated in real-time'
           });
         } else if (payload.eventType === 'UPDATE') {
-          setFeedbackData(prev => prev.map(item => 
-            item.id === payload.new.id ? payload.new as FeedbackData : item
+          setInsightsData(prev => prev.map(item => 
+            item.id === payload.new.id ? payload.new as InsightData : item
           ));
         } else if (payload.eventType === 'DELETE') {
-          setFeedbackData(prev => prev.filter(item => item.id !== payload.old.id));
+          setInsightsData(prev => prev.filter(item => item.id !== payload.old.id));
         }
         
         // Reprocess chart data
-        processChartData(feedbackData);
+        processChartData(insightsData);
       })
       .subscribe();
 
@@ -215,17 +231,17 @@ const Analytics: React.FC = () => {
       console.log('Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };
-  }, [user, feedbackData, processChartData]);
+  }, [user, insightsData, processChartData]);
 
   // Fetch initial data on mount
   useEffect(() => {
-    fetchFeedbackData();
-  }, [fetchFeedbackData]);
+    fetchInsightsData();
+  }, [fetchInsightsData]);
 
   // Generate AI Analytics using Gemini
   const generateAIAnalytics = async () => {
-    if (!user || !feedbackData.length) {
-      toast.error('No feedback data available for analysis');
+    if (!user || !insightsData.length) {
+      toast.error('No insights data available for analysis');
       return;
     }
     
@@ -242,7 +258,7 @@ const Analytics: React.FC = () => {
         },
         body: JSON.stringify({
           user_id: user.id,
-          feedback_data: feedbackData
+          insights_data: insightsData
         })
       });
 
@@ -276,19 +292,19 @@ const Analytics: React.FC = () => {
   // Refresh data
   const refreshData = async () => {
     setRefreshing(true);
-    await fetchFeedbackData();
+    await fetchInsightsData();
     setRefreshing(false);
   };
 
-  // Calculate KPIs from feedback data
-  const totalFeedback = feedbackData.length;
-  const positiveFeedback = feedbackData.filter(item => item.sentiment === 'positive').length;
-  const negativeFeedback = feedbackData.filter(item => item.sentiment === 'negative').length;
-  const neutralFeedback = feedbackData.filter(item => item.sentiment === 'neutral').length;
+  // Calculate KPIs from insights data
+  const totalInsights = insightsData.length;
+  const positiveInsights = insightsData.filter(item => item.sentiment === 'positive').length;
+  const negativeInsights = insightsData.filter(item => item.sentiment === 'negative').length;
+  const neutralInsights = insightsData.filter(item => item.sentiment === 'neutral').length;
   
-  const positivePercentage = totalFeedback > 0 ? Math.round((positiveFeedback / totalFeedback) * 100) : 0;
-  const negativePercentage = totalFeedback > 0 ? Math.round((negativeFeedback / totalFeedback) * 100) : 0;
-  const neutralPercentage = totalFeedback > 0 ? Math.round((neutralFeedback / totalFeedback) * 100) : 0;
+  const positivePercentage = totalInsights > 0 ? Math.round((positiveInsights / totalInsights) * 100) : 0;
+  const negativePercentage = totalInsights > 0 ? Math.round((negativeInsights / totalInsights) * 100) : 0;
+  const neutralPercentage = totalInsights > 0 ? Math.round((neutralInsights / totalInsights) * 100) : 0;
 
   // Chart colors
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316'];
@@ -310,7 +326,7 @@ const Analytics: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Business Analytics</h1>
-          <p className="text-muted-foreground">Real-time insights from your customer feedback</p>
+          <p className="text-muted-foreground">Real-time insights from your AI analysis</p>
         </div>
         <div className="flex space-x-2">
           <Button 
@@ -350,12 +366,12 @@ const Analytics: React.FC = () => {
         <Card className="border-l-4 border-l-blue-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Feedback
+              Total Insights
             </CardTitle>
-            <FileText className="h-5 w-5 text-blue-500" />
+            <Brain className="h-5 w-5 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{totalFeedback}</div>
+            <div className="text-2xl font-bold text-foreground">{totalInsights}</div>
             <div className="flex items-center text-xs text-muted-foreground">
               <Activity className="h-3 w-3 mr-1 text-blue-500" />
               <span className="text-blue-500">Real-time</span>
@@ -375,7 +391,7 @@ const Analytics: React.FC = () => {
             <div className="text-2xl font-bold text-foreground">{positivePercentage}%</div>
             <Progress value={positivePercentage} className="mt-2" />
             <div className="flex items-center text-xs text-muted-foreground mt-1">
-              <span className="text-green-500">{positiveFeedback} responses</span>
+              <span className="text-green-500">{positiveInsights} insights</span>
             </div>
           </CardContent>
         </Card>
@@ -391,7 +407,7 @@ const Analytics: React.FC = () => {
             <div className="text-2xl font-bold text-foreground">{negativePercentage}%</div>
             <Progress value={negativePercentage} className="mt-2" />
             <div className="flex items-center text-xs text-muted-foreground mt-1">
-              <span className="text-red-500">{negativeFeedback} responses</span>
+              <span className="text-red-500">{negativeInsights} insights</span>
             </div>
           </CardContent>
         </Card>
@@ -407,7 +423,7 @@ const Analytics: React.FC = () => {
             <div className="text-2xl font-bold text-foreground">{neutralPercentage}%</div>
             <Progress value={neutralPercentage} className="mt-2" />
             <div className="flex items-center text-xs text-muted-foreground mt-1">
-              <span className="text-gray-500">{neutralFeedback} responses</span>
+              <span className="text-gray-500">{neutralInsights} insights</span>
             </div>
           </CardContent>
         </Card>
@@ -422,7 +438,7 @@ const Analytics: React.FC = () => {
               <TrendingUp className="h-5 w-5 mr-2 text-blue-500" />
               Sentiment Trends (Last 7 Days)
             </CardTitle>
-            <CardDescription>Daily sentiment analysis from feedback</CardDescription>
+            <CardDescription>Daily sentiment analysis from insights</CardDescription>
           </CardHeader>
           <CardContent>
             {sentimentData.length > 0 ? (
@@ -453,9 +469,9 @@ const Analytics: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <PieChart className="h-5 w-5 mr-2 text-green-500" />
-              Feedback Categories
+              Key Themes
             </CardTitle>
-            <CardDescription>Distribution of feedback by category</CardDescription>
+            <CardDescription>Distribution of insights by theme</CardDescription>
           </CardHeader>
           <CardContent>
             {categoryData.length > 0 ? (
@@ -507,14 +523,14 @@ const Analytics: React.FC = () => {
                 <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-medium mb-2">Ready to Generate AI Insights</h3>
                 <p className="text-muted-foreground mb-4">
-                  {totalFeedback > 0 
-                    ? `Analyze ${totalFeedback} feedback responses with AI`
-                    : 'No feedback data available for analysis'
+                  {totalInsights > 0 
+                    ? `Analyze ${totalInsights} insights with AI`
+                    : 'No insights data available for analysis'
                   }
                 </p>
                 <Button 
                   onClick={generateAIAnalytics}
-                  disabled={generatingAI || totalFeedback === 0}
+                  disabled={generatingAI || totalInsights === 0}
                   className="w-full md:w-auto"
                 >
                   {generatingAI ? (

@@ -10,44 +10,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { user_id, feedback_data } = req.body;
+    const { user_id, insights_data } = req.body;
 
-    if (!user_id || !feedback_data || !Array.isArray(feedback_data)) {
+    if (!user_id || !insights_data || !Array.isArray(insights_data)) {
       return res.status(400).json({ error: 'Invalid request data' });
     }
 
-    if (feedback_data.length === 0) {
-      return res.status(400).json({ error: 'No feedback data available for analysis' });
+    if (insights_data.length === 0) {
+      return res.status(400).json({ error: 'No insights data available for analysis' });
     }
 
     // Prepare the data for Gemini analysis
-    const feedbackSummary = feedback_data.map(item => ({
-      text: item.feedback_text,
+    const insightsSummary = insights_data.map(item => ({
+      summary: item.summary,
       sentiment: item.sentiment,
-      category: item.category,
-      priority: item.priority,
+      themes: Array.isArray(item.key_themes) ? item.key_themes.map(theme => 
+        typeof theme === 'string' ? theme : theme.theme
+      ) : [],
+      actions: Array.isArray(item.suggested_actions) ? item.suggested_actions.map(action => 
+        typeof action === 'string' ? action : action.action
+      ) : [],
       date: item.created_at
     }));
 
     // Calculate basic metrics
-    const totalFeedback = feedback_data.length;
-    const positiveCount = feedback_data.filter(item => item.sentiment === 'positive').length;
-    const negativeCount = feedback_data.filter(item => item.sentiment === 'negative').length;
-    const neutralCount = feedback_data.filter(item => item.sentiment === 'neutral').length;
+    const totalInsights = insights_data.length;
+    const positiveCount = insights_data.filter(item => item.sentiment === 'positive').length;
+    const negativeCount = insights_data.filter(item => item.sentiment === 'negative').length;
+    const neutralCount = insights_data.filter(item => item.sentiment === 'neutral').length;
 
-    const positivePercentage = Math.round((positiveCount / totalFeedback) * 100);
-    const negativePercentage = Math.round((negativeCount / totalFeedback) * 100);
-    const neutralPercentage = Math.round((neutralCount / totalFeedback) * 100);
+    const positivePercentage = Math.round((positiveCount / totalInsights) * 100);
+    const negativePercentage = Math.round((negativeCount / totalInsights) * 100);
+    const neutralPercentage = Math.round((neutralCount / totalInsights) * 100);
 
     // Build the prompt for Gemini
     const prompt = `
-You are a senior business analyst specializing in customer feedback analysis. Analyze the following customer feedback data and provide comprehensive business insights.
+You are a senior business analyst specializing in AI insights analysis. Analyze the following AI-generated insights data and provide comprehensive business intelligence.
 
-Customer Feedback Data:
-${JSON.stringify(feedbackSummary, null, 2)}
+AI Insights Data:
+${JSON.stringify(insightsSummary, null, 2)}
 
 Basic Metrics:
-- Total Feedback: ${totalFeedback}
+- Total Insights: ${totalInsights}
 - Positive: ${positiveCount} (${positivePercentage}%)
 - Negative: ${negativeCount} (${negativePercentage}%)
 - Neutral: ${neutralCount} (${neutralPercentage}%)
@@ -55,14 +59,14 @@ Basic Metrics:
 Please analyze this data and provide insights in the following JSON structure:
 
 {
-  "executive_summary": "A 2-3 sentence executive summary of the key findings from the feedback analysis",
+  "executive_summary": "A 2-3 sentence executive summary of the key findings from the insights analysis",
   "key_insights": [
-    "3-5 key insights derived from the feedback data",
+    "3-5 key insights derived from the AI insights data",
     "Focus on actionable business intelligence",
     "Highlight patterns and trends"
   ],
   "trends": [
-    "2-3 emerging trends identified from the feedback",
+    "2-3 emerging trends identified from the insights",
     "Include both positive and concerning trends",
     "Be specific and data-driven"
   ],
@@ -79,12 +83,12 @@ Please analyze this data and provide insights in the following JSON structure:
 }
 
 Requirements:
-- Base all insights on the actual feedback data provided
+- Base all insights on the actual AI insights data provided
 - Be specific and actionable
-- Focus on business value and customer experience
+- Focus on business value and strategic insights
 - Keep each insight/trend/action concise but meaningful
 - Ensure the JSON structure is valid and complete
-- Do not invent or assume data not present in the feedback
+- Do not invent or assume data not present in the insights
 
 Return only the JSON response, no additional text or formatting.
 `;
