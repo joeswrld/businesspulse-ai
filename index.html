@@ -39,10 +39,21 @@
     <script type="module" src="/src/main.tsx"></script>
 
     
-    <!-- NoteX Feedback Widget (Debug Version) -->
-    
-
-    <script src="/widget.js" data-user-id="9a59f1bf-3e74-42d5-9c7e-8c92478e3515"></script>
+    <!-- NoteX Feedback Widget -->
+    <script src="/widget.js"></script>
+    <script>
+      NoteXWidget.init({
+        userId: '9a59f1bf-3e74-42d5-9c7e-8c92478e3515',
+        supabaseUrl: 'https://xjbrqeqizpoqdjkiyqzt.supabase.co',
+        supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84',
+        position: 'bottom-right',
+        greeting: 'How was your experience with NoteX?',
+        primaryColor: '#3b82f6',
+        secondaryColor: '#1e40af',
+        realtime: true,
+        notifications: true
+      });
+    </script>
 
   </body>
 </html>
