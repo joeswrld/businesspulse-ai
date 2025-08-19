@@ -102,6 +102,8 @@ const Analytics: React.FC = () => {
   const [generatingAI, setGeneratingAI] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isRealTimeActive, setIsRealTimeActive] = useState(true);
 
   // Fetch insights data from Supabase
   const fetchInsightsData = useCallback(async () => {
@@ -122,6 +124,7 @@ const Analytics: React.FC = () => {
       }
 
       setInsightsData(data || []);
+      setLastUpdated(new Date());
       console.log('Fetched insights data:', data?.length || 0, 'records');
       
       // Process data for charts
@@ -191,6 +194,9 @@ const Analytics: React.FC = () => {
       .slice(0, 8);
     
     setCategoryData(themes);
+    
+    // Update last updated time when charts are processed
+    setLastUpdated(new Date());
   }, []);
 
   // Set up Supabase Realtime subscription
@@ -210,20 +216,32 @@ const Analytics: React.FC = () => {
         console.log('Real-time insights change:', payload);
         
         if (payload.eventType === 'INSERT') {
-          setInsightsData(prev => [payload.new as InsightData, ...prev]);
+          setInsightsData(prev => {
+            const newData = [payload.new as InsightData, ...prev];
+            // Process chart data with new data immediately
+            setTimeout(() => processChartData(newData), 0);
+            return newData;
+          });
           toast.success('New insight received!', {
             description: 'Analytics updated in real-time'
           });
         } else if (payload.eventType === 'UPDATE') {
-          setInsightsData(prev => prev.map(item => 
-            item.id === payload.new.id ? payload.new as InsightData : item
-          ));
+          setInsightsData(prev => {
+            const updatedData = prev.map(item => 
+              item.id === payload.new.id ? payload.new as InsightData : item
+            );
+            // Process chart data with updated data immediately
+            setTimeout(() => processChartData(updatedData), 0);
+            return updatedData;
+          });
         } else if (payload.eventType === 'DELETE') {
-          setInsightsData(prev => prev.filter(item => item.id !== payload.old.id));
+          setInsightsData(prev => {
+            const filteredData = prev.filter(item => item.id !== payload.old.id);
+            // Process chart data with filtered data immediately
+            setTimeout(() => processChartData(filteredData), 0);
+            return filteredData;
+          });
         }
-        
-        // Reprocess chart data
-        processChartData(insightsData);
       })
       .subscribe();
 
@@ -231,12 +249,71 @@ const Analytics: React.FC = () => {
       console.log('Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };
-  }, [user, insightsData, processChartData]);
+  }, [user, processChartData]);
 
   // Fetch initial data on mount
   useEffect(() => {
     fetchInsightsData();
   }, [fetchInsightsData]);
+
+  // Listen for localStorage changes from InsightsPage
+  useEffect(() => {
+    if (!user) return;
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'insightsHistory' && e.newValue) {
+        try {
+          const newInsights = JSON.parse(e.newValue);
+          // Filter insights for current user
+          const userInsights = newInsights.filter((insight: any) => 
+            insight.user_id === user.id
+          );
+          
+          if (userInsights.length !== insightsData.length) {
+            const newCount = userInsights.length - insightsData.length;
+            setInsightsData(userInsights);
+            processChartData(userInsights);
+            
+            if (newCount > 0) {
+              toast.success(`${newCount} new insight${newCount > 1 ? 's' : ''} received!`, {
+                description: 'Analytics updated in real-time from local storage'
+              });
+            } else {
+              toast.success('Insights updated!', {
+                description: 'Analytics refreshed from local storage'
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error parsing insights from localStorage:', error);
+        }
+      }
+    };
+
+    // Listen for storage events (cross-tab communication)
+    window.addEventListener('storage', handleStorageChange);
+
+    // Also check localStorage on mount for any existing data
+    const savedInsights = localStorage.getItem('insightsHistory');
+    if (savedInsights) {
+      try {
+        const parsedInsights = JSON.parse(savedInsights);
+        const userInsights = parsedInsights.filter((insight: any) => 
+          insight.user_id === user.id
+        );
+        if (userInsights.length > 0 && userInsights.length !== insightsData.length) {
+          setInsightsData(userInsights);
+          processChartData(userInsights);
+        }
+      } catch (error) {
+        console.error('Error parsing insights from localStorage:', error);
+      }
+    }
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [user, insightsData.length, processChartData]);
 
   // Generate AI Analytics using Gemini
   const generateAIAnalytics = async () => {
@@ -327,8 +404,25 @@ const Analytics: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Business Analytics</h1>
           <p className="text-muted-foreground">Real-time insights from your AI analysis</p>
+          <div className="flex items-center gap-2 mt-1">
+            <div className={`flex items-center gap-1 text-xs ${isRealTimeActive ? 'text-green-600' : 'text-gray-500'}`}>
+              <div className={`w-2 h-2 rounded-full ${isRealTimeActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+              {isRealTimeActive ? 'Live' : 'Offline'}
+            </div>
+            <span className="text-xs text-muted-foreground">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </span>
+          </div>
         </div>
         <div className="flex space-x-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setIsRealTimeActive(!isRealTimeActive)}
+            className={isRealTimeActive ? 'border-green-200 bg-green-50' : ''}
+          >
+            <Activity className={`h-4 w-4 mr-2 ${isRealTimeActive ? 'text-green-600' : 'text-gray-500'}`} />
+            {isRealTimeActive ? 'Live' : 'Offline'}
+          </Button>
           <Button 
             variant="outline" 
             onClick={refreshData}
@@ -368,7 +462,12 @@ const Analytics: React.FC = () => {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Total Insights
             </CardTitle>
-            <Brain className="h-5 w-5 text-blue-500" />
+            <div className="flex items-center gap-2">
+              <Brain className="h-5 w-5 text-blue-500" />
+              {isRealTimeActive && (
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">{totalInsights}</div>
@@ -429,6 +528,61 @@ const Analytics: React.FC = () => {
         </Card>
       </div>
 
+      {/* Real-time Data Stream */}
+      <Card className="border-l-4 border-l-green-500">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Activity className="h-5 w-5 mr-2 text-green-500" />
+            Real-time Data Stream
+            {isRealTimeActive && (
+              <div className="ml-2 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Live updates from your insights and AI analysis
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Connection Status:</span>
+              <Badge variant={isRealTimeActive ? "default" : "secondary"}>
+                {isRealTimeActive ? "Connected" : "Disconnected"}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Last Update:</span>
+              <span className="font-mono text-xs">{lastUpdated.toLocaleTimeString()}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Data Source:</span>
+              <span className="text-xs">Supabase + localStorage</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Total Records:</span>
+              <span className="font-mono text-xs">{totalInsights}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Real-time Mode:</span>
+              <Badge variant={isRealTimeActive ? "default" : "secondary"}>
+                {isRealTimeActive ? "Active" : "Paused"}
+              </Badge>
+            </div>
+            <div className="pt-2 border-t">
+              <div className="text-xs text-muted-foreground mb-2">Data Flow:</div>
+              <div className="flex items-center gap-2 text-xs">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span>Supabase Realtime</span>
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span>localStorage Sync</span>
+                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                <span>Chart Updates</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Charts Section */}
       <div className="grid gap-6 md:grid-cols-2">
         {/* Sentiment Trends Line Chart */}
@@ -437,6 +591,9 @@ const Analytics: React.FC = () => {
             <CardTitle className="flex items-center">
               <TrendingUp className="h-5 w-5 mr-2 text-blue-500" />
               Sentiment Trends (Last 7 Days)
+              {isRealTimeActive && (
+                <div className="ml-2 w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+              )}
             </CardTitle>
             <CardDescription>Daily sentiment analysis from insights</CardDescription>
           </CardHeader>
@@ -470,6 +627,9 @@ const Analytics: React.FC = () => {
             <CardTitle className="flex items-center">
               <PieChart className="h-5 w-5 mr-2 text-green-500" />
               Key Themes
+              {isRealTimeActive && (
+                <div className="ml-2 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              )}
             </CardTitle>
             <CardDescription>Distribution of insights by theme</CardDescription>
           </CardHeader>
