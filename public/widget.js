@@ -4,8 +4,8 @@
   // Widget configuration
   let config = {
     userId: null,
-    apiUrl: 'https://your-project.supabase.co',
-    supabaseKey: 'your-anon-key',
+    apiUrl: 'https://xjbrqeqizpoqdjkiyqzt.supabase.co',
+    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84',
     colors: {
       primary: '#3b82f6',
       secondary: '#1e40af'
