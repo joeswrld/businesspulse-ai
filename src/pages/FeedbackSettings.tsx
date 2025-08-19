@@ -654,9 +654,10 @@ const FeedbackSettings = () => {
                 <span>Embed Code</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+              {/* Basic Embed Code */}
               <div>
-                <Label htmlFor="embed-code">Add this code to your website</Label>
+                <Label htmlFor="embed-code">Basic Embed Code (Legacy)</Label>
                 <div className="relative mt-2">
                   <Textarea
                     id="embed-code"
@@ -674,21 +675,128 @@ const FeedbackSettings = () => {
                     {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Basic script tag approach (works everywhere but less secure).
+                </p>
               </div>
-              
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start space-x-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
-                  <div className="text-sm text-blue-800">
-                    <p className="font-medium mb-1">Installation Instructions:</p>
-                    <ol className="list-decimal list-inside space-y-1 text-xs">
-                      <li>Copy the embed code above</li>
-                      <li>Paste it just before the closing &lt;/body&gt; tag on your website</li>
-                      <li>The feedback widget will appear automatically</li>
-                      <li>Customize the appearance using the settings on the left</li>
-                    </ol>
+
+              {/* NPM Package */}
+              <div>
+                <Label>NPM Package (Recommended)</Label>
+                <div className="bg-muted p-4 rounded-lg">
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary">npm</Badge>
+                      <code className="text-sm">npm install notex-feedback-widget</code>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Best for React, Vue, Angular, and modern frameworks
+                    </div>
                   </div>
                 </div>
+              </div>
+
+              {/* React Usage */}
+              <div>
+                <Label>React/Next.js Usage</Label>
+                <div className="bg-muted p-4 rounded-lg">
+                  <pre className="text-sm overflow-x-auto">
+{`import { useNoteXWidget } from 'notex-feedback-widget/react';
+
+function App() {
+  const { toggle } = useNoteXWidget({
+    userId: '${user?.id || 'your-user-id'}',
+    supabaseUrl: '${import.meta.env.VITE_SUPABASE_URL || 'your-supabase-url'}',
+    supabaseKey: '${import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 20) + '...' || 'your-anon-key'}',
+    position: '${formData.button_placement}',
+    greeting: '${formData.greeting_text}',
+    primaryColor: '${formData.brand_colors.primary}'
+  });
+
+  return <button onClick={toggle}>Open Feedback</button>;
+}`}
+                  </pre>
+                </div>
+              </div>
+
+              {/* Vue Usage */}
+              <div>
+                <Label>Vue 3 Usage</Label>
+                <div className="bg-muted p-4 rounded-lg">
+                  <pre className="text-sm overflow-x-auto">
+{`<template>
+  <button @click="toggle">Open Feedback</button>
+</template>
+
+<script setup>
+import { useNoteXWidget } from 'notex-feedback-widget/vue';
+
+const { toggle } = useNoteXWidget({
+  userId: '${user?.id || 'your-user-id'}',
+  supabaseUrl: '${import.meta.env.VITE_SUPABASE_URL || 'your-supabase-url'}',
+  supabaseKey: '${import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 20) + '...' || 'your-anon-key'}',
+  position: '${formData.button_placement}',
+  greeting: '${formData.greeting_text}',
+  primaryColor: '${formData.brand_colors.primary}'
+});
+</script>`}
+                  </pre>
+                </div>
+              </div>
+
+              {/* Vanilla JS */}
+              <div>
+                <Label>Vanilla JavaScript</Label>
+                <div className="bg-muted p-4 rounded-lg">
+                  <pre className="text-sm overflow-x-auto">
+{`import { initNoteXWidget } from 'notex-feedback-widget';
+
+const widget = initNoteXWidget({
+  userId: '${user?.id || 'your-user-id'}',
+  supabaseUrl: '${import.meta.env.VITE_SUPABASE_URL || 'your-supabase-url'}',
+  supabaseKey: '${import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 20) + '...' || 'your-anon-key'}',
+  position: '${formData.button_placement}',
+  greeting: '${formData.greeting_text}',
+  primaryColor: '${formData.brand_colors.primary}',
+  secondaryColor: '${formData.brand_colors.secondary}'
+});
+
+// Control the widget
+widget.open();
+widget.close();
+widget.toggle();`}
+                  </pre>
+                </div>
+              </div>
+
+              {/* CDN Option */}
+              <div>
+                <Label>CDN Option (Static Sites)</Label>
+                <div className="bg-muted p-4 rounded-lg">
+                  <pre className="text-sm overflow-x-auto">
+{`<script>
+  window.NoteXConfig = {
+    userId: '${user?.id || 'your-user-id'}',
+    supabaseUrl: '${import.meta.env.VITE_SUPABASE_URL || 'your-supabase-url'}',
+    supabaseKey: '${import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 20) + '...' || 'your-anon-key'}',
+    position: '${formData.button_placement}',
+    greeting: '${formData.greeting_text}',
+    primaryColor: '${formData.brand_colors.primary}'
+  };
+</script>
+<script src="https://cdn.notex.com.ng/widget-v2.js" async></script>`}
+                  </pre>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-2">💡 Pro Tips</h4>
+                <ul className="text-sm text-blue-800 space-y-1">
+                  <li>• <strong>NPM Package:</strong> Best for modern frameworks with TypeScript support</li>
+                  <li>• <strong>CDN:</strong> Simplest for static sites and quick setup</li>
+                  <li>• <strong>API Key:</strong> More secure than exposing user IDs directly</li>
+                  <li>• <strong>Customization:</strong> All methods support your brand colors and settings</li>
+                </ul>
               </div>
             </CardContent>
           </Card>
