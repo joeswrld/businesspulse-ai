@@ -182,6 +182,51 @@ const dashboardStyles = `
     border-color: #dbeafe;
     color: #1e40af;
   }
+
+  .fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .ai-file-upload {
+    border: 2px dashed #d1d5db;
+    background: #f9fafb;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+
+  .ai-file-upload:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+  }
+
+  .ai-file-upload.dragover {
+    border-color: #3b82f6;
+    background: #dbeafe;
+    transform: scale(1.01);
+  }
+
+  .file-preview {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px;
+    font-family: monospace;
+    font-size: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
 `;
 
 interface InsightsData {
