@@ -32,12 +32,14 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [amount, setAmount] = useState(plan === 'pro' ? 3500000 : 5300000); // Amount in kobo
+  const [paystackReady, setPaystackReady] = useState(false);
 
   useEffect(() => {
     // Load Paystack script
     const script = document.createElement('script');
     script.src = 'https://js.paystack.co/v1/inline.js';
     script.async = true;
+    script.onload = () => setPaystackReady(true);
     document.body.appendChild(script);
 
     return () => {
@@ -59,6 +61,11 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
     setLoading(true);
 
     try {
+      if (!paystackReady || !window.PaystackPop || typeof window.PaystackPop.setup !== 'function') {
+        toast.error('Payment could not be initialized. Please wait a moment and try again.');
+        setLoading(false);
+        return;
+      }
       // Map selected plan to Paystack plan code
       const planCode = plan === 'pro' ? 'PLN_4z2wpgmw41w2k7r' : 'PLN_esryg99ztsy9xc8';
 
@@ -80,18 +87,18 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
         amount: amount, // Plan amount in kobo (overridden by plan, but kept for clarity)
         currency: 'NGN',
         plan: planCode,
-        callback: async function(response: any) {
-          if (response.status === 'success') {
+        callback: function(response: any) {
+          if (response && response.status === 'success') {
             toast.success('Payment successful! Activating your subscription...');
-
-            // Let webhook finalize DB state; optimistically refresh usage/limits
-            try {
-              await supabase.from('analytics_events').insert({
-                event_type: 'upgrade_success',
-                event_data: { plan, email, reference: response.reference },
-              });
-            } catch {}
-
+            // Fire-and-forget async tracking
+            (async () => {
+              try {
+                await supabase.from('analytics_events').insert({
+                  event_type: 'upgrade_success',
+                  event_data: { plan, email, reference: response.reference },
+                });
+              } catch {}
+            })();
             onSuccess({ reference: response.reference, plan });
           } else {
             toast.error('Payment failed. Please try again.');
