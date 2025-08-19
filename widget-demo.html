@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoteX Widget Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #3b82f6;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .demo-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+        }
+        .demo-section h2 {
+            color: #374151;
+            margin-top: 0;
+        }
+        .code-block {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .feature-list li:before {
+            content: "✓";
+            color: #10b981;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .button {
+            background: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #2563eb;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 NoteX Feedback Widget Demo</h1>
+        
+        <div class="demo-section">
+            <h2>✨ Features</h2>
+            <ul class="feature-list">
+                <li>Full Supabase Integration with Real-time Updates</li>
+                <li>Automatic Settings Sync from Dashboard</li>
+                <li>Real-time Notifications for New Feedback</li>
+                <li>Notification Badge with Unread Count</li>
+                <li>Customizable Brand Colors & Greeting Text</li>
+                <li>Rating System with Star Interface</li>
+                <li>Category Selection</li>
+                <li>Mobile Responsive Design</li>
+                <li>Production Ready with Error Handling</li>
+            </ul>
+        </div>
+
+        <div class="demo-section">
+            <h2>🔧 Quick Setup</h2>
+            <p>Add this code to your website:</p>
+            <div class="code-block">
+&lt;script src="widget.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  NoteXWidget.init({
+    userId: 'your-user-id-here',
+    supabaseUrl: 'https://xjbrqeqizpoqdjkiyqzt.supabase.co',
+    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84'
+  });
+&lt;/script&gt;
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>🎛️ Widget Controls</h2>
+            <p>Test the widget functionality:</p>
+            <button class="button" onclick="NoteXWidget.open()">Open Widget</button>
+            <button class="button" onclick="NoteXWidget.close()">Close Widget</button>
+            <button class="button" onclick="NoteXWidget.toggle()">Toggle Widget</button>
+            <button class="button" onclick="NoteXWidget.updateNotificationBadge()">Update Badge</button>
+        </div>
+
+        <div class="demo-section">
+            <h2>📊 Real-time Features</h2>
+            <div class="status info">
+                <strong>Real-time Updates:</strong> The widget automatically syncs with your dashboard settings and shows real-time notifications for new feedback.
+            </div>
+            <div class="status success">
+                <strong>Settings Sync:</strong> Changes made in the Feedback Settings page will automatically update the widget appearance in real-time.
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>🔗 Integration with Dashboard</h2>
+            <p>This widget is fully integrated with your existing feedback system:</p>
+            <ul class="feature-list">
+                <li>Feedback submissions appear in your Feedback page</li>
+                <li>Settings changes in FeedbackSettings page update the widget</li>
+                <li>Real-time notifications for new feedback</li>
+                <li>Automatic priority assignment based on ratings</li>
+                <li>Metadata tracking (user agent, page URL, etc.)</li>
+            </ul>
+        </div>
+
+        <div class="demo-section">
+            <h2>📱 Production Ready</h2>
+            <p>The widget is production-ready with:</p>
+            <ul class="feature-list">
+                <li>Error handling and fallbacks</li>
+                <li>Automatic Supabase client loading</li>
+                <li>Mobile responsive design</li>
+                <li>Accessibility features</li>
+                <li>Performance optimized</li>
+                <li>No external dependencies (except Supabase CDN)</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Widget Script -->
+    <script src="widget.js"></script>
+    <script>
+        // Initialize the widget with demo configuration
+        NoteXWidget.init({
+            userId: 'demo-user-123', // Replace with actual user ID
+            supabaseUrl: 'https://xjbrqeqizpoqdjkiyqzt.supabase.co',
+            supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84',
+            position: 'bottom-right',
+            greeting: 'How was your experience with our demo?',
+            primaryColor: '#3b82f6',
+            secondaryColor: '#1e40af',
+            realtime: true,
+            notifications: true
+        });
+
+        // Log widget status
+        console.log('NoteX Widget Demo initialized');
+        console.log('Widget API available at: window.NoteXWidget');
+    </script>
+</body>
+</html>
