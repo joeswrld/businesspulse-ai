@@ -798,6 +798,142 @@ widget.toggle();`}
                   <li>• <strong>Customization:</strong> All methods support your brand colors and settings</li>
                 </ul>
               </div>
+
+              {/* Tutorial Section */}
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold mb-4">📚 Step-by-Step Tutorials</h3>
+                
+                {/* Basic Script Tag Tutorial */}
+                <div className="mb-6">
+                  <h4 className="font-medium text-gray-900 mb-3">Method 1: Basic Script Tag (Quick Setup)</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
+                      <div>
+                        <p className="text-sm font-medium">Copy the embed code above</p>
+                        <p className="text-xs text-gray-600">Click the "Copy" button next to the basic embed code</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">2</div>
+                      <div>
+                        <p className="text-sm font-medium">Open your website's HTML file</p>
+                        <p className="text-xs text-gray-600">Find the file that contains your website's HTML (usually index.html)</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">3</div>
+                      <div>
+                        <p className="text-sm font-medium">Paste the code before &lt;/body&gt;</p>
+                        <p className="text-xs text-gray-600">Add the script tag just before the closing body tag</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">4</div>
+                      <div>
+                        <p className="text-sm font-medium">Save and upload your website</p>
+                        <p className="text-xs text-gray-600">The feedback widget will appear automatically</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* NPM Package Tutorial */}
+                <div className="mb-6">
+                  <h4 className="font-medium text-gray-900 mb-3">Method 2: NPM Package (React/Vue/Angular)</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
+                      <div>
+                        <p className="text-sm font-medium">Install the package</p>
+                        <p className="text-xs text-gray-600">Run this command in your project directory:</p>
+                        <code className="text-xs bg-gray-200 px-2 py-1 rounded mt-1 block">npm install notex-feedback-widget</code>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">2</div>
+                      <div>
+                        <p className="text-sm font-medium">Import and use in your component</p>
+                        <p className="text-xs text-gray-600">Add the widget to your main app component or any page</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">3</div>
+                      <div>
+                        <p className="text-sm font-medium">Customize the appearance</p>
+                        <p className="text-xs text-gray-600">Use the settings above to match your brand colors</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">4</div>
+                      <div>
+                        <p className="text-sm font-medium">Deploy your website</p>
+                        <p className="text-xs text-gray-600">The widget will be included in your build</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CDN Tutorial */}
+                <div className="mb-6">
+                  <h4 className="font-medium text-gray-900 mb-3">Method 3: CDN (Static Sites)</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
+                      <div>
+                        <p className="text-sm font-medium">Add configuration script</p>
+                        <p className="text-xs text-gray-600">Add this in your HTML &lt;head&gt; section:</p>
+                        <code className="text-xs bg-gray-200 px-2 py-1 rounded mt-1 block">window.NoteXConfig = { userId: 'your-user-id' };</code>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">2</div>
+                      <div>
+                        <p className="text-sm font-medium">Add the CDN script</p>
+                        <p className="text-xs text-gray-600">Add this before &lt;/body&gt;:</p>
+                        <code className="text-xs bg-gray-200 px-2 py-1 rounded mt-1 block">&lt;script src="https://cdn.notex.com.ng/widget-v2.js" async&gt;&lt;/script&gt;</code>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">3</div>
+                      <div>
+                        <p className="text-sm font-medium">Test the widget</p>
+                        <p className="text-xs text-gray-600">Refresh your page and look for the feedback button</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">4</div>
+                      <div>
+                        <p className="text-sm font-medium">Upload to your server</p>
+                        <p className="text-xs text-gray-600">The widget will work on any web server</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Troubleshooting */}
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <h4 className="font-medium text-yellow-900 mb-2">🔧 Troubleshooting</h4>
+                  <div className="text-sm text-yellow-800 space-y-2">
+                    <div className="flex items-start space-x-2">
+                      <span className="text-yellow-600">•</span>
+                      <span><strong>Widget not appearing?</strong> Check browser console for errors</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="text-yellow-600">•</span>
+                      <span><strong>Wrong colors?</strong> Update your settings above and refresh</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="text-yellow-600">•</span>
+                      <span><strong>Not working on mobile?</strong> Ensure your site is mobile-responsive</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="text-yellow-600">•</span>
+                      <span><strong>Need help?</strong> Check our documentation or contact support</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
