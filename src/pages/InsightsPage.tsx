@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
+import { Brain } from "lucide-react";
 
 // Light Platform Styling
 const dashboardStyles = `
