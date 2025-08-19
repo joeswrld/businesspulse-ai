@@ -376,30 +376,36 @@ const Analytics: React.FC = () => {
     setError(null);
     
     try {
-      // Call the Gemini analytics API
-      const response = await fetch('/api/generate-analytics', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        },
-        body: JSON.stringify({
+      // Call the Supabase Edge Function for Gemini analytics
+      const { data, error } = await supabase.functions.invoke('generateAnalytics', {
+        body: {
           user_id: user.id,
           insights_data: insightsData
-        })
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      if (error) {
+        throw new Error(`Edge Function error: ${error.message}`);
       }
 
-      const result = await response.json();
+      if (!data) {
+        throw new Error('No response from AI analytics service');
+      }
+
+      // Check if the response has the expected structure
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // Validate the response structure
+      const requiredFields = ['executive_summary', 'key_insights', 'trends', 'performance_metrics', 'recommended_actions'];
+      const missingFields = requiredFields.filter(field => !data[field]);
       
-      if (result.error) {
-        throw new Error(result.error);
+      if (missingFields.length > 0) {
+        throw new Error(`Invalid response structure. Missing fields: ${missingFields.join(', ')}`);
       }
 
-      setGeminiAnalytics(result);
+      setGeminiAnalytics(data);
       toast.success('AI Analytics Generated!', {
         description: 'Your business performance insights are ready'
       });
