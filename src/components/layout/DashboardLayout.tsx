@@ -12,9 +12,7 @@ import {
   LogOut,
   User,
   CreditCard,
-  Users,
-  MessageSquare,
-  SlidersHorizontal
+  Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,8 +31,6 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     { name: "Business Intelligence", href: "/analytics", icon: BarChart3 },
     { name: "Usage & Billing", href: "/billing", icon: CreditCard },
     { name: "Teams", href: "/teams", icon: Users, comingSoon: true },
-    { name: "Feedback", href: "/feedback", icon: MessageSquare },
-    { name: "Feedback Settings", href: "/feedback-settings", icon: SlidersHorizontal },
     { name: "Settings", href: "/settings", icon: Settings },
     { name: "Profile", href: "/profile", icon: User },
   ];

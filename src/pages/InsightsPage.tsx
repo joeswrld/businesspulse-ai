@@ -265,7 +265,7 @@ export default function InsightsPage() {
   const [loading, setLoading] = useState(false);
   const [insightsHistory, setInsightsHistory] = useState<Array<InsightsData & { id: string; timestamp: string }>>([]);
   const [error, setError] = useState<string | null>(null);
-  const [userFeedbackClassification, setUserFeedbackClassification] = useState<'good' | 'bad' | 'neutral' | null>(null);
+
   const [confidenceMetrics, setConfidenceMetrics] = useState<any>(null);
   
   // File upload states
@@ -498,7 +498,7 @@ export default function InsightsPage() {
 
   const handleAnalyze = async () => {
     if (!input.trim()) {
-      toast.error("Please provide some feedback to analyze.");
+              toast.error("Please provide some data to analyze.");
       return;
     }
 
@@ -574,8 +574,7 @@ Focus on transforming raw data into strategic business intelligence that drives 
         dataQuality: json.result.data_quality_score || 0
       });
       
-      // Reset user feedback classification
-      setUserFeedbackClassification(null);
+
       
       // Add to history with strategic intelligence metadata
       const newInsight = {
@@ -1216,85 +1215,25 @@ Focus on transforming raw data into strategic business intelligence that drives 
                   </div>
                 </div>
                 
-                {/* Sentiment and Feedback Classification */}
+                {/* AI Sentiment Analysis */}
                 <div className="bg-gradient-to-r from-gray-50 to-blue-50 p-4 rounded-lg border border-gray-200 mb-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    {/* AI Sentiment Analysis */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-700">AI Analysis:</span>
-                        <span className={`px-4 py-2 rounded-full text-sm font-medium ai-theme-tag ${
-                          result.sentiment === 'positive' ? 'ai-sentiment-positive' : 
-                          result.sentiment === 'negative' ? 'ai-sentiment-negative' : 
-                          'ai-sentiment-neutral'
-                        }`}>
-                          {getSentimentEmoji(result.sentiment)} {result.sentiment.charAt(0).toUpperCase() + result.sentiment.slice(1)}
-                        </span>
-                      </div>
-                      {result.sentiment_reasoning && (
-                        <span className="text-sm text-gray-600 bg-white px-3 py-1 rounded-full border border-gray-200 shadow-sm">
-                          💭 {result.sentiment_reasoning}
-                        </span>
-                      )}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700">AI Analysis:</span>
+                      <span className={`px-4 py-2 rounded-full text-sm font-medium ai-theme-tag ${
+                        result.sentiment === 'positive' ? 'ai-sentiment-positive' : 
+                        result.sentiment === 'negative' ? 'ai-sentiment-negative' : 
+                        'ai-sentiment-neutral'
+                      }`}>
+                        {getSentimentEmoji(result.sentiment)} {result.sentiment.charAt(0).toUpperCase() + result.sentiment.slice(1)}
+                      </span>
                     </div>
-                    
-                    {/* User Feedback Classification */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                      <span className="text-sm font-medium text-gray-700">Your Feedback:</span>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setUserFeedbackClassification('good')}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 ${
-                            userFeedbackClassification === 'good' 
-                              ? 'bg-green-500 text-white shadow-lg shadow-green-200' 
-                              : 'bg-white text-gray-600 hover:bg-green-50 border border-gray-200 hover:border-green-300'
-                          }`}
-                        >
-                          👍 Good
-                        </button>
-                        <button
-                          onClick={() => setUserFeedbackClassification('neutral')}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 ${
-                            userFeedbackClassification === 'neutral' 
-                              ? 'bg-yellow-500 text-white shadow-lg shadow-yellow-200' 
-                              : 'bg-white text-gray-600 hover:bg-yellow-50 border border-gray-200 hover:border-yellow-300'
-                          }`}
-                        >
-                          😐 Neutral
-                        </button>
-                        <button
-                          onClick={() => setUserFeedbackClassification('bad')}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-105 ${
-                            userFeedbackClassification === 'bad' 
-                              ? 'bg-red-500 text-white shadow-lg shadow-red-200' 
-                              : 'bg-white text-gray-600 hover:bg-red-50 border border-gray-200 hover:border-red-300'
-                          }`}
-                        >
-                          👎 Bad
-                        </button>
-                      </div>
-                    </div>
+                    {result.sentiment_reasoning && (
+                      <span className="text-sm text-gray-600 bg-white px-3 py-1 rounded-full border border-gray-200 shadow-sm">
+                        💭 {result.sentiment_reasoning}
+                      </span>
+                    )}
                   </div>
-                  
-                  {/* Feedback Status */}
-                  {userFeedbackClassification && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-700">Status:</span>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          userFeedbackClassification === 'good' 
-                            ? 'bg-green-100 text-green-800 border border-green-200' 
-                            : userFeedbackClassification === 'neutral'
-                            ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                            : 'bg-red-100 text-red-800 border border-red-200'
-                        }`}>
-                          {userFeedbackClassification === 'good' ? '✅ Feedback Recorded' : 
-                           userFeedbackClassification === 'neutral' ? '⚠️ Feedback Recorded' : 
-                           '❌ Feedback Recorded'}
-                        </span>
-                      </div>
-                    </div>
-                  )}
                 </div>
                 
                 {/* Analysis Notes */}
