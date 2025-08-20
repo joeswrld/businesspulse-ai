@@ -73,7 +73,8 @@ const FeedbackSettings = () => {
           // No settings found, create default ones
           console.log('No settings found, creating default settings...');
           
-          const defaultProjectId = crypto.randomUUID().replace(/-/g, '').substring(0, 12);
+          // Create default settings with a more user-friendly project ID
+          const defaultProjectId = `project-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`;
           const newSettingsData = {
             user_id: user.id,
             project_id: defaultProjectId,
@@ -148,21 +149,60 @@ const FeedbackSettings = () => {
   const handleSave = async () => {
     if (!settings || !user) return;
 
+    // Validate project ID if not locked
+    if (!settings.project_id_locked) {
+      if (!settings.project_id || settings.project_id.trim() === '') {
+        toast.error('Project ID is required');
+        return;
+      }
+      
+      if (settings.project_id.length < 3) {
+        toast.error('Project ID must be at least 3 characters long');
+        return;
+      }
+      
+      // Check for valid characters (alphanumeric, hyphens, underscores)
+      if (!/^[a-zA-Z0-9_-]+$/.test(settings.project_id)) {
+        toast.error('Project ID can only contain letters, numbers, hyphens, and underscores');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       console.log('Saving settings:', settings);
       
+      // Prepare update data
+      const updateData = {
+        title: settings.title,
+        show_name: settings.show_name,
+        show_email: settings.show_email,
+        button_text: settings.button_text,
+        theme: settings.theme,
+        brand_color: settings.brand_color,
+        notify_email: settings.notify_email,
+        redirect_url: settings.redirect_url
+      };
+
+      // Only update project_id if it's not locked yet
+      if (!settings.project_id_locked) {
+        updateData.project_id = settings.project_id;
+        updateData.project_id_locked = true;
+      }
+
       const { error } = await supabase
         .from('feedback_settings')
-        .update({
-          ...settings,
-          project_id_locked: true
-        })
+        .update(updateData)
         .eq('id', settings.id);
 
       if (error) {
         console.error('Error updating settings:', error);
         throw error;
+      }
+
+      // Update local state to reflect the locked status
+      if (!settings.project_id_locked) {
+        setSettings(prev => ({ ...prev, project_id_locked: true }));
       }
 
       toast.success('Settings saved successfully!');
@@ -174,6 +214,8 @@ const FeedbackSettings = () => {
           toast.error('Database tables not set up. Please run the database setup script first.');
         } else if (error.message.includes('permission denied')) {
           toast.error('Permission denied. Please check your database permissions.');
+        } else if (error.message.includes('duplicate key')) {
+          toast.error('Project ID already exists. Please choose a different one.');
         } else {
           toast.error(`Failed to save settings: ${error.message}`);
         }
@@ -300,20 +342,28 @@ const FeedbackSettings = () => {
                   onChange={(e) => setSettings({ ...settings, project_id: e.target.value })}
                   disabled={settings.project_id_locked}
                   className="font-mono"
+                  placeholder="Enter a unique project ID"
                 />
                 {settings.project_id_locked && (
-                  <Badge variant="outline" className="flex items-center gap-1">
+                  <Badge variant="outline" className="flex items-center gap-1 bg-green-50 text-green-700 border-green-200">
                     <Check className="h-3 w-3" />
                     Locked
                   </Badge>
                 )}
               </div>
-              <p className="text-sm text-gray-500">
-                {settings.project_id_locked 
-                  ? "Project ID is locked and cannot be changed after saving."
-                  : "Edit your project ID before saving. It will be locked after the first save."
-                }
-              </p>
+              <div className="space-y-1">
+                <p className="text-sm text-gray-500">
+                  {settings.project_id_locked 
+                    ? "✅ Project ID is locked and cannot be changed. This ensures consistent feedback collection."
+                    : "⚠️ Edit your project ID before saving. It will be permanently locked after the first save."
+                  }
+                </p>
+                {!settings.project_id_locked && (
+                  <p className="text-xs text-amber-600">
+                    💡 Choose a unique, memorable ID (e.g., 'my-website-2024', 'company-feedback')
+                  </p>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -460,7 +510,7 @@ const FeedbackSettings = () => {
         <div className="flex justify-end">
           <Button 
             onClick={handleSave} 
-            disabled={saving || settings.project_id_locked}
+            disabled={saving}
             className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
           >
             {saving ? (
@@ -471,7 +521,7 @@ const FeedbackSettings = () => {
             ) : (
               <>
                 <Save className="h-4 w-4 mr-2" />
-                Save Settings
+                {settings.project_id_locked ? 'Update Settings' : 'Save Settings'}
               </>
             )}
           </Button>
