@@ -1,3 +1,14 @@
+const { createClient } = require('@supabase/supabase-js');
+
+// Supabase configuration
+const SUPABASE_URL = 'https://xjbrqeqizpoqdjkiyqzt.supabase.co';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'your-service-key-here';
+
+// Create Supabase client with service key for admin operations
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+// SQL script to create the feedback system tables
+const setupSQL = `
 -- Feedback System Database Setup
 -- Run this script in your Supabase SQL Editor if the tables don't exist
 
@@ -57,57 +68,33 @@ ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feedback_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feedback_notifications ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies (with IF NOT EXISTS to avoid conflicts)
-DO $$
-BEGIN
-  -- Feedback table policies
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feedback' AND policyname = 'Users can view their own feedback') THEN
-    CREATE POLICY "Users can view their own feedback" ON feedback
-      FOR SELECT USING (auth.uid() = user_id);
-  END IF;
+-- Create RLS policies
+CREATE POLICY "Users can view their own feedback" ON feedback
+  FOR SELECT USING (auth.uid() = user_id);
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feedback' AND policyname = 'Users can update their own feedback') THEN
-    CREATE POLICY "Users can update their own feedback" ON feedback
-      FOR UPDATE USING (auth.uid() = user_id);
-  END IF;
+CREATE POLICY "Users can update their own feedback" ON feedback
+  FOR UPDATE USING (auth.uid() = user_id);
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feedback' AND policyname = 'Users can insert their own feedback') THEN
-    CREATE POLICY "Users can insert their own feedback" ON feedback
-      FOR INSERT WITH CHECK (auth.uid() = user_id);
-  END IF;
+CREATE POLICY "Users can insert their own feedback" ON feedback
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-  -- Feedback settings table policies
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feedback_settings' AND policyname = 'Users can view their own feedback settings') THEN
-    CREATE POLICY "Users can view their own feedback settings" ON feedback_settings
-      FOR SELECT USING (auth.uid() = user_id);
-  END IF;
+CREATE POLICY "Users can view their own feedback settings" ON feedback_settings
+  FOR SELECT USING (auth.uid() = user_id);
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feedback_settings' AND policyname = 'Users can update their own feedback settings') THEN
-    CREATE POLICY "Users can update their own feedback settings" ON feedback_settings
-      FOR UPDATE USING (auth.uid() = user_id);
-  END IF;
+CREATE POLICY "Users can update their own feedback settings" ON feedback_settings
+  FOR UPDATE USING (auth.uid() = user_id);
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feedback_settings' AND policyname = 'Users can insert their own feedback settings') THEN
-    CREATE POLICY "Users can insert their own feedback settings" ON feedback_settings
-      FOR INSERT WITH CHECK (auth.uid() = user_id);
-  END IF;
+CREATE POLICY "Users can insert their own feedback settings" ON feedback_settings
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-  -- Feedback notifications table policies
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feedback_notifications' AND policyname = 'Users can view their own feedback notifications') THEN
-    CREATE POLICY "Users can view their own feedback notifications" ON feedback_notifications
-      FOR SELECT USING (auth.uid() = user_id);
-  END IF;
+CREATE POLICY "Users can view their own feedback notifications" ON feedback_notifications
+  FOR SELECT USING (auth.uid() = user_id);
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feedback_notifications' AND policyname = 'Users can update their own feedback notifications') THEN
-    CREATE POLICY "Users can update their own feedback notifications" ON feedback_notifications
-      FOR UPDATE USING (auth.uid() = user_id);
-  END IF;
+CREATE POLICY "Users can update their own feedback notifications" ON feedback_notifications
+  FOR UPDATE USING (auth.uid() = user_id);
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feedback_notifications' AND policyname = 'Users can insert their own feedback notifications') THEN
-    CREATE POLICY "Users can insert their own feedback notifications" ON feedback_notifications
-      FOR INSERT WITH CHECK (auth.uid() = user_id);
-  END IF;
-END $$;
+CREATE POLICY "Users can insert their own feedback notifications" ON feedback_notifications
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Create function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -118,19 +105,12 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Create triggers for updated_at (with IF NOT EXISTS)
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_feedback_updated_at') THEN
-    CREATE TRIGGER update_feedback_updated_at BEFORE UPDATE ON feedback
-      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-  END IF;
+-- Create triggers for updated_at
+CREATE TRIGGER update_feedback_updated_at BEFORE UPDATE ON feedback
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_feedback_settings_updated_at') THEN
-    CREATE TRIGGER update_feedback_settings_updated_at BEFORE UPDATE ON feedback_settings
-      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-  END IF;
-END $$;
+CREATE TRIGGER update_feedback_settings_updated_at BEFORE UPDATE ON feedback_settings
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Create function to detect urgent keywords
 CREATE OR REPLACE FUNCTION detect_urgent_keywords(message_text TEXT)
@@ -163,14 +143,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger for automatic priority setting (with IF NOT EXISTS)
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'set_feedback_priority_trigger') THEN
-    CREATE TRIGGER set_feedback_priority_trigger BEFORE INSERT ON feedback
-      FOR EACH ROW EXECUTE FUNCTION set_feedback_priority();
-  END IF;
-END $$;
+-- Create trigger for automatic priority setting
+CREATE TRIGGER set_feedback_priority_trigger BEFORE INSERT ON feedback
+  FOR EACH ROW EXECUTE FUNCTION set_feedback_priority();
 
 -- Insert default feedback settings for existing users
 INSERT INTO feedback_settings (user_id, brand_colors, greeting_text, button_placement)
@@ -187,6 +162,37 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated;
+`;
 
--- Success message
-SELECT 'Feedback system database setup completed successfully!' as status;
+async function setupDatabase() {
+  try {
+    console.log('Setting up feedback system database...');
+    
+    // Execute the SQL script
+    const { error } = await supabase.rpc('exec_sql', { sql: setupSQL });
+    
+    if (error) {
+      console.error('Error setting up database:', error);
+      console.log('\nManual Setup Instructions:');
+      console.log('1. Go to your Supabase dashboard');
+      console.log('2. Navigate to SQL Editor');
+      console.log('3. Copy and paste the SQL from setup-feedback-db.sql');
+      console.log('4. Run the script');
+      return;
+    }
+    
+    console.log('✅ Database setup completed successfully!');
+    console.log('✅ Feedback system is now ready to use');
+    
+  } catch (error) {
+    console.error('Failed to setup database:', error);
+    console.log('\nManual Setup Instructions:');
+    console.log('1. Go to your Supabase dashboard');
+    console.log('2. Navigate to SQL Editor');
+    console.log('3. Copy and paste the SQL from setup-feedback-db.sql');
+    console.log('4. Run the script');
+  }
+}
+
+// Run the setup
+setupDatabase();

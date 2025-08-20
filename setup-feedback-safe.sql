@@ -1,7 +1,7 @@
--- Feedback System Database Setup
--- Run this script in your Supabase SQL Editor if the tables don't exist
+-- Safe Feedback System Database Setup
+-- This script only creates missing objects and won't cause conflicts
 
--- Create feedback table
+-- Create feedback table if it doesn't exist
 CREATE TABLE IF NOT EXISTS feedback (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS feedback (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create feedback settings table
+-- Create feedback settings table if it doesn't exist
 CREATE TABLE IF NOT EXISTS feedback_settings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS feedback_settings (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create feedback notifications table
+-- Create feedback notifications table if it doesn't exist
 CREATE TABLE IF NOT EXISTS feedback_notifications (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   feedback_id UUID REFERENCES feedback(id) ON DELETE CASCADE,
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS feedback_notifications (
   metadata JSONB DEFAULT '{}'
 );
 
--- Create indexes for better performance
+-- Create indexes if they don't exist
 CREATE INDEX IF NOT EXISTS idx_feedback_user_id ON feedback(user_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status);
 CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at);
@@ -52,12 +52,12 @@ CREATE INDEX IF NOT EXISTS idx_feedback_settings_user_id ON feedback_settings(us
 CREATE INDEX IF NOT EXISTS idx_feedback_notifications_user_id ON feedback_notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_notifications_feedback_id ON feedback_notifications(feedback_id);
 
--- Enable Row Level Security
+-- Enable Row Level Security (safe to run multiple times)
 ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feedback_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feedback_notifications ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies (with IF NOT EXISTS to avoid conflicts)
+-- Create RLS policies safely
 DO $$
 BEGIN
   -- Feedback table policies
@@ -109,7 +109,7 @@ BEGIN
   END IF;
 END $$;
 
--- Create function to update updated_at timestamp
+-- Create or replace functions (safe to run multiple times)
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -118,21 +118,6 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Create triggers for updated_at (with IF NOT EXISTS)
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_feedback_updated_at') THEN
-    CREATE TRIGGER update_feedback_updated_at BEFORE UPDATE ON feedback
-      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_feedback_settings_updated_at') THEN
-    CREATE TRIGGER update_feedback_settings_updated_at BEFORE UPDATE ON feedback_settings
-      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-  END IF;
-END $$;
-
--- Create function to detect urgent keywords
 CREATE OR REPLACE FUNCTION detect_urgent_keywords(message_text TEXT)
 RETURNS BOOLEAN AS $$
 BEGIN
@@ -148,7 +133,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create function to automatically set priority based on keywords
 CREATE OR REPLACE FUNCTION set_feedback_priority()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -163,16 +147,26 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger for automatic priority setting (with IF NOT EXISTS)
+-- Create triggers safely
 DO $$
 BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_feedback_updated_at') THEN
+    CREATE TRIGGER update_feedback_updated_at BEFORE UPDATE ON feedback
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_feedback_settings_updated_at') THEN
+    CREATE TRIGGER update_feedback_settings_updated_at BEFORE UPDATE ON feedback_settings
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+
   IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'set_feedback_priority_trigger') THEN
     CREATE TRIGGER set_feedback_priority_trigger BEFORE INSERT ON feedback
       FOR EACH ROW EXECUTE FUNCTION set_feedback_priority();
   END IF;
 END $$;
 
--- Insert default feedback settings for existing users
+-- Insert default feedback settings for existing users (safe to run multiple times)
 INSERT INTO feedback_settings (user_id, brand_colors, greeting_text, button_placement)
 SELECT 
   id,
@@ -182,11 +176,11 @@ SELECT
 FROM auth.users
 ON CONFLICT (user_id) DO NOTHING;
 
--- Grant necessary permissions
+-- Grant necessary permissions (safe to run multiple times)
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated;
 
 -- Success message
-SELECT 'Feedback system database setup completed successfully!' as status;
+SELECT 'Feedback system database setup completed successfully! All objects created or updated safely.' as status;

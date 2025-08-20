@@ -68,6 +68,33 @@ const FeedbackSettings = () => {
     try {
       console.log('Fetching settings for user:', user.id);
       
+      // First check if the table exists
+      const { error: tableCheckError } = await supabase
+        .from('feedback_settings')
+        .select('id')
+        .limit(1);
+
+      if (tableCheckError && tableCheckError.code === '42P01') {
+        console.log('Feedback settings table does not exist. Please run database setup first.');
+        toast.error('Database not set up. Please run the database setup script first.');
+        
+        // Use local defaults
+        const localSettings = {
+          id: 'local-default',
+          user_id: user.id,
+          brand_colors: formData.brand_colors,
+          greeting_text: formData.greeting_text,
+          button_placement: formData.button_placement,
+          widget_enabled: formData.widget_enabled,
+          auto_notifications: formData.auto_notifications,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setSettings(localSettings);
+        setLoading(false);
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('feedback_settings')
         .select('*')
@@ -76,13 +103,6 @@ const FeedbackSettings = () => {
 
       if (error) {
         console.log('Error fetching settings:', error);
-        
-        // If table doesn't exist, create default settings
-        if (error.code === '42P01') {
-          console.log('Feedback settings table does not exist. Creating default settings...');
-          await createDefaultSettings();
-          return;
-        }
         
         // If no record found, create default settings
         if (error.code === 'PGRST116') {
@@ -676,17 +696,17 @@ const FeedbackSettings = () => {
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Basic script tag approach (works everywhere but less secure).
+                  Simple one-line embed with just your user ID. Works everywhere.
                 </p>
               </div>
 
-              {/* Simple Widget Embed Code */}
+              {/* Widget 2.0 Embed Code */}
               <div>
-                <Label htmlFor="simple-embed-code">Simple Widget (Recommended)</Label>
+                <Label htmlFor="widget-2-embed-code">Widget 2.0 (Recommended)</Label>
                 <div className="relative mt-2">
                   <Textarea
-                    id="simple-embed-code"
-                    value={`<script src="https://notex.com.ng/widget-simple.js" data-user-id="${user?.id}"></script>`}
+                    id="widget-2-embed-code"
+                    value={`<script src="https://notex.com.ng/widget-2.0.js" data-user-id="${user?.id}"></script>`}
                     readOnly
                     className="font-mono text-sm"
                     rows={2}
@@ -696,134 +716,166 @@ const FeedbackSettings = () => {
                     variant="outline"
                     className="absolute top-2 right-2"
                     onClick={() => {
-                      navigator.clipboard.writeText(`<script src="https://notex.com.ng/widget-simple.js" data-user-id="${user?.id}"></script>`);
+                      navigator.clipboard.writeText(`<script src="https://notex.com.ng/widget-2.0.js" data-user-id="${user?.id}"></script>`);
                       setCopied(true);
                       setTimeout(() => setCopied(false), 2000);
-                      toast.success('Simple widget code copied!');
+                      toast.success('Widget 2.0 code copied!');
                     }}
                   >
                     {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
+                <div className="flex items-center space-x-2 mt-2">
+                  <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200">New</Badge>
+                  <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">Real-time</Badge>
+                  <Badge variant="secondary" className="bg-purple-50 text-purple-700 border-purple-200">Enhanced</Badge>
+                </div>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Simplified version that works immediately without configuration.
+                  Enhanced widget with real-time updates, better UI, and advanced features.
                 </p>
               </div>
 
-              {/* NPM Package */}
+
+
+              {/* WordPress Plugin */}
               <div>
-                <Label>NPM Package (Recommended)</Label>
+                <Label>WordPress Plugin</Label>
                 <div className="bg-muted p-4 rounded-lg">
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex items-center space-x-2">
-                      <Badge variant="secondary">npm</Badge>
-                      <code className="text-sm">npm install notex-feedback-widget</code>
+                      <Badge variant="secondary">WordPress</Badge>
+                      <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">Coming Soon</Badge>
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      Best for React, Vue, Angular, and modern frameworks
+                    <div className="text-center py-8">
+                      <div className="text-4xl mb-4">🚧</div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">WordPress Plugin Coming Soon</h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        We're working hard to bring you a native WordPress plugin with full admin integration.
+                      </p>
+                      <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                        <div className="text-sm font-medium text-blue-900 mb-1">Planned Features:</div>
+                        <ul className="text-xs text-blue-800 space-y-1">
+                          <li>• Automatic widget integration</li>
+                          <li>• Settings panel in WordPress admin</li>
+                          <li>• Real-time feedback dashboard</li>
+                          <li>• Email notifications</li>
+                          <li>• Shortcode support: [notex_feedback]</li>
+                        </ul>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* React Usage */}
+              {/* WordPress Manual Integration */}
               <div>
-                <Label>React/Next.js Usage</Label>
+                <Label>WordPress Manual Integration</Label>
                 <div className="bg-muted p-4 rounded-lg">
-                  <pre className="text-sm overflow-x-auto">
-{`import { useNoteXWidget } from 'notex-feedback-widget/react';
-
-function App() {
-  const { toggle } = useNoteXWidget({
-    userId: '${user?.id || 'your-user-id'}',
-    supabaseUrl: '${import.meta.env.VITE_SUPABASE_URL || 'your-supabase-url'}',
-    supabaseKey: '${import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 20) + '...' || 'your-anon-key'}',
-    position: '${formData.button_placement}',
-    greeting: '${formData.greeting_text}',
-    primaryColor: '${formData.brand_colors.primary}'
-  });
-
-  return <button onClick={toggle}>Open Feedback</button>;
-}`}
-                  </pre>
+                  <div className="text-center py-6">
+                    <div className="text-3xl mb-3">📝</div>
+                    <h3 className="text-md font-semibold text-gray-900 mb-2">Manual Integration Available</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      For advanced users, you can manually integrate the widget into your WordPress theme.
+                    </p>
+                    <pre className="text-sm overflow-x-auto bg-gray-100 p-3 rounded text-left">
+{`// Add this to your theme's functions.php file
+function add_notex_feedback_widget() {
+    wp_enqueue_script('notex-widget', 'https://notex.com.ng/widget.js', array(), '1.0.0', true);
+    wp_add_inline_script('notex-widget', \`
+        window.NoteXConfig = {
+            userId: '${user?.id || 'your-user-id'}',
+            supabaseUrl: '${import.meta.env.VITE_SUPABASE_URL || 'your-supabase-url'}',
+            supabaseKey: '${import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 20) + '...' || 'your-anon-key'}',
+            position: '${formData.button_placement}',
+            greeting: '${formData.greeting_text}',
+            primaryColor: '${formData.brand_colors.primary}',
+            secondaryColor: '${formData.brand_colors.secondary}'
+        };
+    \`);
+}
+add_action('wp_enqueue_scripts', 'add_notex_feedback_widget');`}
+                    </pre>
+                  </div>
                 </div>
               </div>
 
-              {/* Vue Usage */}
+              {/* Shopify App */}
               <div>
-                <Label>Vue 3 Usage</Label>
+                <Label>Shopify App</Label>
                 <div className="bg-muted p-4 rounded-lg">
-                  <pre className="text-sm overflow-x-auto">
-{`<template>
-  <button @click="toggle">Open Feedback</button>
-</template>
-
-<script setup>
-import { useNoteXWidget } from 'notex-feedback-widget/vue';
-
-const { toggle } = useNoteXWidget({
-  userId: '${user?.id || 'your-user-id'}',
-  supabaseUrl: '${import.meta.env.VITE_SUPABASE_URL || 'your-supabase-url'}',
-  supabaseKey: '${import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 20) + '...' || 'your-anon-key'}',
-  position: '${formData.button_placement}',
-  greeting: '${formData.greeting_text}',
-  primaryColor: '${formData.brand_colors.primary}'
-});
-</script>`}
-                  </pre>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary">Shopify</Badge>
+                      <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">Coming Soon</Badge>
+                    </div>
+                    <div className="text-center py-8">
+                      <div className="text-4xl mb-4">🛒</div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Shopify App Coming Soon</h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        We're developing a native Shopify app for seamless e-commerce integration.
+                      </p>
+                      <div className="bg-green-50 p-3 rounded border border-green-200">
+                        <div className="text-sm font-medium text-green-900 mb-1">Planned Features:</div>
+                        <ul className="text-xs text-green-800 space-y-1">
+                          <li>• Native Shopify integration</li>
+                          <li>• Customer feedback collection</li>
+                          <li>• Order-specific feedback</li>
+                          <li>• Shopify admin dashboard</li>
+                          <li>• Email notifications</li>
+                          <li>• Customer segmentation</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Vanilla JS */}
+              {/* Shopify Manual Integration */}
               <div>
-                <Label>Vanilla JavaScript</Label>
+                <Label>Shopify Manual Integration</Label>
                 <div className="bg-muted p-4 rounded-lg">
-                  <pre className="text-sm overflow-x-auto">
-{`import { initNoteXWidget } from 'notex-feedback-widget';
-
-const widget = initNoteXWidget({
-  userId: '${user?.id || 'your-user-id'}',
-  supabaseUrl: '${import.meta.env.VITE_SUPABASE_URL || 'your-supabase-url'}',
-  supabaseKey: '${import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 20) + '...' || 'your-anon-key'}',
-  position: '${formData.button_placement}',
-  greeting: '${formData.greeting_text}',
-  primaryColor: '${formData.brand_colors.primary}',
-  secondaryColor: '${formData.brand_colors.secondary}'
-});
-
-// Control the widget
-widget.open();
-widget.close();
-widget.toggle();`}
-                  </pre>
-                </div>
-              </div>
-
-              {/* CDN Option */}
-              <div>
-                <Label>CDN Option (Static Sites)</Label>
-                <div className="bg-muted p-4 rounded-lg">
-                  <pre className="text-sm overflow-x-auto">
-{`<script>
+                  <div className="text-center py-6">
+                    <div className="text-3xl mb-3">🛠️</div>
+                    <h3 className="text-md font-semibold text-gray-900 mb-2">Manual Integration Available</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      For advanced users, you can manually integrate the widget into your Shopify theme.
+                    </p>
+                    <pre className="text-sm overflow-x-auto bg-gray-100 p-3 rounded text-left">
+{`<!-- Add this to your theme.liquid file in the <head> section -->
+<script>
   window.NoteXConfig = {
     userId: '${user?.id || 'your-user-id'}',
     supabaseUrl: '${import.meta.env.VITE_SUPABASE_URL || 'your-supabase-url'}',
     supabaseKey: '${import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 20) + '...' || 'your-anon-key'}',
     position: '${formData.button_placement}',
     greeting: '${formData.greeting_text}',
-    primaryColor: '${formData.brand_colors.primary}'
+    primaryColor: '${formData.brand_colors.primary}',
+    secondaryColor: '${formData.brand_colors.secondary}'
   };
 </script>
-<script src="https://cdn.notex.com.ng/widget-v2.js" async></script>`}
-                  </pre>
+
+<!-- Add this before </body> tag -->
+<script src="https://notex.com.ng/widget.js" async></script>
+
+<!-- For Shopify Plus, add to checkout.liquid for post-purchase feedback -->
+{% if template contains 'checkout' %}
+  <script>
+    window.NoteXConfig.checkoutMode = true;
+    window.NoteXConfig.orderId = '{{ order.id }}';
+  </script>
+{% endif %}`}
+                    </pre>
+                  </div>
                 </div>
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-medium text-blue-900 mb-2">💡 Pro Tips</h4>
                 <ul className="text-sm text-blue-800 space-y-1">
-                  <li>• <strong>NPM Package:</strong> Best for modern frameworks with TypeScript support</li>
-                  <li>• <strong>CDN:</strong> Simplest for static sites and quick setup</li>
+                  <li>• <strong>Basic Embed:</strong> Simplest method that works everywhere</li>
+                  <li>• <strong>WordPress Plugin:</strong> Coming soon - will provide full admin integration</li>
+                  <li>• <strong>Shopify App:</strong> Coming soon - native e-commerce integration</li>
+                  <li>• <strong>Manual Integration:</strong> Available for advanced users on both platforms</li>
                   <li>• <strong>API Key:</strong> More secure than exposing user IDs directly</li>
                   <li>• <strong>Customization:</strong> All methods support your brand colors and settings</li>
                 </ul>
@@ -833,14 +885,49 @@ widget.toggle();`}
               <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold mb-4">📚 Step-by-Step Tutorials</h3>
                 
+                {/* Widget 2.0 Tutorial */}
+                <div className="mb-6">
+                  <h4 className="font-medium text-gray-900 mb-3">Method 1: Widget 2.0 (Recommended)</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
+                      <div>
+                        <p className="text-sm font-medium">Copy the Widget 2.0 embed code</p>
+                        <p className="text-xs text-gray-600">Click the "Copy" button next to the Widget 2.0 embed code</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">2</div>
+                      <div>
+                        <p className="text-sm font-medium">Add to your website</p>
+                        <p className="text-xs text-gray-600">Paste the code before &lt;/body&gt; in your HTML file</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">3</div>
+                      <div>
+                        <p className="text-sm font-medium">Enjoy enhanced features</p>
+                        <p className="text-xs text-gray-600">Real-time updates, better UI, and advanced analytics</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">4</div>
+                      <div>
+                        <p className="text-sm font-medium">Monitor in your dashboard</p>
+                        <p className="text-xs text-gray-600">All feedback appears in real-time in your Feedback page</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Basic Script Tag Tutorial */}
                 <div className="mb-6">
-                  <h4 className="font-medium text-gray-900 mb-3">Method 1: Basic Script Tag (Quick Setup)</h4>
+                  <h4 className="font-medium text-gray-900 mb-3">Method 2: Basic Script Tag (Legacy)</h4>
                   <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                     <div className="flex items-start space-x-3">
                       <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
                       <div>
-                        <p className="text-sm font-medium">Copy the embed code above</p>
+                        <p className="text-sm font-medium">Copy the basic embed code</p>
                         <p className="text-xs text-gray-600">Click the "Copy" button next to the basic embed code</p>
                       </div>
                     </div>
@@ -868,74 +955,71 @@ widget.toggle();`}
                   </div>
                 </div>
 
-                {/* NPM Package Tutorial */}
+                {/* WordPress Tutorial */}
                 <div className="mb-6">
-                  <h4 className="font-medium text-gray-900 mb-3">Method 2: NPM Package (React/Vue/Angular)</h4>
+                  <h4 className="font-medium text-gray-900 mb-3">Method 3: WordPress Integration</h4>
                   <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                     <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
+                      <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
                       <div>
-                        <p className="text-sm font-medium">Install the package</p>
-                        <p className="text-xs text-gray-600">Run this command in your project directory:</p>
-                        <code className="text-xs bg-gray-200 px-2 py-1 rounded mt-1 block">npm install notex-feedback-widget</code>
+                        <p className="text-sm font-medium">Choose integration method</p>
+                        <p className="text-xs text-gray-600">Use the plugin for easy setup or manual integration for customization</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">2</div>
+                      <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">2</div>
                       <div>
-                        <p className="text-sm font-medium">Import and use in your component</p>
-                        <p className="text-xs text-gray-600">Add the widget to your main app component or any page</p>
+                        <p className="text-sm font-medium">Plugin method (Recommended)</p>
+                        <p className="text-xs text-gray-600">Upload and activate the NoteX Feedback plugin</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">3</div>
+                      <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">3</div>
                       <div>
-                        <p className="text-sm font-medium">Customize the appearance</p>
-                        <p className="text-xs text-gray-600">Use the settings above to match your brand colors</p>
+                        <p className="text-sm font-medium">Configure in WordPress admin</p>
+                        <p className="text-xs text-gray-600">Go to Settings → NoteX Feedback to customize</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">4</div>
+                      <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">4</div>
                       <div>
-                        <p className="text-sm font-medium">Deploy your website</p>
-                        <p className="text-xs text-gray-600">The widget will be included in your build</p>
+                        <p className="text-sm font-medium">Use shortcode (optional)</p>
+                        <p className="text-xs text-gray-600">Add [notex_feedback] to any page or post</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* CDN Tutorial */}
+                {/* Shopify Tutorial */}
                 <div className="mb-6">
-                  <h4 className="font-medium text-gray-900 mb-3">Method 3: CDN (Static Sites)</h4>
+                  <h4 className="font-medium text-gray-900 mb-3">Method 4: Shopify Integration</h4>
                   <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                     <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
                       <div>
-                        <p className="text-sm font-medium">Add configuration script</p>
-                        <p className="text-xs text-gray-600">Add this in your HTML &lt;head&gt; section:</p>
-                        <code className="text-xs bg-gray-200 px-2 py-1 rounded mt-1 block">window.NoteXConfig = {'{'} userId: 'your-user-id' {'}'};</code>
+                        <p className="text-sm font-medium">Install from Shopify App Store</p>
+                        <p className="text-xs text-gray-600">Search for "NoteX Feedback" and click "Add App"</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">2</div>
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">2</div>
                       <div>
-                        <p className="text-sm font-medium">Add the CDN script</p>
-                        <p className="text-xs text-gray-600">Add this before &lt;/body&gt;:</p>
-                        <code className="text-xs bg-gray-200 px-2 py-1 rounded mt-1 block">&lt;script src="https://cdn.notex.com.ng/widget-v2.js" async&gt;&lt;/script&gt;</code>
+                        <p className="text-sm font-medium">Authorize the app</p>
+                        <p className="text-xs text-gray-600">Grant necessary permissions for widget integration</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">3</div>
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">3</div>
                       <div>
-                        <p className="text-sm font-medium">Test the widget</p>
-                        <p className="text-xs text-gray-600">Refresh your page and look for the feedback button</p>
+                        <p className="text-sm font-medium">Configure in Shopify admin</p>
+                        <p className="text-xs text-gray-600">Customize appearance and behavior in the app settings</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">4</div>
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">4</div>
                       <div>
-                        <p className="text-sm font-medium">Upload to your server</p>
-                        <p className="text-xs text-gray-600">The widget will work on any web server</p>
+                        <p className="text-sm font-medium">Test on your store</p>
+                        <p className="text-xs text-gray-600">Visit your store and check for the feedback widget</p>
                       </div>
                     </div>
                   </div>
@@ -956,6 +1040,14 @@ widget.toggle();`}
                     <div className="flex items-start space-x-2">
                       <span className="text-yellow-600">•</span>
                       <span><strong>Not working on mobile?</strong> Ensure your site is mobile-responsive</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="text-yellow-600">•</span>
+                      <span><strong>WordPress issues?</strong> Check theme compatibility and plugin conflicts</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="text-yellow-600">•</span>
+                      <span><strong>Shopify issues?</strong> Verify app installation and theme integration</span>
                     </div>
                     <div className="flex items-start space-x-2">
                       <span className="text-yellow-600">•</span>
