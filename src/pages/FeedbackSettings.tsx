@@ -22,7 +22,8 @@ import {
   Download,
   Copy,
   Check,
-  Save
+  Save,
+  AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -51,29 +52,29 @@ const FeedbackSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadSettings = useCallback(async () => {
     if (!user) return;
 
     try {
+      console.log('Loading settings for user:', user.id);
+      
       const { data, error } = await supabase
         .from('feedback_settings')
         .select('*')
         .eq('user_id', user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
+      console.log('Query result:', { data, error });
 
-      if (data) {
-        setSettings(data);
-      } else {
-        // Create default settings
-        const defaultProjectId = crypto.randomUUID().replace(/-/g, '').substring(0, 12);
-        const { data: newSettings, error: createError } = await supabase
-          .from('feedback_settings')
-          .insert({
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No settings found, create default ones
+          console.log('No settings found, creating default settings...');
+          
+          const defaultProjectId = crypto.randomUUID().replace(/-/g, '').substring(0, 12);
+          const newSettingsData = {
             user_id: user.id,
             project_id: defaultProjectId,
             project_id_locked: false,
@@ -83,16 +84,50 @@ const FeedbackSettings = () => {
             button_text: 'Send Feedback',
             theme: 'light',
             brand_color: '#2563eb'
-          })
-          .select()
-          .single();
+          };
+          
+          console.log('Creating settings with data:', newSettingsData);
+          
+          const { data: newSettings, error: createError } = await supabase
+            .from('feedback_settings')
+            .insert(newSettingsData)
+            .select()
+            .single();
 
-        if (createError) throw createError;
-        setSettings(newSettings);
+          console.log('Create result:', { newSettings, createError });
+
+          if (createError) {
+            console.error('Error creating settings:', createError);
+            throw createError;
+          }
+          
+          setSettings(newSettings);
+        } else {
+          console.error('Error loading settings:', error);
+          throw error;
+        }
+      } else if (data) {
+        console.log('Settings loaded successfully:', data);
+        setSettings(data);
       }
     } catch (error) {
-      console.error('Error loading settings:', error);
-      toast.error('Failed to load settings');
+      console.error('Error in loadSettings:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to load settings. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('relation "feedback_settings" does not exist')) {
+          errorMessage = 'Database tables not set up. Please run the database setup script first.';
+        } else if (error.message.includes('permission denied')) {
+          errorMessage = 'Permission denied. Please check your database permissions.';
+        } else {
+          errorMessage = `Failed to load settings: ${error.message}`;
+        }
+      }
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -100,14 +135,23 @@ const FeedbackSettings = () => {
 
   // Load settings on component mount
   useEffect(() => {
+    setError(null); // Clear any previous errors
     loadSettings();
   }, [user, loadSettings]);
+
+  const handleRetry = () => {
+    setError(null);
+    setLoading(true);
+    loadSettings();
+  };
 
   const handleSave = async () => {
     if (!settings || !user) return;
 
     setSaving(true);
     try {
+      console.log('Saving settings:', settings);
+      
       const { error } = await supabase
         .from('feedback_settings')
         .update({
@@ -116,12 +160,26 @@ const FeedbackSettings = () => {
         })
         .eq('id', settings.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating settings:', error);
+        throw error;
+      }
 
       toast.success('Settings saved successfully!');
     } catch (error) {
       console.error('Error saving settings:', error);
-      toast.error('Failed to save settings');
+      
+      if (error instanceof Error) {
+        if (error.message.includes('relation "feedback_settings" does not exist')) {
+          toast.error('Database tables not set up. Please run the database setup script first.');
+        } else if (error.message.includes('permission denied')) {
+          toast.error('Permission denied. Please check your database permissions.');
+        } else {
+          toast.error(`Failed to save settings: ${error.message}`);
+        }
+      } else {
+        toast.error('Failed to save settings. Please try again.');
+      }
     } finally {
       setSaving(false);
     }
@@ -155,6 +213,35 @@ const FeedbackSettings = () => {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-gray-600">Loading feedback settings...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center max-w-md">
+            <div className="p-4 bg-red-100 rounded-full w-16 h-16 mx-auto mb-6 flex items-center justify-center">
+              <AlertCircle className="h-8 w-8 text-red-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Settings</h2>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <div className="space-y-3">
+              <Button onClick={handleRetry} className="w-full">
+                Try Again
+              </Button>
+              {error.includes('Database tables not set up') && (
+                <div className="text-sm text-gray-500">
+                  <p>To fix this, run the database setup script in your Supabase SQL Editor:</p>
+                  <code className="block mt-2 p-2 bg-gray-100 rounded text-xs">
+                    setup-feedback-system.sql
+                  </code>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

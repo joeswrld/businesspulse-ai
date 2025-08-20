@@ -33,13 +33,64 @@
 -- Copy and paste the contents of check-database-state.sql
 ```
 
-### 2. React Hook Dependency Warnings
+### 2. "Failed to load settings" Error
+
+**Error:** "Failed to load settings. Please try again" in Feedback Settings page
+
+**Cause:** Database tables don't exist, permissions issues, or connection problems.
+
+**Solutions:**
+
+#### Step 1: Test Database Connection
+```sql
+-- Run this in Supabase SQL Editor to diagnose the issue
+-- Copy and paste the contents of test-database-connection.sql
+```
+
+#### Step 2: Check Browser Console
+1. Open browser developer tools (F12)
+2. Go to Console tab
+3. Visit the Feedback Settings page
+4. Look for detailed error messages in the console
+
+#### Step 3: Common Fixes
+- **Tables don't exist:** Run `setup-feedback-system.sql`
+- **Permission denied:** Check RLS policies
+- **Connection issues:** Verify Supabase URL and keys
+
+#### Step 4: Manual Settings Creation
+```sql
+-- Create settings for a specific user (replace USER_ID)
+INSERT INTO feedback_settings (
+  user_id,
+  project_id,
+  project_id_locked,
+  title,
+  show_name,
+  show_email,
+  button_text,
+  theme,
+  brand_color
+) VALUES (
+  'YOUR_USER_ID_HERE',
+  'project-' || substr(md5(random()::text), 1, 12),
+  false,
+  'Share your thoughts with us',
+  true,
+  true,
+  'Send Feedback',
+  'light',
+  '#2563eb'
+);
+```
+
+### 3. React Hook Dependency Warnings
 
 **Error:** `React Hook useEffect has missing dependencies`
 
 **Solution:** ✅ **FIXED** - The feedback pages now use `useCallback` for proper dependency management.
 
-### 3. Build Errors
+### 4. Build Errors
 
 **Error:** `npm run build` fails
 
@@ -48,7 +99,7 @@
 2. Check for TypeScript errors: `npx tsc --noEmit`
 3. Clear build cache: `rm -rf dist && npm run build`
 
-### 4. Supabase Function Deployment Issues
+### 5. Supabase Function Deployment Issues
 
 **Error:** Function deployment fails
 
@@ -58,7 +109,7 @@
 3. Link your project: `supabase link --project-ref YOUR_PROJECT_REF`
 4. Deploy: `supabase functions deploy feedback-api`
 
-### 5. Real-time Updates Not Working
+### 6. Real-time Updates Not Working
 
 **Issue:** New feedback doesn't appear in real-time
 
@@ -67,7 +118,7 @@
 2. Verify the subscription is set up correctly in `Feedback.tsx`
 3. Check browser console for connection errors
 
-### 6. Widget Not Loading
+### 7. Widget Not Loading
 
 **Issue:** The feedback widget doesn't appear on external websites
 
@@ -77,7 +128,7 @@
 3. Verify the `data-project-id` attribute is set correctly
 4. Check browser console for JavaScript errors
 
-### 7. API Endpoint Not Responding
+### 8. API Endpoint Not Responding
 
 **Error:** 404 or 500 errors from the feedback API
 
@@ -91,7 +142,7 @@
      -d "project_id=test&name=Test&email=test@example.com&message=Test message"
    ```
 
-### 8. Permission Denied Errors
+### 9. Permission Denied Errors
 
 **Error:** RLS (Row Level Security) blocking access
 
@@ -100,7 +151,7 @@
 2. Check that the user is authenticated
 3. Verify the user has the correct permissions
 
-### 9. Email Notifications Not Working
+### 10. Email Notifications Not Working
 
 **Issue:** Email notifications not being sent
 
@@ -109,7 +160,7 @@
 2. Verify the email function is deployed: `supabase functions deploy send-email`
 3. Check function logs for email errors
 
-### 10. Project ID Locking Issues
+### 11. Project ID Locking Issues
 
 **Issue:** Project ID not locking after first save
 
