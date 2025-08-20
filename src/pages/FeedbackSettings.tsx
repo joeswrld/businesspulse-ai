@@ -839,9 +839,137 @@ widget.toggle();`}
                 </div>
               </div>
 
+              {/* WordPress Plugin */}
+              <div>
+                <Label>WordPress Plugin</Label>
+                <div className="bg-muted p-4 rounded-lg">
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary">WordPress</Badge>
+                      <span className="text-sm font-medium">Plugin Installation</span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-sm">
+                        <strong>Step 1:</strong> Download the NoteX Feedback Plugin
+                      </div>
+                      <div className="text-sm">
+                        <strong>Step 2:</strong> Upload to WordPress Admin → Plugins → Add New → Upload Plugin
+                      </div>
+                      <div className="text-sm">
+                        <strong>Step 3:</strong> Activate the plugin and configure in Settings → NoteX Feedback
+                      </div>
+                    </div>
+                    <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                      <div className="text-sm font-medium text-blue-900 mb-1">Plugin Features:</div>
+                      <ul className="text-xs text-blue-800 space-y-1">
+                        <li>• Automatic widget integration</li>
+                        <li>• Settings panel in WordPress admin</li>
+                        <li>• Real-time feedback dashboard</li>
+                        <li>• Email notifications</li>
+                        <li>• Shortcode support: [notex_feedback]</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* WordPress Manual Integration */}
+              <div>
+                <Label>WordPress Manual Integration</Label>
+                <div className="bg-muted p-4 rounded-lg">
+                  <pre className="text-sm overflow-x-auto">
+{`// Add this to your theme's functions.php file
+function add_notex_feedback_widget() {
+    wp_enqueue_script('notex-widget', 'https://notex.com.ng/widget.js', array(), '1.0.0', true);
+    wp_add_inline_script('notex-widget', \`
+        window.NoteXConfig = {
+            userId: '${user?.id || 'your-user-id'}',
+            supabaseUrl: '${import.meta.env.VITE_SUPABASE_URL || 'your-supabase-url'}',
+            supabaseKey: '${import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 20) + '...' || 'your-anon-key'}',
+            position: '${formData.button_placement}',
+            greeting: '${formData.greeting_text}',
+            primaryColor: '${formData.brand_colors.primary}',
+            secondaryColor: '${formData.brand_colors.secondary}'
+        };
+    \`);
+}
+add_action('wp_enqueue_scripts', 'add_notex_feedback_widget');`}
+                  </pre>
+                </div>
+              </div>
+
+              {/* Shopify App */}
+              <div>
+                <Label>Shopify App</Label>
+                <div className="bg-muted p-4 rounded-lg">
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary">Shopify</Badge>
+                      <span className="text-sm font-medium">App Installation</span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-sm">
+                        <strong>Step 1:</strong> Visit Shopify App Store and search for "NoteX Feedback"
+                      </div>
+                      <div className="text-sm">
+                        <strong>Step 2:</strong> Click "Add App" and authorize the installation
+                      </div>
+                      <div className="text-sm">
+                        <strong>Step 3:</strong> Configure settings in your Shopify admin
+                      </div>
+                    </div>
+                    <div className="bg-green-50 p-3 rounded border border-green-200">
+                      <div className="text-sm font-medium text-green-900 mb-1">App Features:</div>
+                      <ul className="text-xs text-green-800 space-y-1">
+                        <li>• Native Shopify integration</li>
+                        <li>• Customer feedback collection</li>
+                        <li>• Order-specific feedback</li>
+                        <li>• Shopify admin dashboard</li>
+                        <li>• Email notifications</li>
+                        <li>• Customer segmentation</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Shopify Manual Integration */}
+              <div>
+                <Label>Shopify Manual Integration</Label>
+                <div className="bg-muted p-4 rounded-lg">
+                  <pre className="text-sm overflow-x-auto">
+{`<!-- Add this to your theme.liquid file in the <head> section -->
+<script>
+  window.NoteXConfig = {
+    userId: '${user?.id || 'your-user-id'}',
+    supabaseUrl: '${import.meta.env.VITE_SUPABASE_URL || 'your-supabase-url'}',
+    supabaseKey: '${import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 20) + '...' || 'your-anon-key'}',
+    position: '${formData.button_placement}',
+    greeting: '${formData.greeting_text}',
+    primaryColor: '${formData.brand_colors.primary}',
+    secondaryColor: '${formData.brand_colors.secondary}'
+  };
+</script>
+
+<!-- Add this before </body> tag -->
+<script src="https://notex.com.ng/widget.js" async></script>
+
+<!-- For Shopify Plus, add to checkout.liquid for post-purchase feedback -->
+{% if template contains 'checkout' %}
+  <script>
+    window.NoteXConfig.checkoutMode = true;
+    window.NoteXConfig.orderId = '{{ order.id }}';
+  </script>
+{% endif %}`}
+                  </pre>
+                </div>
+              </div>
+
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-medium text-blue-900 mb-2">💡 Pro Tips</h4>
                 <ul className="text-sm text-blue-800 space-y-1">
+                  <li>• <strong>WordPress Plugin:</strong> Best for WordPress sites with admin panel integration</li>
+                  <li>• <strong>Shopify App:</strong> Native integration for e-commerce with order tracking</li>
                   <li>• <strong>NPM Package:</strong> Best for modern frameworks with TypeScript support</li>
                   <li>• <strong>CDN:</strong> Simplest for static sites and quick setup</li>
                   <li>• <strong>API Key:</strong> More secure than exposing user IDs directly</li>
@@ -961,6 +1089,76 @@ widget.toggle();`}
                   </div>
                 </div>
 
+                {/* WordPress Tutorial */}
+                <div className="mb-6">
+                  <h4 className="font-medium text-gray-900 mb-3">Method 4: WordPress Integration</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
+                      <div>
+                        <p className="text-sm font-medium">Choose integration method</p>
+                        <p className="text-xs text-gray-600">Use the plugin for easy setup or manual integration for customization</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">2</div>
+                      <div>
+                        <p className="text-sm font-medium">Plugin method (Recommended)</p>
+                        <p className="text-xs text-gray-600">Upload and activate the NoteX Feedback plugin</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">3</div>
+                      <div>
+                        <p className="text-sm font-medium">Configure in WordPress admin</p>
+                        <p className="text-xs text-gray-600">Go to Settings → NoteX Feedback to customize</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">4</div>
+                      <div>
+                        <p className="text-sm font-medium">Use shortcode (optional)</p>
+                        <p className="text-xs text-gray-600">Add [notex_feedback] to any page or post</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Shopify Tutorial */}
+                <div className="mb-6">
+                  <h4 className="font-medium text-gray-900 mb-3">Method 5: Shopify Integration</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
+                      <div>
+                        <p className="text-sm font-medium">Install from Shopify App Store</p>
+                        <p className="text-xs text-gray-600">Search for "NoteX Feedback" and click "Add App"</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">2</div>
+                      <div>
+                        <p className="text-sm font-medium">Authorize the app</p>
+                        <p className="text-xs text-gray-600">Grant necessary permissions for widget integration</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">3</div>
+                      <div>
+                        <p className="text-sm font-medium">Configure in Shopify admin</p>
+                        <p className="text-xs text-gray-600">Customize appearance and behavior in the app settings</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">4</div>
+                      <div>
+                        <p className="text-sm font-medium">Test on your store</p>
+                        <p className="text-xs text-gray-600">Visit your store and check for the feedback widget</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Troubleshooting */}
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <h4 className="font-medium text-yellow-900 mb-2">🔧 Troubleshooting</h4>
@@ -976,6 +1174,14 @@ widget.toggle();`}
                     <div className="flex items-start space-x-2">
                       <span className="text-yellow-600">•</span>
                       <span><strong>Not working on mobile?</strong> Ensure your site is mobile-responsive</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="text-yellow-600">•</span>
+                      <span><strong>WordPress issues?</strong> Check theme compatibility and plugin conflicts</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="text-yellow-600">•</span>
+                      <span><strong>Shopify issues?</strong> Verify app installation and theme integration</span>
                     </div>
                     <div className="flex items-start space-x-2">
                       <span className="text-yellow-600">•</span>
