@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,12 +52,7 @@ const FeedbackSettings = () => {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Load settings on component mount
-  useEffect(() => {
-    loadSettings();
-  }, [user]);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -101,7 +96,12 @@ const FeedbackSettings = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  // Load settings on component mount
+  useEffect(() => {
+    loadSettings();
+  }, [user, loadSettings]);
 
   const handleSave = async () => {
     if (!settings || !user) return;

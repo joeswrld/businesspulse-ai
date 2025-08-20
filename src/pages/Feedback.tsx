@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,19 +41,7 @@ const Feedback = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [projectId, setProjectId] = useState<string | null>(null);
 
-  // Load project ID and feedbacks on component mount
-  useEffect(() => {
-    loadProjectId();
-  }, [user]);
-
-  useEffect(() => {
-    if (projectId) {
-      loadFeedbacks();
-      setupRealtimeSubscription();
-    }
-  }, [projectId]);
-
-  const loadProjectId = async () => {
+  const loadProjectId = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -69,9 +57,9 @@ const Feedback = () => {
       console.error('Error loading project ID:', error);
       toast.error('Failed to load project configuration');
     }
-  };
+  }, [user]);
 
-  const loadFeedbacks = async () => {
+  const loadFeedbacks = useCallback(async () => {
     if (!projectId) return;
 
     try {
@@ -89,9 +77,9 @@ const Feedback = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
 
-  const setupRealtimeSubscription = () => {
+  const setupRealtimeSubscription = useCallback(() => {
     if (!projectId) return;
 
     const subscription = supabase
@@ -113,7 +101,19 @@ const Feedback = () => {
     return () => {
       supabase.removeChannel(subscription);
     };
-  };
+  }, [projectId]);
+
+  // Load project ID and feedbacks on component mount
+  useEffect(() => {
+    loadProjectId();
+  }, [user, loadProjectId]);
+
+  useEffect(() => {
+    if (projectId) {
+      loadFeedbacks();
+      setupRealtimeSubscription();
+    }
+  }, [projectId, loadFeedbacks, setupRealtimeSubscription]);
 
   const updateFeedbackStatus = async (feedbackId: string, status: 'new' | 'reviewed' | 'resolved') => {
     try {
