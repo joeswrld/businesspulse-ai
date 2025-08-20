@@ -41,11 +41,17 @@ const Feedback = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [projectId, setProjectId] = useState<string | null>(null);
   const [settingsConfigured, setSettingsConfigured] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadProjectId = useCallback(async () => {
     if (!user) return;
 
+    setError(null);
+    setLoading(true);
+
     try {
+      console.log('Loading project ID for user:', user.id);
+      
       const { data, error } = await supabase
         .from('feedback_settings')
         .select('project_id')
@@ -55,27 +61,36 @@ const Feedback = () => {
       if (error) {
         // If no settings exist, show configuration message
         if (error.code === 'PGRST116') {
+          console.log('No settings found, showing setup message');
           setSettingsConfigured(false);
+          setLoading(false);
           return;
         }
         throw error;
       }
+      
+      console.log('Project ID loaded:', data.project_id);
       setProjectId(data.project_id);
       setSettingsConfigured(true);
     } catch (error) {
       console.error('Error loading project ID:', error);
-      if (error instanceof Error) {
-        toast.error(`Failed to load project configuration: ${error.message}`);
-      } else {
-        toast.error('Failed to load project configuration');
-      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setError(`Failed to load project configuration: ${errorMessage}`);
+      toast.error(`Failed to load project configuration: ${errorMessage}`);
+    } finally {
+      setLoading(false);
     }
   }, [user]);
 
   const loadFeedbacks = useCallback(async () => {
     if (!projectId) return;
 
+    setLoading(true);
+    setError(null);
+
     try {
+      console.log('Loading feedbacks for project:', projectId);
+      
       const { data, error } = await supabase
         .from('feedbacks')
         .select('*')
@@ -83,10 +98,14 @@ const Feedback = () => {
         .order('timestamp', { ascending: false });
 
       if (error) throw error;
+      
+      console.log('Feedbacks loaded:', data?.length || 0);
       setFeedbacks(data || []);
     } catch (error) {
       console.error('Error loading feedbacks:', error);
-      toast.error('Failed to load feedbacks');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setError(`Failed to load feedbacks: ${errorMessage}`);
+      toast.error(`Failed to load feedbacks: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -94,6 +113,8 @@ const Feedback = () => {
 
   const setupRealtimeSubscription = useCallback(() => {
     if (!projectId) return;
+
+    console.log('Setting up real-time subscription for project:', projectId);
 
     const subscription = supabase
       .channel(`feedbacks:project_id=eq.${projectId}`)
@@ -103,15 +124,39 @@ const Feedback = () => {
         table: 'feedbacks',
         filter: `project_id=eq.${projectId}`
       }, (payload) => {
+        console.log('New feedback received:', payload.new);
         const newFeedback = payload.new as Feedback;
         setFeedbacks(prev => [newFeedback, ...prev]);
         toast.success('New feedback received!', {
           description: `From: ${newFeedback.name || 'Anonymous'}`,
         });
       })
-      .subscribe();
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'feedbacks',
+        filter: `project_id=eq.${projectId}`
+      }, (payload) => {
+        console.log('Feedback updated:', payload.new);
+        const updatedFeedback = payload.new as Feedback;
+        setFeedbacks(prev => 
+          prev.map(feedback => 
+            feedback.id === updatedFeedback.id ? updatedFeedback : feedback
+          )
+        );
+      })
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to feedback updates');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('Subscription error');
+          toast.error('Real-time connection failed. Please refresh the page.');
+        }
+      });
 
     return () => {
+      console.log('Cleaning up subscription');
       supabase.removeChannel(subscription);
     };
   }, [projectId]);
@@ -124,12 +169,19 @@ const Feedback = () => {
   useEffect(() => {
     if (projectId) {
       loadFeedbacks();
-      setupRealtimeSubscription();
+      const cleanup = setupRealtimeSubscription();
+      
+      // Cleanup subscription on unmount or projectId change
+      return () => {
+        if (cleanup) cleanup();
+      };
     }
   }, [projectId, loadFeedbacks, setupRealtimeSubscription]);
 
   const updateFeedbackStatus = async (feedbackId: string, status: 'new' | 'reviewed' | 'resolved') => {
     try {
+      console.log('Updating feedback status:', { feedbackId, status });
+      
       const { error } = await supabase
         .from('feedbacks')
         .update({ status })
@@ -137,6 +189,7 @@ const Feedback = () => {
 
       if (error) throw error;
 
+      // Update local state immediately for better UX
       setFeedbacks(prev => 
         prev.map(feedback => 
           feedback.id === feedbackId 
@@ -148,7 +201,17 @@ const Feedback = () => {
       toast.success(`Feedback marked as ${status}`);
     } catch (error) {
       console.error('Error updating feedback status:', error);
-      toast.error('Failed to update feedback status');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to update feedback status: ${errorMessage}`);
+      
+      // Revert the local state change on error
+      setFeedbacks(prev => 
+        prev.map(feedback => 
+          feedback.id === feedbackId 
+            ? { ...feedback, status: feedback.status } // Keep original status
+            : feedback
+        )
+      );
     }
   };
 
@@ -217,7 +280,44 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading feedbacks...</p>
+            <p className="text-gray-600">
+              {projectId ? 'Loading feedbacks...' : 'Loading project configuration...'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center max-w-md">
+            <div className="p-4 bg-red-100 rounded-full w-16 h-16 mx-auto mb-6 flex items-center justify-center">
+              <AlertCircle className="h-8 w-8 text-red-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Feedback</h2>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <div className="space-y-3">
+              <Button 
+                onClick={() => {
+                  setError(null);
+                  setLoading(true);
+                  loadProjectId();
+                }}
+                className="w-full"
+              >
+                Try Again
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => window.location.href = '/feedback-settings'}
+                className="w-full"
+              >
+                Go to Settings
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -356,10 +456,23 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
                 </Select>
               </div>
               
-              <Button onClick={exportToTXT} variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Export TXT
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => {
+                    setLoading(true);
+                    loadFeedbacks();
+                  }}
+                  variant="outline"
+                  disabled={loading}
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+                <Button onClick={exportToTXT} variant="outline">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export TXT
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -367,22 +480,55 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
         {/* Feedback List */}
         <Card>
           <CardHeader>
-            <CardTitle>All Feedback</CardTitle>
-            <CardDescription>
-              {filteredFeedbacks.length} feedback{filteredFeedbacks.length !== 1 ? 's' : ''} found
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>All Feedback</CardTitle>
+                <CardDescription>
+                  {filteredFeedbacks.length} feedback{filteredFeedbacks.length !== 1 ? 's' : ''} found
+                  {feedbacks.length > 0 && (
+                    <span className="text-green-600 ml-2">
+                      • Real-time updates enabled
+                    </span>
+                  )}
+                </CardDescription>
+              </div>
+              {loading && (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  Refreshing...
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {filteredFeedbacks.length === 0 ? (
               <div className="text-center py-12">
                 <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No feedback found</h3>
-                <p className="text-gray-600">
+                <p className="text-gray-600 mb-4">
                   {feedbacks.length === 0 
                     ? "No feedback has been submitted yet. Add the widget to your website to start collecting feedback."
                     : "No feedback matches your current search and filter criteria."
                   }
                 </p>
+                {feedbacks.length === 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+                    <h4 className="font-semibold text-blue-900 mb-2">Getting Started:</h4>
+                    <ol className="text-sm text-blue-800 space-y-1 text-left">
+                      <li>1. Go to <strong>Feedback Settings</strong> to configure your widget</li>
+                      <li>2. Copy the embed code and add it to your website</li>
+                      <li>3. The feedback widget will appear on your website</li>
+                      <li>4. All feedback will be collected here in real-time</li>
+                    </ol>
+                    <Button 
+                      onClick={() => window.location.href = '/feedback-settings'}
+                      className="mt-3 w-full"
+                      variant="outline"
+                    >
+                      Configure Widget
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
