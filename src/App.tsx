@@ -26,7 +26,8 @@ import Billing from "./pages/Billing";
 import Settings from "./pages/Settings";
 import Teams from "./pages/Teams";
 import Profile from "./pages/Profile";
-
+import Feedback from "./pages/Feedback";
+import FeedbackSettings from "./pages/FeedbackSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -125,6 +126,20 @@ const App = () => (
               <ProtectedRoute>
                 <DashboardLayout>
                   <Teams />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/feedback" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <Feedback />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/feedback-settings" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <FeedbackSettings />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
