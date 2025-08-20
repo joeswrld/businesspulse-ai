@@ -1,0 +1,322 @@
+(function() {
+  'use strict';
+
+  // Get project ID from script tag
+  const scriptTag = document.currentScript;
+  const projectId = scriptTag.dataset.projectId;
+
+  if (!projectId) {
+    console.error('NoteX Feedback Widget: Project ID is required');
+    return;
+  }
+
+  // Create widget container
+  const widgetContainer = document.createElement('div');
+  widgetContainer.id = 'notex-feedback-widget';
+  widgetContainer.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  `;
+
+  // Create feedback button
+  const feedbackButton = document.createElement('button');
+  feedbackButton.id = 'notex-feedback-button';
+  feedbackButton.innerHTML = `
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+  `;
+  feedbackButton.style.cssText = `
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #2563eb;
+    color: white;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `;
+
+  // Create modal overlay
+  const modalOverlay = document.createElement('div');
+  modalOverlay.id = 'notex-feedback-overlay';
+  modalOverlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  `;
+
+  // Create modal
+  const modal = document.createElement('div');
+  modal.id = 'notex-feedback-modal';
+  modal.style.cssText = `
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 400px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    position: relative;
+  `;
+
+  // Create form
+  const form = document.createElement('form');
+  form.id = 'notex-feedback-form';
+  form.innerHTML = `
+    <div style="margin-bottom: 20px;">
+      <h3 style="margin: 0 0 16px 0; color: #1f2937; font-size: 18px; font-weight: 600;">
+        Share your thoughts with us
+      </h3>
+      <p style="margin: 0; color: #6b7280; font-size: 14px;">
+        We'd love to hear your feedback to improve our service.
+      </p>
+    </div>
+
+    <input type="hidden" name="project_id" value="${projectId}" />
+
+    <div style="margin-bottom: 16px;">
+      <input 
+        type="text" 
+        name="name" 
+        placeholder="Your Name (optional)" 
+        style="
+          width: 100%;
+          padding: 12px;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          font-size: 14px;
+          box-sizing: border-box;
+        "
+      />
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <input 
+        type="email" 
+        name="email" 
+        placeholder="Your Email (optional)" 
+        style="
+          width: 100%;
+          padding: 12px;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          font-size: 14px;
+          box-sizing: border-box;
+        "
+      />
+    </div>
+
+    <div style="margin-bottom: 20px;">
+      <textarea 
+        name="message" 
+        placeholder="Your feedback..." 
+        required
+        rows="4"
+        style="
+          width: 100%;
+          padding: 12px;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          font-size: 14px;
+          box-sizing: border-box;
+          resize: vertical;
+          font-family: inherit;
+        "
+      ></textarea>
+    </div>
+
+    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+      <button 
+        type="button" 
+        id="notex-cancel-button"
+        style="
+          padding: 10px 16px;
+          border: 1px solid #d1d5db;
+          background: white;
+          color: #374151;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+        "
+      >
+        Cancel
+      </button>
+      <button 
+        type="submit"
+        id="notex-submit-button"
+        style="
+          padding: 10px 20px;
+          background: #2563eb;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 500;
+        "
+      >
+        Send Feedback
+      </button>
+    </div>
+
+    <div 
+      id="notex-success-message" 
+      style="
+        display: none;
+        margin-top: 16px;
+        padding: 12px;
+        background: #d1fae5;
+        color: #065f46;
+        border-radius: 6px;
+        font-size: 14px;
+        text-align: center;
+      "
+    >
+      ✅ Thank you! Your feedback has been submitted successfully.
+    </div>
+
+    <div 
+      id="notex-error-message" 
+      style="
+        display: none;
+        margin-top: 16px;
+        padding: 12px;
+        background: #fee2e2;
+        color: #991b1b;
+        border-radius: 6px;
+        font-size: 14px;
+        text-align: center;
+      "
+    >
+      ⚠️ Something went wrong. Please try again.
+    </div>
+  `;
+
+  // Close button
+  const closeButton = document.createElement('button');
+  closeButton.innerHTML = '×';
+  closeButton.style.cssText = `
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #6b7280;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+  `;
+
+  // Add elements to DOM
+  modal.appendChild(closeButton);
+  modal.appendChild(form);
+  modalOverlay.appendChild(modal);
+  widgetContainer.appendChild(feedbackButton);
+  widgetContainer.appendChild(modalOverlay);
+  document.body.appendChild(widgetContainer);
+
+  // Event handlers
+  function openModal() {
+    modalOverlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    modalOverlay.style.display = 'none';
+    document.body.style.overflow = '';
+    // Reset form
+    form.reset();
+    document.getElementById('notex-success-message').style.display = 'none';
+    document.getElementById('notex-error-message').style.display = 'none';
+  }
+
+  // Button hover effects
+  feedbackButton.addEventListener('mouseenter', () => {
+    feedbackButton.style.transform = 'scale(1.1)';
+    feedbackButton.style.boxShadow = '0 6px 16px rgba(37, 99, 235, 0.4)';
+  });
+
+  feedbackButton.addEventListener('mouseleave', () => {
+    feedbackButton.style.transform = 'scale(1)';
+    feedbackButton.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+  });
+
+  // Event listeners
+  feedbackButton.addEventListener('click', openModal);
+  closeButton.addEventListener('click', closeModal);
+  document.getElementById('notex-cancel-button').addEventListener('click', closeModal);
+  modalOverlay.addEventListener('click', (e) => {
+    if (e.target === modalOverlay) {
+      closeModal();
+    }
+  });
+
+  // Form submission
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const submitButton = document.getElementById('notex-submit-button');
+    const successMessage = document.getElementById('notex-success-message');
+    const errorMessage = document.getElementById('notex-error-message');
+
+    // Show loading state
+    submitButton.disabled = true;
+    submitButton.textContent = 'Sending...';
+    successMessage.style.display = 'none';
+    errorMessage.style.display = 'none';
+
+    try {
+      const formData = new FormData(form);
+      const response = await fetch('https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/feedback-api', {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        successMessage.style.display = 'block';
+        form.reset();
+        // Auto-close after 3 seconds
+        setTimeout(closeModal, 3000);
+      } else {
+        throw new Error(result.error || 'Failed to submit feedback');
+      }
+    } catch (error) {
+      console.error('Feedback submission error:', error);
+      errorMessage.style.display = 'block';
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = 'Send Feedback';
+    }
+  });
+
+  // Keyboard support
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modalOverlay.style.display === 'flex') {
+      closeModal();
+    }
+  });
+
+})();
