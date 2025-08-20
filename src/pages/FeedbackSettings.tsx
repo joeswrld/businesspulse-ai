@@ -696,7 +696,42 @@ const FeedbackSettings = () => {
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Basic script tag approach (works everywhere but less secure).
+                  Simple one-line embed with just your user ID. Works everywhere.
+                </p>
+              </div>
+
+              {/* Widget 2.0 Embed Code */}
+              <div>
+                <Label htmlFor="widget-2-embed-code">Widget 2.0 (Recommended)</Label>
+                <div className="relative mt-2">
+                  <Textarea
+                    id="widget-2-embed-code"
+                    value={`<script src="https://notex.com.ng/widget-2.0.js" data-user-id="${user?.id}"></script>`}
+                    readOnly
+                    className="font-mono text-sm"
+                    rows={2}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="absolute top-2 right-2"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`<script src="https://notex.com.ng/widget-2.0.js" data-user-id="${user?.id}"></script>`);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                      toast.success('Widget 2.0 code copied!');
+                    }}
+                  >
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <div className="flex items-center space-x-2 mt-2">
+                  <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200">New</Badge>
+                  <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">Real-time</Badge>
+                  <Badge variant="secondary" className="bg-purple-50 text-purple-700 border-purple-200">Enhanced</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Enhanced widget with real-time updates, better UI, and advanced features.
                 </p>
               </div>
 
@@ -850,14 +885,49 @@ add_action('wp_enqueue_scripts', 'add_notex_feedback_widget');`}
               <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold mb-4">📚 Step-by-Step Tutorials</h3>
                 
+                {/* Widget 2.0 Tutorial */}
+                <div className="mb-6">
+                  <h4 className="font-medium text-gray-900 mb-3">Method 1: Widget 2.0 (Recommended)</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
+                      <div>
+                        <p className="text-sm font-medium">Copy the Widget 2.0 embed code</p>
+                        <p className="text-xs text-gray-600">Click the "Copy" button next to the Widget 2.0 embed code</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">2</div>
+                      <div>
+                        <p className="text-sm font-medium">Add to your website</p>
+                        <p className="text-xs text-gray-600">Paste the code before &lt;/body&gt; in your HTML file</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">3</div>
+                      <div>
+                        <p className="text-sm font-medium">Enjoy enhanced features</p>
+                        <p className="text-xs text-gray-600">Real-time updates, better UI, and advanced analytics</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">4</div>
+                      <div>
+                        <p className="text-sm font-medium">Monitor in your dashboard</p>
+                        <p className="text-xs text-gray-600">All feedback appears in real-time in your Feedback page</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Basic Script Tag Tutorial */}
                 <div className="mb-6">
-                  <h4 className="font-medium text-gray-900 mb-3">Method 1: Basic Script Tag (Quick Setup)</h4>
+                  <h4 className="font-medium text-gray-900 mb-3">Method 2: Basic Script Tag (Legacy)</h4>
                   <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                     <div className="flex items-start space-x-3">
                       <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
                       <div>
-                        <p className="text-sm font-medium">Copy the embed code above</p>
+                        <p className="text-sm font-medium">Copy the basic embed code</p>
                         <p className="text-xs text-gray-600">Click the "Copy" button next to the basic embed code</p>
                       </div>
                     </div>
@@ -887,7 +957,7 @@ add_action('wp_enqueue_scripts', 'add_notex_feedback_widget');`}
 
                 {/* WordPress Tutorial */}
                 <div className="mb-6">
-                  <h4 className="font-medium text-gray-900 mb-3">Method 2: WordPress Integration</h4>
+                  <h4 className="font-medium text-gray-900 mb-3">Method 3: WordPress Integration</h4>
                   <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                     <div className="flex items-start space-x-3">
                       <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
@@ -922,7 +992,7 @@ add_action('wp_enqueue_scripts', 'add_notex_feedback_widget');`}
 
                 {/* Shopify Tutorial */}
                 <div className="mb-6">
-                  <h4 className="font-medium text-gray-900 mb-3">Method 3: Shopify Integration</h4>
+                  <h4 className="font-medium text-gray-900 mb-3">Method 4: Shopify Integration</h4>
                   <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                     <div className="flex items-start space-x-3">
                       <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
