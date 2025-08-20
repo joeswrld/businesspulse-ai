@@ -59,12 +59,20 @@ fi
 # Step 2: Set up database tables
 print_status "Setting up database tables..."
 if [ -f "setup-feedback-system.sql" ]; then
-    print_warning "Please run the following SQL in your Supabase SQL Editor:"
+    print_warning "IMPORTANT: Database Setup Options"
     echo ""
-    echo "Copy and paste the contents of setup-feedback-system.sql"
+    echo "If you get a foreign key constraint error, choose the appropriate script:"
     echo ""
-    echo "Or run: cat setup-feedback-system.sql"
+    echo "1. Fresh Setup (drops existing data): setup-feedback-system.sql"
+    echo "2. Safe Migration (preserves data): migrate-feedback-system.sql"
+    echo "3. Check current state: check-database-state.sql"
     echo ""
+    print_warning "Please run the chosen SQL script in your Supabase SQL Editor:"
+    echo ""
+    echo "Copy and paste the contents of your chosen script"
+    echo "Or run: cat [script-name].sql"
+    echo ""
+    read -p "Press Enter after you've run the SQL script..."
 else
     print_error "setup-feedback-system.sql not found"
     exit 1
