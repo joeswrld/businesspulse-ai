@@ -18,6 +18,13 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Log request details for debugging
+    console.log('Feedback API called:', {
+      method: req.method,
+      url: req.url,
+      headers: Object.fromEntries(req.headers.entries())
+    })
+
     // Only allow POST requests
     if (req.method !== 'POST') {
       return new Response(

@@ -128,7 +128,52 @@ INSERT INTO feedback_settings (
 3. Verify the `data-project-id` attribute is set correctly
 4. Check browser console for JavaScript errors
 
-### 8. API Endpoint Not Responding
+### 8. Widget Submission Error
+
+**Error:** "⚠️ Something went wrong. Please try again." when submitting feedback
+
+**Cause:** API endpoint issues, database problems, or network errors.
+
+**Solutions:**
+
+#### Step 1: Check Browser Console
+1. Open browser developer tools (F12)
+2. Go to Console tab
+3. Submit feedback through the widget
+4. Look for "NoteX Feedback Widget:" messages
+
+#### Step 2: Test API Endpoint
+```bash
+# Run the test script
+./test-feedback-api.sh
+```
+
+#### Step 3: Common Fixes
+- **401 Error (Authentication):** Deploy with public access: `./deploy-feedback-api.sh`
+- **404 Error:** Deploy the function: `supabase functions deploy feedback-api`
+- **500 Error:** Check function logs: `supabase functions logs feedback-api`
+- **Database Error:** Run database setup: `setup-feedback-system.sql`
+- **Invalid Project ID:** Verify project ID in NoteX dashboard
+
+#### Step 4: Test Locally
+1. Open `test-widget.html` in a browser
+2. Replace `YOUR_PROJECT_ID` with actual project ID
+3. Test the widget submission
+4. Check console for detailed logs
+
+#### Step 5: Verify Function Deployment
+```bash
+# Check if function is deployed
+supabase functions list
+
+# View function logs
+supabase functions logs feedback-api --follow
+
+# Redeploy if needed
+supabase functions deploy feedback-api
+```
+
+### 9. API Endpoint Not Responding
 
 **Error:** 404 or 500 errors from the feedback API
 
@@ -142,7 +187,7 @@ INSERT INTO feedback_settings (
      -d "project_id=test&name=Test&email=test@example.com&message=Test message"
    ```
 
-### 9. Permission Denied Errors
+### 10. Permission Denied Errors
 
 **Error:** RLS (Row Level Security) blocking access
 
@@ -151,7 +196,7 @@ INSERT INTO feedback_settings (
 2. Check that the user is authenticated
 3. Verify the user has the correct permissions
 
-### 10. Email Notifications Not Working
+### 11. Email Notifications Not Working
 
 **Issue:** Email notifications not being sent
 
@@ -160,7 +205,7 @@ INSERT INTO feedback_settings (
 2. Verify the email function is deployed: `supabase functions deploy send-email`
 3. Check function logs for email errors
 
-### 11. Project ID Locking Issues
+### 12. Project ID Locking Issues
 
 **Issue:** Project ID not locking after first save
 
