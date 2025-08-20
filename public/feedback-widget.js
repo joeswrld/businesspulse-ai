@@ -288,12 +288,28 @@
 
     try {
       const formData = new FormData(form);
-      const response = await fetch('https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/feedback-api', {
+      
+      // Log the data being sent for debugging
+      console.log('NoteX Feedback Widget: Submitting feedback', {
+        projectId: formData.get('project_id'),
+        name: formData.get('name'),
+        email: formData.get('email'),
+        message: formData.get('message')
+      });
+
+      const apiUrl = 'https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/feedback-api';
+      console.log('NoteX Feedback Widget: Submitting to', apiUrl);
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         body: formData
       });
 
+      console.log('NoteX Feedback Widget: Response status', response.status);
+      console.log('NoteX Feedback Widget: Response headers', Object.fromEntries(response.headers.entries()));
+
       const result = await response.json();
+      console.log('NoteX Feedback Widget: Response data', result);
 
       if (response.ok && result.success) {
         successMessage.style.display = 'block';
@@ -301,10 +317,26 @@
         // Auto-close after 3 seconds
         setTimeout(closeModal, 3000);
       } else {
-        throw new Error(result.error || 'Failed to submit feedback');
+        let errorMsg = result.error || `HTTP ${response.status}: ${response.statusText}`;
+        
+        // Handle specific error cases
+        if (response.status === 401) {
+          errorMsg = 'API authentication error. Please contact support.';
+        } else if (response.status === 404) {
+          errorMsg = 'API endpoint not found. Please contact support.';
+        } else if (response.status === 500) {
+          errorMsg = 'Server error. Please try again later.';
+        }
+        
+        console.error('NoteX Feedback Widget: API error', errorMsg);
+        throw new Error(errorMsg);
       }
     } catch (error) {
-      console.error('Feedback submission error:', error);
+      console.error('NoteX Feedback Widget: Submission error', error);
+      
+      // Show more specific error message
+      const errorText = error.message || 'Network error or server unavailable';
+      errorMessage.textContent = `⚠️ ${errorText}. Please try again.`;
       errorMessage.style.display = 'block';
     } finally {
       submitButton.disabled = false;

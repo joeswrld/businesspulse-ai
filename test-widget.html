@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoteX Feedback Widget Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #2563eb;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #2563eb;
+        }
+        .project-id {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        .instructions {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .error-tips {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .success-tips {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        code {
+            background: #f1f3f4;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 NoteX Feedback Widget Test Page</h1>
+    
+    <div class="test-section">
+        <h3>📋 Test Instructions</h3>
+        <ol>
+            <li>Look for the feedback button in the bottom-right corner</li>
+            <li>Click the button to open the feedback form</li>
+            <li>Fill out the form and submit</li>
+            <li>Check the browser console for detailed logs</li>
+            <li>Verify the feedback appears in your NoteX dashboard</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h3>🔧 Current Configuration</h3>
+        <p><strong>Project ID:</strong></p>
+        <div class="project-id" id="project-id">Loading...</div>
+        <p><strong>API Endpoint:</strong> <code>https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/feedback-api</code></p>
+    </div>
+
+    <div class="instructions">
+        <h3>📝 How to Test</h3>
+        <p>1. <strong>Open Browser Console:</strong> Press F12 and go to the Console tab</p>
+        <p>2. <strong>Submit Test Feedback:</strong> Use the widget to submit feedback</p>
+        <p>3. <strong>Check Logs:</strong> Look for "NoteX Feedback Widget:" messages in the console</p>
+        <p>4. <strong>Verify Response:</strong> Check if the API returns success or error</p>
+    </div>
+
+    <div class="error-tips">
+        <h3>🚨 Common Issues & Solutions</h3>
+        <p><strong>If you see "⚠️ Something went wrong":</strong></p>
+        <ul>
+            <li>Check browser console for detailed error messages</li>
+            <li>Verify the API endpoint is deployed: <code>supabase functions deploy feedback-api</code></li>
+            <li>Check function logs: <code>supabase functions logs feedback-api</code></li>
+            <li>Ensure database tables exist: Run <code>setup-feedback-system.sql</code></li>
+            <li>Verify the project ID is valid in your NoteX dashboard</li>
+        </ul>
+    </div>
+
+    <div class="success-tips">
+        <h3>✅ Success Indicators</h3>
+        <ul>
+            <li>Widget button appears in bottom-right corner</li>
+            <li>Form opens when button is clicked</li>
+            <li>Console shows "NoteX Feedback Widget: Submitting feedback"</li>
+            <li>Success message appears after submission</li>
+            <li>Feedback appears in your NoteX dashboard</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>🔍 Debug Information</h3>
+        <p><strong>Browser Console Commands:</strong></p>
+        <code>// Check if widget is loaded
+document.getElementById('notex-feedback-widget')</code><br><br>
+        <code>// Check if button exists
+document.getElementById('notex-feedback-button')</code><br><br>
+        <code>// Test API endpoint directly
+fetch('https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/feedback-api', {method: 'POST'})</code>
+    </div>
+
+    <div class="test-section">
+        <h3>📞 Support</h3>
+        <p>If you're still having issues:</p>
+        <ol>
+            <li>Run the test script: <code>./test-feedback-api.sh</code></li>
+            <li>Check the troubleshooting guide: <code>TROUBLESHOOTING.md</code></li>
+            <li>Verify database setup: <code>check-database-state.sql</code></li>
+            <li>Check function deployment: <code>supabase functions list</code></li>
+        </ol>
+    </div>
+
+    <!-- Sample content to test widget positioning -->
+    <h2>Sample Content</h2>
+    <p>This is sample content to test the widget positioning. The feedback widget should appear in the bottom-right corner of this page.</p>
+    
+    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+    
+    <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+
+    <script>
+        // Display the project ID from the script tag
+        document.addEventListener('DOMContentLoaded', function() {
+            const scriptTag = document.querySelector('script[data-project-id]');
+            if (scriptTag) {
+                const projectId = scriptTag.dataset.projectId;
+                document.getElementById('project-id').textContent = projectId;
+            } else {
+                document.getElementById('project-id').textContent = 'No project ID found in script tag';
+            }
+        });
+    </script>
+
+    <!-- Replace YOUR_PROJECT_ID with an actual project ID from your NoteX dashboard -->
+    <script src="feedback-widget.js" data-project-id="YOUR_PROJECT_ID"></script>
+</body>
+</html>
