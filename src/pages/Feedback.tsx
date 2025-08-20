@@ -40,6 +40,7 @@ const Feedback = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [settingsConfigured, setSettingsConfigured] = useState<boolean | null>(null);
 
   const loadProjectId = useCallback(async () => {
     if (!user) return;
@@ -51,11 +52,23 @@ const Feedback = () => {
         .eq('user_id', user.id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // If no settings exist, show configuration message
+        if (error.code === 'PGRST116') {
+          setSettingsConfigured(false);
+          return;
+        }
+        throw error;
+      }
       setProjectId(data.project_id);
+      setSettingsConfigured(true);
     } catch (error) {
       console.error('Error loading project ID:', error);
-      toast.error('Failed to load project configuration');
+      if (error instanceof Error) {
+        toast.error(`Failed to load project configuration: ${error.message}`);
+      } else {
+        toast.error('Failed to load project configuration');
+      }
     }
   }, [user]);
 
@@ -205,6 +218,31 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-gray-600">Loading feedbacks...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show configuration message if settings are not configured
+  if (settingsConfigured === false) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center max-w-md">
+            <div className="p-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full w-16 h-16 mx-auto mb-6 flex items-center justify-center">
+              <MessageSquare className="h-8 w-8 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Setup Required</h2>
+            <p className="text-gray-600 mb-6">
+              You need to configure your feedback settings before you can view feedback.
+            </p>
+            <Button 
+              onClick={() => window.location.href = '/feedback-settings'}
+              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+            >
+              Configure Feedback Settings
+            </Button>
           </div>
         </div>
       </div>
