@@ -19,9 +19,10 @@ WHERE project_id IS NOT NULL AND project_id != '';
 ALTER TABLE feedback_settings ADD CONSTRAINT feedback_settings_project_id_locked_check 
 CHECK (NOT project_id_locked OR (project_id IS NOT NULL AND project_id != ''));
 
--- Recreate the foreign key constraint with CASCADE options
-ALTER TABLE feedbacks ADD CONSTRAINT feedbacks_project_id_fkey 
-FOREIGN KEY (project_id) REFERENCES feedback_settings(project_id) ON UPDATE CASCADE ON DELETE CASCADE;
+-- Note: We're not recreating the foreign key constraint because it would require
+-- project_id to be globally unique, which conflicts with per-user uniqueness.
+-- The feedback system will work fine without this constraint as the relationship
+-- is maintained through application logic.
 
 -- Update any existing empty project_ids to have a default value if they're locked
 UPDATE feedback_settings 

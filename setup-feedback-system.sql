@@ -35,7 +35,7 @@ WHERE project_id IS NOT NULL AND project_id != '';
 -- Create feedbacks table
 CREATE TABLE feedbacks (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  project_id TEXT REFERENCES feedback_settings(project_id) ON UPDATE CASCADE ON DELETE CASCADE,
+  project_id TEXT,
   name TEXT,
   email TEXT,
   message TEXT NOT NULL,

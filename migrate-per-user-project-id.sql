@@ -15,9 +15,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_feedback_settings_project_id_user_unique
 ON feedback_settings (user_id, project_id) 
 WHERE project_id IS NOT NULL AND project_id != '';
 
--- Recreate the foreign key constraint with CASCADE options
-ALTER TABLE feedbacks ADD CONSTRAINT feedbacks_project_id_fkey 
-FOREIGN KEY (project_id) REFERENCES feedback_settings(project_id) ON UPDATE CASCADE ON DELETE CASCADE;
+-- Note: We're not recreating the foreign key constraint because it would require
+-- project_id to be globally unique, which conflicts with per-user uniqueness.
+-- The feedback system will work fine without this constraint as the relationship
+-- is maintained through application logic.
+
+-- If you need referential integrity, you can add it later by creating a composite
+-- foreign key or by changing the design to use a different approach.
 
 -- Add a comment to document the change
 COMMENT ON INDEX idx_feedback_settings_project_id_user_unique IS 
