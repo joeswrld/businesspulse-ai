@@ -70,14 +70,12 @@ const FeedbackSettings = () => {
 
       if (error) {
         if (error.code === 'PGRST116') {
-          // No settings found, create default ones
+          // No settings found, create default ones with blank project_id
           console.log('No settings found, creating default settings...');
           
-          // Create default settings with a more user-friendly project ID
-          const defaultProjectId = `project-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`;
           const newSettingsData = {
             user_id: user.id,
-            project_id: defaultProjectId,
+            project_id: '', // Leave blank for user input
             project_id_locked: false,
             title: 'Share your thoughts with us',
             show_name: true,
@@ -152,7 +150,7 @@ const FeedbackSettings = () => {
     // Validate project ID if not locked
     if (!settings.project_id_locked) {
       if (!settings.project_id || settings.project_id.trim() === '') {
-        toast.error('Project ID is required');
+        toast.error('Please enter a Project ID before saving');
         return;
       }
       
@@ -334,37 +332,37 @@ const FeedbackSettings = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="project-id">Project ID</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="project-id"
-                  value={settings.project_id}
-                  onChange={(e) => setSettings({ ...settings, project_id: e.target.value })}
-                  disabled={settings.project_id_locked}
-                  className="font-mono"
-                  placeholder="Enter a unique project ID"
-                />
-                {settings.project_id_locked && (
-                  <Badge variant="outline" className="flex items-center gap-1 bg-green-50 text-green-700 border-green-200">
-                    <Check className="h-3 w-3" />
-                    Locked
-                  </Badge>
-                )}
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-gray-500">
-                  {settings.project_id_locked 
-                    ? "✅ Project ID is locked and cannot be changed. This ensures consistent feedback collection."
-                    : "⚠️ Edit your project ID before saving. It will be permanently locked after the first save."
-                  }
-                </p>
-                {!settings.project_id_locked && (
-                  <p className="text-xs text-amber-600">
-                    💡 Choose a unique, memorable ID (e.g., 'my-website-2024', 'company-feedback')
+                <Label htmlFor="project-id">Project ID</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="project-id"
+                    value={settings.project_id}
+                    onChange={(e) => setSettings({ ...settings, project_id: e.target.value })}
+                    disabled={settings.project_id_locked}
+                    className="font-mono"
+                    placeholder={settings.project_id_locked ? settings.project_id : "e.g., my-website-2024, company-feedback"}
+                  />
+                  {settings.project_id_locked && (
+                    <Badge variant="outline" className="flex items-center gap-1 bg-green-50 text-green-700 border-green-200">
+                      <Check className="h-3 w-3" />
+                      Locked
+                    </Badge>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-500">
+                    {settings.project_id_locked 
+                      ? "✅ Project ID is locked and cannot be changed. This ensures consistent feedback collection."
+                      : "⚠️ Enter a unique project ID before saving. It will be permanently locked after the first save."
+                    }
                   </p>
-                )}
+                  {!settings.project_id_locked && (
+                    <p className="text-xs text-amber-600">
+                      💡 Choose a unique, memorable ID using letters, numbers, hyphens, and underscores only
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
           </CardContent>
         </Card>
 
@@ -521,7 +519,7 @@ const FeedbackSettings = () => {
             ) : (
               <>
                 <Save className="h-4 w-4 mr-2" />
-                {settings.project_id_locked ? 'Update Settings' : 'Save Settings'}
+                {settings.project_id_locked ? 'Update Settings' : 'Save & Lock Project ID'}
               </>
             )}
           </Button>

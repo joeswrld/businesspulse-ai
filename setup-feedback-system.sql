@@ -9,7 +9,7 @@ DROP TABLE IF EXISTS feedback_settings CASCADE;
 CREATE TABLE feedback_settings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  project_id TEXT UNIQUE NOT NULL,
+  project_id TEXT,
   project_id_locked BOOLEAN DEFAULT false,
   title TEXT DEFAULT 'Share your thoughts with us',
   show_name BOOLEAN DEFAULT true,
@@ -22,6 +22,15 @@ CREATE TABLE feedback_settings (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Add constraints for project_id
+ALTER TABLE feedback_settings ADD CONSTRAINT feedback_settings_project_id_locked_check 
+CHECK (NOT project_id_locked OR (project_id IS NOT NULL AND project_id != ''));
+
+-- Create a unique index on project_id that excludes empty values
+CREATE UNIQUE INDEX idx_feedback_settings_project_id_unique 
+ON feedback_settings (project_id) 
+WHERE project_id IS NOT NULL AND project_id != '';
 
 -- Create feedbacks table
 CREATE TABLE feedbacks (

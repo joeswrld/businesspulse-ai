@@ -10,7 +10,7 @@ BEGIN
         CREATE TABLE feedback_settings (
             id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
             user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-            project_id TEXT UNIQUE NOT NULL,
+            project_id TEXT,
             project_id_locked BOOLEAN DEFAULT false,
             title TEXT DEFAULT 'Share your thoughts with us',
             show_name BOOLEAN DEFAULT true,
@@ -72,6 +72,29 @@ BEGIN
         IF NOT EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'feedback_settings' AND column_name = 'updated_at') THEN
             ALTER TABLE feedback_settings ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
         END IF;
+    END IF;
+END $$;
+
+-- Add constraints for project_id if they don't exist
+DO $$
+BEGIN
+    -- Add constraint to ensure project_id is not empty when locked
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'feedback_settings_project_id_locked_check'
+    ) THEN
+        ALTER TABLE feedback_settings ADD CONSTRAINT feedback_settings_project_id_locked_check 
+        CHECK (NOT project_id_locked OR (project_id IS NOT NULL AND project_id != ''));
+    END IF;
+    
+    -- Create unique index on project_id that excludes empty values
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE indexname = 'idx_feedback_settings_project_id_unique'
+    ) THEN
+        CREATE UNIQUE INDEX idx_feedback_settings_project_id_unique 
+        ON feedback_settings (project_id) 
+        WHERE project_id IS NOT NULL AND project_id != '';
     END IF;
 END $$;
 
