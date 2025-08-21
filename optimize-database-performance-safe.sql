@@ -1,53 +1,20 @@
--- Database Performance Optimization Script
+-- Safe Database Performance Optimization Script
 -- This script adds indexes and optimizations to improve loading times
+-- WITHOUT causing column errors
 
--- 1. Add indexes for faster queries
+-- 1. Add indexes for faster queries (safe)
 CREATE INDEX IF NOT EXISTS idx_feedback_settings_user_id_created_at 
 ON feedback_settings(user_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_feedbacks_project_id_timestamp 
 ON feedbacks(project_id, timestamp DESC);
 
--- 2. Add partial indexes for better performance
+-- 2. Add partial indexes for better performance (safe)
 CREATE INDEX IF NOT EXISTS idx_feedback_settings_active 
 ON feedback_settings(user_id, created_at DESC) 
 WHERE project_id IS NOT NULL AND project_id != '';
 
--- 3. Optimize the feedback_settings table
--- Add a computed column for faster lookups (PostgreSQL 12+)
--- If this fails, we'll use a regular column with a trigger
-DO $$
-BEGIN
-  -- Try to add the generated column (PostgreSQL 12+)
-  ALTER TABLE feedback_settings 
-  ADD COLUMN IF NOT EXISTS is_active BOOLEAN GENERATED ALWAYS AS 
-    (project_id IS NOT NULL AND project_id != '' AND project_id_locked = true) STORED;
-EXCEPTION
-  WHEN syntax_error OR undefined_column THEN
-    -- Fallback: add regular column and create trigger
-    ALTER TABLE feedback_settings ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT false;
-    
-    -- Create function to update is_active
-    CREATE OR REPLACE FUNCTION update_is_active_column()
-    RETURNS TRIGGER AS $$
-    BEGIN
-      NEW.is_active = (NEW.project_id IS NOT NULL AND NEW.project_id != '' AND NEW.project_id_locked = true);
-      RETURN NEW;
-    END;
-    $$ language 'plpgsql';
-    
-    -- Create trigger
-    DROP TRIGGER IF EXISTS update_feedback_settings_is_active ON feedback_settings;
-    CREATE TRIGGER update_feedback_settings_is_active 
-      BEFORE INSERT OR UPDATE ON feedback_settings
-      FOR EACH ROW EXECUTE FUNCTION update_is_active_column();
-    
-    -- Update existing rows
-    UPDATE feedback_settings 
-    SET is_active = (project_id IS NOT NULL AND project_id != '' AND project_id_locked = true);
-END $$;
-
--- 4. Create a view for faster settings retrieval
+-- 3. Create a view for faster settings retrieval (safe)
 CREATE OR REPLACE VIEW active_feedback_settings AS
 SELECT DISTINCT ON (user_id) 
   id,
@@ -70,11 +37,11 @@ WHERE project_id IS NOT NULL
   AND project_id_locked = true
 ORDER BY user_id, created_at DESC;
 
--- 5. Add statistics for better query planning
+-- 4. Add statistics for better query planning
 ANALYZE feedback_settings;
 ANALYZE feedbacks;
 
--- 6. Create a function for optimized settings retrieval
+-- 5. Create a function for optimized settings retrieval (safe)
 CREATE OR REPLACE FUNCTION get_user_feedback_settings(user_uuid UUID)
 RETURNS TABLE (
   id UUID,
@@ -116,15 +83,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE;
 
--- 7. Grant necessary permissions
+-- 6. Grant necessary permissions
 GRANT SELECT ON active_feedback_settings TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_feedback_settings(UUID) TO authenticated;
 
--- 8. Add RLS policies for the view
+-- 7. Add RLS policies for the view
 ALTER VIEW active_feedback_settings SET (security_invoker = true);
 
--- 9. Create a materialized view for frequently accessed data (optional)
--- This can be refreshed periodically for better performance
+-- 8. Create a materialized view for frequently accessed data (safe)
 CREATE MATERIALIZED VIEW IF NOT EXISTS user_feedback_summary AS
 SELECT 
   fs.user_id,
@@ -138,17 +104,17 @@ LEFT JOIN feedbacks f ON fs.project_id = f.project_id
 WHERE fs.project_id IS NOT NULL AND fs.project_id != ''
 GROUP BY fs.user_id;
 
--- 10. Create index on the materialized view
+-- 9. Create index on the materialized view
 CREATE INDEX IF NOT EXISTS idx_user_feedback_summary_user_id 
 ON user_feedback_summary(user_id);
 
--- 11. Grant permissions for the materialized view
+-- 10. Grant permissions for the materialized view
 GRANT SELECT ON user_feedback_summary TO authenticated;
 
--- 12. Add RLS policy for the materialized view
+-- 11. Add RLS policy for the materialized view
 ALTER MATERIALIZED VIEW user_feedback_summary SET (security_invoker = true);
 
--- 13. Create a function to refresh the materialized view
+-- 12. Create a function to refresh the materialized view
 CREATE OR REPLACE FUNCTION refresh_feedback_summary()
 RETURNS void AS $$
 BEGIN
@@ -156,10 +122,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 14. Grant execute permission
+-- 13. Grant execute permission
 GRANT EXECUTE ON FUNCTION refresh_feedback_summary() TO authenticated;
 
--- 15. Show the created indexes
+-- 14. Show the created indexes
 SELECT 
   schemaname,
   tablename,
@@ -168,3 +134,19 @@ SELECT
 FROM pg_indexes 
 WHERE tablename IN ('feedback_settings', 'feedbacks')
 ORDER BY tablename, indexname;
+
+-- 15. Verify the view was created
+SELECT 
+  schemaname,
+  viewname,
+  definition
+FROM pg_views 
+WHERE viewname = 'active_feedback_settings';
+
+-- 16. Verify the materialized view was created
+SELECT 
+  schemaname,
+  matviewname,
+  definition
+FROM pg_matviews 
+WHERE matviewname = 'user_feedback_summary';

@@ -33,26 +33,16 @@ export const optimizedQueries = {
   // Get user's project ID only (minimal data)
   async getUserProjectId(userId: string) {
     return dbPerformance.query('Get Project ID (Optimized)', async () => {
-      // Use the computed column for faster filtering
-      const { data, error } = await supabase
+      // Use manual filtering since is_active column might not exist
+      return supabase
         .from('feedback_settings')
         .select('project_id, project_id_locked')
         .eq('user_id', userId)
-        .eq('is_active', true)
+        .not('project_id', 'is', null)
+        .neq('project_id', '')
+        .eq('project_id_locked', true)
         .order('created_at', { ascending: false })
         .limit(1);
-
-      if (error || !data || data.length === 0) {
-        // Fallback to regular query
-        return supabase
-          .from('feedback_settings')
-          .select('project_id, project_id_locked')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-      }
-
-      return { data, error };
     });
   },
 
