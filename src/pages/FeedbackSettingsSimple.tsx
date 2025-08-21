@@ -148,7 +148,6 @@ const FeedbackSettingsSimple = () => {
 
   const handleRetry = () => {
     setError(null);
-    setLoading(true);
     loadSettings();
   };
 

@@ -49,6 +49,7 @@ const Feedback = () => {
   const [selectedFeedbacks, setSelectedFeedbacks] = useState<Set<string>>(new Set());
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Performance tracking
   const renderTimer = componentPerformance.trackRender('Feedback');
@@ -507,7 +508,8 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
     isInitializing,
     settingsConfigured,
     error,
-    projectId
+    projectId,
+    feedbacksCount: feedbacks.length
   });
 
   // Fallback - show main content even if there are issues
@@ -576,14 +578,14 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
           </div>
           <Button 
             onClick={() => {
-              setLoading(true);
-              loadFeedbacks();
+              setIsRefreshing(true);
+              loadFeedbacks().finally(() => setIsRefreshing(false));
             }}
             variant="outline"
             size="sm"
-            disabled={loading}
+            disabled={isRefreshing}
           >
-            {loading ? (
+            {isRefreshing ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
                 Refreshing...
@@ -686,11 +688,11 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
               <div className="flex gap-2">
                 <Button 
                   onClick={() => {
-                    setLoading(true);
-                    loadFeedbacks();
+                    setIsRefreshing(true);
+                    loadFeedbacks().finally(() => setIsRefreshing(false));
                   }}
                   variant="outline"
-                  disabled={loading}
+                  disabled={isRefreshing}
                 >
                   <Zap className="h-4 w-4 mr-2" />
                   Refresh
@@ -803,7 +805,7 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
                   )}
                 </CardDescription>
               </div>
-              {loading && (
+              {isRefreshing && (
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                   Refreshing...
