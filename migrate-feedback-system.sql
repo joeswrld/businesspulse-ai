@@ -10,7 +10,7 @@ BEGIN
         CREATE TABLE feedback_settings (
             id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
             user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-            project_id TEXT UNIQUE NOT NULL,
+            project_id TEXT,
             project_id_locked BOOLEAN DEFAULT false,
             title TEXT DEFAULT 'Share your thoughts with us',
             show_name BOOLEAN DEFAULT true,
@@ -75,6 +75,29 @@ BEGIN
     END IF;
 END $$;
 
+-- Add constraints for project_id if they don't exist
+DO $$
+BEGIN
+    -- Add constraint to ensure project_id is not empty when locked
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'feedback_settings_project_id_locked_check'
+    ) THEN
+        ALTER TABLE feedback_settings ADD CONSTRAINT feedback_settings_project_id_locked_check 
+        CHECK (NOT project_id_locked OR (project_id IS NOT NULL AND project_id != ''));
+    END IF;
+    
+    -- Create unique index on project_id per user that excludes empty values
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE indexname = 'idx_feedback_settings_project_id_user_unique'
+    ) THEN
+        CREATE UNIQUE INDEX idx_feedback_settings_project_id_user_unique 
+        ON feedback_settings (user_id, project_id) 
+        WHERE project_id IS NOT NULL AND project_id != '';
+    END IF;
+END $$;
+
 -- Check if feedbacks table exists and has required columns
 DO $$
 BEGIN
@@ -125,7 +148,7 @@ BEGIN
         WHERE constraint_name = 'feedbacks_project_id_fkey'
     ) THEN
         ALTER TABLE feedbacks ADD CONSTRAINT feedbacks_project_id_fkey 
-        FOREIGN KEY (project_id) REFERENCES feedback_settings(project_id) ON DELETE CASCADE;
+        FOREIGN KEY (project_id) REFERENCES feedback_settings(project_id) ON UPDATE CASCADE ON DELETE CASCADE;
     END IF;
 END $$;
 

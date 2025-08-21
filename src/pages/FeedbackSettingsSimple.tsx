@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,16 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { 
   SlidersHorizontal, 
   Palette, 
-  Globe, 
   Bell, 
   Code, 
-  Smartphone,
-  Monitor,
-  Zap,
-  Shield,
-  Settings,
-  Eye,
-  Download,
   Copy,
   Check,
   Save,
@@ -46,21 +38,22 @@ interface FeedbackSettings {
   updated_at: string;
 }
 
-const FeedbackSettings = () => {
-  console.log('FeedbackSettings component rendering...');
+const FeedbackSettingsSimple = () => {
+  console.log('FeedbackSettingsSimple component rendering...');
   const { user } = useAuth();
   console.log('User from AuthContext:', user);
+  
   const [settings, setSettings] = useState<FeedbackSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [projectIdStatus, setProjectIdStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
 
-  const loadSettings = useCallback(async () => {
+  const loadSettings = async () => {
     console.log('loadSettings called, user:', user);
     if (!user) {
       console.log('No user, returning early');
+      setLoading(false);
       return;
     }
 
@@ -85,7 +78,7 @@ const FeedbackSettings = () => {
         console.log('Settings loaded successfully:', data[0]);
         setSettings(data[0]);
       } else {
-        // No settings found, create default ones with blank project_id
+        // No settings found, create default ones
         console.log('No settings found, creating default settings...');
         
         const newSettingsData = {
@@ -120,7 +113,6 @@ const FeedbackSettings = () => {
     } catch (error) {
       console.error('Error in loadSettings:', error);
       
-      // Provide more specific error messages
       let errorMessage = 'Failed to load settings. Please try again.';
       
       if (error instanceof Error) {
@@ -138,60 +130,13 @@ const FeedbackSettings = () => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  };
 
-  const checkProjectIdAvailability = useCallback(async (projectId: string) => {
-    if (!user || !projectId || projectId.trim() === '' || projectId.length < 3) {
-      setProjectIdStatus('idle');
-      return;
-    }
-
-    setProjectIdStatus('checking');
-
-    try {
-      const { data: existingSettings, error: checkError } = await supabase
-        .from('feedback_settings')
-        .select('id, project_id')
-        .eq('user_id', user.id)
-        .eq('project_id', projectId.trim())
-        .neq('id', settings?.id || ''); // Exclude current settings
-
-      if (checkError) {
-        console.error('Error checking project ID availability:', checkError);
-        setProjectIdStatus('idle');
-        return;
-      }
-
-      if (existingSettings && existingSettings.length > 0) {
-        setProjectIdStatus('taken');
-      } else {
-        setProjectIdStatus('available');
-      }
-    } catch (error) {
-      console.error('Error checking project ID availability:', error);
-      setProjectIdStatus('idle');
-    }
-  }, [user, settings?.id]);
-
-  // Load settings on component mount
   useEffect(() => {
     console.log('useEffect for loadSettings triggered, user:', user);
-    setError(null); // Clear any previous errors
+    setError(null);
     loadSettings();
-  }, [user, loadSettings]);
-
-  // Check project ID availability when it changes
-  useEffect(() => {
-    if (!settings?.project_id_locked && settings?.project_id) {
-      const timeoutId = setTimeout(() => {
-        checkProjectIdAvailability(settings.project_id);
-      }, 500); // Debounce for 500ms
-
-      return () => clearTimeout(timeoutId);
-    } else {
-      setProjectIdStatus('idle');
-    }
-  }, [settings?.project_id, settings?.project_id_locked, checkProjectIdAvailability]);
+  }, [user]);
 
   const handleRetry = () => {
     setError(null);
@@ -202,7 +147,7 @@ const FeedbackSettings = () => {
   const handleSave = async () => {
     if (!settings || !user) return;
 
-    // Validate project ID if not locked
+    // Basic validation
     if (!settings.project_id_locked) {
       if (!settings.project_id || settings.project_id.trim() === '') {
         toast.error('Please enter a Project ID before saving');
@@ -213,38 +158,12 @@ const FeedbackSettings = () => {
         toast.error('Project ID must be at least 3 characters long');
         return;
       }
-      
-      // Check for valid characters (alphanumeric, hyphens, underscores)
-      if (!/^[a-zA-Z0-9_-]+$/.test(settings.project_id)) {
-        toast.error('Project ID can only contain letters, numbers, hyphens, and underscores');
-        return;
-      }
-
-      // Check if project ID is already used by this user
-      const { data: existingSettings, error: checkError } = await supabase
-        .from('feedback_settings')
-        .select('id, project_id')
-        .eq('user_id', user.id)
-        .eq('project_id', settings.project_id.trim())
-        .neq('id', settings.id); // Exclude current settings
-
-      if (checkError) {
-        console.error('Error checking project ID uniqueness:', checkError);
-        toast.error('Failed to validate Project ID. Please try again.');
-        return;
-      }
-
-      if (existingSettings && existingSettings.length > 0) {
-        toast.error('This Project ID is already used by you. Please choose a different one.');
-        return;
-      }
     }
 
     setSaving(true);
     try {
       console.log('Saving settings:', settings);
       
-      // Prepare update data
       const updateData = {
         title: settings.title,
         show_name: settings.show_name,
@@ -256,7 +175,6 @@ const FeedbackSettings = () => {
         redirect_url: settings.redirect_url
       };
 
-      // Only update project_id if it's not locked yet
       if (!settings.project_id_locked) {
         updateData.project_id = settings.project_id;
         updateData.project_id_locked = true;
@@ -269,14 +187,12 @@ const FeedbackSettings = () => {
 
       if (error) {
         console.error('Error updating settings:', error);
-        // Surface clearer errors for common cases
         if (error.code === '23505' || (error.message && error.message.includes('duplicate'))) {
           throw new Error('This Project ID is already used by you. Please choose a different one.');
         }
         throw new Error(error.message || 'Unknown database error while saving settings');
       }
 
-      // Update local state to reflect the locked status
       if (!settings.project_id_locked) {
         setSettings(prev => ({ ...prev, project_id_locked: true }));
       }
@@ -284,18 +200,11 @@ const FeedbackSettings = () => {
       toast.success('Settings saved successfully!');
     } catch (error) {
       console.error('Error saving settings:', error);
-      
       if (error instanceof Error) {
-        if (error.message.includes('relation "feedback_settings" does not exist')) {
-          toast.error('Database tables not set up. Please run the database setup script first.');
+        if (error.message.includes('already used by you') || error.message.includes('duplicate')) {
+          toast.error('This Project ID is already used by you. Please choose a different one.');
         } else if (error.message.includes('permission denied')) {
           toast.error('Permission denied. Please check your database permissions.');
-        } else if (
-          error.message.includes('duplicate key') ||
-          error.message.includes('unique constraint') ||
-          error.message.includes('already used by you')
-        ) {
-          toast.error('This Project ID is already used by you. Please choose a different one.');
         } else {
           toast.error(`Failed to save settings: ${error.message}`);
         }
@@ -324,7 +233,6 @@ const FeedbackSettings = () => {
 
   const generateEmbedCode = () => {
     if (!settings) return '';
-
     return `<script src="https://notex.com.ng/feedback-widget.js" data-project-id="${settings.project_id}"></script>`;
   };
 
@@ -355,19 +263,9 @@ const FeedbackSettings = () => {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Settings</h2>
             <p className="text-gray-600 mb-6">{error}</p>
-            <div className="space-y-3">
-              <Button onClick={handleRetry} className="w-full">
-                Try Again
-              </Button>
-              {error.includes('Database tables not set up') && (
-                <div className="text-sm text-gray-500">
-                  <p>To fix this, run the database setup script in your Supabase SQL Editor:</p>
-                  <code className="block mt-2 p-2 bg-gray-100 rounded text-xs">
-                    setup-feedback-system.sql
-                  </code>
-                </div>
-              )}
-            </div>
+            <Button onClick={handleRetry} className="w-full">
+              Try Again
+            </Button>
           </div>
         </div>
       </div>
@@ -420,75 +318,30 @@ const FeedbackSettings = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-                <Label htmlFor="project-id">Project ID</Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      id="project-id"
-                      value={settings.project_id}
-                      onChange={(e) => setSettings({ ...settings, project_id: e.target.value })}
-                      disabled={settings.project_id_locked}
-                      className={`font-mono ${
-                        !settings.project_id_locked && settings.project_id && settings.project_id.length >= 3
-                          ? projectIdStatus === 'available'
-                            ? 'border-green-500 focus:border-green-500'
-                            : projectIdStatus === 'taken'
-                            ? 'border-red-500 focus:border-red-500'
-                            : ''
-                          : ''
-                      }`}
-                      placeholder={settings.project_id_locked ? settings.project_id : "e.g., my-website-2024, company-feedback"}
-                    />
-                    {!settings.project_id_locked && settings.project_id && settings.project_id.length >= 3 && (
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        {projectIdStatus === 'checking' && (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                        )}
-                        {projectIdStatus === 'available' && (
-                          <Check className="h-4 w-4 text-green-600" />
-                        )}
-                        {projectIdStatus === 'taken' && (
-                          <AlertCircle className="h-4 w-4 text-red-600" />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {settings.project_id_locked && (
-                    <Badge variant="outline" className="flex items-center gap-1 bg-green-50 text-green-700 border-green-200">
-                      <Check className="h-3 w-3" />
-                      Locked
-                    </Badge>
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-500">
-                    {settings.project_id_locked 
-                      ? "✅ Project ID is locked and cannot be changed. This ensures consistent feedback collection."
-                      : "⚠️ Enter a unique project ID before saving. It will be permanently locked after the first save."
-                    }
-                  </p>
-                  {!settings.project_id_locked && (
-                    <>
-                      <p className="text-xs text-amber-600">
-                        💡 Choose a unique, memorable ID using letters, numbers, hyphens, and underscores only
-                      </p>
-                      {settings.project_id && settings.project_id.length >= 3 && (
-                        <p className={`text-xs ${
-                          projectIdStatus === 'available' 
-                            ? 'text-green-600' 
-                            : projectIdStatus === 'taken' 
-                            ? 'text-red-600' 
-                            : 'text-gray-500'
-                        }`}>
-                          {projectIdStatus === 'checking' && '🔄 Checking availability...'}
-                          {projectIdStatus === 'available' && '✅ This Project ID is available'}
-                          {projectIdStatus === 'taken' && '❌ This Project ID is already used by you'}
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
+              <Label htmlFor="project-id">Project ID</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="project-id"
+                  value={settings.project_id}
+                  onChange={(e) => setSettings({ ...settings, project_id: e.target.value })}
+                  disabled={settings.project_id_locked}
+                  className="font-mono"
+                  placeholder="e.g., my-website-2024, company-feedback"
+                />
+                {settings.project_id_locked && (
+                  <Badge variant="outline" className="flex items-center gap-1 bg-green-50 text-green-700 border-green-200">
+                    <Check className="h-3 w-3" />
+                    Locked
+                  </Badge>
+                )}
               </div>
+              <p className="text-sm text-gray-500">
+                {settings.project_id_locked 
+                  ? "✅ Project ID is locked and cannot be changed."
+                  : "⚠️ Enter a unique project ID before saving. It will be permanently locked after the first save."
+                }
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -634,7 +487,7 @@ const FeedbackSettings = () => {
         <div className="flex justify-end">
           <Button 
             onClick={handleSave} 
-            disabled={saving || (!settings.project_id_locked && projectIdStatus === 'taken')}
+            disabled={saving}
             className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
           >
             {saving ? (
@@ -690,15 +543,6 @@ const FeedbackSettings = () => {
                   )}
                 </Button>
               </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-900 mb-2">How to use:</h4>
-                <ol className="text-sm text-blue-800 space-y-1">
-                  <li>1. Copy the embed code above</li>
-                  <li>2. Paste it into your website's HTML (before the closing &lt;/body&gt; tag)</li>
-                  <li>3. The feedback widget will appear as a floating button on your website</li>
-                  <li>4. All feedback will be collected and displayed in your Feedback page</li>
-                </ol>
-              </div>
             </CardContent>
           </Card>
         )}
@@ -707,4 +551,4 @@ const FeedbackSettings = () => {
   );
 };
 
-export default FeedbackSettings;
+export default FeedbackSettingsSimple;
