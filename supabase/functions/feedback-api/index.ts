@@ -59,9 +59,21 @@ serve(async (req) => {
       .from('feedback_settings')
       .select('*')
       .eq('project_id', projectId)
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1)
 
-    if (settingsError || !settings) {
+    if (settingsError) {
+      console.error('Error checking project_id:', settingsError)
+      return new Response(
+        JSON.stringify({ error: 'Database error while validating project ID' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    if (!settings || settings.length === 0) {
       return new Response(
         JSON.stringify({ error: 'Invalid project ID' }),
         { 
@@ -70,6 +82,8 @@ serve(async (req) => {
         }
       )
     }
+
+    const projectSettings = settings[0];
 
     // Insert feedback into database
     const { data: feedback, error: insertError } = await supabase
@@ -96,7 +110,7 @@ serve(async (req) => {
     }
 
     // Send email notification if notify_email is set
-    if (settings.notify_email) {
+    if (projectSettings.notify_email) {
       try {
         const emailSubject = 'New Feedback Received - NoteX'
         const emailBody = `
