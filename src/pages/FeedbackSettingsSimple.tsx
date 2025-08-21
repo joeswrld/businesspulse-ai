@@ -187,7 +187,10 @@ const FeedbackSettingsSimple = () => {
 
       if (error) {
         console.error('Error updating settings:', error);
-        throw error;
+        if (error.code === '23505' || (error.message && error.message.includes('duplicate'))) {
+          throw new Error('This Project ID is already used by you. Please choose a different one.');
+        }
+        throw new Error(error.message || 'Unknown database error while saving settings');
       }
 
       if (!settings.project_id_locked) {
@@ -197,7 +200,17 @@ const FeedbackSettingsSimple = () => {
       toast.success('Settings saved successfully!');
     } catch (error) {
       console.error('Error saving settings:', error);
-      toast.error('Failed to save settings. Please try again.');
+      if (error instanceof Error) {
+        if (error.message.includes('already used by you') || error.message.includes('duplicate')) {
+          toast.error('This Project ID is already used by you. Please choose a different one.');
+        } else if (error.message.includes('permission denied')) {
+          toast.error('Permission denied. Please check your database permissions.');
+        } else {
+          toast.error(`Failed to save settings: ${error.message}`);
+        }
+      } else {
+        toast.error('Failed to save settings. Please try again.');
+      }
     } finally {
       setSaving(false);
     }

@@ -148,7 +148,7 @@ BEGIN
         WHERE constraint_name = 'feedbacks_project_id_fkey'
     ) THEN
         ALTER TABLE feedbacks ADD CONSTRAINT feedbacks_project_id_fkey 
-        FOREIGN KEY (project_id) REFERENCES feedback_settings(project_id) ON DELETE CASCADE;
+        FOREIGN KEY (project_id) REFERENCES feedback_settings(project_id) ON UPDATE CASCADE ON DELETE CASCADE;
     END IF;
 END $$;
 

@@ -269,7 +269,11 @@ const FeedbackSettings = () => {
 
       if (error) {
         console.error('Error updating settings:', error);
-        throw error;
+        // Surface clearer errors for common cases
+        if (error.code === '23505' || (error.message && error.message.includes('duplicate'))) {
+          throw new Error('This Project ID is already used by you. Please choose a different one.');
+        }
+        throw new Error(error.message || 'Unknown database error while saving settings');
       }
 
       // Update local state to reflect the locked status
@@ -286,7 +290,11 @@ const FeedbackSettings = () => {
           toast.error('Database tables not set up. Please run the database setup script first.');
         } else if (error.message.includes('permission denied')) {
           toast.error('Permission denied. Please check your database permissions.');
-        } else if (error.message.includes('duplicate key') || error.message.includes('unique constraint')) {
+        } else if (
+          error.message.includes('duplicate key') ||
+          error.message.includes('unique constraint') ||
+          error.message.includes('already used by you')
+        ) {
           toast.error('This Project ID is already used by you. Please choose a different one.');
         } else {
           toast.error(`Failed to save settings: ${error.message}`);
