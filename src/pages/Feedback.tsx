@@ -22,6 +22,9 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { dbPerformance } from "@/utils/performance";
+import { optimizedQueries, queryCache } from "@/utils/optimizedQueries";
+import { performanceTest, componentPerformance } from "@/utils/performanceTest";
 
 interface Feedback {
   id: string;
@@ -45,6 +48,9 @@ const Feedback = () => {
   const [selectedFeedbacks, setSelectedFeedbacks] = useState<Set<string>>(new Set());
   const [bulkUpdating, setBulkUpdating] = useState(false);
 
+  // Performance tracking
+  const renderTimer = componentPerformance.trackRender('Feedback');
+
   const loadProjectId = useCallback(async () => {
     if (!user) {
       console.log('No user, skipping loadProjectId');
@@ -65,12 +71,29 @@ const Feedback = () => {
     try {
       console.log('Loading project ID for user:', user.id);
       
-      const { data, error } = await supabase
-        .from('feedback_settings')
-        .select('project_id')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
+      // Check cache first
+      const cacheKey = queryCache.keys.projectId(user.id);
+      const cachedData = queryCache.get(cacheKey);
+      
+      if (cachedData) {
+        console.log('Using cached project ID data');
+        const projectId = cachedData.project_id;
+        
+        if (!projectId || projectId.trim() === '') {
+          console.log('Project ID is empty, showing setup message');
+          setSettingsConfigured(false);
+          setLoading(false);
+          return;
+        }
+        
+        setProjectId(projectId);
+        setSettingsConfigured(true);
+        console.log('Project ID set from cache');
+        return;
+      }
+
+      // Fetch from database
+      const { data, error } = await optimizedQueries.getUserProjectId(user.id);
 
       if (error) {
         console.error('Error loading project ID:', error);
@@ -82,6 +105,9 @@ const Feedback = () => {
       if (data && Array.isArray(data) && data.length > 0) {
         const projectId = data[0].project_id;
         console.log('Project ID loaded:', projectId);
+        
+        // Cache the result
+        queryCache.set(cacheKey, data[0], 60000); // Cache for 1 minute
         
         // Check if project_id is empty or null
         if (!projectId || projectId.trim() === '') {
@@ -123,11 +149,18 @@ const Feedback = () => {
     try {
       console.log('Loading feedbacks for project:', projectId);
       
-      const { data, error } = await supabase
-        .from('feedbacks')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('timestamp', { ascending: false });
+      // Check cache first
+      const cacheKey = queryCache.keys.feedbacks(projectId);
+      const cachedData = queryCache.get(cacheKey);
+      
+      if (cachedData) {
+        console.log('Using cached feedbacks data');
+        setFeedbacks(cachedData);
+        return;
+      }
+
+      // Fetch from database with limit for better performance
+      const { data, error } = await optimizedQueries.getFeedbacks(projectId, 50);
 
       if (error) {
         console.error('Error in loadFeedbacks query:', error);
@@ -135,6 +168,12 @@ const Feedback = () => {
       }
       
       console.log('Feedbacks loaded:', data?.length || 0);
+      
+      // Cache the result for 30 seconds
+      if (data) {
+        queryCache.set(cacheKey, data, 30000);
+      }
+      
       setFeedbacks(data || []);
     } catch (error) {
       console.error('Error loading feedbacks:', error);
@@ -234,6 +273,10 @@ const Feedback = () => {
   useEffect(() => {
     console.log('useEffect triggered - user:', user?.id, 'loading:', loading);
     if (user && !loading) {
+      // Run performance test on first load
+      if (user.id) {
+        performanceTest.runFullTest(user.id).catch(console.error);
+      }
       loadProjectId();
     }
   }, [user, loadProjectId, loading]);
@@ -426,6 +469,19 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
               <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
               <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
             </div>
+            <button 
+              onClick={() => {
+                if (user?.id) {
+                  performanceTest.runFullTest(user.id).then(({ analysis }) => {
+                    console.log('Performance analysis:', analysis);
+                    toast.info(`Performance: ${analysis.recommendations.join(', ')}`);
+                  });
+                }
+              }}
+              className="mt-4 text-xs text-blue-500 hover:text-blue-700 underline"
+            >
+              Run Performance Test
+            </button>
           </div>
         </div>
       </div>
@@ -491,6 +547,9 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
       </div>
     );
   }
+
+  // End render timer
+  renderTimer.end();
 
   return (
     <div className="container mx-auto px-4 py-8">

@@ -20,6 +20,8 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { dbPerformance } from "@/utils/performance";
+import { optimizedQueries, queryCache } from "@/utils/optimizedQueries";
 
 interface FeedbackSettings {
   id: string;
@@ -71,12 +73,18 @@ const FeedbackSettingsSimple = () => {
     try {
       console.log('Loading settings for user:', user.id);
       
-      const { data, error } = await supabase
-        .from('feedback_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
+      // Check cache first
+      const cacheKey = queryCache.keys.userSettings(user.id);
+      const cachedData = queryCache.get(cacheKey);
+      
+      if (cachedData) {
+        console.log('Using cached settings data');
+        setSettings(cachedData);
+        return;
+      }
+
+      // Fetch from database
+      const { data, error } = await optimizedQueries.getUserSettings(user.id);
 
       console.log('Query result:', { data, error });
 
@@ -87,6 +95,10 @@ const FeedbackSettingsSimple = () => {
 
       if (data && Array.isArray(data) && data.length > 0) {
         console.log('Settings loaded successfully:', data[0]);
+        
+        // Cache the result
+        queryCache.set(cacheKey, data[0], 120000); // Cache for 2 minutes
+        
         setSettings(data[0]);
       } else {
         // No settings found, create default ones
@@ -106,11 +118,7 @@ const FeedbackSettingsSimple = () => {
         
         console.log('Creating settings with data:', newSettingsData);
         
-        const { data: newSettings, error: createError } = await supabase
-          .from('feedback_settings')
-          .insert(newSettingsData)
-          .select()
-          .single();
+        const { data: newSettings, error: createError } = await optimizedQueries.createSettings(newSettingsData);
 
         console.log('Create result:', { newSettings, createError });
 
@@ -118,6 +126,9 @@ const FeedbackSettingsSimple = () => {
           console.error('Error creating settings:', createError);
           throw createError;
         }
+        
+        // Cache the new settings
+        queryCache.set(cacheKey, newSettings, 120000);
         
         setSettings(newSettings);
       }
