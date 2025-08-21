@@ -68,26 +68,55 @@ const TestFeedbackSubmission = () => {
       console.log('Direct insert success:', directResult);
       toast.success('Feedback submitted directly to database!');
 
-      // Method 2: API call (optional)
-      const formData = new FormData();
-      formData.append('project_id', projectId);
-      formData.append('name', name);
-      formData.append('email', email);
-      formData.append('message', message);
+      // Method 2: API call (optional) - Commented out for now
+      /*
+      try {
+        const formData = new FormData();
+        formData.append('project_id', projectId);
+        formData.append('name', name);
+        formData.append('email', email);
+        formData.append('message', message);
 
-      const apiResponse = await fetch('/api/feedback-api', {
-        method: 'POST',
-        body: formData
-      });
+        console.log('Making API call to feedback-api...');
+        
+        // Get Supabase URL from environment or use default
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co';
+        const apiUrl = `${supabaseUrl}/functions/v1/feedback-api`;
+        
+        console.log('API URL:', apiUrl);
+        
+        const apiResponse = await fetch(apiUrl, {
+          method: 'POST',
+          body: formData
+        });
 
-      const apiResult = await apiResponse.json();
-      console.log('API response:', apiResult);
+        console.log('API response status:', apiResponse.status);
+        console.log('API response headers:', Object.fromEntries(apiResponse.headers.entries()));
 
-      if (apiResponse.ok) {
-        toast.success('Feedback also submitted via API!');
-      } else {
-        toast.error('API submission failed: ' + apiResult.error);
+        // Check if response has content
+        const responseText = await apiResponse.text();
+        console.log('API response text:', responseText);
+
+        let apiResult;
+        try {
+          apiResult = responseText ? JSON.parse(responseText) : {};
+        } catch (parseError) {
+          console.error('Failed to parse API response as JSON:', parseError);
+          apiResult = { error: 'Invalid JSON response', raw: responseText };
+        }
+
+        console.log('API response parsed:', apiResult);
+
+        if (apiResponse.ok) {
+          toast.success('Feedback also submitted via API!');
+        } else {
+          toast.error('API submission failed: ' + (apiResult.error || `Status ${apiResponse.status}`));
+        }
+      } catch (apiError) {
+        console.error('API call error:', apiError);
+        toast.error('API call failed: ' + (apiError instanceof Error ? apiError.message : 'Unknown error'));
       }
+      */
 
       // Clear form
       setMessage('This is a test feedback message');
@@ -97,6 +126,69 @@ const TestFeedbackSubmission = () => {
       toast.error('Failed to submit feedback: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const checkSupabaseConfig = () => {
+    console.log('Supabase client config:', {
+      url: supabase.supabaseUrl,
+      anonKey: supabase.supabaseKey ? '***' + supabase.supabaseKey.slice(-4) : 'Not set'
+    });
+    toast.success('Check console for Supabase config');
+  };
+
+  const testApi = async () => {
+    if (!projectId) {
+      toast.error('Please enter a project ID');
+      return;
+    }
+
+    try {
+      console.log('Testing API endpoint...');
+      
+      // Get Supabase URL from environment or use default
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co';
+      const apiUrl = `${supabaseUrl}/functions/v1/feedback-api`;
+      
+      console.log('Environment VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
+      console.log('Using Supabase URL:', supabaseUrl);
+      console.log('Testing API URL:', apiUrl);
+      
+      const formData = new FormData();
+      formData.append('project_id', projectId);
+      formData.append('name', 'API Test User');
+      formData.append('email', 'api-test@example.com');
+      formData.append('message', 'This is an API test message');
+
+      const apiResponse = await fetch(apiUrl, {
+        method: 'POST',
+        body: formData
+      });
+
+      console.log('API response status:', apiResponse.status);
+      console.log('API response headers:', Object.fromEntries(apiResponse.headers.entries()));
+
+      const responseText = await apiResponse.text();
+      console.log('API response text:', responseText);
+
+      let apiResult;
+      try {
+        apiResult = responseText ? JSON.parse(responseText) : {};
+      } catch (parseError) {
+        console.error('Failed to parse API response as JSON:', parseError);
+        apiResult = { error: 'Invalid JSON response', raw: responseText };
+      }
+
+      console.log('API response parsed:', apiResult);
+
+      if (apiResponse.ok) {
+        toast.success('API test successful!');
+      } else {
+        toast.error('API test failed: ' + (apiResult.error || `Status ${apiResponse.status}`));
+      }
+    } catch (apiError) {
+      console.error('API test error:', apiError);
+      toast.error('API test failed: ' + (apiError instanceof Error ? apiError.message : 'Unknown error'));
     }
   };
 
@@ -180,7 +272,7 @@ const TestFeedbackSubmission = () => {
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button 
               onClick={submitFeedback}
               disabled={isSubmitting}
@@ -194,18 +286,34 @@ const TestFeedbackSubmission = () => {
             >
               Check Feedbacks
             </Button>
+            <Button 
+              onClick={testApi}
+              variant="outline"
+            >
+              Test API
+            </Button>
+            <Button 
+              onClick={checkSupabaseConfig}
+              variant="outline"
+            >
+              Check Config
+            </Button>
           </div>
 
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-            <h3 className="font-semibold mb-2">Instructions:</h3>
-            <ol className="text-sm space-y-1">
-              <li>1. Enter your project ID (or use the auto-filled one)</li>
-              <li>2. Fill in the feedback details</li>
-              <li>3. Click "Submit Feedback" to test direct database insert</li>
-              <li>4. Click "Check Feedbacks" to see existing feedbacks</li>
-              <li>5. Go to the Feedback page to see if real-time updates work</li>
-            </ol>
-          </div>
+                      <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <h3 className="font-semibold mb-2">Instructions:</h3>
+              <ol className="text-sm space-y-1">
+                <li>1. Enter your project ID (or use the auto-filled one)</li>
+                <li>2. Fill in the feedback details</li>
+                <li>3. Click "Submit Feedback" to test direct database insert</li>
+                <li>4. Click "Check Feedbacks" to see existing feedbacks</li>
+                <li>5. Click "Test API" to test the feedback API endpoint</li>
+                <li>6. Go to the Feedback page to see if real-time updates work</li>
+              </ol>
+              <p className="text-xs text-gray-500 mt-2">
+                Note: The API test is currently disabled in the main submission to avoid errors.
+              </p>
+            </div>
         </CardContent>
       </Card>
     </div>
