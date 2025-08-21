@@ -50,6 +50,7 @@ const Feedback = () => {
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
 
   // Performance tracking
   const renderTimer = componentPerformance.trackRender('Feedback');
@@ -212,17 +213,23 @@ const Feedback = () => {
         console.log('Real-time subscription status:', status);
         if (status === 'SUBSCRIBED') {
           console.log('Successfully subscribed to feedback updates for project:', projectId);
+          setRealtimeStatus('connected');
           toast.success('Real-time updates enabled', {
             description: 'New feedback will appear automatically',
           });
         } else if (status === 'CHANNEL_ERROR') {
           console.error('Real-time subscription error');
+          setRealtimeStatus('error');
           toast.error('Real-time connection failed. Please refresh the page.');
         } else if (status === 'TIMED_OUT') {
           console.error('Real-time subscription timed out');
+          setRealtimeStatus('error');
           toast.error('Real-time connection timed out. Please refresh the page.');
         } else if (status === 'CLOSED') {
           console.log('Real-time subscription closed');
+          setRealtimeStatus('disconnected');
+        } else if (status === 'PENDING') {
+          setRealtimeStatus('connecting');
         }
       });
 
@@ -526,9 +533,31 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
               Feedback Management
             </h1>
             <div className="flex items-center gap-3">
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 px-3 py-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                Live & Real-time
+              <Badge 
+                variant="outline" 
+                className={`px-3 py-1 ${
+                  realtimeStatus === 'connected' 
+                    ? 'bg-green-50 text-green-700 border-green-200' 
+                    : realtimeStatus === 'connecting'
+                    ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                    : realtimeStatus === 'error'
+                    ? 'bg-red-50 text-red-700 border-red-200'
+                    : 'bg-gray-50 text-gray-700 border-gray-200'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full mr-2 ${
+                  realtimeStatus === 'connected' 
+                    ? 'bg-green-500 animate-pulse' 
+                    : realtimeStatus === 'connecting'
+                    ? 'bg-yellow-500 animate-spin'
+                    : realtimeStatus === 'error'
+                    ? 'bg-red-500'
+                    : 'bg-gray-500'
+                }`}></div>
+                {realtimeStatus === 'connected' && 'Live & Real-time'}
+                {realtimeStatus === 'connecting' && 'Connecting...'}
+                {realtimeStatus === 'error' && 'Connection Error'}
+                {realtimeStatus === 'disconnected' && 'Disconnected'}
               </Badge>
               {isInitializing && (
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1">
@@ -697,6 +726,28 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
                   <Zap className="h-4 w-4 mr-2" />
                   Refresh
                 </Button>
+                {realtimeStatus === 'error' && (
+                  <Button 
+                    onClick={() => {
+                      setRealtimeStatus('connecting');
+                      const cleanup = setupRealtimeSubscription();
+                      if (cleanup) {
+                        setTimeout(() => {
+                          if (realtimeStatus === 'connecting') {
+                            setRealtimeStatus('error');
+                            toast.error('Failed to reconnect. Please refresh the page.');
+                          }
+                        }, 5000);
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Reconnect
+                  </Button>
+                )}
                 <Button onClick={exportToTXT} variant="outline">
                   <Download className="h-4 w-4 mr-2" />
                   Export TXT
@@ -799,8 +850,19 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
                 <CardDescription>
                   {filteredFeedbacks.length} feedback{filteredFeedbacks.length !== 1 ? 's' : ''} found
                   {feedbacks.length > 0 && (
-                    <span className="text-green-600 ml-2">
-                      • Real-time updates enabled
+                    <span className={`ml-2 ${
+                      realtimeStatus === 'connected' 
+                        ? 'text-green-600' 
+                        : realtimeStatus === 'connecting'
+                        ? 'text-yellow-600'
+                        : realtimeStatus === 'error'
+                        ? 'text-red-600'
+                        : 'text-gray-600'
+                    }`}>
+                      • {realtimeStatus === 'connected' && 'Real-time updates enabled'}
+                      • {realtimeStatus === 'connecting' && 'Connecting to real-time...'}
+                      • {realtimeStatus === 'error' && 'Real-time connection failed'}
+                      • {realtimeStatus === 'disconnected' && 'Real-time disconnected'}
                     </span>
                   )}
                 </CardDescription>

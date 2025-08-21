@@ -136,28 +136,28 @@ const App = () => (
             <Route path="/feedback" element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <FeedbackSimple />
+                  <Feedback />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
-            <Route path="/feedback-original" element={
+            <Route path="/feedback-simple" element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <Feedback />
+                  <FeedbackSimple />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
             <Route path="/feedback-settings" element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <FeedbackSettingsSimpleTest />
+                  <FeedbackSettings />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
-            <Route path="/feedback-settings-original" element={
+            <Route path="/feedback-settings-simple" element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <FeedbackSettings />
+                  <FeedbackSettingsSimpleTest />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
