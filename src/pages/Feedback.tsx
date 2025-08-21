@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { componentPerformance } from "@/utils/performanceTest";
 
 interface Feedback {
   id: string;
@@ -34,27 +35,43 @@ interface Feedback {
 }
 
 const Feedback = () => {
+  console.log('Feedback component rendering...');
+  
   const { user } = useAuth();
+  console.log('User from AuthContext:', user);
+  
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [projectId, setProjectId] = useState<string | null>(null);
   const [settingsConfigured, setSettingsConfigured] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedFeedbacks, setSelectedFeedbacks] = useState<Set<string>>(new Set());
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
+
+  // Performance tracking
+  const renderTimer = componentPerformance.trackRender('Feedback');
 
   const loadProjectId = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('No user, skipping loadProjectId');
+      setIsInitializing(false);
+      return;
+    }
 
+    console.log('Starting loadProjectId for user:', user.id);
     setError(null);
-    setLoading(true);
 
     try {
       console.log('Loading project ID for user:', user.id);
       
+      // Simple direct query without complex caching
       const { data, error } = await supabase
         .from('feedback_settings')
-        .select('project_id')
+        .select('project_id, project_id_locked')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1);
@@ -64,50 +81,64 @@ const Feedback = () => {
         throw error;
       }
 
+      console.log('Query result:', { data, error });
+
       if (data && Array.isArray(data) && data.length > 0) {
         const projectId = data[0].project_id;
         console.log('Project ID loaded:', projectId);
+        
+
         
         // Check if project_id is empty or null
         if (!projectId || projectId.trim() === '') {
           console.log('Project ID is empty, showing setup message');
           setSettingsConfigured(false);
-          setLoading(false);
+          setIsInitializing(false);
           return;
         }
         
         setProjectId(projectId);
         setSettingsConfigured(true);
+        setIsInitializing(false);
+        console.log('Project ID set successfully');
       } else {
         console.log('No settings found, showing setup message');
         setSettingsConfigured(false);
+        setIsInitializing(false);
       }
     } catch (error) {
       console.error('Error loading project ID:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setError(`Failed to load project configuration: ${errorMessage}`);
       toast.error(`Failed to load project configuration: ${errorMessage}`);
-    } finally {
-      setLoading(false);
+      setIsInitializing(false);
     }
   }, [user]);
 
   const loadFeedbacks = useCallback(async () => {
-    if (!projectId) return;
+    if (!projectId) {
+      console.log('No projectId, skipping loadFeedbacks');
+      return;
+    }
 
-    setLoading(true);
+    console.log('Starting loadFeedbacks for project:', projectId);
     setError(null);
 
     try {
       console.log('Loading feedbacks for project:', projectId);
       
+      // Simple direct query
       const { data, error } = await supabase
         .from('feedbacks')
         .select('*')
         .eq('project_id', projectId)
-        .order('timestamp', { ascending: false });
+        .order('timestamp', { ascending: false })
+        .limit(50);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error in loadFeedbacks query:', error);
+        throw error;
+      }
       
       console.log('Feedbacks loaded:', data?.length || 0);
       setFeedbacks(data || []);
@@ -116,8 +147,6 @@ const Feedback = () => {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setError(`Failed to load feedbacks: ${errorMessage}`);
       toast.error(`Failed to load feedbacks: ${errorMessage}`);
-    } finally {
-      setLoading(false);
     }
   }, [projectId]);
 
@@ -184,17 +213,23 @@ const Feedback = () => {
         console.log('Real-time subscription status:', status);
         if (status === 'SUBSCRIBED') {
           console.log('Successfully subscribed to feedback updates for project:', projectId);
+          setRealtimeStatus('connected');
           toast.success('Real-time updates enabled', {
             description: 'New feedback will appear automatically',
           });
         } else if (status === 'CHANNEL_ERROR') {
           console.error('Real-time subscription error');
+          setRealtimeStatus('error');
           toast.error('Real-time connection failed. Please refresh the page.');
         } else if (status === 'TIMED_OUT') {
           console.error('Real-time subscription timed out');
+          setRealtimeStatus('error');
           toast.error('Real-time connection timed out. Please refresh the page.');
         } else if (status === 'CLOSED') {
           console.log('Real-time subscription closed');
+          setRealtimeStatus('disconnected');
+        } else if (status === 'PENDING') {
+          setRealtimeStatus('connecting');
         }
       });
 
@@ -206,7 +241,10 @@ const Feedback = () => {
 
   // Load project ID and feedbacks on component mount
   useEffect(() => {
-    loadProjectId();
+    console.log('Feedback useEffect triggered - user:', user?.id, 'isInitializing:', isInitializing, 'settingsConfigured:', settingsConfigured);
+    if (user) {
+      loadProjectId();
+    }
   }, [user, loadProjectId]);
 
   useEffect(() => {
@@ -256,6 +294,69 @@ const Feedback = () => {
         )
       );
     }
+  };
+
+  const bulkUpdateFeedbackStatus = async (status: 'new' | 'reviewed' | 'resolved') => {
+    if (selectedFeedbacks.size === 0) {
+      toast.error('Please select feedbacks to update');
+      return;
+    }
+
+    setBulkUpdating(true);
+    try {
+      console.log('Bulk updating feedback status:', { 
+        feedbackIds: Array.from(selectedFeedbacks), 
+        status 
+      });
+      
+      const { error } = await supabase
+        .from('feedbacks')
+        .update({ status })
+        .in('id', Array.from(selectedFeedbacks));
+
+      if (error) throw error;
+
+      // Update local state immediately for better UX
+      setFeedbacks(prev => 
+        prev.map(feedback => 
+          selectedFeedbacks.has(feedback.id)
+            ? { ...feedback, status }
+            : feedback
+        )
+      );
+
+      // Clear selection
+      setSelectedFeedbacks(new Set());
+
+      toast.success(`${selectedFeedbacks.size} feedback(s) marked as ${status}`);
+    } catch (error) {
+      console.error('Error bulk updating feedback status:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to update feedback status: ${errorMessage}`);
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  const toggleFeedbackSelection = (feedbackId: string) => {
+    setSelectedFeedbacks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(feedbackId)) {
+        newSet.delete(feedbackId);
+      } else {
+        newSet.add(feedbackId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllFeedbacks = () => {
+    const allIds = filteredFeedbacks.map(f => f.id);
+    setSelectedFeedbacks(new Set(allIds));
+  };
+
+  const clearSelection = () => {
+    setSelectedFeedbacks(new Set());
   };
 
   const exportToTXT = () => {
@@ -317,20 +418,7 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
     return matchesSearch && matchesStatus;
   });
 
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">
-              {projectId ? 'Loading feedbacks...' : 'Loading project configuration...'}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+
 
   if (error) {
     return (
@@ -346,7 +434,6 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
               <Button 
                 onClick={() => {
                   setError(null);
-                  setLoading(true);
                   loadProjectId();
                 }}
                 className="w-full"
@@ -392,24 +479,118 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
     );
   }
 
+  // Show loading state while initializing
+  if (isInitializing || settingsConfigured === null) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 mb-4">Initializing...</p>
+            <p className="text-sm text-gray-500 mb-4">
+              User: {user?.id ? 'Logged in' : 'Not logged in'} | 
+              Settings: {settingsConfigured === null ? 'Loading' : settingsConfigured ? 'Configured' : 'Not configured'}
+            </p>
+            <Button 
+              onClick={() => {
+                console.log('Debug: Force loading project ID');
+                loadProjectId();
+              }}
+              variant="outline"
+              size="sm"
+            >
+              Debug: Retry Load
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // End render timer
+  renderTimer.end();
+
+  console.log('About to render Feedback component - states:', {
+    user: !!user,
+    isInitializing,
+    settingsConfigured,
+    error,
+    projectId,
+    feedbacksCount: feedbacks.length
+  });
+
+  // Fallback - show main content even if there are issues
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="text-center mb-8">
-        <div className="flex items-center justify-center mb-4">
-          <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mr-4">
-            <MessageSquare className="h-8 w-8 text-white" />
+        <div className="flex items-center justify-center mb-6">
+          <div className="p-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl mr-6 shadow-lg">
+            <MessageSquare className="h-10 w-10 text-white" />
           </div>
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">Feedback Management</h1>
-            <Badge variant="secondary" className="mt-2">
-              Live
-            </Badge>
+          <div className="text-left">
+            <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2">
+              Feedback Management
+            </h1>
+            <div className="flex items-center gap-3">
+              <Badge 
+                variant="outline" 
+                className={`px-3 py-1 ${
+                  realtimeStatus === 'connected' 
+                    ? 'bg-green-50 text-green-700 border-green-200' 
+                    : realtimeStatus === 'connecting'
+                    ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                    : realtimeStatus === 'error'
+                    ? 'bg-red-50 text-red-700 border-red-200'
+                    : 'bg-gray-50 text-gray-700 border-gray-200'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full mr-2 ${
+                  realtimeStatus === 'connected' 
+                    ? 'bg-green-500 animate-pulse' 
+                    : realtimeStatus === 'connecting'
+                    ? 'bg-yellow-500 animate-spin'
+                    : realtimeStatus === 'error'
+                    ? 'bg-red-500'
+                    : 'bg-gray-500'
+                }`}></div>
+                {realtimeStatus === 'connected' && 'Live & Real-time'}
+                {realtimeStatus === 'connecting' && 'Connecting...'}
+                {realtimeStatus === 'error' && 'Connection Error'}
+                {realtimeStatus === 'disconnected' && 'Disconnected'}
+              </Badge>
+              {isInitializing && (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-spin"></div>
+                  Loading...
+                </Badge>
+              )}
+              <span className="text-sm text-gray-500 font-medium">
+                Powered by NoteX
+              </span>
+            </div>
           </div>
         </div>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          View and manage all feedback from your website visitors in real-time.
-        </p>
+        <div className="max-w-3xl mx-auto">
+          <p className="text-xl text-gray-600 leading-relaxed mb-4">
+            View and manage all feedback from your website visitors in real-time. 
+            Stay connected with your audience and respond to their needs instantly.
+          </p>
+          <div className="flex items-center justify-center gap-6 text-sm text-gray-500">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <span>Real-time updates</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span>Bulk actions</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+              <span>Smart filtering</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="max-w-6xl mx-auto space-y-6">
@@ -426,14 +607,14 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
           </div>
           <Button 
             onClick={() => {
-              setLoading(true);
-              loadFeedbacks();
+              setIsRefreshing(true);
+              loadFeedbacks().finally(() => setIsRefreshing(false));
             }}
             variant="outline"
             size="sm"
-            disabled={loading}
+            disabled={isRefreshing}
           >
-            {loading ? (
+            {isRefreshing ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
                 Refreshing...
@@ -536,15 +717,37 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
               <div className="flex gap-2">
                 <Button 
                   onClick={() => {
-                    setLoading(true);
-                    loadFeedbacks();
+                    setIsRefreshing(true);
+                    loadFeedbacks().finally(() => setIsRefreshing(false));
                   }}
                   variant="outline"
-                  disabled={loading}
+                  disabled={isRefreshing}
                 >
                   <Zap className="h-4 w-4 mr-2" />
                   Refresh
                 </Button>
+                {realtimeStatus === 'error' && (
+                  <Button 
+                    onClick={() => {
+                      setRealtimeStatus('connecting');
+                      const cleanup = setupRealtimeSubscription();
+                      if (cleanup) {
+                        setTimeout(() => {
+                          if (realtimeStatus === 'connecting') {
+                            setRealtimeStatus('error');
+                            toast.error('Failed to reconnect. Please refresh the page.');
+                          }
+                        }, 5000);
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Reconnect
+                  </Button>
+                )}
                 <Button onClick={exportToTXT} variant="outline">
                   <Download className="h-4 w-4 mr-2" />
                   Export TXT
@@ -553,6 +756,90 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
             </div>
           </CardContent>
         </Card>
+
+        {/* Bulk Actions */}
+        {filteredFeedbacks.length > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedFeedbacks.size === filteredFeedbacks.length && filteredFeedbacks.length > 0}
+                      onChange={selectedFeedbacks.size === filteredFeedbacks.length ? clearSelection : selectAllFeedbacks}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-600">
+                      {selectedFeedbacks.size === 0 
+                        ? 'Select all' 
+                        : `${selectedFeedbacks.size} of ${filteredFeedbacks.length} selected`
+                      }
+                    </span>
+                  </div>
+                  
+                  {selectedFeedbacks.size > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-500">Bulk actions:</span>
+                      <Button
+                        onClick={() => bulkUpdateFeedbackStatus('reviewed')}
+                        disabled={bulkUpdating}
+                        size="sm"
+                        variant="outline"
+                        className="text-yellow-700 border-yellow-200 hover:bg-yellow-50"
+                      >
+                        {bulkUpdating ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-yellow-600 mr-1"></div>
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="h-3 w-3 mr-1" />
+                            Mark Reviewed
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        onClick={() => bulkUpdateFeedbackStatus('resolved')}
+                        disabled={bulkUpdating}
+                        size="sm"
+                        variant="outline"
+                        className="text-green-700 border-green-200 hover:bg-green-50"
+                      >
+                        {bulkUpdating ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-1"></div>
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Mark Resolved
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        onClick={clearSelection}
+                        size="sm"
+                        variant="ghost"
+                        className="text-gray-500"
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                
+                {selectedFeedbacks.size > 0 && (
+                  <div className="text-sm text-gray-500">
+                    {selectedFeedbacks.size} feedback{selectedFeedbacks.size !== 1 ? 's' : ''} selected
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Feedback List */}
         <Card>
@@ -563,13 +850,24 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
                 <CardDescription>
                   {filteredFeedbacks.length} feedback{filteredFeedbacks.length !== 1 ? 's' : ''} found
                   {feedbacks.length > 0 && (
-                    <span className="text-green-600 ml-2">
-                      • Real-time updates enabled
+                    <span className={`ml-2 ${
+                      realtimeStatus === 'connected' 
+                        ? 'text-green-600' 
+                        : realtimeStatus === 'connecting'
+                        ? 'text-yellow-600'
+                        : realtimeStatus === 'error'
+                        ? 'text-red-600'
+                        : 'text-gray-600'
+                    }`}>
+                      • {realtimeStatus === 'connected' && 'Real-time updates enabled'}
+                      • {realtimeStatus === 'connecting' && 'Connecting to real-time...'}
+                      • {realtimeStatus === 'error' && 'Real-time connection failed'}
+                      • {realtimeStatus === 'disconnected' && 'Real-time disconnected'}
                     </span>
                   )}
                 </CardDescription>
               </div>
-              {loading && (
+              {isRefreshing && (
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                   Refreshing...
@@ -610,9 +908,19 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
             ) : (
               <div className="space-y-4">
                 {filteredFeedbacks.map((feedback) => (
-                  <div key={feedback.id} className="border rounded-lg p-6 hover:bg-gray-50 transition-colors">
+                  <div key={feedback.id} className={`border rounded-lg p-6 transition-colors ${
+                    selectedFeedbacks.has(feedback.id) 
+                      ? 'bg-blue-50 border-blue-200' 
+                      : 'hover:bg-gray-50'
+                  }`}>
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedFeedbacks.has(feedback.id)}
+                          onChange={() => toggleFeedbackSelection(feedback.id)}
+                          className="rounded border-gray-300 mt-1"
+                        />
                         {getStatusIcon(feedback.status)}
                         <div>
                           <h3 className="font-semibold text-gray-900">

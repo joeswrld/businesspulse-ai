@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
+
 interface FeedbackSettings {
   id: string;
   user_id: string;
@@ -40,26 +41,31 @@ interface FeedbackSettings {
 
 const FeedbackSettingsSimple = () => {
   console.log('FeedbackSettingsSimple component rendering...');
+  
   const { user } = useAuth();
   console.log('User from AuthContext:', user);
   
   const [settings, setSettings] = useState<FeedbackSettings | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const loadSettings = async () => {
     console.log('loadSettings called, user:', user);
     if (!user) {
       console.log('No user, returning early');
-      setLoading(false);
+      setIsInitializing(false);
       return;
     }
+
+    console.log('Starting loadSettings for user:', user.id);
+    setError(null);
 
     try {
       console.log('Loading settings for user:', user.id);
       
+      // Simple direct query
       const { data, error } = await supabase
         .from('feedback_settings')
         .select('*')
@@ -77,6 +83,7 @@ const FeedbackSettingsSimple = () => {
       if (data && Array.isArray(data) && data.length > 0) {
         console.log('Settings loaded successfully:', data[0]);
         setSettings(data[0]);
+        setIsInitializing(false);
       } else {
         // No settings found, create default ones
         console.log('No settings found, creating default settings...');
@@ -109,6 +116,7 @@ const FeedbackSettingsSimple = () => {
         }
         
         setSettings(newSettings);
+        setIsInitializing(false);
       }
     } catch (error) {
       console.error('Error in loadSettings:', error);
@@ -127,20 +135,19 @@ const FeedbackSettingsSimple = () => {
       
       setError(errorMessage);
       toast.error(errorMessage);
-    } finally {
-      setLoading(false);
+      setIsInitializing(false);
     }
   };
 
   useEffect(() => {
-    console.log('useEffect for loadSettings triggered, user:', user);
-    setError(null);
-    loadSettings();
+    console.log('FeedbackSettings useEffect triggered - user:', user?.id, 'isInitializing:', isInitializing, 'settings:', settings);
+    if (user) {
+      loadSettings();
+    }
   }, [user]);
 
   const handleRetry = () => {
     setError(null);
-    setLoading(true);
     loadSettings();
   };
 
@@ -236,21 +243,9 @@ const FeedbackSettingsSimple = () => {
     return `<script src="https://notex.com.ng/feedback-widget.js" data-project-id="${settings.project_id}"></script>`;
   };
 
-  console.log('Render conditions - loading:', loading, 'error:', error, 'settings:', settings);
+  console.log('Render conditions - error:', error, 'settings:', settings);
   
-  if (loading) {
-    console.log('Rendering loading state');
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading feedback settings...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+
 
   if (error) {
     console.log('Rendering error state');
@@ -272,18 +267,45 @@ const FeedbackSettingsSimple = () => {
     );
   }
 
-  if (!settings) {
-    console.log('Rendering no settings state');
+  // Show loading state while initializing
+  if (isInitializing || !settings) {
+    console.log('Rendering loading state - isInitializing:', isInitializing, 'settings:', settings);
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <p className="text-gray-600">Failed to load settings. Please try again.</p>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 mb-4">Loading settings...</p>
+            <p className="text-sm text-gray-500 mb-4">
+              User: {user?.id ? 'Logged in' : 'Not logged in'} | 
+              Settings: {settings ? 'Loaded' : 'Not loaded'}
+            </p>
+            <Button 
+              onClick={() => {
+                console.log('Debug: Force loading settings');
+                loadSettings();
+              }}
+              variant="outline"
+              size="sm"
+            >
+              Debug: Retry Load
+            </Button>
+          </div>
         </div>
       </div>
     );
   }
 
-  console.log('Rendering main content');
+  console.log('Rendering main content - settings:', settings);
+  
+  console.log('About to render FeedbackSettings component - states:', {
+    user: !!user,
+    isInitializing,
+    settings,
+    error
+  });
+  
+  // Fallback - show main content even if there are issues
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
@@ -292,12 +314,20 @@ const FeedbackSettingsSimple = () => {
           <div className="p-3 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full mr-4">
             <SlidersHorizontal className="h-8 w-8 text-white" />
           </div>
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">Feedback Settings</h1>
-            <Badge variant="secondary" className="mt-2">
-              Live
-            </Badge>
-          </div>
+                      <div>
+              <h1 className="text-4xl font-bold text-gray-900">Feedback Settings</h1>
+              <div className="flex items-center gap-2 mt-2">
+                <Badge variant="secondary">
+                  Live
+                </Badge>
+                {isInitializing && (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-spin"></div>
+                    Loading...
+                  </Badge>
+                )}
+              </div>
+            </div>
         </div>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
           Customize your feedback widget and configure how you receive feedback from your website visitors.
