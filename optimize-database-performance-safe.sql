@@ -87,10 +87,7 @@ $$ LANGUAGE plpgsql STABLE;
 GRANT SELECT ON active_feedback_settings TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_feedback_settings(UUID) TO authenticated;
 
--- 7. Add RLS policies for the view
-ALTER VIEW active_feedback_settings SET (security_invoker = true);
-
--- 8. Create a materialized view for frequently accessed data (safe)
+-- 7. Create a materialized view for frequently accessed data (safe)
 CREATE MATERIALIZED VIEW IF NOT EXISTS user_feedback_summary AS
 SELECT 
   fs.user_id,
@@ -104,15 +101,12 @@ LEFT JOIN feedbacks f ON fs.project_id = f.project_id
 WHERE fs.project_id IS NOT NULL AND fs.project_id != ''
 GROUP BY fs.user_id;
 
--- 9. Create index on the materialized view
+-- 8. Create index on the materialized view
 CREATE INDEX IF NOT EXISTS idx_user_feedback_summary_user_id 
 ON user_feedback_summary(user_id);
 
--- 10. Grant permissions for the materialized view
+-- 9. Grant permissions for the materialized view
 GRANT SELECT ON user_feedback_summary TO authenticated;
-
--- 11. Add RLS policy for the materialized view
-ALTER MATERIALIZED VIEW user_feedback_summary SET (security_invoker = true);
 
 -- 12. Create a function to refresh the materialized view
 CREATE OR REPLACE FUNCTION refresh_feedback_summary()
@@ -138,15 +132,13 @@ ORDER BY tablename, indexname;
 -- 15. Verify the view was created
 SELECT 
   schemaname,
-  viewname,
-  definition
+  viewname
 FROM pg_views 
 WHERE viewname = 'active_feedback_settings';
 
 -- 16. Verify the materialized view was created
 SELECT 
   schemaname,
-  matviewname,
-  definition
+  matviewname
 FROM pg_matviews 
 WHERE matviewname = 'user_feedback_summary';

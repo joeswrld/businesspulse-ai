@@ -6,17 +6,17 @@ The error `column "user_id" does not exist` was caused by trying to create a mat
 
 ## 🔧 **How to Run the Safe Optimization**
 
-### **Option 1: Use the Safe Script (Recommended)**
+### **Option 1: Use the Minimal Script (Recommended)**
 
-1. **Copy the safe optimization script:**
+1. **Copy the minimal optimization script:**
    ```sql
-   -- Copy the contents of `optimize-database-performance-safe.sql`
+   -- Copy the contents of `optimize-database-performance-minimal.sql`
    ```
 
 2. **Run it in your Supabase SQL Editor:**
    - Go to your Supabase Dashboard
    - Navigate to SQL Editor
-   - Paste the safe script
+   - Paste the minimal script
    - Click "Run"
 
 ### **Option 2: Run Individual Commands**
@@ -31,22 +31,7 @@ ON feedback_settings(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_feedbacks_project_id_timestamp 
 ON feedbacks(project_id, timestamp DESC);
 
--- 2. Add partial index for active settings
-CREATE INDEX IF NOT EXISTS idx_feedback_settings_active 
-ON feedback_settings(user_id, created_at DESC) 
-WHERE project_id IS NOT NULL AND project_id != '';
-
--- 3. Create optimized view
-CREATE OR REPLACE VIEW active_feedback_settings AS
-SELECT DISTINCT ON (user_id) 
-  id, user_id, project_id, project_id_locked, title, show_name, 
-  show_email, button_text, redirect_url, theme, brand_color, 
-  notify_email, created_at, updated_at
-FROM feedback_settings 
-WHERE project_id IS NOT NULL AND project_id != '' AND project_id_locked = true
-ORDER BY user_id, created_at DESC;
-
--- 4. Update statistics
+-- 2. Update statistics
 ANALYZE feedback_settings;
 ANALYZE feedbacks;
 ```
@@ -82,7 +67,6 @@ ORDER BY tablename, indexname;
 You should see:
 - `idx_feedback_settings_user_id_created_at`
 - `idx_feedbacks_project_id_timestamp`
-- `idx_feedback_settings_active`
 
 ## 🚀 **Test the Performance**
 
