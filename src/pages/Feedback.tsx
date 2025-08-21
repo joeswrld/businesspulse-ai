@@ -22,9 +22,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { dbPerformance } from "@/utils/performance";
-import { optimizedQueries, queryCache } from "@/utils/optimizedQueries";
-import { performanceTest, componentPerformance } from "@/utils/performanceTest";
+import { componentPerformance } from "@/utils/performanceTest";
 
 interface Feedback {
   id: string;
@@ -58,6 +56,7 @@ const Feedback = () => {
   const loadProjectId = useCallback(async () => {
     if (!user) {
       console.log('No user, skipping loadProjectId');
+      setIsInitializing(false);
       return;
     }
 
@@ -67,45 +66,13 @@ const Feedback = () => {
     try {
       console.log('Loading project ID for user:', user.id);
       
-      // Check cache first
-      const cacheKey = queryCache.keys.projectId(user.id);
-      const cachedData = queryCache.get(cacheKey);
-      
-      if (cachedData) {
-        console.log('Using cached project ID data');
-        const projectId = cachedData.project_id;
-        
-        if (!projectId || projectId.trim() === '') {
-          console.log('Project ID is empty, showing setup message');
-          setSettingsConfigured(false);
-          return;
-        }
-        
-        setProjectId(projectId);
-        setSettingsConfigured(true);
-        setIsInitializing(false);
-        console.log('Project ID set from cache');
-        return;
-      }
-
-      // Fetch from database with fallback
-      let data, error;
-      try {
-        const result = await optimizedQueries.getUserProjectId(user.id);
-        data = result.data;
-        error = result.error;
-      } catch (optError) {
-        console.log('Optimized query failed, using fallback:', optError);
-        // Fallback to direct query
-        const result = await supabase
-          .from('feedback_settings')
-          .select('project_id, project_id_locked')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1);
-        data = result.data;
-        error = result.error;
-      }
+      // Simple direct query without complex caching
+      const { data, error } = await supabase
+        .from('feedback_settings')
+        .select('project_id, project_id_locked')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
 
       if (error) {
         console.error('Error loading project ID:', error);
@@ -118,8 +85,7 @@ const Feedback = () => {
         const projectId = data[0].project_id;
         console.log('Project ID loaded:', projectId);
         
-        // Cache the result
-        queryCache.set(cacheKey, data[0], 60000); // Cache for 1 minute
+
         
         // Check if project_id is empty or null
         if (!projectId || projectId.trim() === '') {
@@ -159,18 +125,13 @@ const Feedback = () => {
     try {
       console.log('Loading feedbacks for project:', projectId);
       
-      // Check cache first
-      const cacheKey = queryCache.keys.feedbacks(projectId);
-      const cachedData = queryCache.get(cacheKey);
-      
-      if (cachedData) {
-        console.log('Using cached feedbacks data');
-        setFeedbacks(cachedData);
-        return;
-      }
-
-      // Fetch from database with limit for better performance
-      const { data, error } = await optimizedQueries.getFeedbacks(projectId, 50);
+      // Simple direct query
+      const { data, error } = await supabase
+        .from('feedbacks')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('timestamp', { ascending: false })
+        .limit(50);
 
       if (error) {
         console.error('Error in loadFeedbacks query:', error);
@@ -178,12 +139,6 @@ const Feedback = () => {
       }
       
       console.log('Feedbacks loaded:', data?.length || 0);
-      
-      // Cache the result for 30 seconds
-      if (data) {
-        queryCache.set(cacheKey, data, 30000);
-      }
-      
       setFeedbacks(data || []);
     } catch (error) {
       console.error('Error loading feedbacks:', error);
@@ -280,10 +235,6 @@ const Feedback = () => {
   useEffect(() => {
     console.log('Feedback useEffect triggered - user:', user?.id, 'isInitializing:', isInitializing, 'settingsConfigured:', settingsConfigured);
     if (user) {
-      // Run performance test on first load
-      if (user.id) {
-        performanceTest.runFullTest(user.id).catch(console.error);
-      }
       loadProjectId();
     }
   }, [user, loadProjectId]);
