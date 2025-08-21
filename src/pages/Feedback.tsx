@@ -56,22 +56,32 @@ const Feedback = () => {
         .from('feedback_settings')
         .select('project_id')
         .eq('user_id', user.id)
-        .single();
+        .order('created_at', { ascending: false })
+        .limit(1);
 
       if (error) {
-        // If no settings exist, show configuration message
-        if (error.code === 'PGRST116') {
-          console.log('No settings found, showing setup message');
+        console.error('Error loading project ID:', error);
+        throw error;
+      }
+
+      if (data && Array.isArray(data) && data.length > 0) {
+        const projectId = data[0].project_id;
+        console.log('Project ID loaded:', projectId);
+        
+        // Check if project_id is empty or null
+        if (!projectId || projectId.trim() === '') {
+          console.log('Project ID is empty, showing setup message');
           setSettingsConfigured(false);
           setLoading(false);
           return;
         }
-        throw error;
+        
+        setProjectId(projectId);
+        setSettingsConfigured(true);
+      } else {
+        console.log('No settings found, showing setup message');
+        setSettingsConfigured(false);
       }
-      
-      console.log('Project ID loaded:', data.project_id);
-      setProjectId(data.project_id);
-      setSettingsConfigured(true);
     } catch (error) {
       console.error('Error loading project ID:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
