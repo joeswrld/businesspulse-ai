@@ -126,17 +126,30 @@ const Feedback = () => {
 
     console.log('Setting up real-time subscription for project:', projectId);
 
+    const channelName = `feedbacks-${projectId}`;
     const subscription = supabase
-      .channel(`feedbacks:project_id=eq.${projectId}`)
+      .channel(channelName)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'feedbacks',
         filter: `project_id=eq.${projectId}`
       }, (payload) => {
-        console.log('New feedback received:', payload.new);
+        console.log('New feedback received via real-time:', payload.new);
         const newFeedback = payload.new as Feedback;
-        setFeedbacks(prev => [newFeedback, ...prev]);
+        
+        // Add the new feedback to the top of the list
+        setFeedbacks(prev => {
+          // Check if feedback already exists to avoid duplicates
+          const exists = prev.some(f => f.id === newFeedback.id);
+          if (exists) {
+            console.log('Feedback already exists in list, skipping duplicate');
+            return prev;
+          }
+          console.log('Adding new feedback to list');
+          return [newFeedback, ...prev];
+        });
+        
         toast.success('New feedback received!', {
           description: `From: ${newFeedback.name || 'Anonymous'}`,
         });
@@ -147,7 +160,7 @@ const Feedback = () => {
         table: 'feedbacks',
         filter: `project_id=eq.${projectId}`
       }, (payload) => {
-        console.log('Feedback updated:', payload.new);
+        console.log('Feedback updated via real-time:', payload.new);
         const updatedFeedback = payload.new as Feedback;
         setFeedbacks(prev => 
           prev.map(feedback => 
@@ -155,18 +168,38 @@ const Feedback = () => {
           )
         );
       })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'feedbacks',
+        filter: `project_id=eq.${projectId}`
+      }, (payload) => {
+        console.log('Feedback deleted via real-time:', payload.old);
+        const deletedFeedback = payload.old as Feedback;
+        setFeedbacks(prev => 
+          prev.filter(feedback => feedback.id !== deletedFeedback.id)
+        );
+      })
       .subscribe((status) => {
-        console.log('Subscription status:', status);
+        console.log('Real-time subscription status:', status);
         if (status === 'SUBSCRIBED') {
-          console.log('Successfully subscribed to feedback updates');
+          console.log('Successfully subscribed to feedback updates for project:', projectId);
+          toast.success('Real-time updates enabled', {
+            description: 'New feedback will appear automatically',
+          });
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('Subscription error');
+          console.error('Real-time subscription error');
           toast.error('Real-time connection failed. Please refresh the page.');
+        } else if (status === 'TIMED_OUT') {
+          console.error('Real-time subscription timed out');
+          toast.error('Real-time connection timed out. Please refresh the page.');
+        } else if (status === 'CLOSED') {
+          console.log('Real-time subscription closed');
         }
       });
 
     return () => {
-      console.log('Cleaning up subscription');
+      console.log('Cleaning up real-time subscription for project:', projectId);
       supabase.removeChannel(subscription);
     };
   }, [projectId]);
@@ -380,6 +413,40 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
       </div>
 
       <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header Actions */}
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+              Real-time Active
+            </Badge>
+            <span className="text-sm text-gray-500">
+              New feedback will appear automatically
+            </span>
+          </div>
+          <Button 
+            onClick={() => {
+              setLoading(true);
+              loadFeedbacks();
+            }}
+            variant="outline"
+            size="sm"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <Zap className="h-4 w-4 mr-2" />
+                Refresh
+              </>
+            )}
+          </Button>
+        </div>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
