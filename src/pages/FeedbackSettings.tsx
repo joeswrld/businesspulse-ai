@@ -53,6 +53,7 @@ const FeedbackSettings = () => {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [projectIdStatus, setProjectIdStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
 
   const loadSettings = useCallback(async () => {
     if (!user) return;
@@ -138,6 +139,52 @@ const FeedbackSettings = () => {
     loadSettings();
   }, [user, loadSettings]);
 
+  // Check project ID availability when it changes
+  useEffect(() => {
+    if (!settings?.project_id_locked && settings?.project_id) {
+      const timeoutId = setTimeout(() => {
+        checkProjectIdAvailability(settings.project_id);
+      }, 500); // Debounce for 500ms
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      setProjectIdStatus('idle');
+    }
+  }, [settings?.project_id, settings?.project_id_locked, checkProjectIdAvailability]);
+
+  const checkProjectIdAvailability = useCallback(async (projectId: string) => {
+    if (!user || !projectId || projectId.trim() === '' || projectId.length < 3) {
+      setProjectIdStatus('idle');
+      return;
+    }
+
+    setProjectIdStatus('checking');
+
+    try {
+      const { data: existingSettings, error: checkError } = await supabase
+        .from('feedback_settings')
+        .select('id, project_id')
+        .eq('user_id', user.id)
+        .eq('project_id', projectId.trim())
+        .neq('id', settings?.id || ''); // Exclude current settings
+
+      if (checkError) {
+        console.error('Error checking project ID availability:', checkError);
+        setProjectIdStatus('idle');
+        return;
+      }
+
+      if (existingSettings && existingSettings.length > 0) {
+        setProjectIdStatus('taken');
+      } else {
+        setProjectIdStatus('available');
+      }
+    } catch (error) {
+      console.error('Error checking project ID availability:', error);
+      setProjectIdStatus('idle');
+    }
+  }, [user, settings?.id]);
+
   const handleRetry = () => {
     setError(null);
     setLoading(true);
@@ -162,6 +209,25 @@ const FeedbackSettings = () => {
       // Check for valid characters (alphanumeric, hyphens, underscores)
       if (!/^[a-zA-Z0-9_-]+$/.test(settings.project_id)) {
         toast.error('Project ID can only contain letters, numbers, hyphens, and underscores');
+        return;
+      }
+
+      // Check if project ID is already used by this user
+      const { data: existingSettings, error: checkError } = await supabase
+        .from('feedback_settings')
+        .select('id, project_id')
+        .eq('user_id', user.id)
+        .eq('project_id', settings.project_id.trim())
+        .neq('id', settings.id); // Exclude current settings
+
+      if (checkError) {
+        console.error('Error checking project ID uniqueness:', checkError);
+        toast.error('Failed to validate Project ID. Please try again.');
+        return;
+      }
+
+      if (existingSettings && existingSettings.length > 0) {
+        toast.error('This Project ID is already used by you. Please choose a different one.');
         return;
       }
     }
@@ -212,8 +278,8 @@ const FeedbackSettings = () => {
           toast.error('Database tables not set up. Please run the database setup script first.');
         } else if (error.message.includes('permission denied')) {
           toast.error('Permission denied. Please check your database permissions.');
-        } else if (error.message.includes('duplicate key')) {
-          toast.error('Project ID already exists. Please choose a different one.');
+        } else if (error.message.includes('duplicate key') || error.message.includes('unique constraint')) {
+          toast.error('This Project ID is already used by you. Please choose a different one.');
         } else {
           toast.error(`Failed to save settings: ${error.message}`);
         }
@@ -331,17 +397,40 @@ const FeedbackSettings = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
+                          <div className="space-y-2">
                 <Label htmlFor="project-id">Project ID</Label>
                 <div className="flex gap-2">
-                  <Input
-                    id="project-id"
-                    value={settings.project_id}
-                    onChange={(e) => setSettings({ ...settings, project_id: e.target.value })}
-                    disabled={settings.project_id_locked}
-                    className="font-mono"
-                    placeholder={settings.project_id_locked ? settings.project_id : "e.g., my-website-2024, company-feedback"}
-                  />
+                  <div className="relative flex-1">
+                    <Input
+                      id="project-id"
+                      value={settings.project_id}
+                      onChange={(e) => setSettings({ ...settings, project_id: e.target.value })}
+                      disabled={settings.project_id_locked}
+                      className={`font-mono ${
+                        !settings.project_id_locked && settings.project_id && settings.project_id.length >= 3
+                          ? projectIdStatus === 'available'
+                            ? 'border-green-500 focus:border-green-500'
+                            : projectIdStatus === 'taken'
+                            ? 'border-red-500 focus:border-red-500'
+                            : ''
+                          : ''
+                      }`}
+                      placeholder={settings.project_id_locked ? settings.project_id : "e.g., my-website-2024, company-feedback"}
+                    />
+                    {!settings.project_id_locked && settings.project_id && settings.project_id.length >= 3 && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        {projectIdStatus === 'checking' && (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        )}
+                        {projectIdStatus === 'available' && (
+                          <Check className="h-4 w-4 text-green-600" />
+                        )}
+                        {projectIdStatus === 'taken' && (
+                          <AlertCircle className="h-4 w-4 text-red-600" />
+                        )}
+                      </div>
+                    )}
+                  </div>
                   {settings.project_id_locked && (
                     <Badge variant="outline" className="flex items-center gap-1 bg-green-50 text-green-700 border-green-200">
                       <Check className="h-3 w-3" />
@@ -357,9 +446,24 @@ const FeedbackSettings = () => {
                     }
                   </p>
                   {!settings.project_id_locked && (
-                    <p className="text-xs text-amber-600">
-                      💡 Choose a unique, memorable ID using letters, numbers, hyphens, and underscores only
-                    </p>
+                    <>
+                      <p className="text-xs text-amber-600">
+                        💡 Choose a unique, memorable ID using letters, numbers, hyphens, and underscores only
+                      </p>
+                      {settings.project_id && settings.project_id.length >= 3 && (
+                        <p className={`text-xs ${
+                          projectIdStatus === 'available' 
+                            ? 'text-green-600' 
+                            : projectIdStatus === 'taken' 
+                            ? 'text-red-600' 
+                            : 'text-gray-500'
+                        }`}>
+                          {projectIdStatus === 'checking' && '🔄 Checking availability...'}
+                          {projectIdStatus === 'available' && '✅ This Project ID is available'}
+                          {projectIdStatus === 'taken' && '❌ This Project ID is already used by you'}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -508,7 +612,7 @@ const FeedbackSettings = () => {
         <div className="flex justify-end">
           <Button 
             onClick={handleSave} 
-            disabled={saving}
+            disabled={saving || (!settings.project_id_locked && projectIdStatus === 'taken')}
             className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
           >
             {saving ? (

@@ -87,13 +87,13 @@ BEGIN
         CHECK (NOT project_id_locked OR (project_id IS NOT NULL AND project_id != ''));
     END IF;
     
-    -- Create unique index on project_id that excludes empty values
+    -- Create unique index on project_id per user that excludes empty values
     IF NOT EXISTS (
         SELECT 1 FROM pg_indexes 
-        WHERE indexname = 'idx_feedback_settings_project_id_unique'
+        WHERE indexname = 'idx_feedback_settings_project_id_user_unique'
     ) THEN
-        CREATE UNIQUE INDEX idx_feedback_settings_project_id_unique 
-        ON feedback_settings (project_id) 
+        CREATE UNIQUE INDEX idx_feedback_settings_project_id_user_unique 
+        ON feedback_settings (user_id, project_id) 
         WHERE project_id IS NOT NULL AND project_id != '';
     END IF;
 END $$;

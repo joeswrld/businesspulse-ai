@@ -4,18 +4,12 @@
 -- First, drop the existing unique constraint on project_id
 ALTER TABLE feedback_settings DROP CONSTRAINT IF EXISTS feedback_settings_project_id_key;
 
--- Add a new unique constraint that only applies to non-empty project_ids
-ALTER TABLE feedback_settings ADD CONSTRAINT feedback_settings_project_id_unique 
-CHECK (project_id IS NULL OR project_id = '' OR NOT EXISTS (
-  SELECT 1 FROM feedback_settings fs2 
-  WHERE fs2.project_id = feedback_settings.project_id 
-  AND fs2.project_id != '' 
-  AND fs2.id != feedback_settings.id
-));
+-- Drop the old unique index if it exists
+DROP INDEX IF EXISTS idx_feedback_settings_project_id_unique;
 
--- Create a unique index on project_id that excludes empty values
-CREATE UNIQUE INDEX IF NOT EXISTS idx_feedback_settings_project_id_unique 
-ON feedback_settings (project_id) 
+-- Create a unique index on project_id per user that excludes empty values
+CREATE UNIQUE INDEX IF NOT EXISTS idx_feedback_settings_project_id_user_unique 
+ON feedback_settings (user_id, project_id) 
 WHERE project_id IS NOT NULL AND project_id != '';
 
 -- Add a check constraint to ensure project_id is not empty when locked

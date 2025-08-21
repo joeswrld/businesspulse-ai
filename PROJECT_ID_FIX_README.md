@@ -5,6 +5,7 @@ The Feedback Settings page had an issue where:
 1. On browser refresh, the Project ID would unlock and change to a random value
 2. The Project ID field was not properly handling empty values
 3. Users couldn't input their own Project ID initially
+4. Project IDs were globally unique, preventing multiple users from using the same Project ID
 
 ## Root Cause
 The issue was in the `loadSettings` function in `src/pages/FeedbackSettings.tsx`. When no settings existed, it would:
@@ -12,7 +13,7 @@ The issue was in the `loadSettings` function in `src/pages/FeedbackSettings.tsx`
 2. Set `project_id_locked: false`
 3. This happened every time the page was refreshed if no settings existed
 
-Additionally, the database schema had `project_id TEXT UNIQUE NOT NULL`, which prevented empty values.
+Additionally, the database schema had `project_id TEXT UNIQUE NOT NULL`, which prevented empty values and made Project IDs globally unique instead of per-user unique.
 
 ## Solution Implemented
 
@@ -29,14 +30,16 @@ Additionally, the database schema had `project_id TEXT UNIQUE NOT NULL`, which p
 - **Modified `setup-feedback-system.sql`**: Changed `project_id TEXT UNIQUE NOT NULL` to `project_id TEXT`
 - **Added proper constraints**:
   - `project_id_locked_check`: Ensures Project ID is not empty when locked
-  - `idx_feedback_settings_project_id_unique`: Unique index excluding empty values
+  - `idx_feedback_settings_project_id_user_unique`: Unique index per user excluding empty values
 - **Updated `migrate-feedback-system.sql`**: Added migration logic for existing databases
+- **Per-user uniqueness**: Project IDs are now unique per user, allowing multiple users to use the same Project ID
 
 ### 3. New Migration Script (`fix-project-id-constraint.sql`)
 Created a standalone migration script to fix existing databases:
 - Drops the old unique constraint
 - Adds new constraints that allow empty values initially
 - Updates any locked settings with empty Project IDs
+- Changes from global uniqueness to per-user uniqueness
 
 ## How to Apply the Fix
 
@@ -69,8 +72,9 @@ Created a standalone migration script to fix existing databases:
 ## Validation Rules
 - Project ID must be at least 3 characters long
 - Only allows letters, numbers, hyphens, and underscores
-- Must be unique across all users
+- Must be unique per user (multiple users can use the same Project ID)
 - Cannot be changed once locked
+- Real-time availability checking with visual feedback
 
 ## Testing
 To test the fix:
@@ -80,6 +84,8 @@ To test the fix:
 4. Enter a Project ID and save
 5. Refresh the page and verify the Project ID remains locked
 6. Try to edit the Project ID - it should be disabled
+7. Test per-user uniqueness by creating multiple user accounts and using the same Project ID
+8. Verify real-time availability checking shows appropriate status
 
 ## Files Modified
 - `src/pages/FeedbackSettings.tsx` - Main frontend fix
