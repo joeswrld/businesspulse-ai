@@ -71,50 +71,51 @@ const FeedbackSettings = () => {
         .from('feedback_settings')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .order('created_at', { ascending: false })
+        .limit(1);
 
       console.log('Query result:', { data, error });
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // No settings found, create default ones with blank project_id
-          console.log('No settings found, creating default settings...');
-          
-          const newSettingsData = {
-            user_id: user.id,
-            project_id: '', // Leave blank for user input
-            project_id_locked: false,
-            title: 'Share your thoughts with us',
-            show_name: true,
-            show_email: true,
-            button_text: 'Send Feedback',
-            theme: 'light',
-            brand_color: '#2563eb'
-          };
-          
-          console.log('Creating settings with data:', newSettingsData);
-          
-          const { data: newSettings, error: createError } = await supabase
-            .from('feedback_settings')
-            .insert(newSettingsData)
-            .select()
-            .single();
+        console.error('Error loading settings:', error);
+        throw error;
+      }
 
-          console.log('Create result:', { newSettings, createError });
+      if (data && Array.isArray(data) && data.length > 0) {
+        console.log('Settings loaded successfully:', data[0]);
+        setSettings(data[0]);
+      } else {
+        // No settings found, create default ones with blank project_id
+        console.log('No settings found, creating default settings...');
+        
+        const newSettingsData = {
+          user_id: user.id,
+          project_id: '', // Leave blank for user input
+          project_id_locked: false,
+          title: 'Share your thoughts with us',
+          show_name: true,
+          show_email: true,
+          button_text: 'Send Feedback',
+          theme: 'light',
+          brand_color: '#2563eb'
+        };
+        
+        console.log('Creating settings with data:', newSettingsData);
+        
+        const { data: newSettings, error: createError } = await supabase
+          .from('feedback_settings')
+          .insert(newSettingsData)
+          .select()
+          .single();
 
-          if (createError) {
-            console.error('Error creating settings:', createError);
-            throw createError;
-          }
-          
-          setSettings(newSettings);
-        } else {
-          console.error('Error loading settings:', error);
-          throw error;
+        console.log('Create result:', { newSettings, createError });
+
+        if (createError) {
+          console.error('Error creating settings:', createError);
+          throw createError;
         }
-      } else if (data) {
-        console.log('Settings loaded successfully:', data);
-        setSettings(data);
+        
+        setSettings(newSettings);
       }
     } catch (error) {
       console.error('Error in loadSettings:', error);
