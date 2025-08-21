@@ -46,10 +46,21 @@ const Feedback = () => {
   const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const loadProjectId = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('No user, skipping loadProjectId');
+      return;
+    }
 
+    console.log('Starting loadProjectId for user:', user.id);
     setError(null);
     setLoading(true);
+
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.log('LoadProjectId timeout reached');
+      setLoading(false);
+      setError('Request timed out. Please try again.');
+    }, 10000); // 10 second timeout
 
     try {
       console.log('Loading project ID for user:', user.id);
@@ -66,6 +77,8 @@ const Feedback = () => {
         throw error;
       }
 
+      console.log('Query result:', { data, error });
+
       if (data && Array.isArray(data) && data.length > 0) {
         const projectId = data[0].project_id;
         console.log('Project ID loaded:', projectId);
@@ -80,6 +93,7 @@ const Feedback = () => {
         
         setProjectId(projectId);
         setSettingsConfigured(true);
+        console.log('Project ID set successfully');
       } else {
         console.log('No settings found, showing setup message');
         setSettingsConfigured(false);
@@ -90,13 +104,19 @@ const Feedback = () => {
       setError(`Failed to load project configuration: ${errorMessage}`);
       toast.error(`Failed to load project configuration: ${errorMessage}`);
     } finally {
+      console.log('Setting loading to false');
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [user]);
 
   const loadFeedbacks = useCallback(async () => {
-    if (!projectId) return;
+    if (!projectId) {
+      console.log('No projectId, skipping loadFeedbacks');
+      return;
+    }
 
+    console.log('Starting loadFeedbacks for project:', projectId);
     setLoading(true);
     setError(null);
 
@@ -109,7 +129,10 @@ const Feedback = () => {
         .eq('project_id', projectId)
         .order('timestamp', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error in loadFeedbacks query:', error);
+        throw error;
+      }
       
       console.log('Feedbacks loaded:', data?.length || 0);
       setFeedbacks(data || []);
@@ -119,6 +142,7 @@ const Feedback = () => {
       setError(`Failed to load feedbacks: ${errorMessage}`);
       toast.error(`Failed to load feedbacks: ${errorMessage}`);
     } finally {
+      console.log('Setting loading to false in loadFeedbacks');
       setLoading(false);
     }
   }, [projectId]);
@@ -208,8 +232,11 @@ const Feedback = () => {
 
   // Load project ID and feedbacks on component mount
   useEffect(() => {
-    loadProjectId();
-  }, [user, loadProjectId]);
+    console.log('useEffect triggered - user:', user?.id, 'loading:', loading);
+    if (user && !loading) {
+      loadProjectId();
+    }
+  }, [user, loadProjectId, loading]);
 
   useEffect(() => {
     if (projectId) {
@@ -388,9 +415,17 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">
+            <p className="text-gray-600 mb-2">
               {projectId ? 'Loading feedbacks...' : 'Loading project configuration...'}
             </p>
+            <p className="text-sm text-gray-500">
+              This may take a few seconds
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
+              <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse"></div>
+              <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+              <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+            </div>
           </div>
         </div>
       </div>

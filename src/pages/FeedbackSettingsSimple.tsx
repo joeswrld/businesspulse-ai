@@ -57,6 +57,17 @@ const FeedbackSettingsSimple = () => {
       return;
     }
 
+    console.log('Starting loadSettings for user:', user.id);
+    setError(null);
+    setLoading(true);
+
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.log('LoadSettings timeout reached');
+      setLoading(false);
+      setError('Request timed out. Please try again.');
+    }, 10000); // 10 second timeout
+
     try {
       console.log('Loading settings for user:', user.id);
       
@@ -128,15 +139,18 @@ const FeedbackSettingsSimple = () => {
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
+      console.log('Setting loading to false in loadSettings');
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    console.log('useEffect for loadSettings triggered, user:', user);
-    setError(null);
-    loadSettings();
-  }, [user]);
+    console.log('useEffect for loadSettings triggered, user:', user?.id, 'loading:', loading);
+    if (user && !loading) {
+      loadSettings();
+    }
+  }, [user, loading]);
 
   const handleRetry = () => {
     setError(null);
@@ -245,7 +259,15 @@ const FeedbackSettingsSimple = () => {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading feedback settings...</p>
+            <p className="text-gray-600 mb-2">Loading feedback settings...</p>
+            <p className="text-sm text-gray-500">
+              This may take a few seconds
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
+              <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse"></div>
+              <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+              <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+            </div>
           </div>
         </div>
       </div>
