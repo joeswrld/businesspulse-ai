@@ -42,6 +42,7 @@ interface FeedbackSettings {
 
 const FeedbackSettingsSimple = () => {
   console.log('FeedbackSettingsSimple component rendering...');
+  
   const { user } = useAuth();
   console.log('User from AuthContext:', user);
   
@@ -321,6 +322,13 @@ const FeedbackSettingsSimple = () => {
   }
 
   console.log('Rendering main content - settings:', settings);
+  
+  console.log('About to render FeedbackSettings component - states:', {
+    user: !!user,
+    isInitializing,
+    settings,
+    error
+  });
   
   // Fallback - show main content even if there are issues
   return (

@@ -27,8 +27,11 @@ import Settings from "./pages/Settings";
 import Teams from "./pages/Teams";
 import Profile from "./pages/Profile";
 import Feedback from "./pages/Feedback";
+import FeedbackSimple from "./pages/FeedbackSimple";
 import FeedbackSettings from "./pages/FeedbackSettingsSimple";
+import FeedbackSettingsSimpleTest from "./pages/FeedbackSettingsSimpleTest";
 import TestFeedbackSettings from "./pages/TestFeedbackSettings";
+import TestPage from "./pages/TestPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -133,11 +136,25 @@ const App = () => (
             <Route path="/feedback" element={
               <ProtectedRoute>
                 <DashboardLayout>
+                  <FeedbackSimple />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/feedback-original" element={
+              <ProtectedRoute>
+                <DashboardLayout>
                   <Feedback />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
             <Route path="/feedback-settings" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <FeedbackSettingsSimpleTest />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/feedback-settings-original" element={
               <ProtectedRoute>
                 <DashboardLayout>
                   <FeedbackSettings />
@@ -148,6 +165,13 @@ const App = () => (
               <ProtectedRoute>
                 <DashboardLayout>
                   <TestFeedbackSettings />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/test" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <TestPage />
                 </DashboardLayout>
               </ProtectedRoute>
             } />

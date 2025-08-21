@@ -37,7 +37,11 @@ interface Feedback {
 }
 
 const Feedback = () => {
+  console.log('Feedback component rendering...');
+  
   const { user } = useAuth();
+  console.log('User from AuthContext:', user);
+  
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -546,6 +550,14 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
 
   // End render timer
   renderTimer.end();
+
+  console.log('About to render Feedback component - states:', {
+    user: !!user,
+    isInitializing,
+    settingsConfigured,
+    error,
+    projectId
+  });
 
   // Fallback - show main content even if there are issues
   return (
