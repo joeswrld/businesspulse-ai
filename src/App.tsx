@@ -32,6 +32,7 @@ import FeedbackSettings from "./pages/FeedbackSettingsSimple";
 import FeedbackSettingsSimpleTest from "./pages/FeedbackSettingsSimpleTest";
 import TestFeedbackSettings from "./pages/TestFeedbackSettings";
 import TestPage from "./pages/TestPage";
+import TestFeedbackSubmission from "./pages/TestFeedbackSubmission";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -172,6 +173,13 @@ const App = () => (
               <ProtectedRoute>
                 <DashboardLayout>
                   <TestPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/test-feedback-submission" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <TestFeedbackSubmission />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
