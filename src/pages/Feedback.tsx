@@ -461,20 +461,45 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="text-center mb-8">
-        <div className="flex items-center justify-center mb-4">
-          <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mr-4">
-            <MessageSquare className="h-8 w-8 text-white" />
+        <div className="flex items-center justify-center mb-6">
+          <div className="p-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl mr-6 shadow-lg">
+            <MessageSquare className="h-10 w-10 text-white" />
           </div>
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">Feedback Management</h1>
-            <Badge variant="secondary" className="mt-2">
-              Live
-            </Badge>
+          <div className="text-left">
+            <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2">
+              Feedback Management
+            </h1>
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 px-3 py-1">
+                <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                Live & Real-time
+              </Badge>
+              <span className="text-sm text-gray-500 font-medium">
+                Powered by NoteX
+              </span>
+            </div>
           </div>
         </div>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          View and manage all feedback from your website visitors in real-time.
-        </p>
+        <div className="max-w-3xl mx-auto">
+          <p className="text-xl text-gray-600 leading-relaxed mb-4">
+            View and manage all feedback from your website visitors in real-time. 
+            Stay connected with your audience and respond to their needs instantly.
+          </p>
+          <div className="flex items-center justify-center gap-6 text-sm text-gray-500">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <span>Real-time updates</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span>Bulk actions</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+              <span>Smart filtering</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="max-w-6xl mx-auto space-y-6">
