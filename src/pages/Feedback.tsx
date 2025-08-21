@@ -84,8 +84,24 @@ const Feedback = () => {
         return;
       }
 
-      // Fetch from database
-      const { data, error } = await optimizedQueries.getUserProjectId(user.id);
+      // Fetch from database with fallback
+      let data, error;
+      try {
+        const result = await optimizedQueries.getUserProjectId(user.id);
+        data = result.data;
+        error = result.error;
+      } catch (optError) {
+        console.log('Optimized query failed, using fallback:', optError);
+        // Fallback to direct query
+        const result = await supabase
+          .from('feedback_settings')
+          .select('project_id, project_id_locked')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) {
         console.error('Error loading project ID:', error);
@@ -258,7 +274,7 @@ const Feedback = () => {
 
   // Load project ID and feedbacks on component mount
   useEffect(() => {
-    console.log('useEffect triggered - user:', user?.id);
+    console.log('Feedback useEffect triggered - user:', user?.id, 'isInitializing:', isInitializing, 'settingsConfigured:', settingsConfigured);
     if (user) {
       // Run performance test on first load
       if (user.id) {
@@ -500,9 +516,38 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
     );
   }
 
+  // Show loading state while initializing
+  if (isInitializing || settingsConfigured === null) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 mb-4">Initializing...</p>
+            <p className="text-sm text-gray-500 mb-4">
+              User: {user?.id ? 'Logged in' : 'Not logged in'} | 
+              Settings: {settingsConfigured === null ? 'Loading' : settingsConfigured ? 'Configured' : 'Not configured'}
+            </p>
+            <Button 
+              onClick={() => {
+                console.log('Debug: Force loading project ID');
+                loadProjectId();
+              }}
+              variant="outline"
+              size="sm"
+            >
+              Debug: Retry Load
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // End render timer
   renderTimer.end();
 
+  // Fallback - show main content even if there are issues
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}

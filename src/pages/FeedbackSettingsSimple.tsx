@@ -74,8 +74,24 @@ const FeedbackSettingsSimple = () => {
         return;
       }
 
-      // Fetch from database
-      const { data, error } = await optimizedQueries.getUserSettings(user.id);
+      // Fetch from database with fallback
+      let data, error;
+      try {
+        const result = await optimizedQueries.getUserSettings(user.id);
+        data = result.data;
+        error = result.error;
+      } catch (optError) {
+        console.log('Optimized query failed, using fallback:', optError);
+        // Fallback to direct query
+        const result = await supabase
+          .from('feedback_settings')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        data = result.data;
+        error = result.error;
+      }
 
       console.log('Query result:', { data, error });
 
@@ -147,7 +163,7 @@ const FeedbackSettingsSimple = () => {
   };
 
   useEffect(() => {
-    console.log('useEffect for loadSettings triggered, user:', user?.id);
+    console.log('FeedbackSettings useEffect triggered - user:', user?.id, 'isInitializing:', isInitializing, 'settings:', settings);
     if (user) {
       loadSettings();
     }
@@ -275,18 +291,38 @@ const FeedbackSettingsSimple = () => {
     );
   }
 
-  if (!settings) {
-    console.log('Rendering no settings state');
+  // Show loading state while initializing
+  if (isInitializing || !settings) {
+    console.log('Rendering loading state - isInitializing:', isInitializing, 'settings:', settings);
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <p className="text-gray-600">Failed to load settings. Please try again.</p>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 mb-4">Loading settings...</p>
+            <p className="text-sm text-gray-500 mb-4">
+              User: {user?.id ? 'Logged in' : 'Not logged in'} | 
+              Settings: {settings ? 'Loaded' : 'Not loaded'}
+            </p>
+            <Button 
+              onClick={() => {
+                console.log('Debug: Force loading settings');
+                loadSettings();
+              }}
+              variant="outline"
+              size="sm"
+            >
+              Debug: Retry Load
+            </Button>
+          </div>
         </div>
       </div>
     );
   }
 
-  console.log('Rendering main content');
+  console.log('Rendering main content - settings:', settings);
+  
+  // Fallback - show main content even if there are issues
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
