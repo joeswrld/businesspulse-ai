@@ -39,7 +39,6 @@ interface Feedback {
 const Feedback = () => {
   const { user } = useAuth();
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -47,6 +46,7 @@ const Feedback = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedFeedbacks, setSelectedFeedbacks] = useState<Set<string>>(new Set());
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Performance tracking
   const renderTimer = componentPerformance.trackRender('Feedback');
@@ -59,14 +59,6 @@ const Feedback = () => {
 
     console.log('Starting loadProjectId for user:', user.id);
     setError(null);
-    setLoading(true);
-
-    // Add timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      console.log('LoadProjectId timeout reached');
-      setLoading(false);
-      setError('Request timed out. Please try again.');
-    }, 10000); // 10 second timeout
 
     try {
       console.log('Loading project ID for user:', user.id);
@@ -82,12 +74,12 @@ const Feedback = () => {
         if (!projectId || projectId.trim() === '') {
           console.log('Project ID is empty, showing setup message');
           setSettingsConfigured(false);
-          setLoading(false);
           return;
         }
         
         setProjectId(projectId);
         setSettingsConfigured(true);
+        setIsInitializing(false);
         console.log('Project ID set from cache');
         return;
       }
@@ -113,26 +105,25 @@ const Feedback = () => {
         if (!projectId || projectId.trim() === '') {
           console.log('Project ID is empty, showing setup message');
           setSettingsConfigured(false);
-          setLoading(false);
+          setIsInitializing(false);
           return;
         }
         
         setProjectId(projectId);
         setSettingsConfigured(true);
+        setIsInitializing(false);
         console.log('Project ID set successfully');
       } else {
         console.log('No settings found, showing setup message');
         setSettingsConfigured(false);
+        setIsInitializing(false);
       }
     } catch (error) {
       console.error('Error loading project ID:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setError(`Failed to load project configuration: ${errorMessage}`);
       toast.error(`Failed to load project configuration: ${errorMessage}`);
-    } finally {
-      console.log('Setting loading to false');
-      clearTimeout(timeoutId);
-      setLoading(false);
+      setIsInitializing(false);
     }
   }, [user]);
 
@@ -143,7 +134,6 @@ const Feedback = () => {
     }
 
     console.log('Starting loadFeedbacks for project:', projectId);
-    setLoading(true);
     setError(null);
 
     try {
@@ -180,9 +170,6 @@ const Feedback = () => {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setError(`Failed to load feedbacks: ${errorMessage}`);
       toast.error(`Failed to load feedbacks: ${errorMessage}`);
-    } finally {
-      console.log('Setting loading to false in loadFeedbacks');
-      setLoading(false);
     }
   }, [projectId]);
 
@@ -271,15 +258,15 @@ const Feedback = () => {
 
   // Load project ID and feedbacks on component mount
   useEffect(() => {
-    console.log('useEffect triggered - user:', user?.id, 'loading:', loading);
-    if (user && !loading) {
+    console.log('useEffect triggered - user:', user?.id);
+    if (user) {
       // Run performance test on first load
       if (user.id) {
         performanceTest.runFullTest(user.id).catch(console.error);
       }
       loadProjectId();
     }
-  }, [user, loadProjectId, loading]);
+  }, [user, loadProjectId]);
 
   useEffect(() => {
     if (projectId) {
@@ -452,41 +439,7 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
     return matchesSearch && matchesStatus;
   });
 
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600 mb-2">
-              {projectId ? 'Loading feedbacks...' : 'Loading project configuration...'}
-            </p>
-            <p className="text-sm text-gray-500">
-              This may take a few seconds
-            </p>
-            <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
-              <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse"></div>
-              <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-              <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-            </div>
-            <button 
-              onClick={() => {
-                if (user?.id) {
-                  performanceTest.runFullTest(user.id).then(({ analysis }) => {
-                    console.log('Performance analysis:', analysis);
-                    toast.info(`Performance: ${analysis.recommendations.join(', ')}`);
-                  });
-                }
-              }}
-              className="mt-4 text-xs text-blue-500 hover:text-blue-700 underline"
-            >
-              Run Performance Test
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+
 
   if (error) {
     return (
@@ -502,7 +455,6 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
               <Button 
                 onClick={() => {
                   setError(null);
-                  setLoading(true);
                   loadProjectId();
                 }}
                 className="w-full"
@@ -568,6 +520,12 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
                 <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
                 Live & Real-time
               </Badge>
+              {isInitializing && (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-spin"></div>
+                  Loading...
+                </Badge>
+              )}
               <span className="text-sm text-gray-500 font-medium">
                 Powered by NoteX
               </span>

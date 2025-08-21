@@ -46,29 +46,20 @@ const FeedbackSettingsSimple = () => {
   console.log('User from AuthContext:', user);
   
   const [settings, setSettings] = useState<FeedbackSettings | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const loadSettings = async () => {
     console.log('loadSettings called, user:', user);
     if (!user) {
       console.log('No user, returning early');
-      setLoading(false);
       return;
     }
 
     console.log('Starting loadSettings for user:', user.id);
     setError(null);
-    setLoading(true);
-
-    // Add timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      console.log('LoadSettings timeout reached');
-      setLoading(false);
-      setError('Request timed out. Please try again.');
-    }, 10000); // 10 second timeout
 
     try {
       console.log('Loading settings for user:', user.id);
@@ -100,6 +91,7 @@ const FeedbackSettingsSimple = () => {
         queryCache.set(cacheKey, data[0], 120000); // Cache for 2 minutes
         
         setSettings(data[0]);
+        setIsInitializing(false);
       } else {
         // No settings found, create default ones
         console.log('No settings found, creating default settings...');
@@ -131,6 +123,7 @@ const FeedbackSettingsSimple = () => {
         queryCache.set(cacheKey, newSettings, 120000);
         
         setSettings(newSettings);
+        setIsInitializing(false);
       }
     } catch (error) {
       console.error('Error in loadSettings:', error);
@@ -149,19 +142,16 @@ const FeedbackSettingsSimple = () => {
       
       setError(errorMessage);
       toast.error(errorMessage);
-    } finally {
-      console.log('Setting loading to false in loadSettings');
-      clearTimeout(timeoutId);
-      setLoading(false);
+      setIsInitializing(false);
     }
   };
 
   useEffect(() => {
-    console.log('useEffect for loadSettings triggered, user:', user?.id, 'loading:', loading);
-    if (user && !loading) {
+    console.log('useEffect for loadSettings triggered, user:', user?.id);
+    if (user) {
       loadSettings();
     }
-  }, [user, loading]);
+  }, [user]);
 
   const handleRetry = () => {
     setError(null);
@@ -261,29 +251,9 @@ const FeedbackSettingsSimple = () => {
     return `<script src="https://notex.com.ng/feedback-widget.js" data-project-id="${settings.project_id}"></script>`;
   };
 
-  console.log('Render conditions - loading:', loading, 'error:', error, 'settings:', settings);
+  console.log('Render conditions - error:', error, 'settings:', settings);
   
-  if (loading) {
-    console.log('Rendering loading state');
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600 mb-2">Loading feedback settings...</p>
-            <p className="text-sm text-gray-500">
-              This may take a few seconds
-            </p>
-            <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
-              <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse"></div>
-              <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-              <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+
 
   if (error) {
     console.log('Rendering error state');
@@ -325,12 +295,20 @@ const FeedbackSettingsSimple = () => {
           <div className="p-3 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full mr-4">
             <SlidersHorizontal className="h-8 w-8 text-white" />
           </div>
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">Feedback Settings</h1>
-            <Badge variant="secondary" className="mt-2">
-              Live
-            </Badge>
-          </div>
+                      <div>
+              <h1 className="text-4xl font-bold text-gray-900">Feedback Settings</h1>
+              <div className="flex items-center gap-2 mt-2">
+                <Badge variant="secondary">
+                  Live
+                </Badge>
+                {isInitializing && (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-spin"></div>
+                    Loading...
+                  </Badge>
+                )}
+              </div>
+            </div>
         </div>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
           Customize your feedback widget and configure how you receive feedback from your website visitors.
