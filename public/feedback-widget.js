@@ -1,6 +1,11 @@
 (function() {
   'use strict';
 
+  // Widget version
+  const WIDGET_VERSION = '1.1.0';
+  
+  console.log('NoteX Feedback Widget v' + WIDGET_VERSION + ' initializing...');
+
   // Get project ID from script tag
   const scriptTag = document.currentScript;
   const projectId = scriptTag.dataset.projectId;
@@ -9,6 +14,8 @@
     console.error('NoteX Feedback Widget: Project ID is required');
     return;
   }
+
+  console.log('NoteX Feedback Widget: Project ID loaded:', projectId);
 
   // Create widget container
   const widgetContainer = document.createElement('div');
@@ -188,7 +195,8 @@
         text-align: center;
       "
     >
-      ✅ Thank you! Your feedback has been submitted successfully.
+      ✅ Thank you! Your feedback has been submitted successfully.<br>
+      <small style="opacity: 0.8;">We'll review it and get back to you soon.</small>
     </div>
 
     <div 
@@ -235,6 +243,9 @@
   widgetContainer.appendChild(feedbackButton);
   widgetContainer.appendChild(modalOverlay);
   document.body.appendChild(widgetContainer);
+
+  // Widget ready
+  console.log('NoteX Feedback Widget v' + WIDGET_VERSION + ' ready!');
 
   // Event handlers
   function openModal() {
@@ -283,6 +294,7 @@
     // Show loading state
     submitButton.disabled = true;
     submitButton.textContent = 'Sending...';
+    submitButton.style.opacity = '0.7';
     successMessage.style.display = 'none';
     errorMessage.style.display = 'none';
 
@@ -297,8 +309,10 @@
         message: formData.get('message')
       });
 
+      // Use the correct Supabase URL
       const apiUrl = 'https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/feedback-api';
       console.log('NoteX Feedback Widget: Submitting to', apiUrl);
+      console.log('NoteX Feedback Widget: Project ID:', formData.get('project_id'));
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -308,7 +322,22 @@
       console.log('NoteX Feedback Widget: Response status', response.status);
       console.log('NoteX Feedback Widget: Response headers', Object.fromEntries(response.headers.entries()));
 
-      const result = await response.json();
+      // Handle different response types
+      let result;
+      try {
+        const responseText = await response.text();
+        console.log('NoteX Feedback Widget: Response text', responseText);
+        
+        if (responseText) {
+          result = JSON.parse(responseText);
+        } else {
+          result = { success: false, error: 'Empty response from server' };
+        }
+      } catch (parseError) {
+        console.error('NoteX Feedback Widget: Failed to parse response', parseError);
+        result = { success: false, error: 'Invalid response format' };
+      }
+      
       console.log('NoteX Feedback Widget: Response data', result);
 
       if (response.ok && result.success) {
@@ -323,9 +352,13 @@
         if (response.status === 401) {
           errorMsg = 'API authentication error. Please contact support.';
         } else if (response.status === 404) {
-          errorMsg = 'API endpoint not found. Please contact support.';
+          errorMsg = 'API endpoint not found. The feedback system may be temporarily unavailable.';
         } else if (response.status === 500) {
           errorMsg = 'Server error. Please try again later.';
+        } else if (response.status === 0) {
+          errorMsg = 'Network error. Please check your connection and try again.';
+        } else if (response.status >= 400) {
+          errorMsg = `Request failed (${response.status}). Please try again.`;
         }
         
         console.error('NoteX Feedback Widget: API error', errorMsg);
@@ -341,6 +374,7 @@
     } finally {
       submitButton.disabled = false;
       submitButton.textContent = 'Send Feedback';
+      submitButton.style.opacity = '1';
     }
   });
 
