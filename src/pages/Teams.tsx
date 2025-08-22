@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import TeamsDebug from '@/components/TeamsDebug';
 import {
   Dialog,
   DialogContent,
@@ -158,54 +157,14 @@ const Teams: React.FC = () => {
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
-  // Test database connection
-  const testDatabaseConnection = async () => {
-    if (!user) return;
-    
-    try {
-      console.log('Testing database connection...');
-      
-      // Test basic teams query
-      const { data: testTeams, error: testError } = await supabase
-        .from('teams')
-        .select('count')
-        .limit(1);
-      
-      console.log('Test teams query result:', { data: testTeams, error: testError });
-      
-      // Test user's own teams
-      const { data: userTeams, error: userTeamsError } = await supabase
-        .from('teams')
-        .select('*')
-        .eq('owner_id', user.id);
-      
-      console.log('User teams query result:', { data: userTeams, error: userTeamsError });
-      
-      // Test team members
-      const { data: userMembers, error: userMembersError } = await supabase
-        .from('team_members')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      console.log('User members query result:', { data: userMembers, error: userMembersError });
-      
-    } catch (error) {
-      console.error('Database connection test failed:', error);
-    }
-  };
-
   // Load teams data
   const loadTeams = useCallback(async () => {
-    if (!user) {
-      console.log('No user found, skipping teams load');
-      return;
-    }
+    if (!user) return;
 
     try {
       setLoading(true);
-      console.log('Loading teams for user:', user.id);
       
-      // Load teams where user is owner (simplified query)
+      // Load teams where user is owner
       const { data: ownedTeams, error: ownedError } = await supabase
         .from('teams')
         .select('*')
@@ -215,7 +174,7 @@ const Teams: React.FC = () => {
         console.error('Owned teams error:', ownedError);
       }
 
-      // Load teams where user is a member (simplified query)
+      // Load teams where user is a member
       const { data: memberTeams, error: memberError } = await supabase
         .from('team_members')
         .select('team_id')
@@ -247,7 +206,6 @@ const Teams: React.FC = () => {
         index === self.findIndex(t => t.id === team.id)
       );
 
-      console.log('Found teams:', uniqueTeams);
       setTeams(uniqueTeams);
 
       // Load team members for all teams
@@ -261,12 +219,11 @@ const Teams: React.FC = () => {
         if (membersError) {
           console.error('Members error:', membersError);
         } else {
-          console.log('Found team members:', membersData);
           setTeamMembers(membersData || []);
         }
       }
 
-      // Load invitations (simplified)
+      // Load invitations
       const { data: invitationsData, error: invitationsError } = await supabase
         .from('team_invitations')
         .select('*')
@@ -276,7 +233,6 @@ const Teams: React.FC = () => {
       if (invitationsError) {
         console.error('Invitations error:', invitationsError);
       } else {
-        console.log('Found invitations:', invitationsData);
         setInvitations(invitationsData || []);
       }
 
@@ -311,8 +267,6 @@ const Teams: React.FC = () => {
     }
 
     try {
-      console.log('Creating team with data:', { ...newTeam, owner_id: user.id });
-      
       // Create team first
       const { data: team, error: teamError } = await supabase
         .from('teams')
@@ -338,8 +292,6 @@ const Teams: React.FC = () => {
         throw teamError;
       }
 
-      console.log('Team created successfully:', team);
-
       // Add owner as team member
       const { error: memberError } = await supabase
         .from('team_members')
@@ -357,8 +309,6 @@ const Teams: React.FC = () => {
         await supabase.from('teams').delete().eq('id', team.id);
         throw memberError;
       }
-
-      console.log('Team member added successfully');
 
       toast.success('Team created successfully!');
       setCreateTeamDialog(false);
@@ -518,14 +468,6 @@ const Teams: React.FC = () => {
         </div>
         <div className="flex items-center space-x-2">
           <Button
-            variant="outline"
-            size="sm"
-            onClick={testDatabaseConnection}
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Debug DB
-          </Button>
-          <Button
             variant={realTimeMode ? "default" : "outline"}
             size="sm"
             onClick={() => setRealTimeMode(!realTimeMode)}
@@ -614,9 +556,6 @@ const Teams: React.FC = () => {
           </Dialog>
         </div>
       </div>
-
-      {/* Debug Component */}
-      <TeamsDebug />
 
       {/* Tabs */}
       <div className="flex space-x-1 bg-muted p-1 rounded-lg">
