@@ -34,6 +34,7 @@ import TestFeedbackSettings from "./pages/TestFeedbackSettings";
 import TestPage from "./pages/TestPage";
 import TestFeedbackSubmission from "./pages/TestFeedbackSubmission";
 import NotFound from "./pages/NotFound";
+import TeamInvitation from "./pages/TeamInvitation";
 
 const queryClient = new QueryClient();
 
@@ -183,6 +184,7 @@ const App = () => (
                 </DashboardLayout>
               </ProtectedRoute>
             } />
+            <Route path="/teams/invite/:token" element={<TeamInvitation />} />
 
             <Route path="/profile" element={
               <ProtectedRoute>

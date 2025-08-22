@@ -334,29 +334,78 @@ const Teams: React.FC = () => {
 
   // Invite member to team
   const inviteMember = async () => {
-    if (!selectedTeam || !inviteData.email.trim()) {
-      toast.error('Please provide an email address');
-      return;
-    }
+    if (!user || !selectedTeam || !inviteData.email) return;
 
     try {
-      const { error } = await supabase
+      // Validate email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(inviteData.email)) {
+        toast.error('Please enter a valid email address');
+        return;
+      }
+
+      // Check if user is already a member
+      const existingMember = teamMembers.find(
+        member => member.user?.email === inviteData.email && member.team_id === selectedTeam.id
+      );
+      if (existingMember) {
+        toast.error('This user is already a member of the team');
+        return;
+      }
+
+      // Check if invitation already exists
+      const existingInvitation = invitations.find(
+        inv => inv.email === inviteData.email && inv.team_id === selectedTeam.id && inv.status === 'pending'
+      );
+      if (existingInvitation) {
+        toast.error('An invitation has already been sent to this email');
+        return;
+      }
+
+      // Create invitation
+      const { data: invitation, error: invitationError } = await supabase
         .from('team_invitations')
         .insert({
           team_id: selectedTeam.id,
+          inviter_id: user.id,
           email: inviteData.email,
           role: inviteData.role,
-          invited_by: user?.id,
-          status: 'pending',
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+          personal_message: inviteData.message || null
+        })
+        .select()
+        .single();
+
+      if (invitationError) {
+        console.error('Error creating invitation:', invitationError);
+        toast.error('Failed to create invitation');
+        return;
+      }
+
+      // Send invitation email
+      try {
+        const { data: emailResponse, error: emailError } = await supabase.functions.invoke('send-team-invitation', {
+          body: { invitation_id: invitation.id }
         });
 
-      if (error) throw error;
+        if (emailError) {
+          console.error('Email sending error:', emailError);
+          // Don't fail the invitation creation, just log the error
+          toast.warning('Invitation created but email delivery failed');
+        } else {
+          toast.success('Invitation sent successfully!');
+        }
+      } catch (emailError) {
+        console.error('Email function error:', emailError);
+        toast.warning('Invitation created but email delivery failed');
+      }
 
-      toast.success(`Invitation sent to ${inviteData.email}!`);
-      setInviteDialog(false);
+      // Reset form and close dialog
       setInviteData({ email: '', role: 'member', message: '' });
+      setInviteDialog(false);
       setSelectedTeam(null);
+
+      // Reload invitations
+      loadTeams();
 
     } catch (error) {
       console.error('Error inviting member:', error);
@@ -903,42 +952,52 @@ const Teams: React.FC = () => {
 
       {/* Invite Member Dialog */}
       <Dialog open={inviteDialog} onOpenChange={setInviteDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Invite Member to {selectedTeam?.name}</DialogTitle>
+            <DialogTitle>Invite Team Member</DialogTitle>
             <DialogDescription>
               Send an invitation to collaborate with your team.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Email Address</label>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                Email Address
+              </label>
               <Input
+                id="email"
                 type="email"
-                placeholder="colleague@company.com"
+                placeholder="colleague@example.com"
                 value={inviteData.email}
-                onChange={(e) => setInviteData(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(e) => setInviteData({ ...inviteData, email: e.target.value })}
+                required
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Role</label>
-              <Select value={inviteData.role} onValueChange={(value) => setInviteData(prev => ({ ...prev, role: value }))}>
+              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
+                Role
+              </label>
+              <Select value={inviteData.role} onValueChange={(value) => setInviteData({ ...inviteData, role: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="member">Member</SelectItem>
+                  <SelectItem value="moderator">Moderator</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="viewer">Viewer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium">Personal Message (Optional)</label>
+              <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">
+                Personal Message (Optional)
+              </label>
               <Textarea
+                id="message"
                 placeholder="Add a personal message to your invitation..."
                 value={inviteData.message}
-                onChange={(e) => setInviteData(prev => ({ ...prev, message: e.target.value }))}
+                onChange={(e) => setInviteData({ ...inviteData, message: e.target.value })}
+                rows={3}
               />
             </div>
           </div>
@@ -946,7 +1005,7 @@ const Teams: React.FC = () => {
             <Button variant="outline" onClick={() => setInviteDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={inviteMember}>
+            <Button onClick={inviteMember} disabled={!inviteData.email.trim()}>
               <UserPlus className="h-4 w-4 mr-2" />
               Send Invitation
             </Button>
