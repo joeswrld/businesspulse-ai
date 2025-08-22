@@ -47,7 +47,7 @@ const TestFeedbackSubmission = () => {
     try {
       console.log('Submitting feedback:', { projectId, name, email, message });
 
-      // Method 1: Direct database insert
+      // Method 1: Direct database insert (this should work)
       const { data: directResult, error: directError } = await supabase
         .from('feedbacks')
         .insert({
@@ -66,7 +66,7 @@ const TestFeedbackSubmission = () => {
       }
 
       console.log('Direct insert success:', directResult);
-      toast.success('Feedback submitted directly to database!');
+      toast.success('✅ Feedback submitted successfully! Check the Feedback page to see it.');
 
       // Method 2: API call (optional) - Commented out for now
       /*
@@ -146,8 +146,8 @@ const TestFeedbackSubmission = () => {
     try {
       console.log('Testing API endpoint...');
       
-      // Get Supabase URL from environment or use default
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co';
+      // Use the correct Supabase URL from the client
+      const supabaseUrl = 'https://xjbrqeqizpoqdjkiyqzt.supabase.co';
       const apiUrl = `${supabaseUrl}/functions/v1/feedback-api`;
       
       console.log('Environment VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
@@ -312,6 +312,10 @@ const TestFeedbackSubmission = () => {
               </ol>
               <p className="text-xs text-gray-500 mt-2">
                 Note: The API test is currently disabled in the main submission to avoid errors.
+                <br />
+                <strong>API Issue:</strong> The feedback-api function needs to be deployed to Supabase.
+                <br />
+                <strong>Workaround:</strong> Direct database insert works and feedbacks will appear on the Feedback page.
               </p>
             </div>
         </CardContent>
