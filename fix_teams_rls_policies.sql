@@ -6,6 +6,7 @@ DROP POLICY IF EXISTS "Users can view public teams" ON teams;
 DROP POLICY IF EXISTS "Team members can view their teams" ON teams;
 DROP POLICY IF EXISTS "Team owners can update their teams" ON teams;
 DROP POLICY IF EXISTS "Users can create teams" ON teams;
+DROP POLICY IF EXISTS "Users can delete their own teams" ON teams;
 
 DROP POLICY IF EXISTS "Team members can view team members" ON team_members;
 DROP POLICY IF EXISTS "Team admins can manage members" ON team_members;
@@ -30,6 +31,9 @@ CREATE POLICY "Users can create teams" ON teams
 
 CREATE POLICY "Users can update their own teams" ON teams
   FOR UPDATE USING (owner_id = auth.uid());
+
+CREATE POLICY "Users can delete their own teams" ON teams
+  FOR DELETE USING (owner_id = auth.uid());
 
 -- Step 3: Create simple policies for team_members
 CREATE POLICY "Users can view their own memberships" ON team_members

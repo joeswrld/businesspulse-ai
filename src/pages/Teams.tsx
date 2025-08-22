@@ -150,6 +150,10 @@ const Teams: React.FC = () => {
     message: ''
   });
   
+  // Delete team states
+  const [deleteDialog, setDeleteDialog] = useState(false);
+  const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
+  
   // Real-time states
   const [realTimeMode, setRealTimeMode] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -402,6 +406,83 @@ const Teams: React.FC = () => {
     } catch (error) {
       console.error('Error declining invitation:', error);
       toast.error('Failed to decline invitation');
+    }
+  };
+
+  // Delete team
+  const deleteTeam = async (teamId: string) => {
+    if (!user) return;
+
+    try {
+      // Check if user is the owner of the team
+      const team = teams.find(t => t.id === teamId);
+      if (!team || team.owner_id !== user.id) {
+        toast.error('You can only delete teams that you own');
+        return;
+      }
+
+      // Delete team members first (cascade will handle this, but explicit for clarity)
+      const { error: membersError } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('team_id', teamId);
+
+      if (membersError) {
+        console.error('Error deleting team members:', membersError);
+      }
+
+      // Delete team invitations
+      const { error: invitationsError } = await supabase
+        .from('team_invitations')
+        .delete()
+        .eq('team_id', teamId);
+
+      if (invitationsError) {
+        console.error('Error deleting team invitations:', invitationsError);
+      }
+
+      // Delete team activities
+      const { error: activitiesError } = await supabase
+        .from('team_activities')
+        .delete()
+        .eq('team_id', teamId);
+
+      if (activitiesError) {
+        console.error('Error deleting team activities:', activitiesError);
+      }
+
+      // Delete the team
+      const { error: teamError } = await supabase
+        .from('teams')
+        .delete()
+        .eq('id', teamId);
+
+      if (teamError) {
+        console.error('Error deleting team:', teamError);
+        throw teamError;
+      }
+
+      toast.success('Team deleted successfully');
+      loadTeams();
+
+    } catch (error) {
+      console.error('Error deleting team:', error);
+      toast.error('Failed to delete team');
+    }
+  };
+
+  // Handle delete team confirmation
+  const handleDeleteTeam = (team: Team) => {
+    setTeamToDelete(team);
+    setDeleteDialog(true);
+  };
+
+  // Confirm delete team
+  const confirmDeleteTeam = async () => {
+    if (teamToDelete) {
+      await deleteTeam(teamToDelete.id);
+      setDeleteDialog(false);
+      setTeamToDelete(null);
     }
   };
 
@@ -722,6 +803,17 @@ const Teams: React.FC = () => {
                       <BarChart3 className="h-4 w-4 mr-1" />
                       Analytics
                     </Button>
+                    {userRole === 'owner' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteTeam(team)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -853,6 +945,48 @@ const Teams: React.FC = () => {
             <Button onClick={inviteMember}>
               <UserPlus className="h-4 w-4 mr-2" />
               Send Invitation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Team Confirmation Dialog */}
+      <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Team</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{teamToDelete?.name}"? This action cannot be undone and will permanently remove the team and all its data.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <span className="text-sm font-medium text-red-800">Warning</span>
+              </div>
+              <p className="text-sm text-red-700 mt-2">
+                This will permanently delete:
+              </p>
+              <ul className="text-sm text-red-700 mt-2 list-disc list-inside space-y-1">
+                <li>All team members and their data</li>
+                <li>All team invitations</li>
+                <li>All team activities and history</li>
+                <li>All team settings and configurations</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteTeam}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Team
             </Button>
           </DialogFooter>
         </DialogContent>
