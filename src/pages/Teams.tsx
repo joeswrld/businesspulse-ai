@@ -205,7 +205,7 @@ const Teams: React.FC = () => {
       setLoading(true);
       console.log('Loading teams for user:', user.id);
       
-      // First, try to get teams where user is owner
+      // Load teams where user is owner (simplified query)
       const { data: ownedTeams, error: ownedError } = await supabase
         .from('teams')
         .select('*')
@@ -215,7 +215,7 @@ const Teams: React.FC = () => {
         console.error('Owned teams error:', ownedError);
       }
 
-      // Then, try to get teams where user is a member
+      // Load teams where user is a member (simplified query)
       const { data: memberTeams, error: memberError } = await supabase
         .from('team_members')
         .select('team_id')
@@ -266,7 +266,7 @@ const Teams: React.FC = () => {
         }
       }
 
-      // Load invitations
+      // Load invitations (simplified)
       const { data: invitationsData, error: invitationsError } = await supabase
         .from('team_invitations')
         .select('*')
@@ -311,6 +311,8 @@ const Teams: React.FC = () => {
     }
 
     try {
+      console.log('Creating team with data:', { ...newTeam, owner_id: user.id });
+      
       // Create team first
       const { data: team, error: teamError } = await supabase
         .from('teams')
@@ -336,6 +338,8 @@ const Teams: React.FC = () => {
         throw teamError;
       }
 
+      console.log('Team created successfully:', team);
+
       // Add owner as team member
       const { error: memberError } = await supabase
         .from('team_members')
@@ -353,6 +357,8 @@ const Teams: React.FC = () => {
         await supabase.from('teams').delete().eq('id', team.id);
         throw memberError;
       }
+
+      console.log('Team member added successfully');
 
       toast.success('Team created successfully!');
       setCreateTeamDialog(false);
