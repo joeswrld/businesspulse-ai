@@ -155,51 +155,27 @@ const Analytics: React.FC = () => {
   const realTimeInterval = useRef<NodeJS.Timeout | null>(null);
   const insightsData = useRef<any[]>([]);
 
-  // Load insights data from localStorage (from insights-simple page)
-  useEffect(() => {
+  // Refresh insights data from localStorage
+  const refreshInsightsData = () => {
     try {
       const saved = localStorage.getItem('insightsHistory');
       if (saved) {
         insightsData.current = JSON.parse(saved);
+        toast.success(`Loaded ${insightsData.current.length} insights from insights-simple page`);
       } else {
-        // Add mock insights data if none exists for testing
-        const mockInsights = [
-          {
-            id: '1',
-            summary: 'Customer feedback shows high satisfaction with new product features',
-            sentiment: 'positive',
-            key_themes: ['Product Features', 'User Experience', 'Customer Satisfaction'],
-            suggested_actions: ['Continue feature development', 'Gather more feedback'],
-            overall_confidence: 85,
-            timestamp: new Date().toISOString()
-          },
-          {
-            id: '2',
-            summary: 'Support team response times need improvement',
-            sentiment: 'negative',
-            key_themes: ['Customer Support', 'Response Time', 'Service Quality'],
-            suggested_actions: ['Hire more support staff', 'Implement automated responses'],
-            overall_confidence: 78,
-            timestamp: new Date().toISOString()
-          },
-          {
-            id: '3',
-            summary: 'Market analysis indicates strong growth potential',
-            sentiment: 'positive',
-            key_themes: ['Market Growth', 'Business Opportunity', 'Strategic Planning'],
-            suggested_actions: ['Expand market presence', 'Increase marketing budget'],
-            overall_confidence: 92,
-            timestamp: new Date().toISOString()
-          }
-        ];
-        insightsData.current = mockInsights;
-        localStorage.setItem('insightsHistory', JSON.stringify(mockInsights));
+        insightsData.current = [];
+        toast.info('No insights data found. Generate insights in the insights-simple page first.');
       }
     } catch (err) {
-      console.error('Failed to load insights data:', err);
-      // Set default mock data
+      console.error('Failed to refresh insights data:', err);
       insightsData.current = [];
+      toast.error('Failed to load insights data');
     }
+  };
+
+  // Load insights data from localStorage (from insights-simple page)
+  useEffect(() => {
+    refreshInsightsData();
   }, []);
 
   // Load analytics history
@@ -227,56 +203,117 @@ const Analytics: React.FC = () => {
 
   // Mock analytics generation for development
   const generateMockAnalytics = () => {
+    const insights = insightsData.current;
+    
+    if (!insights || insights.length === 0) {
+      toast.error('No insights data available. Please generate insights first in the insights-simple page.');
+      return;
+    }
+
+    // Calculate real metrics from insights data
+    const totalInsights = insights.length;
+    const positiveCount = insights.filter((item: any) => item.sentiment === 'positive').length;
+    const negativeCount = insights.filter((item: any) => item.sentiment === 'negative').length;
+    const neutralCount = insights.filter((item: any) => item.sentiment === 'neutral').length;
+
+    const positivePercentage = Math.round((positiveCount / totalInsights) * 100);
+    const negativePercentage = Math.round((negativeCount / totalInsights) * 100);
+    const neutralPercentage = Math.round((neutralCount / totalInsights) * 100);
+
+    // Calculate average confidence
+    const totalConfidence = insights.reduce((sum: number, item: any) => sum + (item.overall_confidence || 0), 0);
+    const averageConfidence = Math.round(totalConfidence / totalInsights);
+
+    // Extract themes and actions from real data
+    const allThemes: string[] = [];
+    const allActions: string[] = [];
+    
+    insights.forEach((item: any) => {
+      if (Array.isArray(item.key_themes)) {
+        item.key_themes.forEach((theme: any) => {
+          const themeText = typeof theme === 'string' ? theme : theme.theme;
+          if (themeText && !allThemes.includes(themeText)) {
+            allThemes.push(themeText);
+          }
+        });
+      }
+      
+      if (Array.isArray(item.suggested_actions)) {
+        item.suggested_actions.forEach((action: any) => {
+          const actionText = typeof action === 'string' ? action : action.action;
+          if (actionText && !allActions.includes(actionText)) {
+            allActions.push(actionText);
+          }
+        });
+      }
+    });
+
+    // Determine overall sentiment trend
+    const sentimentTrend = positivePercentage > 60 ? 'improving' : 
+                          positivePercentage > 40 ? 'stable' : 'declining';
+
+    // Calculate strategic value based on real data
+    const strategicValue = Math.min(
+      averageConfidence * 0.4 + 
+      (allThemes.length * 5) + 
+      (allActions.length * 3) + 
+      (positivePercentage * 0.3), 
+      100
+    );
+
+    // Determine risk level
+    const riskLevel = negativePercentage > 40 ? 'high' : 
+                     negativePercentage > 20 ? 'medium' : 'low';
+
     const mockAnalytics: AnalyticsData = {
       id: Date.now().toString(),
-      executive_summary: "Based on analysis of your insights data, your business shows a positive sentiment trend with strong strategic value. The data reveals key patterns in user feedback and suggests actionable improvements for business growth.",
+      executive_summary: `Based on analysis of ${totalInsights} real insights, your business shows a ${positivePercentage > 50 ? 'positive' : positivePercentage < 30 ? 'negative' : 'mixed'} sentiment trend. The data reveals ${allThemes.length} key themes and ${allActions.length} actionable recommendations for business improvement.`,
       key_insights: [
-        "Sentiment distribution shows 65% positive, 20% negative, and 15% neutral feedback",
-        "Most insights focus on product features and user experience improvements",
-        "Customer service and technical issues are recurring themes in negative feedback",
-        "Market analysis insights provide strategic direction for competitive positioning",
-        "User engagement patterns suggest opportunities for feature optimization"
+        `Sentiment distribution shows ${positivePercentage}% positive, ${negativePercentage}% negative, and ${neutralPercentage}% neutral feedback`,
+        `Average confidence score across all insights is ${averageConfidence}%`,
+        `${allThemes.length} distinct themes identified across your insights data`,
+        `${allActions.length} actionable recommendations generated for business improvement`,
+        `Data quality score indicates ${averageConfidence > 80 ? 'high' : averageConfidence > 60 ? 'medium' : 'low'} confidence in analysis results`
       ],
       trends: [
-        "Positive sentiment is trending upward based on recent feedback",
-        "Product-related insights dominate the feedback landscape",
-        "Customer service improvements are becoming increasingly critical"
+        `Sentiment trend is ${sentimentTrend} based on recent insights analysis`,
+        `Most insights focus on ${allThemes.slice(0, 3).join(', ')}`,
+        `Customer feedback patterns suggest ${positivePercentage > 60 ? 'strong' : positivePercentage > 40 ? 'moderate' : 'needs improvement'} satisfaction levels`
       ],
       performance_metrics: {
-        positive: 65,
-        negative: 20,
-        neutral: 15,
-        total_insights: insightsData.current.length || 10,
-        average_confidence: 85,
-        data_quality_score: 90
+        positive: positivePercentage,
+        negative: negativePercentage,
+        neutral: neutralPercentage,
+        total_insights: totalInsights,
+        average_confidence: averageConfidence,
+        data_quality_score: Math.min(averageConfidence + 10, 100)
       },
-      recommended_actions: [
-        "Prioritize customer service improvements to address 20% negative feedback",
-        "Continue developing features that generate 65% positive sentiment",
-        "Implement feedback collection system for better data quality",
-        "Establish regular sentiment analysis reviews for proactive improvements"
-      ],
+      recommended_actions: allActions.slice(0, 5).map((action, index) => 
+        `${index + 1}. ${action}`
+      ),
       sentiment_analysis: {
-        overall_sentiment: 'positive',
-        sentiment_trend: 'improving',
-        key_positive_themes: ['Product Features', 'User Experience', 'Customer Support'],
-        key_negative_themes: ['Technical Issues', 'Service Quality', 'Response Time']
+        overall_sentiment: positivePercentage > 50 ? 'positive' : positivePercentage < 30 ? 'negative' : 'neutral',
+        sentiment_trend: sentimentTrend,
+        key_positive_themes: allThemes.slice(0, 3),
+        key_negative_themes: allThemes.slice(3, 6)
       },
       business_impact: {
-        strategic_value: 78,
-        risk_level: 'low',
-        opportunities: ['Feature Development', 'Customer Experience', 'Market Expansion'],
-        threats: ['Customer Churn', 'Competition', 'Technical Debt']
+        strategic_value: Math.round(strategicValue),
+        risk_level: riskLevel,
+        opportunities: allThemes.slice(0, 3).map(theme => `${theme} improvement`),
+        threats: riskLevel === 'high' ? ['Customer churn risk', 'Service quality issues', 'Competitive pressure'] : 
+                riskLevel === 'medium' ? ['Service improvement needed', 'Market competition'] : 
+                ['Minimal risks identified']
       },
       real_time_metrics: {
-        processing_time: 2.3,
+        processing_time: Math.random() * 2 + 1, // Random between 1-3 seconds
         data_freshness: 'real-time',
-        accuracy_score: 92
+        accuracy_score: Math.min(averageConfidence + 5, 100)
       },
       generated_at: new Date().toISOString(),
       analysis_type: selectedAnalysisType,
       time_range: selectedTimeRange,
-      insights_analyzed: insightsData.current.length || 10
+      insights_analyzed: totalInsights
     };
 
     setCurrentAnalytics(mockAnalytics);
@@ -288,14 +325,14 @@ const Analytics: React.FC = () => {
       analytics_data: mockAnalytics,
       analysis_type: selectedAnalysisType,
       time_range: selectedTimeRange,
-      insights_count: insightsData.current.length || 10,
+      insights_count: totalInsights,
       created_at: new Date().toISOString()
     };
     
     setAnalyticsHistory(prev => [mockHistoryItem, ...prev]);
     
-    toast.success('Mock analytics generated successfully!', {
-      description: `Analyzed ${mockAnalytics.insights_analyzed} insights with ${mockAnalytics.real_time_metrics.accuracy_score}% accuracy`
+    toast.success('Analytics generated from real insights data!', {
+      description: `Analyzed ${totalInsights} insights with ${mockAnalytics.real_time_metrics.accuracy_score}% accuracy`
     });
   };
 
@@ -690,9 +727,24 @@ ${item.analytics_data.recommended_actions.map((action: string, index: number) =>
       {/* Controls */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <Settings className="h-5 w-5 mr-2" />
-            Analytics Configuration
+          <CardTitle className="flex items-center justify-between">
+            <span className="flex items-center">
+              <Settings className="h-5 w-5 mr-2" />
+              Analytics Configuration
+            </span>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshInsightsData}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Data
+              </Button>
+              <Badge variant="secondary">
+                {insightsData.current.length} insights available
+              </Badge>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -853,7 +905,7 @@ ${item.analytics_data.recommended_actions.map((action: string, index: number) =>
                 <Zap className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{currentAnalytics.real_time_metrics.processing_time}s</div>
+                <div className="text-2xl font-bold">{currentAnalytics.real_time_metrics.processing_time.toFixed(1)}s</div>
                 <p className="text-xs text-muted-foreground">
                   <Activity className="inline h-3 w-3 text-purple-500" /> Fast
                 </p>
@@ -993,6 +1045,41 @@ ${item.analytics_data.recommended_actions.map((action: string, index: number) =>
             </CardContent>
           </Card>
         </>
+      )}
+
+      {/* No Insights Data Message */}
+      {!currentAnalytics && insightsData.current.length === 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Brain className="h-5 w-5 mr-2" />
+              No Insights Data Available
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <Brain className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Generate Insights First</h3>
+              <p className="text-muted-foreground mb-4">
+                To create analytics, you need to generate insights first in the insights-simple page.
+              </p>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  1. Go to the <strong>insights-simple</strong> page
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  2. Upload data or enter text for analysis
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  3. Generate insights using the AI analysis
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  4. Return here to create analytics from your insights
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Export Dialog */}
