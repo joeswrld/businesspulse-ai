@@ -100,7 +100,19 @@ const Feedback = () => {
         setProjectId(projectId);
         setSettingsConfigured(true);
         setIsInitializing(false);
-        console.log('Project ID set successfully');
+        console.log('Project ID set successfully:', projectId);
+        
+        // Debug: Check if there are any existing feedbacks for this project
+        const { data: existingFeedbacks, error: feedbackError } = await supabase
+          .from('feedbacks')
+          .select('*')
+          .eq('project_id', projectId)
+          .order('timestamp', { ascending: false });
+        
+        console.log('Existing feedbacks for project:', projectId, ':', existingFeedbacks?.length || 0, existingFeedbacks);
+        if (feedbackError) {
+          console.error('Error checking existing feedbacks:', feedbackError);
+        }
       } else {
         console.log('No settings found, showing setup message');
         setSettingsConfigured(false);
@@ -151,9 +163,13 @@ const Feedback = () => {
   }, [projectId]);
 
   const setupRealtimeSubscription = useCallback(() => {
-    if (!projectId) return;
+    if (!projectId) {
+      console.log('No projectId for real-time subscription');
+      return;
+    }
 
     console.log('Setting up real-time subscription for project:', projectId);
+    console.log('Current feedbacks count:', feedbacks.length);
 
     const channelName = `feedbacks-${projectId}`;
     const subscription = supabase
@@ -489,18 +505,33 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
             <p className="text-gray-600 mb-4">Initializing...</p>
             <p className="text-sm text-gray-500 mb-4">
               User: {user?.id ? 'Logged in' : 'Not logged in'} | 
-              Settings: {settingsConfigured === null ? 'Loading' : settingsConfigured ? 'Configured' : 'Not configured'}
+              Settings: {settingsConfigured === null ? 'Loading' : settingsConfigured ? 'Configured' : 'Not configured'} |
+              Project ID: {projectId || 'None'}
             </p>
-            <Button 
-              onClick={() => {
-                console.log('Debug: Force loading project ID');
-                loadProjectId();
-              }}
-              variant="outline"
-              size="sm"
-            >
-              Debug: Retry Load
-            </Button>
+            <div className="space-y-2">
+              <Button 
+                onClick={() => {
+                  console.log('Debug: Force loading project ID');
+                  loadProjectId();
+                }}
+                variant="outline"
+                size="sm"
+              >
+                Debug: Retry Load
+              </Button>
+              {projectId && (
+                <Button 
+                  onClick={() => {
+                    console.log('Debug: Force loading feedbacks for project:', projectId);
+                    loadFeedbacks();
+                  }}
+                  variant="outline"
+                  size="sm"
+                >
+                  Debug: Load Feedbacks
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
