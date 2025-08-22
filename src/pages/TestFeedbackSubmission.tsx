@@ -137,6 +137,13 @@ const TestFeedbackSubmission = () => {
     toast.success('Check console for Supabase config');
   };
 
+  const checkWidgetProjectId = () => {
+    console.log('Widget should be using project ID:', projectId);
+    console.log('To test widget, use this HTML:');
+    console.log(`<script src="/feedback-widget.js" data-project-id="${projectId}"></script>`);
+    toast.success('Check console for widget configuration');
+  };
+
   const testApi = async () => {
     if (!projectId) {
       toast.error('Please enter a project ID');
@@ -297,6 +304,12 @@ const TestFeedbackSubmission = () => {
               variant="outline"
             >
               Check Config
+            </Button>
+            <Button 
+              onClick={checkWidgetProjectId}
+              variant="outline"
+            >
+              Check Widget Config
             </Button>
           </div>
 

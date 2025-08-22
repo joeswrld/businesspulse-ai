@@ -113,6 +113,18 @@ const Feedback = () => {
         if (feedbackError) {
           console.error('Error checking existing feedbacks:', feedbackError);
         }
+        
+        // Debug: Check ALL feedbacks in the database to see what's there
+        const { data: allFeedbacks, error: allFeedbacksError } = await supabase
+          .from('feedbacks')
+          .select('*')
+          .order('timestamp', { ascending: false })
+          .limit(10);
+        
+        console.log('ALL feedbacks in database (latest 10):', allFeedbacks?.length || 0, allFeedbacks);
+        if (allFeedbacksError) {
+          console.error('Error checking all feedbacks:', allFeedbacksError);
+        }
       } else {
         console.log('No settings found, showing setup message');
         setSettingsConfigured(false);
@@ -180,7 +192,11 @@ const Feedback = () => {
         table: 'feedbacks',
         filter: `project_id=eq.${projectId}`
       }, (payload) => {
-        console.log('New feedback received via real-time:', payload.new);
+        console.log('Real-time INSERT event received:', payload);
+        console.log('Current project ID:', projectId);
+        console.log('Payload project ID:', payload.new?.project_id);
+        console.log('Current feedbacks count:', feedbacks.length);
+        
         const newFeedback = payload.new as Feedback;
         
         // Add the new feedback to the top of the list
@@ -253,7 +269,7 @@ const Feedback = () => {
       console.log('Cleaning up real-time subscription for project:', projectId);
       supabase.removeChannel(subscription);
     };
-  }, [projectId]);
+  }, [projectId, feedbacks.length]);
 
   // Load project ID and feedbacks on component mount
   useEffect(() => {
@@ -520,16 +536,37 @@ Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
                 Debug: Retry Load
               </Button>
               {projectId && (
-                <Button 
-                  onClick={() => {
-                    console.log('Debug: Force loading feedbacks for project:', projectId);
-                    loadFeedbacks();
-                  }}
-                  variant="outline"
-                  size="sm"
-                >
-                  Debug: Load Feedbacks
-                </Button>
+                <>
+                  <Button 
+                    onClick={() => {
+                      console.log('Debug: Force loading feedbacks for project:', projectId);
+                      loadFeedbacks();
+                    }}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Debug: Load Feedbacks
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      console.log('Debug: Check all feedbacks in database');
+                      const checkAllFeedbacks = async () => {
+                        const { data, error } = await supabase
+                          .from('feedbacks')
+                          .select('*')
+                          .order('timestamp', { ascending: false })
+                          .limit(20);
+                        console.log('All feedbacks in database:', data);
+                        if (error) console.error('Error:', error);
+                      };
+                      checkAllFeedbacks();
+                    }}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Debug: Check All Feedbacks
+                  </Button>
+                </>
               )}
             </div>
           </div>
