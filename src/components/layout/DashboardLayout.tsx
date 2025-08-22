@@ -28,12 +28,12 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Feedback", href: "/feedback", icon: MessageSquare }, 
     { name: "AI Analytics", href: "/insights-simple", icon: Brain },
-    { name: "Feedback", href: "/feedback", icon: MessageSquare },
     { name: "Executive Reports", href: "/reports", icon: FileText },
     { name: "Business Intelligence", href: "/analytics", icon: BarChart3 },
-    { name: "Usage & Billing", href: "/billing", icon: CreditCard },
     { name: "Teams", href: "/teams", icon: Users, comingSoon: true },
+    { name: "Usage & Billing", href: "/billing", icon: CreditCard },
     { name: "Feedback Settings", href: "/feedback-settings", icon: SlidersHorizontal },
     { name: "Settings", href: "/settings", icon: Settings },
     { name: "Profile", href: "/profile", icon: User },
@@ -120,13 +120,6 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
           {/* User Menu */}
           <div className="p-4 border-t border-border space-y-2">
-            <Link
-              to="/profile"
-              className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            >
-              <User className="h-5 w-5" />
-              <span>Profile</span>
-            </Link>
             <button
               onClick={handleSignOut}
               className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors w-full"
