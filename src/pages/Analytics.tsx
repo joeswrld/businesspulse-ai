@@ -134,7 +134,8 @@ const Analytics: React.FC = () => {
         .from('ai_insights')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(200);
 
       if (fetchError) {
         console.error('Supabase fetch error:', fetchError);
@@ -175,10 +176,10 @@ const Analytics: React.FC = () => {
       
     } catch (error) {
       console.error('Error fetching insights data:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch insights data');
-      toast.error('Failed to load insights data');
-      
-      // Try localStorage as fallback on error
+      const message = error instanceof Error ? error.message : 'Failed to fetch insights data';
+
+      // Try localStorage as fallback on error (e.g., offline)
+      let usedFallback = false;
       try {
         const savedInsights = localStorage.getItem('insightsHistory');
         if (savedInsights) {
@@ -191,10 +192,21 @@ const Analytics: React.FC = () => {
             setInsightsData(userInsights);
             processChartData(userInsights);
             setError(null); // Clear error since we have fallback data
+            usedFallback = true;
+            // Inform user softly if network issue
+            if (message.toLowerCase().includes('failed to fetch')) {
+              toast.info('Showing cached analytics while offline.');
+            }
           }
         }
       } catch (localError) {
         console.error('Fallback localStorage also failed:', localError);
+      }
+
+      // Only surface error if no fallback was available
+      if (!usedFallback) {
+        setError(message);
+        toast.error('Failed to load insights data');
       }
     } finally {
       setLoading(false);
