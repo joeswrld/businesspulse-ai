@@ -558,9 +558,9 @@ const Dashboard: React.FC = () => {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Welcome back, {userProfile?.full_name || user?.email || 'codexpress200'}! 👋
+          Hey {userProfile?.first_name || userProfile?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'there'}! ✨
         </h1>
-        <p className="text-gray-600">Your real-time business intelligence dashboard</p>
+        <p className="text-gray-600">Your real-time business intelligence dashboard is looking fire 🔥</p>
         <div className="mt-4 flex items-center gap-2">
           <div className="flex items-center gap-1 text-green-600">
             <Activity className="h-4 w-4" />
