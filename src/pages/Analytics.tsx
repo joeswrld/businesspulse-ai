@@ -1000,25 +1000,7 @@ const Analytics: React.FC = () => {
                     </p>
                     <div className="flex flex-col sm:flex-row gap-2 justify-center">
                       <Button 
-                        onClick={createSampleInsights}
-                        disabled={generatingAI}
-                        variant="outline"
-                        className="w-full sm:w-auto"
-                      >
-                        {generatingAI ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Creating...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            Create Sample Data
-                          </>
-                        )}
-                      </Button>
-                      <Button 
-                        onClick={() => window.open('/insights', '_blank')}
+                        onClick={() => window.open('/insights', '_self')}
                         variant="outline"
                         className="w-full sm:w-auto"
                       >
@@ -1026,9 +1008,6 @@ const Analytics: React.FC = () => {
                         Go to Insights Page
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Sample data will be created locally for testing purposes
-                    </p>
                   </div>
                 ) : (
                   <Button 
