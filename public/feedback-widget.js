@@ -101,7 +101,8 @@
       <input 
         type="text" 
         name="name" 
-        placeholder="Your Name (optional)" 
+        placeholder="Your Name"
+        required 
         style="
           width: 100%;
           padding: 12px;
@@ -117,7 +118,8 @@
       <input 
         type="email" 
         name="email" 
-        placeholder="Your Email (optional)" 
+        placeholder="Your Email"
+        required
         style="
           width: 100%;
           padding: 12px;

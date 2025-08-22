@@ -29,11 +29,11 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "AI Analytics", href: "/insights-simple", icon: Brain },
+    { name: "Feedback", href: "/feedback", icon: MessageSquare },
     { name: "Executive Reports", href: "/reports", icon: FileText },
     { name: "Business Intelligence", href: "/analytics", icon: BarChart3 },
     { name: "Usage & Billing", href: "/billing", icon: CreditCard },
     { name: "Teams", href: "/teams", icon: Users, comingSoon: true },
-    { name: "Feedback", href: "/feedback", icon: MessageSquare },
     { name: "Feedback Settings", href: "/feedback-settings", icon: SlidersHorizontal },
     { name: "Settings", href: "/settings", icon: Settings },
     { name: "Profile", href: "/profile", icon: User },
@@ -73,7 +73,6 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           <div className="flex items-center justify-between p-4 border-b border-border">
             <Link to="/dashboard" className="flex items-center space-x-2">
               <img src="/favicon.ico" alt="NoteX BI" className="h-8 w-8" />
-              <span className="text-xl font-bold text-primary">NoteX BI</span>
             </Link>
             <button 
               className="lg:hidden p-1"

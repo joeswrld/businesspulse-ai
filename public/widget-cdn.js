@@ -113,11 +113,11 @@
       </div>
       <form class="notex-feedback-form" id="notex-feedback-form">
         <div class="notex-feedback-field">
-          <label for="notex-name">Name (optional)</label>
+          <label for="notex-name">Name *</label>
           <input type="text" id="notex-name" name="name" placeholder="Your name">
         </div>
         <div class="notex-feedback-field">
-          <label for="notex-email">Email (optional)</label>
+          <label for="notex-email">Email *</label>
           <input type="email" id="notex-email" name="email" placeholder="your@email.com">
         </div>
         <div class="notex-feedback-field">
