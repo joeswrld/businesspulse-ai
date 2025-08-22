@@ -57,7 +57,7 @@ const App = () => (
                 </DashboardLayout>
               </ProtectedRoute>
             } />
-            <Route path="/insights-simple" element={
+            <Route path="/insights" element={
               <ProtectedRoute>
                 <DashboardLayout>
                   <InsightsPage />
