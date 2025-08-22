@@ -32,7 +32,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     { name: "AI Analytics", href: "/insights-simple", icon: Brain },
     { name: "Executive Reports", href: "/reports", icon: FileText },
     { name: "Business Intelligence", href: "/analytics", icon: BarChart3 },
-    { name: "Teams", href: "/teams", icon: Users, comingSoon: true },
+    { name: "Teams", href: "/teams", icon: Users },
     { name: "Usage & Billing", href: "/billing", icon: CreditCard },
     { name: "Feedback Settings", href: "/feedback-settings", icon: SlidersHorizontal },
     { name: "Settings", href: "/settings", icon: Settings },
@@ -133,27 +133,16 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Main content */}
       <div className="lg:pl-64">
-        {/* Top bar */}
-        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
-          <div className="flex items-center justify-between px-4 py-3">
-            <button
-              className="lg:hidden p-2 -ml-2"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-            
-            <div className="flex-1" />
-            
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span>System Online</span>
-              </div>
-            </div>
-          </div>
-        </header>
-
+        {/* Mobile menu button */}
+        <div className="lg:hidden p-4">
+          <button
+            className="p-2 -ml-2"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
+        
         {/* Page content */}
         <main className="p-4 md:p-6">
           {children}
