@@ -681,22 +681,45 @@ const Analytics: React.FC = () => {
                 const confirmed = window.confirm('Reset analytics? This will clear generated analytics and reset your usage counters for today.');
                 if (!confirmed) return;
 
-                // Clear analytics data for this user
-                const { error: delErr } = await supabase
-                  .from('ai_insights')
-                  .delete()
-                  .eq('user_id', user.id);
-                if (delErr) throw delErr;
+                                 // Clear analytics data for this user
+                 const { error: delErr } = await supabase
+                   .from('ai_insights')
+                   .delete()
+                   .eq('user_id', user.id);
+                 if (delErr) throw delErr;
 
-                // Reset usage counters on server (business_analytics)
-                await resetUsage('business_analytics');
-                // Optionally reset AI insights usage as well
-                await resetUsage('ai_insights');
+                 // Also clear any locally cached insights for a truly blank state
+                 try {
+                   const saved = localStorage.getItem('insightsHistory');
+                   if (saved) {
+                     const parsed = JSON.parse(saved);
+                     const filtered = Array.isArray(parsed) 
+                       ? parsed.filter((ins: any) => ins?.user_id !== user.id)
+                       : [];
+                     if (filtered.length === 0) {
+                       localStorage.removeItem('insightsHistory');
+                     } else {
+                       localStorage.setItem('insightsHistory', JSON.stringify(filtered));
+                     }
+                   }
+                 } catch (e) {
+                   console.warn('Failed to clear local cached insights:', e);
+                 }
 
-                // Refresh UI
-                await fetchInsightsData();
-                await refreshUsage();
-                toast.success('Analytics reset successfully');
+                 // Immediately blank current UI state for re-entry
+                 setInsightsData([]);
+                 setGeminiAnalytics(null);
+                 setSentimentData([]);
+                 setCategoryData([]);
+
+                 // Reset usage counters on server (business_analytics)
+                 await resetUsage('business_analytics');
+                 // Optionally reset AI insights usage as well
+                 await resetUsage('ai_insights');
+
+                 // Refresh usage (do not repopulate insights to keep blank state)
+                 await refreshUsage();
+                 toast.success('Analytics reset successfully');
               } catch (e: any) {
                 console.error('Reset analytics failed:', e);
                 toast.error('Failed to reset analytics');
