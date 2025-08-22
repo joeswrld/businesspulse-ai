@@ -37,6 +37,44 @@ const TestFeedbackSubmission = () => {
     }
   }, [user]);
 
+  const submitToWidgetProject = async () => {
+    const widgetProjectId = 'Note1';
+    if (!message) {
+      toast.error('Message is required');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      console.log('Submitting feedback to widget project:', { widgetProjectId, name, email, message });
+
+      const { data: directResult, error: directError } = await supabase
+        .from('feedbacks')
+        .insert({
+          project_id: widgetProjectId,
+          name: name || null,
+          email: email || null,
+          message: message,
+          status: 'new'
+        })
+        .select()
+        .single();
+
+      if (directError) {
+        console.error('Direct insert error:', directError);
+        throw directError;
+      }
+
+      console.log('Direct insert success:', directResult);
+      toast.success('✅ Feedback submitted to widget project! This should appear on your feedback page.');
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      toast.error('Failed to submit feedback: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const submitFeedback = async () => {
     if (!projectId || !message) {
       toast.error('Project ID and message are required');
@@ -46,6 +84,14 @@ const TestFeedbackSubmission = () => {
     setIsSubmitting(true);
     try {
       console.log('Submitting feedback:', { projectId, name, email, message });
+
+      // Check for project ID mismatch
+      const widgetProjectId = 'Note1';
+      if (projectId !== widgetProjectId) {
+        console.warn('⚠️ Submitting to different project ID than widget!');
+        console.warn('Widget uses:', widgetProjectId);
+        console.warn('Submitting to:', projectId);
+      }
 
       // Method 1: Direct database insert (this should work)
       const { data: directResult, error: directError } = await supabase
@@ -141,7 +187,18 @@ const TestFeedbackSubmission = () => {
     console.log('Widget should be using project ID:', projectId);
     console.log('To test widget, use this HTML:');
     console.log(`<script src="/feedback-widget.js" data-project-id="${projectId}"></script>`);
-    toast.success('Check console for widget configuration');
+    
+    // Check if there's a mismatch
+    const widgetProjectId = 'Note1'; // From the console logs
+    if (projectId !== widgetProjectId) {
+      console.warn('⚠️ PROJECT ID MISMATCH DETECTED!');
+      console.warn('Widget is using:', widgetProjectId);
+      console.warn('Your settings use:', projectId);
+      console.warn('This is why feedbacks don\'t appear on your page!');
+      toast.error('Project ID mismatch detected! Check console for details.');
+    } else {
+      toast.success('Project IDs match! Check console for widget configuration');
+    }
   };
 
   const testApi = async () => {
@@ -206,20 +263,42 @@ const TestFeedbackSubmission = () => {
     }
 
     try {
-      const { data, error } = await supabase
+      // Check feedbacks for your project ID
+      const { data: yourFeedbacks, error: yourError } = await supabase
         .from('feedbacks')
         .select('*')
         .eq('project_id', projectId)
         .order('timestamp', { ascending: false });
 
-      if (error) {
-        console.error('Error checking feedbacks:', error);
-        toast.error('Error checking feedbacks: ' + error.message);
+      if (yourError) {
+        console.error('Error checking your feedbacks:', yourError);
+        toast.error('Error checking feedbacks: ' + yourError.message);
         return;
       }
 
-      console.log('Feedbacks for project', projectId, ':', data);
-      toast.success(`Found ${data.length} feedback(s) for project ${projectId}`);
+      // Check feedbacks for widget project ID
+      const widgetProjectId = 'Note1';
+      const { data: widgetFeedbacks, error: widgetError } = await supabase
+        .from('feedbacks')
+        .select('*')
+        .eq('project_id', widgetProjectId)
+        .order('timestamp', { ascending: false });
+
+      if (widgetError) {
+        console.error('Error checking widget feedbacks:', widgetError);
+      }
+
+      console.log('Feedbacks for your project', projectId, ':', yourFeedbacks);
+      console.log('Feedbacks for widget project', widgetProjectId, ':', widgetFeedbacks);
+      
+      if (projectId !== widgetProjectId) {
+        console.warn('⚠️ PROJECT ID MISMATCH!');
+        console.warn('Your feedbacks:', yourFeedbacks?.length || 0);
+        console.warn('Widget feedbacks:', widgetFeedbacks?.length || 0);
+        toast.error(`Project ID mismatch! Your: ${yourFeedbacks?.length || 0}, Widget: ${widgetFeedbacks?.length || 0}`);
+      } else {
+        toast.success(`Found ${yourFeedbacks?.length || 0} feedback(s) for project ${projectId}`);
+      }
     } catch (error) {
       console.error('Error checking feedbacks:', error);
       toast.error('Error checking feedbacks: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -286,6 +365,13 @@ const TestFeedbackSubmission = () => {
               className="flex-1"
             >
               {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
+            </Button>
+            <Button 
+              onClick={submitToWidgetProject}
+              disabled={isSubmitting}
+              variant="outline"
+            >
+              Submit to Widget Project
             </Button>
             <Button 
               onClick={checkFeedbacks}
