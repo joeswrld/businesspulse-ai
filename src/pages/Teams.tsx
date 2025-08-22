@@ -157,38 +157,112 @@ const Teams: React.FC = () => {
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
+  // Test database connection
+  const testDatabaseConnection = async () => {
+    if (!user) return;
+    
+    try {
+      console.log('Testing database connection...');
+      
+      // Test basic teams query
+      const { data: testTeams, error: testError } = await supabase
+        .from('teams')
+        .select('count')
+        .limit(1);
+      
+      console.log('Test teams query result:', { data: testTeams, error: testError });
+      
+      // Test user's own teams
+      const { data: userTeams, error: userTeamsError } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('owner_id', user.id);
+      
+      console.log('User teams query result:', { data: userTeams, error: userTeamsError });
+      
+      // Test team members
+      const { data: userMembers, error: userMembersError } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('user_id', user.id);
+      
+      console.log('User members query result:', { data: userMembers, error: userMembersError });
+      
+    } catch (error) {
+      console.error('Database connection test failed:', error);
+    }
+  };
+
   // Load teams data
   const loadTeams = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('No user found, skipping teams load');
+      return;
+    }
 
     try {
       setLoading(true);
+      console.log('Loading teams for user:', user.id);
       
-      // Load user's teams
-      const { data: teamsData, error: teamsError } = await supabase
+      // First, try to get teams where user is owner
+      const { data: ownedTeams, error: ownedError } = await supabase
         .from('teams')
-        .select(`
-          *,
-          team_members!inner(user_id)
-        `)
-        .eq('team_members.user_id', user.id);
+        .select('*')
+        .eq('owner_id', user.id);
 
-      if (teamsError) throw teamsError;
-      setTeams(teamsData || []);
+      if (ownedError) {
+        console.error('Owned teams error:', ownedError);
+      }
+
+      // Then, try to get teams where user is a member
+      const { data: memberTeams, error: memberError } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', user.id);
+
+      if (memberError) {
+        console.error('Member teams error:', memberError);
+      }
+
+      // Get the actual team data for member teams
+      let memberTeamData: any[] = [];
+      if (memberTeams && memberTeams.length > 0) {
+        const teamIds = memberTeams.map(m => m.team_id);
+        const { data: memberTeamDetails, error: memberTeamError } = await supabase
+          .from('teams')
+          .select('*')
+          .in('id', teamIds);
+
+        if (memberTeamError) {
+          console.error('Member team details error:', memberTeamError);
+        } else {
+          memberTeamData = memberTeamDetails || [];
+        }
+      }
+
+      // Combine owned and member teams, removing duplicates
+      const allTeams = [...(ownedTeams || []), ...memberTeamData];
+      const uniqueTeams = allTeams.filter((team, index, self) => 
+        index === self.findIndex(t => t.id === team.id)
+      );
+
+      console.log('Found teams:', uniqueTeams);
+      setTeams(uniqueTeams);
 
       // Load team members for all teams
-      if (teamsData && teamsData.length > 0) {
-        const teamIds = teamsData.map(team => team.id);
+      if (uniqueTeams.length > 0) {
+        const teamIds = uniqueTeams.map(team => team.id);
         const { data: membersData, error: membersError } = await supabase
           .from('team_members')
-          .select(`
-            *,
-            user:users(id, email, full_name, avatar_url)
-          `)
+          .select('*')
           .in('team_id', teamIds);
 
-        if (membersError) throw membersError;
-        setTeamMembers(membersData || []);
+        if (membersError) {
+          console.error('Members error:', membersError);
+        } else {
+          console.log('Found team members:', membersData);
+          setTeamMembers(membersData || []);
+        }
       }
 
       // Load invitations
@@ -198,8 +272,12 @@ const Teams: React.FC = () => {
         .eq('email', user.email)
         .eq('status', 'pending');
 
-      if (invitationsError) throw invitationsError;
-      setInvitations(invitationsData || []);
+      if (invitationsError) {
+        console.error('Invitations error:', invitationsError);
+      } else {
+        console.log('Found invitations:', invitationsData);
+        setInvitations(invitationsData || []);
+      }
 
     } catch (error) {
       console.error('Error loading teams:', error);
@@ -232,6 +310,7 @@ const Teams: React.FC = () => {
     }
 
     try {
+      // Create team first
       const { data: team, error: teamError } = await supabase
         .from('teams')
         .insert({
@@ -251,7 +330,10 @@ const Teams: React.FC = () => {
         .select()
         .single();
 
-      if (teamError) throw teamError;
+      if (teamError) {
+        console.error('Team creation error:', teamError);
+        throw teamError;
+      }
 
       // Add owner as team member
       const { error: memberError } = await supabase
@@ -264,7 +346,12 @@ const Teams: React.FC = () => {
           permissions: ['all']
         });
 
-      if (memberError) throw memberError;
+      if (memberError) {
+        console.error('Member creation error:', memberError);
+        // If member creation fails, try to delete the team
+        await supabase.from('teams').delete().eq('id', team.id);
+        throw memberError;
+      }
 
       toast.success('Team created successfully!');
       setCreateTeamDialog(false);
@@ -423,6 +510,14 @@ const Teams: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={testDatabaseConnection}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Debug DB
+          </Button>
           <Button
             variant={realTimeMode ? "default" : "outline"}
             size="sm"
