@@ -309,6 +309,78 @@ export const useUsageTracking = () => {
     return false;
   };
 
+  // Reset usage for a resource (server preferred, with local fallback)
+  const resetUsage = useCallback(async (resourceType: keyof UsageData): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      const { data, error } = await supabase.functions.invoke('usageTracking', {
+        body: {
+          user_id: user.id,
+          resource_type: resourceType,
+          action: 'reset'
+        }
+      });
+
+      if (error) {
+        console.error('Error resetting usage:', error);
+        // Fallback: reset locally for today
+        setUsage(prev => ({
+          ...prev,
+          [resourceType]: {
+            ...prev[resourceType],
+            current: resourceType === 'team_members' ? 1 : 0,
+            remaining: prev[resourceType].limit === -1 
+              ? -1 
+              : Math.max(0, prev[resourceType].limit - (resourceType === 'team_members' ? 1 : 0))
+          }
+        }));
+        toast.success('Usage reset locally');
+        return true;
+      }
+
+      if (data?.success) {
+        // Sync from server response
+        setUsage(prev => ({
+          ...prev,
+          ai_insights: {
+            current: data.current_usage.ai_insights_used,
+            limit: data.limits.ai_insights_limit,
+            remaining: data.remaining.ai_insights,
+            reset_date: prev.ai_insights.reset_date
+          },
+          data_sources: {
+            current: data.current_usage.data_sources_used,
+            limit: data.limits.data_sources_limit,
+            remaining: data.remaining.data_sources
+          },
+          team_members: {
+            current: data.current_usage.team_members_used,
+            limit: data.limits.team_members_limit,
+            remaining: data.remaining.team_members
+          },
+          ai_reports: {
+            current: data.current_usage.ai_reports_used,
+            limit: data.limits.ai_reports_limit,
+            remaining: data.remaining.ai_reports,
+            reset_date: prev.ai_reports.reset_date
+          },
+          business_analytics: {
+            current: data.current_usage.business_analytics_used,
+            limit: data.limits.business_analytics_limit,
+            remaining: data.remaining.business_analytics
+          }
+        }));
+        toast.success('Usage reset successfully');
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      console.error('Error in resetUsage:', err);
+      return false;
+    }
+  }, [user, usage]);
+
   // Get usage percentage
   const getUsagePercentage = useCallback((resourceType: keyof UsageData): number => {
     const currentUsage = usage[resourceType];
@@ -393,6 +465,7 @@ export const useUsageTracking = () => {
     incrementUsage,
     getUsagePercentage,
     getUsageStatus,
-    refreshUsage: fetchUsage
+    refreshUsage: fetchUsage,
+    resetUsage
   };
 };

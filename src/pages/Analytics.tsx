@@ -101,7 +101,7 @@ interface CategoryData {
 
 const Analytics: React.FC = () => {
   const { user } = useAuth();
-  const { checkUsage, incrementUsage, usage } = useUsageTracking();
+  const { checkUsage, incrementUsage, usage, resetUsage, refreshUsage } = useUsageTracking();
   
   // State for real-time data
   const [insightsData, setInsightsData] = useState<InsightData[]>([]);
@@ -660,6 +660,38 @@ const Analytics: React.FC = () => {
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+          <Button 
+            variant="destructive" 
+            onClick={async () => {
+              if (!user) return;
+              try {
+                const confirmed = window.confirm('Reset analytics? This will clear generated analytics and reset your usage counters for today.');
+                if (!confirmed) return;
+
+                // Clear analytics data for this user
+                const { error: delErr } = await supabase
+                  .from('ai_insights')
+                  .delete()
+                  .eq('user_id', user.id);
+                if (delErr) throw delErr;
+
+                // Reset usage counters on server (business_analytics)
+                await resetUsage('business_analytics');
+                // Optionally reset AI insights usage as well
+                await resetUsage('ai_insights');
+
+                // Refresh UI
+                await fetchInsightsData();
+                await refreshUsage();
+                toast.success('Analytics reset successfully');
+              } catch (e: any) {
+                console.error('Reset analytics failed:', e);
+                toast.error('Failed to reset analytics');
+              }
+            }}
+          >
+            Reset
           </Button>
         </div>
       </div>

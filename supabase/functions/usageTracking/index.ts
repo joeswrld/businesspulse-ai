@@ -10,7 +10,7 @@ interface UsageRequest {
   user_id: string;
   resource_type: 'ai_insights' | 'data_sources' | 'team_members' | 'ai_reports' | 'business_analytics';
   count?: number;
-  action?: 'increment' | 'check' | 'get';
+  action?: 'increment' | 'check' | 'get' | 'reset';
 }
 
 interface UsageResponse {
@@ -277,6 +277,94 @@ serve(async (req) => {
           business_analytics: limits.business_analytics_limit === -1 ? -1 : Math.max(0, limits.business_analytics_limit - currentUsage.business_analytics_used)
         },
         message: canPerformResult ? 'Action allowed' : 'Action would exceed usage limits'
+      };
+
+    } else if (action === 'reset') {
+      // Reset usage counters for today and optionally clear analytics data
+      // Reset user_usage counts for today to zero (keep team_members at 1)
+      const { error: resetError } = await supabaseClient
+        .from('user_usage')
+        .update({
+          ai_insights_used: 0,
+          data_sources_used: 0,
+          team_members_used: 1,
+          ai_reports_used: 0,
+          business_analytics_used: 0,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user_id)
+        .eq('usage_date', new Date().toISOString().slice(0, 10));
+
+      if (resetError) {
+        console.error('Error resetting usage:', resetError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to reset usage', details: resetError.message }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        )
+      }
+
+      // Return fresh usage snapshot
+      const { data: usageData, error: usageError } = await supabaseClient
+        .rpc('get_user_usage', { user_uuid: user_id });
+
+      if (usageError) {
+        console.error('Error getting usage data after reset:', usageError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to get usage data', details: usageError.message }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        )
+      }
+
+      const currentUsage = usageData?.[0] || {
+        ai_insights_used: 0,
+        data_sources_used: 0,
+        team_members_used: 1,
+        ai_reports_used: 0,
+        business_analytics_used: 0
+      };
+
+      // Get user's plan limits
+      const { data: subscriptionData } = await supabaseClient
+        .from('user_subscriptions')
+        .select('plan_name')
+        .eq('user_id', user_id)
+        .in('status', ['active', 'trialing'])
+        .single();
+
+      const planName = subscriptionData?.plan_name || 'free_trial';
+      const { data: limitsData } = await supabaseClient
+        .from('usage_limits')
+        .select('*')
+        .eq('plan_name', planName)
+        .single();
+
+      const limits = limitsData || {
+        ai_insights_limit: 20,
+        data_sources_limit: 1,
+        team_members_limit: 1,
+        ai_reports_limit: 2,
+        business_analytics_limit: 1
+      };
+
+      response = {
+        success: true,
+        can_perform: true,
+        current_usage: currentUsage,
+        limits,
+        remaining: {
+          ai_insights: limits.ai_insights_limit === -1 ? -1 : Math.max(0, limits.ai_insights_limit - currentUsage.ai_insights_used),
+          data_sources: limits.data_sources_limit === -1 ? -1 : Math.max(0, limits.data_sources_limit - currentUsage.data_sources_used),
+          team_members: limits.team_members_limit === -1 ? -1 : Math.max(0, limits.team_members_limit - currentUsage.team_members_used),
+          ai_reports: limits.ai_reports_limit === -1 ? -1 : Math.max(0, limits.ai_reports_limit - currentUsage.ai_reports_used),
+          business_analytics: limits.business_analytics_limit === -1 ? -1 : Math.max(0, limits.business_analytics_limit - currentUsage.business_analytics_used)
+        },
+        message: 'Usage reset successfully'
       };
 
     } else if (action === 'get') {
