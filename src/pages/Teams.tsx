@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
+import TeamsDebug from '@/components/TeamsDebug';
 import {
   Dialog,
   DialogContent,
@@ -607,6 +608,9 @@ const Teams: React.FC = () => {
           </Dialog>
         </div>
       </div>
+
+      {/* Debug Component */}
+      <TeamsDebug />
 
       {/* Tabs */}
       <div className="flex space-x-1 bg-muted p-1 rounded-lg">
