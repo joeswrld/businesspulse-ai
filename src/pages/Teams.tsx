@@ -25,6 +25,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Users,
   UserPlus,
   UserMinus,
@@ -153,6 +159,7 @@ const Teams: React.FC = () => {
   // Delete team states
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
   
   // Real-time states
   const [realTimeMode, setRealTimeMode] = useState(false);
@@ -421,41 +428,14 @@ const Teams: React.FC = () => {
         return;
       }
 
-      // Delete team members first (cascade will handle this, but explicit for clarity)
-      const { error: membersError } = await supabase
-        .from('team_members')
-        .delete()
-        .eq('team_id', teamId);
+      console.log('Deleting team:', teamId);
 
-      if (membersError) {
-        console.error('Error deleting team members:', membersError);
-      }
-
-      // Delete team invitations
-      const { error: invitationsError } = await supabase
-        .from('team_invitations')
-        .delete()
-        .eq('team_id', teamId);
-
-      if (invitationsError) {
-        console.error('Error deleting team invitations:', invitationsError);
-      }
-
-      // Delete team activities
-      const { error: activitiesError } = await supabase
-        .from('team_activities')
-        .delete()
-        .eq('team_id', teamId);
-
-      if (activitiesError) {
-        console.error('Error deleting team activities:', activitiesError);
-      }
-
-      // Delete the team
+      // Delete the team (cascade will handle related data)
       const { error: teamError } = await supabase
         .from('teams')
         .delete()
-        .eq('id', teamId);
+        .eq('id', teamId)
+        .eq('owner_id', user.id); // Extra security check
 
       if (teamError) {
         console.error('Error deleting team:', teamError);
@@ -739,6 +719,41 @@ const Teams: React.FC = () => {
                       {team.real_time_collaboration && (
                         <Zap className="h-4 w-4 text-yellow-500" />
                       )}
+                      {userRole === 'owner' && (
+                        <DropdownMenu open={dropdownOpen === team.id} onOpenChange={(open) => setDropdownOpen(open ? team.id : null)}>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedTeam(team);
+                                setInviteDialog(true);
+                              }}
+                            >
+                              <UserPlus className="h-4 w-4 mr-2" />
+                              Invite Member
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Settings className="h-4 w-4 mr-2" />
+                              Team Settings
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <BarChart3 className="h-4 w-4 mr-2" />
+                              View Analytics
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteTeam(team)}
+                              className="text-red-600 focus:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Team
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -803,17 +818,6 @@ const Teams: React.FC = () => {
                       <BarChart3 className="h-4 w-4 mr-1" />
                       Analytics
                     </Button>
-                    {userRole === 'owner' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteTeam(team)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
-                    )}
                   </div>
                 </CardContent>
               </Card>
