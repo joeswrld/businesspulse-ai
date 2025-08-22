@@ -362,26 +362,37 @@ const Teams: React.FC = () => {
         return;
       }
 
-      // Create invitation
+      // Create invitation with fallback for missing columns
+      const invitationData = {
+        team_id: selectedTeam.id,
+        inviter_id: user.id,
+        email: inviteData.email,
+        role: inviteData.role,
+        personal_message: inviteData.message || null,
+        status: 'pending',
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+      };
+
       const { data: invitation, error: invitationError } = await supabase
         .from('team_invitations')
-        .insert({
-          team_id: selectedTeam.id,
-          inviter_id: user.id,
-          email: inviteData.email,
-          role: inviteData.role,
-          personal_message: inviteData.message || null
-        })
+        .insert(invitationData)
         .select()
         .single();
 
       if (invitationError) {
         console.error('Error creating invitation:', invitationError);
+        
+        // If it's a column error, show a helpful message
+        if (invitationError.message.includes('column') && invitationError.message.includes('does not exist')) {
+          toast.error('Invitation system needs to be set up. Please run the database migration first.');
+          return;
+        }
+        
         toast.error('Failed to create invitation');
         return;
       }
 
-      // Send invitation email
+      // Try to send invitation email (optional - don't fail if email fails)
       try {
         const { data: emailResponse, error: emailError } = await supabase.functions.invoke('send-team-invitation', {
           body: { invitation_id: invitation.id }
@@ -389,7 +400,6 @@ const Teams: React.FC = () => {
 
         if (emailError) {
           console.error('Email sending error:', emailError);
-          // Don't fail the invitation creation, just log the error
           toast.warning('Invitation created but email delivery failed');
         } else {
           toast.success('Invitation sent successfully!');
