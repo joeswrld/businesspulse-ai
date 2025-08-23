@@ -81,7 +81,10 @@ const Billing = () => {
       }
 
       if (data) {
+        console.log('Fetched subscription data:', data);
         setSubscriptionData(data);
+      } else {
+        console.log('No subscription data found for user');
       }
     } catch (error) {
       console.error('Error fetching subscription:', error);
@@ -127,10 +130,33 @@ const Billing = () => {
     return subscriptionData.status || 'trialing';
   };
 
-  // Fetch subscription on component mount
+  // Fetch subscription on component mount and set up real-time listener
   useEffect(() => {
     fetchSubscription();
-  }, [fetchSubscription]);
+    
+    // Set up real-time subscription for subscription changes
+    const subscriptionChannel = supabase
+      .channel('subscription-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_subscriptions',
+          filter: `user_id=eq.${user?.id}`
+        },
+        (payload) => {
+          console.log('Subscription updated:', payload);
+          // Refresh subscription data when changes occur
+          fetchSubscription();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscriptionChannel);
+    };
+  }, [fetchSubscription, user?.id]);
 
   // Default to Free Trial plan
   const defaultPlan: SubscriptionPlan = {
@@ -261,8 +287,9 @@ const Billing = () => {
     
     toast.success('Subscription activated successfully!');
     
-    // Refresh usage data to reflect new plan limits
+    // Refresh both usage and subscription data to reflect new plan
     await refreshUsage();
+    await fetchSubscription();
     
     // Track successful upgrade
     try {
@@ -339,10 +366,16 @@ const Billing = () => {
             Monitor your usage and manage your subscription
           </p>
         </div>
-        <Button onClick={refreshUsage} disabled={refreshing} variant="outline">
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh Usage
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={refreshUsage} disabled={refreshing} variant="outline">
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh Usage
+          </Button>
+          <Button onClick={fetchSubscription} disabled={refreshing} variant="outline">
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh Subscription
+          </Button>
+        </div>
       </div>
 
       {/* Current Subscription Status */}
