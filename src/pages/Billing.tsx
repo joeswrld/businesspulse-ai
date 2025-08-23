@@ -101,7 +101,7 @@ const Billing = () => {
       
       // Fallback: determine plan based on price or other indicators
       if (subscriptionData.price === 35000) return 'Pro';
-      if (subscriptionData.price === 75000) return 'Business';
+      if (subscriptionData.price === 53000) return 'Business';
       
       // Default to Pro if we can't determine
       return 'Pro';
