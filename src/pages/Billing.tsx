@@ -99,15 +99,25 @@ const Billing = () => {
     if (subscriptionData.status === 'active' || subscriptionData.status === 'trialing') {
       // Determine plan based on subscription details
       if (subscriptionData.plan_name) {
-        return subscriptionData.plan_name;
+        // Convert plan_name to display name
+        switch (subscriptionData.plan_name) {
+          case 'free_trial':
+            return 'Free Trial';
+          case 'pro':
+            return 'Pro';
+          case 'business':
+            return 'Business';
+          default:
+            return subscriptionData.plan_name;
+        }
       }
       
       // Fallback: determine plan based on price or other indicators
       if (subscriptionData.price === 35000) return 'Pro';
       if (subscriptionData.price === 53000) return 'Business';
       
-      // Default to Pro if we can't determine
-      return 'Pro';
+      // Default to Free Trial if we can't determine
+      return 'Free Trial';
     }
     
     return 'Free Trial';
