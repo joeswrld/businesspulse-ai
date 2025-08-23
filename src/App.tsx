@@ -65,7 +65,7 @@ const App = () => (
             <Route path="/insights-simple" element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <InsightsPageSimple />
+                  <InsightsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
@@ -107,7 +107,7 @@ const App = () => (
             <Route path="/reports" element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <ReportsSimple />
+                  <Reports />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
