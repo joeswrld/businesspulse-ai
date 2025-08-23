@@ -317,26 +317,26 @@ const BillingPage: React.FC = () => {
               <div className="text-center p-4 bg-purple-50 rounded-lg">
                 <Brain className="h-8 w-8 text-purple-600 mx-auto mb-2" />
                 <div className="text-2xl font-bold text-purple-900">{usageMetrics.ai_analytics_generated}</div>
-                <div className="text-sm text-purple-700">AI Analytics</div>
+                <div className="text-sm text-purple-700">AI Analytics Generated</div>
               </div>
               
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <TrendingUp className="h-8 w-8 text-green-600 mx-auto mb-2" />
                 <div className="text-2xl font-bold text-green-900">{usageMetrics.executive_reports_generated}</div>
-                <div className="text-sm text-green-700">Executive Reports</div>
+                <div className="text-sm text-green-700">Executive Reports Generated</div>
               </div>
               
               <div className="text-center p-4 bg-orange-50 rounded-lg">
                 <BarChart3 className="h-8 w-8 text-orange-600 mx-auto mb-2" />
                 <div className="text-2xl font-bold text-orange-900">{usageMetrics.business_intelligence_generated}</div>
-                <div className="text-sm text-orange-700">Business Intelligence</div>
+                <div className="text-sm text-orange-700">Business Intelligence Generated</div>
               </div>
             </div>
             
             <div className="text-center p-4 bg-gray-50 rounded-lg">
               <Users className="h-8 w-8 text-gray-600 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-gray-900">{usageMetrics.teams}</div>
-              <div className="text-sm text-gray-700">Teams</div>
+              <div className="text-2xl font-bold text-gray-900">0</div>
+              <div className="text-sm text-gray-700">Teams (Coming Soon)</div>
             </div>
           </CardContent>
         </Card>
