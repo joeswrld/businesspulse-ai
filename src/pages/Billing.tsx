@@ -28,7 +28,8 @@ import {
   Shield,
   TrendingUp,
   DollarSign,
-  Receipt
+  Receipt,
+  RefreshCw
 } from 'lucide-react';
 
 // Types
@@ -62,6 +63,8 @@ interface Subscription {
   trial_start?: string;
   trial_end?: string;
   plan_id: string;
+  paystack_subscription_code?: string;
+  paystack_token?: string;
 }
 
 type PlanType = 'free' | 'pro' | 'business' | 'enterprise';
@@ -75,36 +78,124 @@ const BillingPage: React.FC = () => {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const [updatingCard, setUpdatingCard] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Load data on component mount
+  // Load data on component mount and when user changes
   useEffect(() => {
     if (user) {
       loadBillingData();
     }
   }, [user]);
 
-  const loadBillingData = async () => {
+  // Set up real-time subscription for usage updates
+  useEffect(() => {
     if (!user) return;
 
-    setLoading(true);
+    // Subscribe to usage_tracking changes
+    const usageChannel = supabase
+      .channel('usage-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'usage_tracking',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Usage data changed:', payload);
+          // Refresh usage data when changes occur
+          loadBillingData(true);
+        }
+      )
+      .subscribe();
+
+    // Subscribe to transaction changes
+    const transactionChannel = supabase
+      .channel('transaction-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'transactions',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Transaction data changed:', payload);
+          // Refresh transaction data when changes occur
+          loadBillingData(true);
+        }
+      )
+      .subscribe();
+
+    // Subscribe to subscription changes
+    const subscriptionChannel = supabase
+      .channel('subscription-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_subscriptions',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Subscription data changed:', payload);
+          // Refresh subscription data when changes occur
+          loadBillingData(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(usageChannel);
+      supabase.removeChannel(transactionChannel);
+      supabase.removeChannel(subscriptionChannel);
+    };
+  }, [user]);
+
+  const loadBillingData = async (isRefresh = false) => {
+    if (!user) return;
+
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
 
     try {
-      // Load usage data
+      // Load usage data from usage_tracking table
       const { data: usage, error: usageError } = await supabase
         .from('usage_tracking')
-        .select('*')
+        .select('feedback_count, analytics_count, reports_count, insights_count, teams_count, created_at, updated_at')
         .eq('user_id', user.id)
         .single();
 
       if (usageError && usageError.code !== 'PGRST116') {
         console.error('Error loading usage data:', usageError);
+        toast.error('Failed to load usage data');
       } else if (usage) {
         setUsageData(usage);
+      } else {
+        // Create default usage data if none exists
+        setUsageData({
+          id: '',
+          user_id: user.id,
+          feedback_count: 0,
+          analytics_count: 0,
+          reports_count: 0,
+          insights_count: 0,
+          teams_count: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
       }
 
-      // Load subscription data
+      // Load subscription data from user_subscriptions table
       const { data: subscriptionData, error: subscriptionError } = await supabase
         .from('user_subscriptions')
         .select('*')
@@ -113,19 +204,21 @@ const BillingPage: React.FC = () => {
 
       if (subscriptionError && subscriptionError.code !== 'PGRST116') {
         console.error('Error loading subscription:', subscriptionError);
+        toast.error('Failed to load subscription data');
       } else if (subscriptionData) {
         setSubscription(subscriptionData);
       }
 
-      // Load transactions
+      // Load transactions from transactions table
       const { data: transactionsData, error: transactionsError } = await supabase
         .from('transactions')
-        .select('*')
+        .select('id, amount, currency, status, created_at, invoice_url, description')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (transactionsError) {
         console.error('Error loading transactions:', transactionsError);
+        toast.error('Failed to load transaction history');
       } else {
         setTransactions(transactionsData || []);
       }
@@ -133,8 +226,10 @@ const BillingPage: React.FC = () => {
     } catch (err) {
       console.error('Error loading billing data:', err);
       setError('Failed to load billing information');
+      toast.error('Failed to load billing data');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -234,25 +329,32 @@ const BillingPage: React.FC = () => {
     setCancelling(true);
     
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
       const response = await fetch('/api/cancel-subscription', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ subscriptionId: subscription.id }),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to cancel subscription');
+        throw new Error(result.error || 'Failed to cancel subscription');
       }
 
       toast.success('Subscription cancelled successfully');
-      await loadBillingData(); // Refresh data
+      await loadBillingData(true); // Refresh data
       
     } catch (err) {
       console.error('Error cancelling subscription:', err);
-      toast.error('Failed to cancel subscription');
+      toast.error(err instanceof Error ? err.message : 'Failed to cancel subscription');
     } finally {
       setCancelling(false);
     }
@@ -260,26 +362,42 @@ const BillingPage: React.FC = () => {
 
   // Update payment method
   const handleUpdateCard = async () => {
+    if (!subscription) return;
+
+    setUpdatingCard(true);
+    
     try {
-      // Redirect to Paystack update link
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
       const response = await fetch('/api/paystack/update-card', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          'Authorization': `Bearer ${session.access_token}`,
         },
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to generate update link');
+        throw new Error(result.error || 'Failed to generate update link');
       }
 
-      const { url } = await response.json();
-      window.open(url, '_blank');
+      if (result.url) {
+        window.open(result.url, '_blank');
+        toast.success('Payment method update page opened');
+      } else {
+        throw new Error('No update URL received');
+      }
       
     } catch (err) {
       console.error('Error updating card:', err);
-      toast.error('Failed to update payment method');
+      toast.error(err instanceof Error ? err.message : 'Failed to update payment method');
+    } finally {
+      setUpdatingCard(false);
     }
   };
 
@@ -313,6 +431,49 @@ const BillingPage: React.FC = () => {
         return { icon: <AlertTriangle className="h-4 w-4" />, color: 'text-gray-600' };
     }
   };
+
+  // Download invoice
+  const handleDownloadInvoice = async (transactionId: string, invoiceUrl?: string) => {
+    if (!invoiceUrl) {
+      toast.error('No invoice available for this transaction');
+      return;
+    }
+
+    try {
+      // Try to open the invoice URL directly
+      window.open(invoiceUrl, '_blank');
+      toast.success('Invoice opened in new tab');
+    } catch (err) {
+      console.error('Error downloading invoice:', err);
+      toast.error('Failed to download invoice');
+    }
+  };
+
+  // Refresh data
+  const handleRefresh = () => {
+    loadBillingData(true);
+  };
+
+  // Check if user is authenticated
+  if (!user) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Billing & Usage</h1>
+          <p className="text-muted-foreground">
+            Manage your subscription and view usage statistics
+          </p>
+        </div>
+        
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Please log in to view your billing information.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -361,11 +522,27 @@ const BillingPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Billing & Usage</h1>
-        <p className="text-muted-foreground">
-          Manage your subscription and view usage statistics
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Billing & Usage</h1>
+          <p className="text-muted-foreground">
+            Manage your subscription and view usage statistics
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center space-x-2"
+        >
+          {refreshing ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4" />
+          )}
+          <span>Refresh</span>
+        </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -522,9 +699,14 @@ const BillingPage: React.FC = () => {
                 <Button
                   variant="outline"
                   onClick={handleUpdateCard}
+                  disabled={updatingCard}
                   className="w-full"
                 >
-                  <CreditCard className="h-4 w-4 mr-2" />
+                  {updatingCard ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <CreditCard className="h-4 w-4 mr-2" />
+                  )}
                   Update Card
                 </Button>
               )}
@@ -614,18 +796,18 @@ const BillingPage: React.FC = () => {
                           <span className="capitalize">{transaction.status}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        {transaction.invoice_url && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(transaction.invoice_url, '_blank')}
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Invoice
-                          </Button>
-                        )}
-                      </TableCell>
+                                             <TableCell className="text-right">
+                         {transaction.invoice_url && (
+                           <Button
+                             variant="ghost"
+                             size="sm"
+                             onClick={() => handleDownloadInvoice(transaction.id, transaction.invoice_url)}
+                           >
+                             <Download className="h-4 w-4 mr-2" />
+                             Invoice
+                           </Button>
+                         )}
+                       </TableCell>
                     </TableRow>
                   );
                 })}
