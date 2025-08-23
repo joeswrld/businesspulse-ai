@@ -76,6 +76,13 @@ CREATE TABLE usage_tracking (
 );
 ```
 
+### Subscription Plans
+The system supports multiple subscription tiers:
+- **Free Plan**: Basic features with limitations
+- **Pro Plan**: Advanced features for individuals
+- **Business Plan**: Team features and advanced analytics
+- **Enterprise Plan**: Custom solutions for large organizations
+
 ### Transactions Table
 ```sql
 CREATE TABLE transactions (
@@ -206,6 +213,8 @@ Each usage metric is displayed in a colored card:
 ### Plan Status Badges
 - **Free Trial**: Blue badge with trial days
 - **Pro Plan**: Green badge
+- **Business Plan**: Gold/Amber badge
+- **Enterprise Plan**: Purple badge
 - **Cancelled**: Gray badge
 - **Payment Due**: Yellow badge
 

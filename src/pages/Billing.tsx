@@ -64,7 +64,7 @@ interface Subscription {
   plan_id: string;
 }
 
-type PlanType = 'free' | 'pro' | 'enterprise';
+type PlanType = 'free' | 'pro' | 'business' | 'enterprise';
 
 const BillingPage: React.FC = () => {
   const { user } = useAuth();
@@ -155,27 +155,76 @@ const BillingPage: React.FC = () => {
   // Get current plan
   const getCurrentPlan = (): { type: PlanType; label: string; color: string } => {
     if (subscription) {
+      // Check plan type based on plan_id or metadata
+      const planId = subscription.plan_id?.toLowerCase() || '';
+      
+      // Determine plan type and status
+      let planType: PlanType = 'pro';
+      let statusLabel = '';
+      
+      if (planId.includes('business')) {
+        planType = 'business';
+      } else if (planId.includes('enterprise')) {
+        planType = 'enterprise';
+      } else if (planId.includes('pro') || planId.includes('premium')) {
+        planType = 'pro';
+      } else {
+        planType = 'free';
+      }
+      
+      // Add status to label
       switch (subscription.status) {
         case 'active':
-          return { type: 'pro', label: 'Pro Plan', color: 'bg-green-100 text-green-800' };
+          statusLabel = '';
+          break;
         case 'trialing':
-          return { type: 'pro', label: 'Pro Trial', color: 'bg-blue-100 text-blue-800' };
+          statusLabel = ' Trial';
+          break;
         case 'cancelled':
           return { type: 'free', label: 'Free Plan', color: 'bg-gray-100 text-gray-800' };
         case 'past_due':
-          return { type: 'pro', label: 'Payment Due', color: 'bg-yellow-100 text-yellow-800' };
+          statusLabel = ' - Payment Due';
+          break;
         default:
           return { type: 'free', label: 'Free Plan', color: 'bg-gray-100 text-gray-800' };
+      }
+      
+      // Return plan with appropriate color
+      switch (planType) {
+        case 'business':
+          return { 
+            type: 'business', 
+            label: `Business Plan${statusLabel}`, 
+            color: 'bg-amber-100 text-amber-800 border-amber-300' 
+          };
+        case 'enterprise':
+          return { 
+            type: 'enterprise', 
+            label: `Enterprise Plan${statusLabel}`, 
+            color: 'bg-purple-100 text-purple-800 border-purple-300' 
+          };
+        case 'pro':
+          return { 
+            type: 'pro', 
+            label: `Pro Plan${statusLabel}`, 
+            color: 'bg-green-100 text-green-800 border-green-300' 
+          };
+        default:
+          return { 
+            type: 'free', 
+            label: `Free Plan${statusLabel}`, 
+            color: 'bg-gray-100 text-gray-800 border-gray-300' 
+          };
       }
     }
     
     // Check if user is in trial period
     const trialDaysLeft = getTrialDaysLeft();
     if (trialDaysLeft > 0) {
-      return { type: 'free', label: 'Free Trial', color: 'bg-blue-100 text-blue-800' };
+      return { type: 'free', label: 'Free Trial', color: 'bg-blue-100 text-blue-800 border-blue-300' };
     }
     
-    return { type: 'free', label: 'Free Plan', color: 'bg-gray-100 text-gray-800' };
+    return { type: 'free', label: 'Free Plan', color: 'bg-gray-100 text-gray-800 border-gray-300' };
   };
 
   // Cancel subscription
@@ -481,9 +530,29 @@ const BillingPage: React.FC = () => {
               )}
 
               {!subscription && trialDaysLeft === 0 && (
-                <Button className="w-full">
-                  <Crown className="h-4 w-4 mr-2" />
-                  Upgrade to Pro
+                <div className="space-y-2">
+                  <Button className="w-full">
+                    <Crown className="h-4 w-4 mr-2" />
+                    Upgrade to Pro
+                  </Button>
+                  <Button variant="outline" className="w-full">
+                    <Zap className="h-4 w-4 mr-2" />
+                    Upgrade to Business
+                  </Button>
+                </div>
+              )}
+
+              {subscription && subscription.status === 'active' && currentPlan.type === 'pro' && (
+                <Button variant="outline" className="w-full">
+                  <Zap className="h-4 w-4 mr-2" />
+                  Upgrade to Business
+                </Button>
+              )}
+
+              {subscription && subscription.status === 'active' && currentPlan.type === 'business' && (
+                <Button variant="outline" className="w-full">
+                  <Shield className="h-4 w-4 mr-2" />
+                  Upgrade to Enterprise
                 </Button>
               )}
             </div>
