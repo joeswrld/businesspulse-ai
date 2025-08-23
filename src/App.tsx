@@ -22,7 +22,6 @@ import MockInsights from "./pages/MockInsights";
 import ActionableInsights from "./pages/ActionableInsights";
 import Reports from "./pages/Reports";
 import Analytics from "./pages/Analytics";
-import Billing from "./pages/Billing";
 import Settings from "./pages/Settings";
 import Teams from "./pages/Teams";
 import Profile from "./pages/Profile";
@@ -111,13 +110,6 @@ const App = () => (
               <ProtectedRoute>
                 <DashboardLayout>
                   <Analytics />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/billing" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <Billing />
                 </DashboardLayout>
               </ProtectedRoute>
             } />

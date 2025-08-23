@@ -1,398 +1,235 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
-export interface UsageData {
-  ai_insights: {
-    current: number;
-    limit: number;
-    remaining: number;
-    reset_date: string;
-  };
-  data_sources: {
-    current: number;
-    limit: number;
-    remaining: number;
-  };
-  team_members: {
-    current: number;
-    limit: number;
-    remaining: number;
-  };
-  ai_reports: {
-    current: number;
-    limit: number;
-    remaining: number;
-    reset_date: string;
-  };
-  business_analytics: {
-    current: number;
-    limit: number;
-    remaining: number;
-  };
+// Types for the usage tracking
+export type UsageAction = 'feedback' | 'analytics' | 'reports' | 'insights' | 'teams';
+
+interface UsageRequest {
+  action: UsageAction;
 }
 
-export interface UsageLimits {
-  ai_insights_limit: number;
-  data_sources_limit: number;
-  team_members_limit: number;
-  ai_reports_limit: number;
-  business_analytics_limit: number;
-}
-
-export interface UsageResponse {
+interface UsageResponse {
   success: boolean;
-  can_perform: boolean;
-  current_usage: {
-    ai_insights_used: number;
-    data_sources_used: number;
-    team_members_used: number;
-    ai_reports_used: number;
-    business_analytics_used: number;
+  data?: {
+    id: string;
+    user_id: string;
+    feedback_count: number;
+    analytics_count: number;
+    reports_count: number;
+    insights_count: number;
+    teams_count: number;
+    created_at: string;
+    updated_at: string;
   };
-  limits: UsageLimits;
-  remaining: {
-    ai_insights: number;
-    data_sources: number;
-    team_members: number;
-    ai_reports: number;
-    business_analytics: number;
-  };
-  message?: string;
+  error?: string;
 }
 
-export const useUsageTracking = () => {
-  const { user } = useAuth();
-  const [usage, setUsage] = useState<UsageData>({
-    ai_insights: { current: 0, limit: 20, remaining: 20, reset_date: '' },
-    data_sources: { current: 0, limit: 1, remaining: 1 },
-    team_members: { current: 1, limit: 1, remaining: 0 },
-    ai_reports: { current: 0, limit: 2, remaining: 2, reset_date: '' },
-    business_analytics: { current: 0, limit: 1, remaining: 1 }
-  });
-  const [loading, setLoading] = useState(false);
-  const [subscription, setSubscription] = useState<any>(null);
+interface UseUsageTrackingReturn {
+  trackUsage: (action: UsageAction) => Promise<void>;
+  loading: boolean;
+  error: string | null;
+  success: boolean;
+  reset: () => void;
+}
 
-  // Fetch current usage data
-  const fetchUsage = useCallback(async () => {
-    if (!user) return;
+/**
+ * React hook for tracking user usage of different features
+ * 
+ * @returns Object containing trackUsage function and state management
+ * 
+ * @example
+ * ```tsx
+ * const { trackUsage, loading, error, success } = useUsageTracking();
+ * 
+ * async function handleSubmitFeedback() {
+ *   await trackUsage("feedback");
+ * }
+ * ```
+ */
+export function useUsageTracking(): UseUsageTrackingReturn {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  /**
+   * Reset the hook state
+   */
+  const reset = useCallback(() => {
+    setLoading(false);
+    setError(null);
+    setSuccess(false);
+  }, []);
+
+  /**
+   * Track usage for a specific action
+   * 
+   * @param action - The action to track (feedback, analytics, reports, insights, teams)
+   */
+  const trackUsage = useCallback(async (action: UsageAction): Promise<void> => {
+    // Reset previous state
+    reset();
+    
+    // Check if user is authenticated
+    if (!user) {
+      setError('User not authenticated');
+      return;
+    }
+
+    // Get the current session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      setError('Authentication session not found');
+      return;
+    }
 
     setLoading(true);
+
     try {
-      // Try to get usage from Supabase first
-      const { data, error } = await supabase.functions.invoke('usageTracking', {
-        body: {
-          user_id: user.id,
-          resource_type: 'ai_insights',
-          action: 'get'
-        }
+      // Get the Supabase URL from the client
+      const supabaseUrl = supabase.supabaseUrl;
+      
+      // Make the API call to the usage tracking function
+      const response = await fetch(`${supabaseUrl}/functions/v1/usage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ action } as UsageRequest),
       });
 
-      if (error) {
-        console.error('Error fetching usage from Supabase:', error);
-        // Fallback to localStorage for now
-        await fetchUsageFromLocalStorage();
-      } else if (data) {
-        // Update usage with Supabase data
-        setUsage({
-          ai_insights: {
-            current: data.current_usage.ai_insights_used,
-            limit: data.limits.ai_insights_limit,
-            remaining: data.remaining.ai_insights,
-            reset_date: new Date().toISOString()
-          },
-          data_sources: {
-            current: data.current_usage.data_sources_used,
-            limit: data.limits.data_sources_limit,
-            remaining: data.remaining.data_sources
-          },
-          team_members: {
-            current: data.current_usage.team_members_used,
-            limit: data.limits.team_members_limit,
-            remaining: data.remaining.team_members
-          },
-          ai_reports: {
-            current: data.current_usage.ai_reports_used,
-            limit: data.limits.ai_reports_limit,
-            remaining: data.remaining.ai_reports,
-            reset_date: new Date().toISOString()
-          },
-          business_analytics: {
-            current: data.current_usage.business_analytics_used,
-            limit: data.limits.business_analytics_limit,
-            remaining: data.remaining.business_analytics
-          }
-        });
+      const result: UsageResponse = await response.json();
+
+      if (!response.ok) {
+        // Handle different error status codes
+        switch (response.status) {
+          case 401:
+            setError('Authentication failed. Please log in again.');
+            break;
+          case 400:
+            setError(result.error || 'Invalid request');
+            break;
+          case 500:
+            setError('Server error. Please try again later.');
+            break;
+          default:
+            setError(result.error || 'An unexpected error occurred');
+        }
+        return;
       }
-    } catch (error) {
-      console.error('Error fetching usage:', error);
-      // Fallback to localStorage
-      await fetchUsageFromLocalStorage();
+
+      if (!result.success) {
+        setError(result.error || 'Failed to track usage');
+        return;
+      }
+
+      // Success!
+      setSuccess(true);
+      
+      // Optional: Log success for debugging
+      console.log(`Usage tracked successfully for action: ${action}`, result.data);
+
+    } catch (err) {
+      // Handle network errors or other exceptions
+      console.error('Error tracking usage:', err);
+      
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setError('Network error. Please check your connection.');
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
-  }, [user]);
-
-  // Fallback to localStorage for development/testing
-  const fetchUsageFromLocalStorage = async () => {
-    try {
-      const savedInsights = localStorage.getItem('insightsHistory');
-      const insightsCount = savedInsights ? JSON.parse(savedInsights).length : 0;
-
-      // Get reports count from localStorage
-      const savedReports = localStorage.getItem('userReports');
-      const reportsCount = savedReports ? JSON.parse(savedReports).length : 0;
-
-      setUsage(prev => ({
-        ...prev,
-        ai_insights: {
-          ...prev.ai_insights,
-          current: insightsCount,
-          remaining: Math.max(0, prev.ai_insights.limit - insightsCount)
-        },
-        ai_reports: {
-          ...prev.ai_reports,
-          current: reportsCount,
-          remaining: Math.max(0, prev.ai_reports.limit - reportsCount)
-        }
-      }));
-    } catch (error) {
-      console.error('Error fetching from localStorage:', error);
-    }
-  };
-
-  // Check if user can perform an action
-  const checkUsage = useCallback(async (
-    resourceType: keyof UsageData,
-    requiredCount: number = 1
-  ): Promise<boolean> => {
-    if (!user) return false;
-
-    try {
-      const { data, error } = await supabase.functions.invoke('usageTracking', {
-        body: {
-          user_id: user.id,
-          resource_type: resourceType,
-          count: requiredCount,
-          action: 'check'
-        }
-      });
-
-      if (error) {
-        console.error('Error checking usage:', error);
-        // Fallback check
-        return checkUsageFallback(resourceType, requiredCount);
-      }
-
-      return data?.can_perform || false;
-    } catch (error) {
-      console.error('Error checking usage:', error);
-      return checkUsageFallback(resourceType, requiredCount);
-    }
-  }, [user]);
-
-  // Fallback usage check
-  const checkUsageFallback = (resourceType: keyof UsageData, requiredCount: number = 1): boolean => {
-    const currentUsage = usage[resourceType];
-    if (!currentUsage) return false;
-
-    // Check if unlimited (-1) or within limits
-    if (currentUsage.limit === -1) return true;
-    return (currentUsage.current + requiredCount) <= currentUsage.limit;
-  };
-
-  // Increment usage for a resource
-  const incrementUsage = useCallback(async (
-    resourceType: keyof UsageData,
-    count: number = 1
-  ): Promise<boolean> => {
-    if (!user) return false;
-
-    try {
-      const { data, error } = await supabase.functions.invoke('usageTracking', {
-        body: {
-          user_id: user.id,
-          resource_type: resourceType,
-          count: count,
-          action: 'increment'
-        }
-      });
-
-      if (error) {
-        console.error('Error incrementing usage:', error);
-        // Fallback increment
-        return incrementUsageFallback(resourceType, count);
-      }
-
-      if (data?.success) {
-        // Update local state with new usage data
-        setUsage(prev => ({
-          ...prev,
-          ai_insights: {
-            current: data.current_usage.ai_insights_used,
-            limit: data.limits.ai_insights_limit,
-            remaining: data.remaining.ai_insights,
-            reset_date: prev.ai_insights.reset_date
-          },
-          data_sources: {
-            current: data.current_usage.data_sources_used,
-            limit: data.limits.data_sources_limit,
-            remaining: data.remaining.data_sources
-          },
-          team_members: {
-            current: data.current_usage.team_members_used,
-            limit: data.limits.team_members_limit,
-            remaining: data.remaining.team_members
-          },
-          ai_reports: {
-            current: data.current_usage.ai_reports_used,
-            limit: data.limits.ai_reports_limit,
-            remaining: data.remaining.ai_reports,
-            reset_date: prev.ai_reports.reset_date
-          },
-          business_analytics: {
-            current: data.current_usage.business_analytics_used,
-            limit: data.limits.business_analytics_limit,
-            remaining: data.remaining.business_analytics
-          }
-        }));
-
-        // Show success message
-        if (data.can_perform) {
-          toast.success('Usage updated successfully');
-        } else {
-          toast.error('Usage limit exceeded');
-        }
-
-        return data.can_perform;
-      }
-
-      return false;
-    } catch (error) {
-      console.error('Error incrementing usage:', error);
-      return incrementUsageFallback(resourceType, count);
-    }
-  }, [user]);
-
-  // Fallback usage increment
-  const incrementUsageFallback = (resourceType: keyof UsageData, count: number = 1): boolean => {
-    const currentUsage = usage[resourceType];
-    if (!currentUsage) return false;
-
-    // Check if unlimited (-1) or within limits
-    if (currentUsage.limit === -1) {
-      setUsage(prev => ({
-        ...prev,
-        [resourceType]: {
-          ...prev[resourceType],
-          current: prev[resourceType].current + count,
-          remaining: -1
-        }
-      }));
-      return true;
-    }
-
-    if ((currentUsage.current + count) <= currentUsage.limit) {
-      setUsage(prev => ({
-        ...prev,
-        [resourceType]: {
-          ...prev[resourceType],
-          current: prev[resourceType].current + count,
-          remaining: Math.max(0, prev[resourceType].limit - (prev[resourceType].current + count))
-        }
-      }));
-      return true;
-    }
-
-    toast.error('Usage limit exceeded');
-    return false;
-  };
-
-  // Get usage percentage
-  const getUsagePercentage = useCallback((resourceType: keyof UsageData): number => {
-    const currentUsage = usage[resourceType];
-    if (!currentUsage || currentUsage.limit === -1) return 0;
-    return Math.min((currentUsage.current / currentUsage.limit) * 100, 100);
-  }, [usage]);
-
-  // Get usage status (normal, warning, critical)
-  const getUsageStatus = useCallback((resourceType: keyof UsageData): 'normal' | 'warning' | 'critical' => {
-    const percentage = getUsagePercentage(resourceType);
-    if (percentage >= 90) return 'critical';
-    if (percentage >= 75) return 'warning';
-    return 'normal';
-  }, [getUsagePercentage]);
-
-  // Set up real-time subscription for usage updates
-  useEffect(() => {
-    if (!user) return;
-
-    // Initial fetch
-    fetchUsage();
-
-    // Set up real-time subscription for usage changes
-    const channel = supabase
-      .channel('usage-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_usage'
-        },
-        (payload) => {
-          console.log('Usage changed:', payload);
-          // Refresh usage data when changes occur
-          fetchUsage();
-        }
-      )
-      .subscribe();
-
-    // Set up real-time subscription for subscription changes
-    const subscriptionChannel = supabase
-      .channel('subscription-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_subscriptions'
-        },
-        (payload) => {
-          console.log('Subscription changed:', payload);
-          // Refresh usage data when subscription changes
-          fetchUsage();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-      supabase.removeChannel(subscriptionChannel);
-    };
-  }, [user, fetchUsage]);
-
-  // Auto-refresh usage every 5 minutes
-  useEffect(() => {
-    if (!user) return;
-
-    const interval = setInterval(() => {
-      fetchUsage();
-    }, 5 * 60 * 1000); // 5 minutes
-
-    return () => clearInterval(interval);
-  }, [user, fetchUsage]);
+  }, [user, reset]);
 
   return {
-    usage,
+    trackUsage,
     loading,
-    subscription,
-    fetchUsage,
-    checkUsage,
-    incrementUsage,
-    getUsagePercentage,
-    getUsageStatus,
-    refreshUsage: fetchUsage
+    error,
+    success,
+    reset,
   };
-};
+}
+
+/**
+ * Hook for tracking usage with automatic success reset
+ * This version automatically resets success state after a delay
+ */
+export function useUsageTrackingWithAutoReset(delay: number = 3000): UseUsageTrackingReturn {
+  const { trackUsage, loading, error, success, reset } = useUsageTracking();
+  const [autoResetTimeout, setAutoResetTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Enhanced trackUsage that auto-resets success state
+  const trackUsageWithAutoReset = useCallback(async (action: UsageAction): Promise<void> => {
+    // Clear any existing timeout
+    if (autoResetTimeout) {
+      clearTimeout(autoResetTimeout);
+      setAutoResetTimeout(null);
+    }
+
+    await trackUsage(action);
+
+    // Set up auto-reset for success state
+    if (success) {
+      const timeout = setTimeout(() => {
+        reset();
+        setAutoResetTimeout(null);
+      }, delay);
+      setAutoResetTimeout(timeout);
+    }
+  }, [trackUsage, success, reset, delay, autoResetTimeout]);
+
+  // Cleanup timeout on unmount
+  const resetWithCleanup = useCallback(() => {
+    if (autoResetTimeout) {
+      clearTimeout(autoResetTimeout);
+      setAutoResetTimeout(null);
+    }
+    reset();
+  }, [autoResetTimeout, reset]);
+
+  return {
+    trackUsage: trackUsageWithAutoReset,
+    loading,
+    error,
+    success,
+    reset: resetWithCleanup,
+  };
+}
+
+/**
+ * Hook for tracking usage with optimistic updates
+ * This version provides immediate feedback while making the API call
+ */
+export function useUsageTrackingOptimistic(): UseUsageTrackingReturn & { 
+  optimisticSuccess: boolean;
+  trackUsageOptimistic: (action: UsageAction) => Promise<void>;
+} {
+  const { trackUsage, loading, error, success, reset } = useUsageTracking();
+  const [optimisticSuccess, setOptimisticSuccess] = useState(false);
+
+  const trackUsageOptimistic = useCallback(async (action: UsageAction): Promise<void> => {
+    // Set optimistic success immediately
+    setOptimisticSuccess(true);
+    
+    // Reset after a short delay for visual feedback
+    setTimeout(() => setOptimisticSuccess(false), 1000);
+
+    // Make the actual API call
+    await trackUsage(action);
+  }, [trackUsage]);
+
+  return {
+    trackUsage,
+    trackUsageOptimistic,
+    loading,
+    error,
+    success,
+    optimisticSuccess,
+    reset,
+  };
+}

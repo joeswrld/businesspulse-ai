@@ -1,0 +1,169 @@
+-- Migration: Create usage_tracking table
+-- Description: Creates a table to track user usage of different features
+-- Date: 2024-01-XX
+
+-- Enable UUID extension if not already enabled
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Drop existing table if it exists (for idempotency)
+DROP TABLE IF EXISTS usage_tracking CASCADE;
+
+-- Create the usage_tracking table
+CREATE TABLE usage_tracking (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    feedback_count INTEGER DEFAULT 0,
+    analytics_count INTEGER DEFAULT 0,
+    reports_count INTEGER DEFAULT 0,
+    insights_count INTEGER DEFAULT 0,
+    teams_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Ensure one record per user
+    UNIQUE(user_id)
+);
+
+-- Create index on user_id for better performance
+CREATE INDEX idx_usage_tracking_user_id ON usage_tracking(user_id);
+
+-- Create index on created_at for time-based queries
+CREATE INDEX idx_usage_tracking_created_at ON usage_tracking(created_at);
+
+-- Create function to update the updated_at timestamp
+CREATE OR REPLACE FUNCTION update_usage_tracking_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to automatically update updated_at on row updates
+DROP TRIGGER IF EXISTS trigger_update_usage_tracking_updated_at ON usage_tracking;
+CREATE TRIGGER trigger_update_usage_tracking_updated_at
+    BEFORE UPDATE ON usage_tracking
+    FOR EACH ROW
+    EXECUTE FUNCTION update_usage_tracking_updated_at();
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE usage_tracking ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies (for idempotency)
+DROP POLICY IF EXISTS "Users can view their own usage data" ON usage_tracking;
+DROP POLICY IF EXISTS "Users can insert their own usage data" ON usage_tracking;
+DROP POLICY IF EXISTS "Users can update their own usage data" ON usage_tracking;
+
+-- Create RLS policies
+-- Policy for SELECT: Users can only view their own usage data
+CREATE POLICY "Users can view their own usage data" ON usage_tracking
+    FOR SELECT
+    USING (user_id = auth.uid());
+
+-- Policy for INSERT: Users can only insert their own usage data
+CREATE POLICY "Users can insert their own usage data" ON usage_tracking
+    FOR INSERT
+    WITH CHECK (user_id = auth.uid());
+
+-- Policy for UPDATE: Users can only update their own usage data
+CREATE POLICY "Users can update their own usage data" ON usage_tracking
+    FOR UPDATE
+    USING (user_id = auth.uid())
+    WITH CHECK (user_id = auth.uid());
+
+-- Create a function to get or create usage tracking record for a user
+CREATE OR REPLACE FUNCTION get_or_create_usage_tracking(user_uuid UUID)
+RETURNS usage_tracking AS $$
+DECLARE
+    usage_record usage_tracking;
+BEGIN
+    -- Try to get existing record
+    SELECT * INTO usage_record
+    FROM usage_tracking
+    WHERE user_id = user_uuid;
+    
+    -- If no record exists, create one
+    IF usage_record IS NULL THEN
+        INSERT INTO usage_tracking (user_id)
+        VALUES (user_uuid)
+        RETURNING * INTO usage_record;
+    END IF;
+    
+    RETURN usage_record;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create a function to increment usage counters
+CREATE OR REPLACE FUNCTION increment_usage_counter(
+    user_uuid UUID,
+    counter_name TEXT,
+    increment_amount INTEGER DEFAULT 1
+)
+RETURNS usage_tracking AS $$
+DECLARE
+    usage_record usage_tracking;
+    sql_query TEXT;
+BEGIN
+    -- Ensure user has a usage tracking record
+    usage_record := get_or_create_usage_tracking(user_uuid);
+    
+    -- Build dynamic SQL to update the specific counter
+    sql_query := format(
+        'UPDATE usage_tracking 
+         SET %I = %I + $2 
+         WHERE user_id = $1 
+         RETURNING *',
+        counter_name || '_count',
+        counter_name || '_count'
+    );
+    
+    -- Execute the update
+    EXECUTE sql_query INTO usage_record USING user_uuid, increment_amount;
+    
+    RETURN usage_record;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant necessary permissions
+GRANT USAGE ON SCHEMA public TO authenticated;
+GRANT ALL ON usage_tracking TO authenticated;
+GRANT EXECUTE ON FUNCTION get_or_create_usage_tracking(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION increment_usage_counter(UUID, TEXT, INTEGER) TO authenticated;
+
+-- Insert comment for documentation
+COMMENT ON TABLE usage_tracking IS 'Tracks user usage of different features in the application';
+COMMENT ON COLUMN usage_tracking.user_id IS 'References the user from auth.users';
+COMMENT ON COLUMN usage_tracking.feedback_count IS 'Number of feedback submissions by the user';
+COMMENT ON COLUMN usage_tracking.analytics_count IS 'Number of analytics queries by the user';
+COMMENT ON COLUMN usage_tracking.reports_count IS 'Number of reports generated by the user';
+COMMENT ON COLUMN usage_tracking.insights_count IS 'Number of insights accessed by the user';
+COMMENT ON COLUMN usage_tracking.teams_count IS 'Number of team interactions (placeholder for future use)';
+
+-- Verify the migration
+DO $$
+BEGIN
+    -- Check if table exists
+    IF NOT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'usage_tracking') THEN
+        RAISE EXCEPTION 'Table usage_tracking was not created successfully';
+    END IF;
+    
+    -- Check if RLS is enabled
+    IF NOT EXISTS (
+        SELECT FROM pg_tables 
+        WHERE tablename = 'usage_tracking' 
+        AND rowsecurity = true
+    ) THEN
+        RAISE EXCEPTION 'Row Level Security is not enabled on usage_tracking table';
+    END IF;
+    
+    -- Check if policies exist
+    IF NOT EXISTS (
+        SELECT FROM pg_policies 
+        WHERE tablename = 'usage_tracking' 
+        AND policyname = 'Users can view their own usage data'
+    ) THEN
+        RAISE EXCEPTION 'RLS policies were not created successfully';
+    END IF;
+    
+    RAISE NOTICE 'Migration completed successfully!';
+END $$;

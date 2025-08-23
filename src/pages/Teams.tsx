@@ -1,581 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Users,
-  UserPlus,
-  UserMinus,
-  Crown,
-  Shield,
-  User,
-  MessageSquare,
-  Calendar,
-  Clock,
-  Activity,
-  Plus,
-  Edit,
-  Trash2,
-  Search,
-  Filter,
-  MoreHorizontal,
-  Star,
-  TrendingUp,
-  Target,
-  Award,
-  Zap,
-  Globe,
-  Lock,
-  Unlock,
-  Eye,
-  EyeOff,
-  Settings,
-  Bell,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Info,
-  Sparkles,
-  Rocket,
-  Lightbulb,
-  BarChart3,
-  FileText,
-  Share2,
-  Copy,
-  ExternalLink,
-  Download,
-  Upload,
-  RefreshCw,
-  Play,
-  Pause,
-  Square,
-  RotateCcw
-} from 'lucide-react';
-
-interface TeamMember {
-  id: string;
-  user_id: string;
-  team_id: string;
-  role: 'owner' | 'admin' | 'member' | 'viewer';
-  status: 'active' | 'inactive' | 'pending';
-  joined_at: string;
-  last_active: string;
-  permissions: string[];
-  user: {
-    id: string;
-    email: string;
-    full_name?: string;
-    avatar_url?: string;
-  };
-}
-
-interface Team {
-  id: string;
-  name: string;
-  description: string;
-  avatar_url?: string;
-  is_public: boolean;
-  created_at: string;
-  updated_at: string;
-  owner_id: string;
-  member_count: number;
-  analytics_enabled: boolean;
-  real_time_collaboration: boolean;
-  settings: {
-    allow_invites: boolean;
-    require_approval: boolean;
-    auto_assign_roles: boolean;
-    notification_preferences: string[];
-  };
-}
-
-interface TeamInvitation {
-  id: string;
-  team_id: string;
-  email: string;
-  role: string;
-  status: 'pending' | 'accepted' | 'declined';
-  invited_by: string;
-  invited_at: string;
-  expires_at: string;
-}
+import { Users, Sparkles, Rocket, Lightbulb, Globe, MessageSquare, BarChart3, Shield } from 'lucide-react';
 
 const Teams: React.FC = () => {
-  const { user } = useAuth();
-  
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [invitations, setInvitations] = useState<TeamInvitation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'my-teams' | 'invitations' | 'discover'>('my-teams');
-  
-  // Create team states
-  const [createTeamDialog, setCreateTeamDialog] = useState(false);
-  const [newTeam, setNewTeam] = useState({
-    name: '',
-    description: '',
-    is_public: false,
-    analytics_enabled: true,
-    real_time_collaboration: true
-  });
-  
-  // Invite member states
-  const [inviteDialog, setInviteDialog] = useState(false);
-  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-  const [inviteData, setInviteData] = useState({
-    email: '',
-    role: 'member',
-    message: ''
-  });
-  
-  // Delete team states
-  const [deleteDialog, setDeleteDialog] = useState(false);
-  const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
-  const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
-  
-  // Real-time states
-  const [realTimeMode, setRealTimeMode] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterRole, setFilterRole] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-
-  // Load teams data
-  const loadTeams = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
-      
-      // Load teams where user is owner
-      const { data: ownedTeams, error: ownedError } = await supabase
-        .from('teams')
-        .select('*')
-        .eq('owner_id', user.id);
-
-      if (ownedError) {
-        console.error('Owned teams error:', ownedError);
-      }
-
-      // Load teams where user is a member
-      const { data: memberTeams, error: memberError } = await supabase
-        .from('team_members')
-        .select('team_id')
-        .eq('user_id', user.id);
-
-      if (memberError) {
-        console.error('Member teams error:', memberError);
-      }
-
-      // Get the actual team data for member teams
-      let memberTeamData: any[] = [];
-      if (memberTeams && memberTeams.length > 0) {
-        const teamIds = memberTeams.map(m => m.team_id);
-        const { data: memberTeamDetails, error: memberTeamError } = await supabase
-          .from('teams')
-          .select('*')
-          .in('id', teamIds);
-
-        if (memberTeamError) {
-          console.error('Member team details error:', memberTeamError);
-        } else {
-          memberTeamData = memberTeamDetails || [];
-        }
-      }
-
-      // Combine owned and member teams, removing duplicates
-      const allTeams = [...(ownedTeams || []), ...memberTeamData];
-      const uniqueTeams = allTeams.filter((team, index, self) => 
-        index === self.findIndex(t => t.id === team.id)
-      );
-
-      setTeams(uniqueTeams);
-
-      // Load team members for all teams
-      if (uniqueTeams.length > 0) {
-        const teamIds = uniqueTeams.map(team => team.id);
-        const { data: membersData, error: membersError } = await supabase
-          .from('team_members')
-          .select('*')
-          .in('team_id', teamIds);
-
-        if (membersError) {
-          console.error('Members error:', membersError);
-        } else {
-          setTeamMembers(membersData || []);
-        }
-      }
-
-      // Load invitations
-      const { data: invitationsData, error: invitationsError } = await supabase
-        .from('team_invitations')
-        .select('*')
-        .eq('email', user.email)
-        .eq('status', 'pending');
-
-      if (invitationsError) {
-        console.error('Invitations error:', invitationsError);
-      } else {
-        setInvitations(invitationsData || []);
-      }
-
-    } catch (error) {
-      console.error('Error loading teams:', error);
-      toast.error('Failed to load teams data');
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    loadTeams();
-  }, [loadTeams]);
-
-  // Real-time updates
-  useEffect(() => {
-    if (realTimeMode && autoRefresh) {
-      const interval = setInterval(() => {
-        loadTeams();
-      }, 10000); // Refresh every 10 seconds
-
-      return () => clearInterval(interval);
-    }
-  }, [realTimeMode, autoRefresh, loadTeams]);
-
-  // Create new team
-  const createTeam = async () => {
-    if (!user || !newTeam.name.trim()) {
-      toast.error('Please provide a team name');
-      return;
-    }
-
-    try {
-      // Create team first
-      const { data: team, error: teamError } = await supabase
-        .from('teams')
-        .insert({
-          name: newTeam.name,
-          description: newTeam.description,
-          is_public: newTeam.is_public,
-          owner_id: user.id,
-          analytics_enabled: newTeam.analytics_enabled,
-          real_time_collaboration: newTeam.real_time_collaboration,
-          settings: {
-            allow_invites: true,
-            require_approval: false,
-            auto_assign_roles: true,
-            notification_preferences: ['email', 'push']
-          }
-        })
-        .select()
-        .single();
-
-      if (teamError) {
-        console.error('Team creation error:', teamError);
-        throw teamError;
-      }
-
-      // Add owner as team member
-      const { error: memberError } = await supabase
-        .from('team_members')
-        .insert({
-          team_id: team.id,
-          user_id: user.id,
-          role: 'owner',
-          status: 'active',
-          permissions: ['all']
-        });
-
-      if (memberError) {
-        console.error('Member creation error:', memberError);
-        // If member creation fails, try to delete the team
-        await supabase.from('teams').delete().eq('id', team.id);
-        throw memberError;
-      }
-
-      toast.success('Team created successfully!');
-      setCreateTeamDialog(false);
-      setNewTeam({ name: '', description: '', is_public: false, analytics_enabled: true, real_time_collaboration: true });
-      loadTeams();
-
-    } catch (error) {
-      console.error('Error creating team:', error);
-      toast.error('Failed to create team');
-    }
-  };
-
-  // Invite member to team
-  const inviteMember = async () => {
-    if (!user || !selectedTeam || !inviteData.email) return;
-
-    try {
-      // Validate email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(inviteData.email)) {
-        toast.error('Please enter a valid email address');
-        return;
-      }
-
-      // Check if user is already a member
-      const existingMember = teamMembers.find(
-        member => member.user?.email === inviteData.email && member.team_id === selectedTeam.id
-      );
-      if (existingMember) {
-        toast.error('This user is already a member of the team');
-        return;
-      }
-
-      // Check if invitation already exists
-      const existingInvitation = invitations.find(
-        inv => inv.email === inviteData.email && inv.team_id === selectedTeam.id && inv.status === 'pending'
-      );
-      if (existingInvitation) {
-        toast.error('An invitation has already been sent to this email');
-        return;
-      }
-
-      // Create invitation with fallback for missing columns
-      const invitationData = {
-        team_id: selectedTeam.id,
-        inviter_id: user.id,
-        email: inviteData.email,
-        role: inviteData.role,
-        personal_message: inviteData.message || null,
-        status: 'pending',
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
-      };
-
-      const { data: invitation, error: invitationError } = await supabase
-        .from('team_invitations')
-        .insert(invitationData)
-        .select()
-        .single();
-
-      if (invitationError) {
-        console.error('Error creating invitation:', invitationError);
-        
-        // If it's a column error, show a helpful message
-        if (invitationError.message.includes('column') && invitationError.message.includes('does not exist')) {
-          toast.error('Invitation system needs to be set up. Please run the database migration first.');
-          return;
-        }
-        
-        toast.error('Failed to create invitation');
-        return;
-      }
-
-      // Try to send invitation email (optional - don't fail if email fails)
-      try {
-        const { data: emailResponse, error: emailError } = await supabase.functions.invoke('send-team-invitation', {
-          body: { invitation_id: invitation.id }
-        });
-
-        if (emailError) {
-          console.error('Email sending error:', emailError);
-          toast.warning('Invitation created but email delivery failed');
-        } else {
-          toast.success('Invitation sent successfully!');
-        }
-      } catch (emailError) {
-        console.error('Email function error:', emailError);
-        toast.warning('Invitation created but email delivery failed');
-      }
-
-      // Reset form and close dialog
-      setInviteData({ email: '', role: 'member', message: '' });
-      setInviteDialog(false);
-      setSelectedTeam(null);
-
-      // Reload invitations
-      loadTeams();
-
-    } catch (error) {
-      console.error('Error inviting member:', error);
-      toast.error('Failed to send invitation');
-    }
-  };
-
-  // Accept invitation
-  const acceptInvitation = async (invitation: TeamInvitation) => {
-    try {
-      // Add user to team
-      const { error: memberError } = await supabase
-        .from('team_members')
-        .insert({
-          team_id: invitation.team_id,
-          user_id: user?.id,
-          role: invitation.role,
-          status: 'active',
-          permissions: invitation.role === 'admin' ? ['read', 'write', 'admin'] : ['read', 'write']
-        });
-
-      if (memberError) throw memberError;
-
-      // Update invitation status
-      const { error: inviteError } = await supabase
-        .from('team_invitations')
-        .update({ status: 'accepted' })
-        .eq('id', invitation.id);
-
-      if (inviteError) throw inviteError;
-
-      toast.success('Invitation accepted! Welcome to the team!');
-      loadTeams();
-
-    } catch (error) {
-      console.error('Error accepting invitation:', error);
-      toast.error('Failed to accept invitation');
-    }
-  };
-
-  // Decline invitation
-  const declineInvitation = async (invitation: TeamInvitation) => {
-    try {
-      const { error } = await supabase
-        .from('team_invitations')
-        .update({ status: 'declined' })
-        .eq('id', invitation.id);
-
-      if (error) throw error;
-
-      toast.success('Invitation declined');
-      loadTeams();
-
-    } catch (error) {
-      console.error('Error declining invitation:', error);
-      toast.error('Failed to decline invitation');
-    }
-  };
-
-  // Delete team
-  const deleteTeam = async (teamId: string) => {
-    if (!user) return;
-
-    try {
-      // Check if user is the owner of the team
-      const team = teams.find(t => t.id === teamId);
-      if (!team || team.owner_id !== user.id) {
-        toast.error('You can only delete teams that you own');
-        return;
-      }
-
-      console.log('Deleting team:', teamId);
-
-      // Delete the team (cascade will handle related data)
-      const { error: teamError } = await supabase
-        .from('teams')
-        .delete()
-        .eq('id', teamId)
-        .eq('owner_id', user.id); // Extra security check
-
-      if (teamError) {
-        console.error('Error deleting team:', teamError);
-        throw teamError;
-      }
-
-      toast.success('Team deleted successfully');
-      loadTeams();
-
-    } catch (error) {
-      console.error('Error deleting team:', error);
-      toast.error('Failed to delete team');
-    }
-  };
-
-  // Handle delete team confirmation
-  const handleDeleteTeam = (team: Team) => {
-    setTeamToDelete(team);
-    setDeleteDialog(true);
-  };
-
-  // Confirm delete team
-  const confirmDeleteTeam = async () => {
-    if (teamToDelete) {
-      await deleteTeam(teamToDelete.id);
-      setDeleteDialog(false);
-      setTeamToDelete(null);
-    }
-  };
-
-  // Get team members for a specific team
-  const getTeamMembers = (teamId: string) => {
-    return teamMembers.filter(member => member.team_id === teamId);
-  };
-
-  // Get user's role in a team
-  const getUserRole = (teamId: string) => {
-    const member = teamMembers.find(m => m.team_id === teamId && m.user_id === user?.id);
-    return member?.role || 'none';
-  };
-
-  // Filter teams based on search and filters
-  const filteredTeams = teams.filter(team => {
-    const matchesSearch = team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         team.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = filterRole === 'all' || getUserRole(team.id) === filterRole;
-    const matchesStatus = filterStatus === 'all' || team.analytics_enabled === (filterStatus === 'enabled');
-    return matchesSearch && matchesRole && matchesStatus;
-  });
-
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'owner': return <Crown className="h-4 w-4 text-yellow-500" />;
-      case 'admin': return <Shield className="h-4 w-4 text-blue-500" />;
-      case 'member': return <User className="h-4 w-4 text-green-500" />;
-      case 'viewer': return <Eye className="h-4 w-4 text-gray-500" />;
-      default: return <User className="h-4 w-4 text-gray-400" />;
-    }
-  };
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'owner': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'admin': return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'member': return 'bg-green-100 text-green-800 border-green-300';
-      case 'viewer': return 'bg-gray-100 text-gray-800 border-gray-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex items-center space-x-2">
-          <RefreshCw className="h-6 w-6 animate-spin" />
-          <span>Loading teams...</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -586,484 +15,192 @@ const Teams: React.FC = () => {
             Collaborate with your team in real-time
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant={realTimeMode ? "default" : "outline"}
-            size="sm"
-            onClick={() => setRealTimeMode(!realTimeMode)}
-          >
-            {realTimeMode ? <Activity className="h-4 w-4 mr-2" /> : <Activity className="h-4 w-4 mr-2" />}
-            {realTimeMode ? 'Real-time' : 'Static'}
-          </Button>
-          {realTimeMode && (
-            <Button
-              variant={autoRefresh ? "default" : "outline"}
-              size="sm"
-              onClick={() => setAutoRefresh(!autoRefresh)}
-            >
-              {autoRefresh ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
-              Auto-refresh
-            </Button>
-          )}
-          <Dialog open={createTeamDialog} onOpenChange={setCreateTeamDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Team
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Team</DialogTitle>
-                <DialogDescription>
-                  Create a new team to collaborate with your colleagues.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Team Name</label>
-                  <Input
-                    placeholder="Enter team name"
-                    value={newTeam.name}
-                    onChange={(e) => setNewTeam(prev => ({ ...prev, name: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Description</label>
-                  <Textarea
-                    placeholder="Describe your team's purpose"
-                    value={newTeam.description}
-                    onChange={(e) => setNewTeam(prev => ({ ...prev, description: e.target.value }))}
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="is_public"
-                    checked={newTeam.is_public}
-                    onChange={(e) => setNewTeam(prev => ({ ...prev, is_public: e.target.checked }))}
-                  />
-                  <label htmlFor="is_public" className="text-sm">Public team (visible to everyone)</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="analytics_enabled"
-                    checked={newTeam.analytics_enabled}
-                    onChange={(e) => setNewTeam(prev => ({ ...prev, analytics_enabled: e.target.checked }))}
-                  />
-                  <label htmlFor="analytics_enabled" className="text-sm">Enable team analytics</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="real_time_collaboration"
-                    checked={newTeam.real_time_collaboration}
-                    onChange={(e) => setNewTeam(prev => ({ ...prev, real_time_collaboration: e.target.checked }))}
-                  />
-                  <label htmlFor="real_time_collaboration" className="text-sm">Enable real-time collaboration</label>
-                </div>
+        <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-300">
+          <Sparkles className="h-3 w-3 mr-1" />
+          Coming Soon
+        </Badge>
+      </div>
+
+      {/* Coming Soon Content */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Team Collaboration */}
+        <Card className="border-2 border-dashed border-muted-foreground/20">
+          <CardHeader>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Users className="h-5 w-5 text-white" />
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setCreateTeamDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={createTeam}>
-                  Create Team
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex space-x-1 bg-muted p-1 rounded-lg">
-        <button
-          className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'my-teams' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => setActiveTab('my-teams')}
-        >
-          My Teams ({teams.length})
-        </button>
-        <button
-          className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'invitations' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => setActiveTab('invitations')}
-        >
-          Invitations ({invitations.length})
-        </button>
-        <button
-          className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'discover' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-          }`}
-          onClick={() => setActiveTab('discover')}
-        >
-          Discover
-        </button>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search teams..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Select value={filterRole} onValueChange={setFilterRole}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="owner">Owner</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="member">Member</SelectItem>
-              <SelectItem value="viewer">Viewer</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="enabled">Analytics Enabled</SelectItem>
-              <SelectItem value="disabled">Analytics Disabled</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Content based on active tab */}
-      {activeTab === 'my-teams' && (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredTeams.map((team) => {
-            const members = getTeamMembers(team.id);
-            const userRole = getUserRole(team.id);
-            
-            return (
-              <Card key={team.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                        <Users className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg">{team.name}</CardTitle>
-                        <div className="flex items-center space-x-2">
-                          {getRoleIcon(userRole)}
-                          <Badge variant="outline" className={getRoleColor(userRole)}>
-                            {userRole}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      {team.is_public ? (
-                        <Globe className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <Lock className="h-4 w-4 text-orange-500" />
-                      )}
-                      {team.real_time_collaboration && (
-                        <Zap className="h-4 w-4 text-yellow-500" />
-                      )}
-                      {userRole === 'owner' && (
-                        <DropdownMenu open={dropdownOpen === team.id} onOpenChange={(open) => setDropdownOpen(open ? team.id : null)}>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedTeam(team);
-                                setInviteDialog(true);
-                              }}
-                            >
-                              <UserPlus className="h-4 w-4 mr-2" />
-                              Invite Member
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Settings className="h-4 w-4 mr-2" />
-                              Team Settings
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <BarChart3 className="h-4 w-4 mr-2" />
-                              View Analytics
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteTeam(team)}
-                              className="text-red-600 focus:text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete Team
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {team.description || 'No description provided'}
-                  </p>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Members</span>
-                      <span className="font-medium">{members.length}</span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Analytics</span>
-                      <div className="flex items-center space-x-1">
-                        {team.analytics_enabled ? (
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-red-500" />
-                        )}
-                        <span className={team.analytics_enabled ? 'text-green-600' : 'text-red-600'}>
-                          {team.analytics_enabled ? 'Enabled' : 'Disabled'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Real-time</span>
-                      <div className="flex items-center space-x-1">
-                        {team.real_time_collaboration ? (
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-red-500" />
-                        )}
-                        <span className={team.real_time_collaboration ? 'text-green-600' : 'text-red-600'}>
-                          {team.real_time_collaboration ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedTeam(team);
-                        setInviteDialog(true);
-                      }}
-                      disabled={!['owner', 'admin'].includes(userRole)}
-                    >
-                      <UserPlus className="h-4 w-4 mr-1" />
-                      Invite
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <MessageSquare className="h-4 w-4 mr-1" />
-                      Chat
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <BarChart3 className="h-4 w-4 mr-1" />
-                      Analytics
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {activeTab === 'invitations' && (
-        <div className="space-y-4">
-          {invitations.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-8">
-                <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Pending Invitations</h3>
-                <p className="text-muted-foreground">
-                  You don't have any pending team invitations at the moment.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            invitations.map((invitation) => (
-              <Card key={invitation.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                        <Users className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">Team Invitation</h3>
-                        <p className="text-sm text-muted-foreground">
-                          You've been invited to join a team
-                        </p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Badge variant="outline">{invitation.role}</Badge>
-                          <span className="text-xs text-muted-foreground">
-                            Expires {new Date(invitation.expires_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        size="sm"
-                        onClick={() => acceptInvitation(invitation)}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Accept
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => declineInvitation(invitation)}
-                      >
-                        <XCircle className="h-4 w-4 mr-1" />
-                        Decline
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
-      )}
-
-      {activeTab === 'discover' && (
-        <Card>
-          <CardContent className="text-center py-8">
-            <Globe className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Discover Public Teams</h3>
-            <p className="text-muted-foreground mb-4">
-              Find and join public teams to collaborate with others.
-            </p>
-            <Button variant="outline">
-              <Search className="h-4 w-4 mr-2" />
-              Browse Public Teams
-            </Button>
+              <div>
+                <CardTitle className="text-lg">Team Collaboration</CardTitle>
+                <CardDescription>Real-time collaboration features</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <MessageSquare className="h-4 w-4" />
+                <span>Team chat and messaging</span>
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <BarChart3 className="h-4 w-4" />
+                <span>Shared analytics dashboards</span>
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <Shield className="h-4 w-4" />
+                <span>Role-based permissions</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
-      )}
 
-      {/* Invite Member Dialog */}
-      <Dialog open={inviteDialog} onOpenChange={setInviteDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Invite Team Member</DialogTitle>
-            <DialogDescription>
-              Send an invitation to collaborate with your team.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address
-              </label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="colleague@example.com"
-                value={inviteData.email}
-                onChange={(e) => setInviteData({ ...inviteData, email: e.target.value })}
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
-                Role
-              </label>
-              <Select value={inviteData.role} onValueChange={(value) => setInviteData({ ...inviteData, role: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="member">Member</SelectItem>
-                  <SelectItem value="moderator">Moderator</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">
-                Personal Message (Optional)
-              </label>
-              <Textarea
-                id="message"
-                placeholder="Add a personal message to your invitation..."
-                value={inviteData.message}
-                onChange={(e) => setInviteData({ ...inviteData, message: e.target.value })}
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setInviteDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={inviteMember} disabled={!inviteData.email.trim()}>
-              <UserPlus className="h-4 w-4 mr-2" />
-              Send Invitation
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Team Confirmation Dialog */}
-      <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Team</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{teamToDelete?.name}"? This action cannot be undone and will permanently remove the team and all its data.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <span className="text-sm font-medium text-red-800">Warning</span>
+        {/* Team Management */}
+        <Card className="border-2 border-dashed border-muted-foreground/20">
+          <CardHeader>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                <Rocket className="h-5 w-5 text-white" />
               </div>
-              <p className="text-sm text-red-700 mt-2">
-                This will permanently delete:
-              </p>
-              <ul className="text-sm text-red-700 mt-2 list-disc list-inside space-y-1">
-                <li>All team members and their data</li>
-                <li>All team invitations</li>
-                <li>All team activities and history</li>
-                <li>All team settings and configurations</li>
-              </ul>
+              <div>
+                <CardTitle className="text-lg">Team Management</CardTitle>
+                <CardDescription>Create and manage teams</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <Users className="h-4 w-4" />
+                <span>Invite team members</span>
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <Globe className="h-4 w-4" />
+                <span>Public and private teams</span>
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <Shield className="h-4 w-4" />
+                <span>Advanced security controls</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Team Analytics */}
+        <Card className="border-2 border-dashed border-muted-foreground/20">
+          <CardHeader>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                <Lightbulb className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Team Analytics</CardTitle>
+                <CardDescription>Insights and performance tracking</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <BarChart3 className="h-4 w-4" />
+                <span>Team performance metrics</span>
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <Sparkles className="h-4 w-4" />
+                <span>AI-powered insights</span>
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <Rocket className="h-4 w-4" />
+                <span>Productivity optimization</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Coming Soon Message */}
+      <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+        <CardContent className="text-center py-12">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+              <Sparkles className="h-8 w-8 text-white" />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialog(false)}>
-              Cancel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={confirmDeleteTeam}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Team
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <h3 className="text-2xl font-bold mb-2">Teams Feature Coming Soon!</h3>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            We're working hard to bring you powerful team collaboration features. 
+            Get ready for real-time collaboration, team analytics, and seamless project management.
+          </p>
+          <div className="flex items-center justify-center space-x-4">
+            <Badge variant="outline" className="bg-white">
+              <Rocket className="h-3 w-3 mr-1" />
+              Q1 2024
+            </Badge>
+            <Badge variant="outline" className="bg-white">
+              <Users className="h-3 w-3 mr-1" />
+              Beta Access
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Feature Preview */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <MessageSquare className="h-5 w-5" />
+              <span>Real-time Communication</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Built-in chat, video calls, and screen sharing for seamless team collaboration.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <BarChart3 className="h-5 w-5" />
+              <span>Team Analytics</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Track team performance, productivity metrics, and collaboration insights.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Shield className="h-5 w-5" />
+              <span>Advanced Security</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Enterprise-grade security with role-based access control and audit logs.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Globe className="h-5 w-5" />
+              <span>Global Collaboration</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Connect with teams worldwide with multi-language support and timezone management.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
