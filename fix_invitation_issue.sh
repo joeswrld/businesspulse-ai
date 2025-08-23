@@ -48,7 +48,7 @@ echo "3. 📝 Copy and paste this SQL code:"
 echo ""
 
 # Display the SQL content
-cat fix_invitation_system_complete.sql
+cat fix_invitation_simple.sql
 
 echo ""
 echo "4. ▶️  Click 'Run' to execute the SQL"
@@ -58,6 +58,7 @@ print_warning "Important Notes:"
 echo "- This will fix the database schema for team invitations"
 echo "- It will add missing columns and fix RLS policies"
 echo "- No existing data will be lost"
+echo "- This version avoids sequence-related errors"
 echo ""
 
 print_success "After running the SQL:"
