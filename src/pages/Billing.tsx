@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +63,110 @@ const Billing = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'pro' | 'business' | null>(null);
+  const [subscriptionData, setSubscriptionData] = useState<any>(null);
+
+  // Fetch subscription data
+  const fetchSubscription = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error('Error fetching subscription:', error);
+      }
+
+      if (data) {
+        console.log('Fetched subscription data:', data);
+        setSubscriptionData(data);
+      } else {
+        console.log('No subscription data found for user');
+      }
+    } catch (error) {
+      console.error('Error fetching subscription:', error);
+    }
+  }, [user]);
+
+  // Get plan name based on subscription status
+  const getPlanName = () => {
+    if (!subscriptionData) return 'Free Trial';
+    
+    // Check if user has an active subscription
+    if (subscriptionData.status === 'active' || subscriptionData.status === 'trialing') {
+      // Determine plan based on subscription details
+      if (subscriptionData.plan_name) {
+        // Convert plan_name to display name
+        switch (subscriptionData.plan_name) {
+          case 'free_trial':
+            return 'Free Trial';
+          case 'pro':
+            return 'Pro';
+          case 'business':
+            return 'Business';
+          default:
+            return subscriptionData.plan_name;
+        }
+      }
+      
+      // Fallback: determine plan based on price or other indicators
+      if (subscriptionData.price === 35000) return 'Pro';
+      if (subscriptionData.price === 53000) return 'Business';
+      
+      // Default to Free Trial if we can't determine
+      return 'Free Trial';
+    }
+    
+    return 'Free Trial';
+  };
+
+  // Get plan price and interval
+  const getPlanPrice = () => {
+    if (!subscriptionData) return { price: 0, currency: '₦', interval: '8 days' };
+    
+    return {
+      price: subscriptionData.price || 0,
+      currency: subscriptionData.currency || '₦',
+      interval: subscriptionData.interval || 'month'
+    };
+  };
+
+  // Get subscription status
+  const getSubscriptionStatus = () => {
+    if (!subscriptionData) return 'trialing';
+    return subscriptionData.status || 'trialing';
+  };
+
+  // Fetch subscription on component mount and set up real-time listener
+  useEffect(() => {
+    fetchSubscription();
+    
+    // Set up real-time subscription for subscription changes
+    const subscriptionChannel = supabase
+      .channel('subscription-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_subscriptions',
+          filter: `user_id=eq.${user?.id}`
+        },
+        (payload) => {
+          console.log('Subscription updated:', payload);
+          // Refresh subscription data when changes occur
+          fetchSubscription();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscriptionChannel);
+    };
+  }, [fetchSubscription, user?.id]);
 
   // Default to Free Trial plan
   const defaultPlan: SubscriptionPlan = {
@@ -91,6 +195,7 @@ const Billing = () => {
   const refreshUsage = async () => {
     setRefreshing(true);
     await hookRefreshUsage();
+    await fetchSubscription();
     setRefreshing(false);
     toast.success("Usage data refreshed");
   };
@@ -192,8 +297,9 @@ const Billing = () => {
     
     toast.success('Subscription activated successfully!');
     
-    // Refresh usage data to reflect new plan limits
+    // Refresh both usage and subscription data to reflect new plan
     await refreshUsage();
+    await fetchSubscription();
     
     // Track successful upgrade
     try {
@@ -213,7 +319,7 @@ const Billing = () => {
   };
 
   const handleCancelSubscription = async () => {
-    if (!user?.email || !subscription?.subscription_id) {
+    if (!user?.email || !subscriptionData?.subscription_id) {
       toast.error("Unable to cancel subscription. Please contact support.");
       return;
     }
@@ -222,7 +328,7 @@ const Billing = () => {
       const { data, error } = await supabase.functions.invoke('manage-subscription', {
         body: {
           action: 'cancel',
-          subscription_id: subscription.subscription_id,
+          subscription_id: subscriptionData.subscription_id,
           email: user.email
         }
       });
@@ -270,10 +376,16 @@ const Billing = () => {
             Monitor your usage and manage your subscription
           </p>
         </div>
-        <Button onClick={refreshUsage} disabled={refreshing} variant="outline">
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh Usage
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={refreshUsage} disabled={refreshing} variant="outline">
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh Usage
+          </Button>
+          <Button onClick={fetchSubscription} disabled={refreshing} variant="outline">
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh Subscription
+          </Button>
+        </div>
       </div>
 
       {/* Current Subscription Status */}
@@ -284,8 +396,8 @@ const Billing = () => {
               <CreditCard className="h-5 w-5 mr-2" />
               Current Subscription
             </span>
-            <Badge className={subscription?.status === 'active' ? 'bg-success' : 'bg-warning'}>
-              {subscription?.status === 'trialing' ? 'Trial' : subscription?.status || 'Unknown'}
+            <Badge className={getSubscriptionStatus() === 'active' ? 'bg-success' : 'bg-warning'}>
+              {getSubscriptionStatus() === 'trialing' ? 'Trial' : getSubscriptionStatus() === 'active' ? 'Active' : 'Unknown'}
             </Badge>
           </CardTitle>
         </CardHeader>
@@ -293,13 +405,13 @@ const Billing = () => {
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <h3 className="font-semibold text-lg mb-2">
-                {subscription?.name || 'Free Trial'} Plan
+                {getPlanName()} Plan
               </h3>
               <p className="text-muted-foreground mb-4">
-                {subscription?.currency || '₦'}{subscription?.price || 0}/{subscription?.interval || '8 days'}
+                {getPlanPrice().currency}{getPlanPrice().price}/{getPlanPrice().interval}
               </p>
               
-              {subscription?.status === 'trialing' && (
+                              {getSubscriptionStatus() === 'trialing' && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span>Trial Progress</span>
@@ -312,25 +424,25 @@ const Billing = () => {
                 </div>
               )}
               
-              {subscription?.current_period_end && (
+              {subscriptionData?.current_period_end && (
                 <div className="flex items-center text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4 mr-2" />
-                  Next billing: {new Date(subscription.current_period_end).toLocaleDateString()}
+                                      Next billing: {new Date(subscriptionData.current_period_end).toLocaleDateString()}
                 </div>
               )}
             </div>
             
             <div className="space-y-4">
               <div>
-                <h4 className="font-medium mb-2">Usage This Period</h4>
+                <h4 className="font-medium mb-2">Usage Overview</h4>
                 <div className="space-y-3">
                   <div>
                     <div className="flex items-center justify-between text-sm mb-1">
                       <span className="flex items-center">
-                        <Brain className="h-4 w-4 mr-1" />
-                        AI Insights
+                        <FileText className="h-4 w-4 mr-1" />
+                        Feedback Submitted
                       </span>
-                      <span>{usage.ai_insights.current} / {usage.ai_insights.limit}</span>
+                      <span>{usage.ai_insights.current}</span>
                     </div>
                     <Progress value={getUsagePercentage('ai_insights')} />
                   </div>
@@ -338,10 +450,32 @@ const Billing = () => {
                   <div>
                     <div className="flex items-center justify-between text-sm mb-1">
                       <span className="flex items-center">
-                        <Database className="h-4 w-4 mr-1" />
-                        Data Sources
+                        <Brain className="h-4 w-4 mr-1" />
+                        AI Analytics Generated
                       </span>
-                      <span>{usage.data_sources.current} / {usage.data_sources.limit}</span>
+                      <span>{usage.ai_reports.current}</span>
+                    </div>
+                    <Progress value={getUsagePercentage('ai_reports')} />
+                  </div>
+                  
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="flex items-center">
+                        <TrendingUp className="h-4 w-4 mr-1" />
+                        Executive Reports Generated
+                      </span>
+                      <span>{usage.business_analytics.current}</span>
+                    </div>
+                    <Progress value={getUsagePercentage('business_analytics')} />
+                  </div>
+                  
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="flex items-center">
+                        <BarChart3 className="h-4 w-4 mr-1" />
+                        Business Intelligence Generated
+                      </span>
+                      <span>{usage.data_sources.current}</span>
                     </div>
                     <Progress value={getUsagePercentage('data_sources')} />
                   </div>
@@ -350,11 +484,11 @@ const Billing = () => {
                     <div className="flex items-center justify-between text-sm mb-1">
                       <span className="flex items-center">
                         <Users className="h-4 w-4 mr-1" />
-                        Team Members
+                        Teams (Coming Soon)
                       </span>
-                      <span>{usage.team_members.current} / {usage.team_members.limit}</span>
+                      <span>0</span>
                     </div>
-                    <Progress value={getUsagePercentage('team_members')} />
+                    <Progress value={0} />
                   </div>
                 </div>
               </div>
@@ -363,152 +497,7 @@ const Billing = () => {
         </CardContent>
       </Card>
 
-      {/* Detailed Usage Tracking */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <TrendingUp className="h-5 w-5 mr-2" />
-            Detailed Usage Tracking
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="insights">AI Insights</TabsTrigger>
-              <TabsTrigger value="sources">Data Sources</TabsTrigger>
-              <TabsTrigger value="reports">AI Reports</TabsTrigger>
-              <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="overview" className="space-y-4">
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <Brain className="h-5 w-5 text-blue-600" />
-                    <Badge variant={getUsageStatus('ai_insights') === 'critical' ? 'destructive' : getUsageStatus('ai_insights') === 'warning' ? 'secondary' : 'default'}>
-                      {getUsageStatus('ai_insights')}
-                    </Badge>
-                  </div>
-                  <div className="text-2xl font-bold">{usage.ai_insights.current}</div>
-                  <div className="text-sm text-muted-foreground">of {usage.ai_insights.limit} AI Insights</div>
-                  <Progress value={getUsagePercentage('ai_insights')} className="mt-2" />
-                </div>
-                
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <Database className="h-5 w-5 text-green-600" />
-                    <Badge variant={getUsageStatus('data_sources') === 'critical' ? 'destructive' : getUsageStatus('data_sources') === 'warning' ? 'secondary' : 'default'}>
-                      {getUsageStatus('data_sources')}
-                    </Badge>
-                  </div>
-                  <div className="text-2xl font-bold">{usage.data_sources.current}</div>
-                  <div className="text-sm text-muted-foreground">of {usage.data_sources.limit} Data Sources</div>
-                  <Progress value={getUsagePercentage('data_sources')} className="mt-2" />
-                </div>
-                
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <Users className="h-5 w-5 text-purple-600" />
-                    <Badge variant={getUsageStatus('team_members') === 'critical' ? 'destructive' : getUsageStatus('team_members') === 'warning' ? 'secondary' : 'default'}>
-                      {getUsageStatus('team_members')}
-                    </Badge>
-                  </div>
-                  <div className="text-2xl font-bold">{usage.team_members.current}</div>
-                  <div className="text-sm text-muted-foreground">of {usage.team_members.limit} Team Members</div>
-                  <Progress value={getUsagePercentage('team_members')} className="mt-2" />
-                </div>
-                
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <FileText className="h-5 w-5 text-orange-600" />
-                    <Badge variant={getUsageStatus('ai_reports') === 'critical' ? 'destructive' : getUsageStatus('ai_reports') === 'warning' ? 'secondary' : 'default'}>
-                      {getUsageStatus('ai_reports')}
-                    </Badge>
-                  </div>
-                  <div className="text-2xl font-bold">{usage.ai_reports.current}</div>
-                  <div className="text-sm text-muted-foreground">of {usage.ai_reports.limit} AI Reports</div>
-                  <Progress value={getUsagePercentage('ai_reports')} className="mt-2" />
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="insights" className="space-y-4">
-              <div className="p-4 border rounded-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">AI Insights Usage</h3>
-                  <div className="text-sm text-muted-foreground">
-                    Resets: {usage.ai_insights.reset_date ? new Date(usage.ai_insights.reset_date).toLocaleDateString() : 'Never'}
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span>Current Usage</span>
-                    <span className="font-semibold">{usage.ai_insights.current} / {usage.ai_insights.limit}</span>
-                  </div>
-                  <Progress value={getUsagePercentage('ai_insights')} />
-                  <div className="text-sm text-muted-foreground">
-                    {usage.ai_insights.remaining} insights remaining
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="sources" className="space-y-4">
-              <div className="p-4 border rounded-lg">
-                <h3 className="text-lg font-semibold mb-4">Data Sources Usage</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span>Connected Sources</span>
-                    <span className="font-semibold">{usage.data_sources.current} / {usage.data_sources.limit}</span>
-                  </div>
-                  <Progress value={getUsagePercentage('data_sources')} />
-                  <div className="text-sm text-muted-foreground">
-                    {usage.data_sources.remaining} sources remaining
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="reports" className="space-y-4">
-              <div className="p-4 border rounded-lg">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">AI Reports Usage</h3>
-                  <div className="text-sm text-muted-foreground">
-                    Resets: {usage.ai_reports.reset_date ? new Date(usage.ai_reports.reset_date).toLocaleDateString() : 'Never'}
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span>Generated Reports</span>
-                    <span className="font-semibold">{usage.ai_reports.current} / {usage.ai_reports.limit}</span>
-                  </div>
-                  <Progress value={getUsagePercentage('ai_reports')} />
-                  <div className="text-sm text-muted-foreground">
-                    {usage.ai_reports.remaining} reports remaining
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="analytics" className="space-y-4">
-              <div className="p-4 border rounded-lg">
-                <h3 className="text-lg font-semibold mb-4">Business Analytics Usage</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span>Analytics Generated</span>
-                    <span className="font-semibold">{usage.business_analytics.current} / {usage.business_analytics.limit}</span>
-                  </div>
-                  <Progress value={getUsagePercentage('business_analytics')} />
-                  <div className="text-sm text-muted-foreground">
-                    {usage.business_analytics.remaining} analytics remaining
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+
 
       {/* Upgrade Plans */}
       <div>
