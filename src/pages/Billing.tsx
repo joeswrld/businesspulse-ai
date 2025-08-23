@@ -434,18 +434,38 @@ const BillingPage: React.FC = () => {
 
   // Download invoice
   const handleDownloadInvoice = async (transactionId: string, invoiceUrl?: string) => {
-    if (!invoiceUrl) {
-      toast.error('No invoice available for this transaction');
-      return;
-    }
-
     try {
-      // Try to open the invoice URL directly
-      window.open(invoiceUrl, '_blank');
-      toast.success('Invoice opened in new tab');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      // Option 1: Use the API route to get the invoice URL
+      const response = await fetch(`/api/invoice/${transactionId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to get invoice');
+      }
+
+      const result = await response.json();
+      
+      if (result.invoice_url) {
+        // Open the invoice URL in a new tab
+        window.open(result.invoice_url, '_blank');
+        toast.success('Invoice opened in new tab');
+      } else {
+        throw new Error('No invoice URL received');
+      }
+      
     } catch (err) {
       console.error('Error downloading invoice:', err);
-      toast.error('Failed to download invoice');
+      toast.error(err instanceof Error ? err.message : 'Failed to download invoice');
     }
   };
 
