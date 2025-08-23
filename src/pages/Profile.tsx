@@ -17,7 +17,6 @@ import {
   MapPin,
   Calendar,
   Shield,
-  CreditCard,
   Activity,
   Save,
   Loader2,
@@ -39,22 +38,13 @@ interface Profile {
   onboarding_completed: boolean | null;
 }
 
-interface Subscription {
-  id: string;
-  plan_id: string;
-  status: string;
-  current_period_start: string | null;
-  current_period_end: string | null;
-  trial_start: string | null;
-  trial_end: string | null;
-}
+
 
 const Profile: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -89,16 +79,7 @@ const Profile: React.FC = () => {
           });
         }
 
-        // Fetch subscription data
-        const { data: subscriptionData } = await supabase
-          .from('user_subscriptions')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
 
-        if (subscriptionData) {
-          setSubscription(subscriptionData);
-        }
 
       } catch (error) {
         console.error('Error fetching profile data:', error);
@@ -150,36 +131,7 @@ const Profile: React.FC = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const getSubscriptionStatus = () => {
-    if (!subscription) return { text: 'No Subscription', color: 'bg-gray-100 text-gray-800' };
-    
-    switch (subscription.status) {
-      case 'active':
-        return { text: 'Active', color: 'bg-green-100 text-green-800' };
-      case 'trialing':
-        return { text: 'Trial', color: 'bg-blue-100 text-blue-800' };
-      case 'past_due':
-        return { text: 'Past Due', color: 'bg-yellow-100 text-yellow-800' };
-      case 'canceled':
-        return { text: 'Canceled', color: 'bg-red-100 text-red-800' };
-      default:
-        return { text: subscription.status, color: 'bg-gray-100 text-gray-800' };
-    }
-  };
 
-  const isTrialActive = () => {
-    if (!subscription?.trial_end) return false;
-    return new Date() < new Date(subscription.trial_end);
-  };
-
-  const getTrialDaysLeft = () => {
-    if (!subscription?.trial_end) return 0;
-    const trialEnd = new Date(subscription.trial_end);
-    const now = new Date();
-    const diffTime = trialEnd.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, diffDays);
-  };
 
   if (loading) {
     return (
@@ -192,7 +144,7 @@ const Profile: React.FC = () => {
     );
   }
 
-  const subscriptionStatus = getSubscriptionStatus();
+
 
   return (
     <div className="space-y-6">
@@ -354,43 +306,7 @@ const Profile: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Subscription Status */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center">
-                <CreditCard className="h-5 w-5 mr-2" />
-                Subscription
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Status</span>
-                <Badge className={subscriptionStatus.color}>
-                  {subscriptionStatus.text}
-                </Badge>
-              </div>
-              {isTrialActive() && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Trial Days Left</span>
-                  <span className="text-sm font-medium text-blue-600">
-                    {getTrialDaysLeft()} days
-                  </span>
-                </div>
-              )}
-              {subscription?.current_period_end && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Next Billing</span>
-                  <span className="text-sm font-medium">
-                    {new Date(subscription.current_period_end).toLocaleDateString()}
-                  </span>
-                </div>
-              )}
-              <Button variant="outline" className="w-full" size="sm">
-                <Settings className="h-4 w-4 mr-2" />
-                Manage Subscription
-              </Button>
-            </CardContent>
-          </Card>
+
 
           {/* Security */}
           <Card>
