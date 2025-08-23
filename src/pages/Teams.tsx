@@ -362,7 +362,7 @@ const Teams: React.FC = () => {
         return;
       }
 
-      // Create invitation with fallback for missing columns
+      // Create invitation with all required fields
       const invitationData = {
         team_id: selectedTeam.id,
         inviter_id: user.id,
@@ -370,8 +370,11 @@ const Teams: React.FC = () => {
         role: inviteData.role,
         personal_message: inviteData.message || null,
         status: 'pending',
+        token: crypto.randomUUID(), // Generate a unique token
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
       };
+
+      console.log('Creating invitation with data:', invitationData);
 
       const { data: invitation, error: invitationError } = await supabase
         .from('team_invitations')
@@ -382,15 +385,38 @@ const Teams: React.FC = () => {
       if (invitationError) {
         console.error('Error creating invitation:', invitationError);
         
-        // If it's a column error, show a helpful message
+        // Provide specific error messages based on the error type
         if (invitationError.message.includes('column') && invitationError.message.includes('does not exist')) {
-          toast.error('Invitation system needs to be set up. Please run the database migration first.');
+          toast.error('Database schema issue: Missing columns in team_invitations table. Please contact support.');
           return;
         }
         
-        toast.error('Failed to create invitation');
+        if (invitationError.message.includes('permission denied') || invitationError.message.includes('new row violates row-level security policy')) {
+          toast.error('Permission denied: You may not have admin rights to invite members to this team.');
+          return;
+        }
+        
+        if (invitationError.message.includes('duplicate key value')) {
+          toast.error('An invitation with this token already exists. Please try again.');
+          return;
+        }
+        
+        if (invitationError.message.includes('foreign key constraint')) {
+          toast.error('Invalid team or user reference. Please refresh the page and try again.');
+          return;
+        }
+        
+        // Generic error with more details
+        toast.error(`Failed to create invitation: ${invitationError.message}`);
         return;
       }
+
+      if (!invitation) {
+        toast.error('Invitation was not created. Please try again.');
+        return;
+      }
+
+      console.log('Invitation created successfully:', invitation);
 
       // Try to send invitation email (optional - don't fail if email fails)
       try {
@@ -400,13 +426,13 @@ const Teams: React.FC = () => {
 
         if (emailError) {
           console.error('Email sending error:', emailError);
-          toast.warning('Invitation created but email delivery failed');
+          toast.warning('Invitation created but email delivery failed. The user can still join using the invitation link.');
         } else {
           toast.success('Invitation sent successfully!');
         }
       } catch (emailError) {
         console.error('Email function error:', emailError);
-        toast.warning('Invitation created but email delivery failed');
+        toast.warning('Invitation created but email delivery failed. The user can still join using the invitation link.');
       }
 
       // Reset form and close dialog
@@ -419,7 +445,7 @@ const Teams: React.FC = () => {
 
     } catch (error) {
       console.error('Error inviting member:', error);
-      toast.error('Failed to send invitation');
+      toast.error('Failed to send invitation. Please try again.');
     }
   };
 
