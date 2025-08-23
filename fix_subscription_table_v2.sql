@@ -1,178 +1,139 @@
--- Fix subscription table structure and data - Version 2
--- Run this in Supabase SQL Editor
+-- Comprehensive User Subscriptions Table Migration
 
--- 1. Check current table structure
-SELECT 
-  'Current user_subscriptions structure' as check_result,
-  column_name,
-  data_type,
-  is_nullable,
-  column_default
-FROM information_schema.columns 
-WHERE table_name = 'user_subscriptions' 
-AND table_schema = 'public'
-ORDER BY ordinal_position;
+-- 1. Ensure uuid-ossp extension is available
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 2. Check constraints
-SELECT 
-  'Table constraints' as check_result,
-  constraint_name,
-  constraint_type,
-  column_name
-FROM information_schema.table_constraints tc
-JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
-WHERE tc.table_name = 'user_subscriptions' 
-AND tc.table_schema = 'public';
-
--- 3. Add missing columns if they don't exist
-DO $$
-BEGIN
-    -- Add plan_id column if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'user_subscriptions' 
-        AND column_name = 'plan_id'
-    ) THEN
-        ALTER TABLE user_subscriptions ADD COLUMN plan_id UUID;
-    END IF;
-
-    -- Add plan_name column if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'user_subscriptions' 
-        AND column_name = 'plan_name'
-    ) THEN
-        ALTER TABLE user_subscriptions ADD COLUMN plan_name TEXT NOT NULL DEFAULT 'free_trial';
-    END IF;
-
-    -- Add plan_type column if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'user_subscriptions' 
-        AND column_name = 'plan_type'
-    ) THEN
-        ALTER TABLE user_subscriptions ADD COLUMN plan_type TEXT NOT NULL DEFAULT 'trial';
-    END IF;
-
-    -- Add current_period_start column if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'user_subscriptions' 
-        AND column_name = 'current_period_start'
-    ) THEN
-        ALTER TABLE user_subscriptions ADD COLUMN current_period_start TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-    END IF;
-
-    -- Add current_period_end column if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'user_subscriptions' 
-        AND column_name = 'current_period_end'
-    ) THEN
-        ALTER TABLE user_subscriptions ADD COLUMN current_period_end TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '8 days');
-    END IF;
-
-    -- Add trial_end column if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'user_subscriptions' 
-        AND column_name = 'trial_end'
-    ) THEN
-        ALTER TABLE user_subscriptions ADD COLUMN trial_end TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '8 days');
-    END IF;
-
-    -- Add price column if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'user_subscriptions' 
-        AND column_name = 'price'
-    ) THEN
-        ALTER TABLE user_subscriptions ADD COLUMN price INTEGER DEFAULT 0;
-    END IF;
-
-    -- Add currency column if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'user_subscriptions' 
-        AND column_name = 'currency'
-    ) THEN
-        ALTER TABLE user_subscriptions ADD COLUMN currency TEXT DEFAULT '₦';
-    END IF;
-
-    -- Add interval column if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'user_subscriptions' 
-        AND column_name = 'interval'
-    ) THEN
-        ALTER TABLE user_subscriptions ADD COLUMN interval TEXT DEFAULT '8 days';
-    END IF;
-
-    -- Add subscription_id column if it doesn't exist
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'user_subscriptions' 
-        AND column_name = 'subscription_id'
-    ) THEN
-        ALTER TABLE user_subscriptions ADD COLUMN subscription_id TEXT;
-    END IF;
-END $$;
-
--- 4. Update existing records to have proper plan_id values
-UPDATE user_subscriptions 
-SET plan_id = uuid_generate_v4()
-WHERE plan_id IS NULL;
-
--- 5. Create default subscription for current user (with plan_id)
-INSERT INTO user_subscriptions (
-  user_id,
-  plan_id,
-  plan_name,
-  plan_type,
-  status,
-  price,
-  currency,
-  interval,
-  current_period_start,
-  current_period_end,
-  trial_end,
-  created_at,
-  updated_at
-)
-SELECT 
-  '9a59f1bf-3e74-42d5-9c7e-8c92478e3515' as user_id,
-  uuid_generate_v4() as plan_id,
-  'free_trial' as plan_name,
-  'trial' as plan_type,
-  'trialing' as status,
-  0 as price,
-  '₦' as currency,
-  '8 days' as interval,
-  NOW() as current_period_start,
-  (NOW() + INTERVAL '8 days') as current_period_end,
-  (NOW() + INTERVAL '8 days') as trial_end,
-  NOW() as created_at,
-  NOW() as updated_at
-WHERE NOT EXISTS (
-  SELECT 1 FROM user_subscriptions 
-  WHERE user_id = '9a59f1bf-3e74-42d5-9c7e-8c92478e3515'
+-- 2. Create or Alter user_subscriptions table with a comprehensive structure
+CREATE TABLE IF NOT EXISTS user_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    
+    -- Subscription Details
+    plan_id UUID DEFAULT uuid_generate_v4(),
+    plan_name TEXT NOT NULL DEFAULT 'free_trial',
+    plan_type TEXT NOT NULL DEFAULT 'trial',
+    status TEXT NOT NULL DEFAULT 'trialing' 
+        CHECK (status IN ('active', 'trialing', 'past_due', 'canceled', 'incomplete')),
+    
+    -- Financial Details
+    price INTEGER DEFAULT 0,
+    currency TEXT DEFAULT '₦',
+    interval TEXT DEFAULT '8 days',
+    
+    -- Timing Columns
+    current_period_start TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    current_period_end TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '8 days'),
+    trial_end TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '8 days'),
+    
+    -- Metadata
+    subscription_id TEXT UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Constraints
+    CONSTRAINT unique_active_subscription UNIQUE (user_id, status)
 );
 
--- 6. Check updated table structure
-SELECT 
-  'Updated user_subscriptions structure' as check_result,
-  column_name,
-  data_type,
-  is_nullable,
-  column_default
-FROM information_schema.columns 
-WHERE table_name = 'user_subscriptions' 
-AND table_schema = 'public'
-ORDER BY ordinal_position;
+-- 3. Create an index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_id 
+ON user_subscriptions(user_id);
 
--- 7. Verify the subscription was created
+-- 4. Create a trigger to auto-update the updated_at column
+CREATE OR REPLACE FUNCTION update_modified_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER update_user_subscription_modtime
+BEFORE UPDATE ON user_subscriptions
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
+
+-- 5. Upsert function for managing subscriptions
+CREATE OR REPLACE FUNCTION upsert_user_subscription(
+    p_user_id UUID,
+    p_plan_name TEXT DEFAULT 'free_trial',
+    p_plan_type TEXT DEFAULT 'trial',
+    p_price INTEGER DEFAULT 0,
+    p_interval TEXT DEFAULT '8 days'
+)
+RETURNS UUID AS $$
+DECLARE
+    v_subscription_id UUID;
+BEGIN
+    -- Cancel any existing active subscriptions
+    UPDATE user_subscriptions 
+    SET status = 'canceled', 
+        current_period_end = NOW()
+    WHERE user_id = p_user_id AND status != 'canceled';
+
+    -- Insert new subscription
+    INSERT INTO user_subscriptions (
+        user_id, 
+        plan_name, 
+        plan_type, 
+        status, 
+        price, 
+        interval,
+        current_period_start,
+        current_period_end,
+        trial_end
+    ) VALUES (
+        p_user_id,
+        p_plan_name,
+        p_plan_type,
+        'trialing',
+        p_price,
+        p_interval,
+        NOW(),
+        NOW() + (p_interval || ' days')::interval,
+        NOW() + (p_interval || ' days')::interval
+    )
+    RETURNING id INTO v_subscription_id;
+
+    RETURN v_subscription_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 6. Example of using the upsert function
+-- This can be called from your application or SQL editor
+-- SELECT upsert_user_subscription(
+--     '9a59f1bf-3e74-42d5-9c7e-8c92478e3515'::UUID,
+--     'free_trial',
+--     'trial',
+--     0,
+--     '8'
+-- );
+
+-- 7. RLS Policies
+ALTER TABLE user_subscriptions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own subscriptions" ON user_subscriptions
+FOR SELECT 
+TO authenticated
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create own subscriptions" ON user_subscriptions
+FOR INSERT 
+TO authenticated
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own subscriptions" ON user_subscriptions
+FOR UPDATE 
+TO authenticated
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- 8. Verification Queries
+-- Check table structure
 SELECT 
-  'Subscription after fix' as check_result,
-  us.*
-FROM user_subscriptions us
-WHERE us.user_id = '9a59f1bf-3e74-42d5-9c7e-8c92478e3515';
+    column_name, 
+    data_type, 
+    column_default, 
+    is_nullable
+FROM information_schema.columns
+WHERE table_name = 'user_subscriptions'
+ORDER BY ordinal_position;
