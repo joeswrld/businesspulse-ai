@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +63,74 @@ const Billing = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'pro' | 'business' | null>(null);
+  const [subscriptionData, setSubscriptionData] = useState<any>(null);
+
+  // Fetch subscription data
+  const fetchSubscription = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error('Error fetching subscription:', error);
+      }
+
+      if (data) {
+        setSubscriptionData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching subscription:', error);
+    }
+  }, [user]);
+
+  // Get plan name based on subscription status
+  const getPlanName = () => {
+    if (!subscriptionData) return 'Free Trial';
+    
+    // Check if user has an active subscription
+    if (subscriptionData.status === 'active' || subscriptionData.status === 'trialing') {
+      // Determine plan based on subscription details
+      if (subscriptionData.plan_name) {
+        return subscriptionData.plan_name;
+      }
+      
+      // Fallback: determine plan based on price or other indicators
+      if (subscriptionData.price === 35000) return 'Pro';
+      if (subscriptionData.price === 75000) return 'Business';
+      
+      // Default to Pro if we can't determine
+      return 'Pro';
+    }
+    
+    return 'Free Trial';
+  };
+
+  // Get plan price and interval
+  const getPlanPrice = () => {
+    if (!subscriptionData) return { price: 0, currency: '₦', interval: '8 days' };
+    
+    return {
+      price: subscriptionData.price || 0,
+      currency: subscriptionData.currency || '₦',
+      interval: subscriptionData.interval || 'month'
+    };
+  };
+
+  // Get subscription status
+  const getSubscriptionStatus = () => {
+    if (!subscriptionData) return 'trialing';
+    return subscriptionData.status || 'trialing';
+  };
+
+  // Fetch subscription on component mount
+  useEffect(() => {
+    fetchSubscription();
+  }, [fetchSubscription]);
 
   // Default to Free Trial plan
   const defaultPlan: SubscriptionPlan = {
@@ -91,6 +159,7 @@ const Billing = () => {
   const refreshUsage = async () => {
     setRefreshing(true);
     await hookRefreshUsage();
+    await fetchSubscription();
     setRefreshing(false);
     toast.success("Usage data refreshed");
   };
@@ -213,7 +282,7 @@ const Billing = () => {
   };
 
   const handleCancelSubscription = async () => {
-    if (!user?.email || !subscription?.subscription_id) {
+    if (!user?.email || !subscriptionData?.subscription_id) {
       toast.error("Unable to cancel subscription. Please contact support.");
       return;
     }
@@ -222,7 +291,7 @@ const Billing = () => {
       const { data, error } = await supabase.functions.invoke('manage-subscription', {
         body: {
           action: 'cancel',
-          subscription_id: subscription.subscription_id,
+          subscription_id: subscriptionData.subscription_id,
           email: user.email
         }
       });
@@ -284,8 +353,8 @@ const Billing = () => {
               <CreditCard className="h-5 w-5 mr-2" />
               Current Subscription
             </span>
-            <Badge className={subscription?.status === 'active' ? 'bg-success' : 'bg-warning'}>
-              {subscription?.status === 'trialing' ? 'Trial' : subscription?.status || 'Unknown'}
+            <Badge className={getSubscriptionStatus() === 'active' ? 'bg-success' : 'bg-warning'}>
+              {getSubscriptionStatus() === 'trialing' ? 'Trial' : getSubscriptionStatus() === 'active' ? 'Active' : 'Unknown'}
             </Badge>
           </CardTitle>
         </CardHeader>
@@ -293,13 +362,13 @@ const Billing = () => {
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <h3 className="font-semibold text-lg mb-2">
-                {subscription?.name || 'Free Trial'} Plan
+                {getPlanName()} Plan
               </h3>
               <p className="text-muted-foreground mb-4">
-                {subscription?.currency || '₦'}{subscription?.price || 0}/{subscription?.interval || '8 days'}
+                {getPlanPrice().currency}{getPlanPrice().price}/{getPlanPrice().interval}
               </p>
               
-              {subscription?.status === 'trialing' && (
+                              {getSubscriptionStatus() === 'trialing' && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span>Trial Progress</span>
@@ -312,10 +381,10 @@ const Billing = () => {
                 </div>
               )}
               
-              {subscription?.current_period_end && (
+              {subscriptionData?.current_period_end && (
                 <div className="flex items-center text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4 mr-2" />
-                  Next billing: {new Date(subscription.current_period_end).toLocaleDateString()}
+                                      Next billing: {new Date(subscriptionData.current_period_end).toLocaleDateString()}
                 </div>
               )}
             </div>
