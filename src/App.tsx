@@ -26,6 +26,7 @@ import Settings from "./pages/Settings";
 import Teams from "./pages/Teams";
 import Profile from "./pages/Profile";
 import Feedback from "./pages/Feedback";
+import Billing from "./pages/Billing";
 import FeedbackSimple from "./pages/FeedbackSimple";
 import FeedbackSettings from "./pages/FeedbackSettingsSimple";
 import FeedbackSettingsSimpleTest from "./pages/FeedbackSettingsSimpleTest";
@@ -124,6 +125,13 @@ const App = () => (
               <ProtectedRoute>
                 <DashboardLayout>
                   <Teams />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/billing" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <Billing />
                 </DashboardLayout>
               </ProtectedRoute>
             } />

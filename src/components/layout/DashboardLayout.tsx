@@ -33,7 +33,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     { name: "Executive Reports", href: "/reports", icon: FileText },
     { name: "Business Intelligence", href: "/analytics", icon: BarChart3 },
     { name: "Teams", href: "/teams", icon: Users, comingSoon: true },
-    { name: "Usage & Billing", href: "/billing", icon: CreditCard, comingSoon: true },
+    { name: "Usage & Billing", href: "/billing", icon: CreditCard },
     { name: "Feedback Settings", href: "/feedback-settings", icon: SlidersHorizontal },
     { name: "Settings", href: "/settings", icon: Settings },
     { name: "Profile", href: "/profile", icon: User },
