@@ -1,0 +1,572 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { toast } from 'sonner';
+import {
+  CreditCard,
+  Download,
+  Calendar,
+  Users,
+  MessageSquare,
+  BarChart3,
+  FileText,
+  Brain,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Clock,
+  ExternalLink,
+  Loader2,
+  Crown,
+  Zap,
+  Shield,
+  TrendingUp,
+  DollarSign,
+  Receipt
+} from 'lucide-react';
+
+// Types
+interface UsageData {
+  id: string;
+  user_id: string;
+  feedback_count: number;
+  analytics_count: number;
+  reports_count: number;
+  insights_count: number;
+  teams_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Transaction {
+  id: string;
+  amount: number;
+  currency: string;
+  status: 'success' | 'pending' | 'failed';
+  created_at: string;
+  invoice_url?: string;
+  description?: string;
+}
+
+interface Subscription {
+  id: string;
+  status: 'active' | 'trialing' | 'cancelled' | 'past_due';
+  current_period_start: string;
+  current_period_end: string;
+  trial_start?: string;
+  trial_end?: string;
+  plan_id: string;
+}
+
+type PlanType = 'free' | 'pro' | 'enterprise';
+
+const BillingPage: React.FC = () => {
+  const { user } = useAuth();
+  
+  // State
+  const [usageData, setUsageData] = useState<UsageData | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load data on component mount
+  useEffect(() => {
+    if (user) {
+      loadBillingData();
+    }
+  }, [user]);
+
+  const loadBillingData = async () => {
+    if (!user) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Load usage data
+      const { data: usage, error: usageError } = await supabase
+        .from('usage_tracking')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (usageError && usageError.code !== 'PGRST116') {
+        console.error('Error loading usage data:', usageError);
+      } else if (usage) {
+        setUsageData(usage);
+      }
+
+      // Load subscription data
+      const { data: subscriptionData, error: subscriptionError } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (subscriptionError && subscriptionError.code !== 'PGRST116') {
+        console.error('Error loading subscription:', subscriptionError);
+      } else if (subscriptionData) {
+        setSubscription(subscriptionData);
+      }
+
+      // Load transactions
+      const { data: transactionsData, error: transactionsError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (transactionsError) {
+        console.error('Error loading transactions:', transactionsError);
+      } else {
+        setTransactions(transactionsData || []);
+      }
+
+    } catch (err) {
+      console.error('Error loading billing data:', err);
+      setError('Failed to load billing information');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Calculate trial days left
+  const getTrialDaysLeft = (): number => {
+    if (!user?.created_at) return 0;
+    
+    const trialEnd = new Date(user.created_at);
+    trialEnd.setDate(trialEnd.getDate() + 8); // 8-day trial
+    
+    const now = new Date();
+    const diffTime = trialEnd.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return Math.max(0, diffDays);
+  };
+
+  // Get current plan
+  const getCurrentPlan = (): { type: PlanType; label: string; color: string } => {
+    if (subscription) {
+      switch (subscription.status) {
+        case 'active':
+          return { type: 'pro', label: 'Pro Plan', color: 'bg-green-100 text-green-800' };
+        case 'trialing':
+          return { type: 'pro', label: 'Pro Trial', color: 'bg-blue-100 text-blue-800' };
+        case 'cancelled':
+          return { type: 'free', label: 'Free Plan', color: 'bg-gray-100 text-gray-800' };
+        case 'past_due':
+          return { type: 'pro', label: 'Payment Due', color: 'bg-yellow-100 text-yellow-800' };
+        default:
+          return { type: 'free', label: 'Free Plan', color: 'bg-gray-100 text-gray-800' };
+      }
+    }
+    
+    // Check if user is in trial period
+    const trialDaysLeft = getTrialDaysLeft();
+    if (trialDaysLeft > 0) {
+      return { type: 'free', label: 'Free Trial', color: 'bg-blue-100 text-blue-800' };
+    }
+    
+    return { type: 'free', label: 'Free Plan', color: 'bg-gray-100 text-gray-800' };
+  };
+
+  // Cancel subscription
+  const handleCancelSubscription = async () => {
+    if (!subscription) return;
+
+    setCancelling(true);
+    
+    try {
+      const response = await fetch('/api/cancel-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        body: JSON.stringify({ subscriptionId: subscription.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to cancel subscription');
+      }
+
+      toast.success('Subscription cancelled successfully');
+      await loadBillingData(); // Refresh data
+      
+    } catch (err) {
+      console.error('Error cancelling subscription:', err);
+      toast.error('Failed to cancel subscription');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  // Update payment method
+  const handleUpdateCard = async () => {
+    try {
+      // Redirect to Paystack update link
+      const response = await fetch('/api/paystack/update-card', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate update link');
+      }
+
+      const { url } = await response.json();
+      window.open(url, '_blank');
+      
+    } catch (err) {
+      console.error('Error updating card:', err);
+      toast.error('Failed to update payment method');
+    }
+  };
+
+  // Format currency
+  const formatCurrency = (amount: number, currency: string): string => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(amount / 100); // Convert from kobo to naira
+  };
+
+  // Format date
+  const formatDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  // Get status icon and color
+  const getStatusDisplay = (status: string) => {
+    switch (status) {
+      case 'success':
+        return { icon: <CheckCircle className="h-4 w-4" />, color: 'text-green-600' };
+      case 'pending':
+        return { icon: <Clock className="h-4 w-4" />, color: 'text-yellow-600' };
+      case 'failed':
+        return { icon: <XCircle className="h-4 w-4" />, color: 'text-red-600' };
+      default:
+        return { icon: <AlertTriangle className="h-4 w-4" />, color: 'text-gray-600' };
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-8 w-64 mb-2" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+        
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-6 w-32 mb-2" />
+                <Skeleton className="h-4 w-48" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5].map((j) => (
+                    <div key={j} className="flex justify-between items-center">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-4 w-12" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  const currentPlan = getCurrentPlan();
+  const trialDaysLeft = getTrialDaysLeft();
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Billing & Usage</h1>
+        <p className="text-muted-foreground">
+          Manage your subscription and view usage statistics
+        </p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Current Usage Section */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <TrendingUp className="h-5 w-5" />
+              <span>Current Usage</span>
+            </CardTitle>
+            <CardDescription>
+              Track your feature usage across the platform
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {/* Feedback Usage */}
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <MessageSquare className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className="text-sm font-medium">Feedback</p>
+                    <p className="text-xs text-muted-foreground">Submissions</p>
+                  </div>
+                </div>
+                <span className="text-lg font-bold text-blue-600">
+                  {usageData?.feedback_count || 0}
+                </span>
+              </div>
+
+              {/* Analytics Usage */}
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <BarChart3 className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="text-sm font-medium">Analytics</p>
+                    <p className="text-xs text-muted-foreground">Generated</p>
+                  </div>
+                </div>
+                <span className="text-lg font-bold text-green-600">
+                  {usageData?.analytics_count || 0}
+                </span>
+              </div>
+
+              {/* Reports Usage */}
+              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <FileText className="h-5 w-5 text-purple-600" />
+                  <div>
+                    <p className="text-sm font-medium">Reports</p>
+                    <p className="text-xs text-muted-foreground">Generated</p>
+                  </div>
+                </div>
+                <span className="text-lg font-bold text-purple-600">
+                  {usageData?.reports_count || 0}
+                </span>
+              </div>
+
+              {/* Insights Usage */}
+              <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <Brain className="h-5 w-5 text-orange-600" />
+                  <div>
+                    <p className="text-sm font-medium">Insights</p>
+                    <p className="text-xs text-muted-foreground">Generated</p>
+                  </div>
+                </div>
+                <span className="text-lg font-bold text-orange-600">
+                  {usageData?.insights_count || 0}
+                </span>
+              </div>
+
+              {/* Teams Usage (Coming Soon) */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg opacity-60">
+                <div className="flex items-center space-x-2">
+                  <Users className="h-5 w-5 text-gray-600" />
+                  <div>
+                    <p className="text-sm font-medium">Teams</p>
+                    <p className="text-xs text-muted-foreground">Coming Soon</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg font-bold text-gray-600">
+                    {usageData?.teams_count || 0}
+                  </span>
+                  <Badge variant="secondary" className="text-xs">
+                    Soon
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Current Plan Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <CreditCard className="h-5 w-5" />
+              <span>Current Plan</span>
+            </CardTitle>
+            <CardDescription>
+              Your subscription details and billing information
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Plan Status */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Plan</span>
+              <Badge className={currentPlan.color}>
+                {currentPlan.label}
+              </Badge>
+            </div>
+
+            {/* Trial Days Left */}
+            {trialDaysLeft > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Trial Days Left</span>
+                <span className="text-sm text-blue-600 font-medium">
+                  {trialDaysLeft} days
+                </span>
+              </div>
+            )}
+
+            {/* Subscription Period */}
+            {subscription && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Next Billing</span>
+                <span className="text-sm text-muted-foreground">
+                  {formatDate(subscription.current_period_end)}
+                </span>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="space-y-2 pt-4">
+              {subscription && subscription.status === 'active' && (
+                <Button
+                  variant="outline"
+                  onClick={handleCancelSubscription}
+                  disabled={cancelling}
+                  className="w-full"
+                >
+                  {cancelling ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <XCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Cancel Subscription
+                </Button>
+              )}
+
+              {subscription && (
+                <Button
+                  variant="outline"
+                  onClick={handleUpdateCard}
+                  className="w-full"
+                >
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Update Card
+                </Button>
+              )}
+
+              {!subscription && trialDaysLeft === 0 && (
+                <Button className="w-full">
+                  <Crown className="h-4 w-4 mr-2" />
+                  Upgrade to Pro
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Transaction History Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Receipt className="h-5 w-5" />
+            <span>Transaction History</span>
+          </CardTitle>
+          <CardDescription>
+            View your payment history and download invoices
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {transactions.length === 0 ? (
+            <div className="text-center py-8">
+              <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No transactions yet</h3>
+              <p className="text-muted-foreground">
+                Your transaction history will appear here once you make your first payment.
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transactions.map((transaction) => {
+                  const statusDisplay = getStatusDisplay(transaction.status);
+                  
+                  return (
+                    <TableRow key={transaction.id}>
+                      <TableCell className="font-medium">
+                        {formatDate(transaction.created_at)}
+                      </TableCell>
+                      <TableCell>
+                        {transaction.description || 'Subscription Payment'}
+                      </TableCell>
+                      <TableCell>
+                        {formatCurrency(transaction.amount, transaction.currency)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <span className={statusDisplay.color}>
+                            {statusDisplay.icon}
+                          </span>
+                          <span className="capitalize">{transaction.status}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {transaction.invoice_url && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(transaction.invoice_url, '_blank')}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Invoice
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default BillingPage;
