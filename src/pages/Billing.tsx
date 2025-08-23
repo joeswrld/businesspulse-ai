@@ -322,15 +322,15 @@ const Billing = () => {
             
             <div className="space-y-4">
               <div>
-                <h4 className="font-medium mb-2">Usage This Period</h4>
+                <h4 className="font-medium mb-2">Usage Overview</h4>
                 <div className="space-y-3">
                   <div>
                     <div className="flex items-center justify-between text-sm mb-1">
                       <span className="flex items-center">
-                        <Brain className="h-4 w-4 mr-1" />
-                        AI Insights
+                        <FileText className="h-4 w-4 mr-1" />
+                        Feedback Submitted
                       </span>
-                      <span>{usage.ai_insights.current} / {usage.ai_insights.limit}</span>
+                      <span>{usage.ai_insights.current}</span>
                     </div>
                     <Progress value={getUsagePercentage('ai_insights')} />
                   </div>
@@ -338,10 +338,32 @@ const Billing = () => {
                   <div>
                     <div className="flex items-center justify-between text-sm mb-1">
                       <span className="flex items-center">
-                        <Database className="h-4 w-4 mr-1" />
-                        Data Sources
+                        <Brain className="h-4 w-4 mr-1" />
+                        AI Analytics Generated
                       </span>
-                      <span>{usage.data_sources.current} / {usage.data_sources.limit}</span>
+                      <span>{usage.ai_reports.current}</span>
+                    </div>
+                    <Progress value={getUsagePercentage('ai_reports')} />
+                  </div>
+                  
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="flex items-center">
+                        <TrendingUp className="h-4 w-4 mr-1" />
+                        Executive Reports Generated
+                      </span>
+                      <span>{usage.business_analytics.current}</span>
+                    </div>
+                    <Progress value={getUsagePercentage('business_analytics')} />
+                  </div>
+                  
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="flex items-center">
+                        <BarChart3 className="h-4 w-4 mr-1" />
+                        Business Intelligence Generated
+                      </span>
+                      <span>{usage.data_sources.current}</span>
                     </div>
                     <Progress value={getUsagePercentage('data_sources')} />
                   </div>
@@ -350,11 +372,11 @@ const Billing = () => {
                     <div className="flex items-center justify-between text-sm mb-1">
                       <span className="flex items-center">
                         <Users className="h-4 w-4 mr-1" />
-                        Team Members
+                        Teams (Coming Soon)
                       </span>
-                      <span>{usage.team_members.current} / {usage.team_members.limit}</span>
+                      <span>0</span>
                     </div>
-                    <Progress value={getUsagePercentage('team_members')} />
+                    <Progress value={0} />
                   </div>
                 </div>
               </div>
