@@ -16,11 +16,15 @@ import DataUpload from "./pages/DataUpload";
 import AIInsights from "./pages/AIInsights";
 import InsightsPage from "./pages/InsightsPage";
 import TestInsights from "./pages/TestInsights";
+import TestInsightsPage from "./pages/TestInsightsPage";
+import InsightsPageSimple from "./pages/InsightsPageSimple";
 import DemoInsights from "./pages/DemoInsights";
 import CompleteInsights from "./pages/CompleteInsights";
 import MockInsights from "./pages/MockInsights";
 import ActionableInsights from "./pages/ActionableInsights";
 import Reports from "./pages/Reports";
+import TestReportsPage from "./pages/TestReportsPage";
+import ReportsSimple from "./pages/ReportsSimple";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Teams from "./pages/Teams";
@@ -61,7 +65,7 @@ const App = () => (
             <Route path="/insights-simple" element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <InsightsPage />
+                  <InsightsPageSimple />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
@@ -103,7 +107,7 @@ const App = () => (
             <Route path="/reports" element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <Reports />
+                  <ReportsSimple />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
