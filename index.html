@@ -44,6 +44,8 @@
   (function() {
     var script = document.createElement('script');
     script.src = 'https://notex.com.ng/feedback-widget.js';
+
+    script.src = '/feedback-widget.js';
     script.setAttribute('data-project-id', 'NoteX_home');
     script.setAttribute('data-brand-color', '#506695');
     script.setAttribute('data-greeting-text', 'We'd love to hear your feedback!');
@@ -55,6 +57,7 @@
     script.onerror = function() {
       console.error('Failed to load feedback widget script');
     };
+
     document.head.appendChild(script);
   })();
 </script>
