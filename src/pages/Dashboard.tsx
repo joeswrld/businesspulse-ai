@@ -115,6 +115,7 @@ export default function Dashboard() {
   const [sentimentFilter, setSentimentFilter] = useState<'all' | 'positive' | 'negative' | 'neutral'>('all');
   const [aiInsight, setAiInsight] = useState<AIInsight | null>(null);
   const [generatingInsight, setGeneratingInsight] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Load user's data
   const loadDashboardData = useCallback(async () => {
@@ -122,6 +123,7 @@ export default function Dashboard() {
 
     try {
       setLoading(true);
+      console.log('Loading dashboard data for user:', user.id);
       
       // Get user's project IDs from feedback_settings
       const { data: projectSettings, error: projectError } = await supabase
@@ -135,23 +137,32 @@ export default function Dashboard() {
         return;
       }
 
+      console.log('Project settings loaded:', projectSettings);
       const projectIds = projectSettings?.map(setting => setting.project_id).filter(Boolean) || [];
+      console.log('Project IDs:', projectIds);
 
       // Get latest 50 feedbacks for user's projects
-      const { data: feedbacksData, error: feedbacksError } = await supabase
-        .from('feedbacks')
-        .select('*')
-        .in('project_id', projectIds)
-        .order('timestamp', { ascending: false })
-        .limit(50);
+      let feedbacksData = [];
+      if (projectIds.length > 0) {
+        const { data, error: feedbacksError } = await supabase
+          .from('feedbacks')
+          .select('*')
+          .in('project_id', projectIds)
+          .order('timestamp', { ascending: false })
+          .limit(50);
 
-      if (feedbacksError) {
-        console.error('Error loading feedbacks:', feedbacksError);
-        toast.error('Failed to load feedbacks');
-        return;
+        if (feedbacksError) {
+          console.error('Error loading feedbacks:', feedbacksError);
+          toast.error('Failed to load feedbacks');
+        } else {
+          feedbacksData = data || [];
+        }
+      } else {
+        console.log('No project IDs found, setting empty feedbacks');
       }
 
-      setFeedbacks(feedbacksData || []);
+      console.log('Feedbacks loaded:', feedbacksData.length);
+      setFeedbacks(feedbacksData);
 
       // Get user subscription
       const { data: subscriptionData, error: subscriptionError } = await supabase
@@ -164,6 +175,7 @@ export default function Dashboard() {
         console.error('Error loading subscription:', subscriptionError);
       }
 
+      console.log('Subscription loaded:', subscriptionData);
       setSubscription(subscriptionData);
 
     } catch (error) {
@@ -226,7 +238,10 @@ export default function Dashboard() {
 
   // Calculate dashboard stats
   const dashboardStats = useMemo((): DashboardStats => {
+    console.log('Calculating dashboard stats for', feedbacks.length, 'feedbacks');
+    
     if (feedbacks.length === 0) {
+      console.log('No feedbacks, returning empty stats');
       return {
         totalFeedback: 0,
         positiveSentiment: 0,
@@ -486,6 +501,20 @@ export default function Dashboard() {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <RefreshCw className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Loading Dashboard...</h2>
+            <p className="text-gray-600">Please wait while we fetch your data.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const planInfo = getPlanInfo();
 
   return (
@@ -497,6 +526,16 @@ export default function Dashboard() {
           <p className="text-gray-600 mt-2">
             Real-time overview of your feedback and insights
           </p>
+          <div className="flex items-center space-x-2 mt-2">
+            <div className="flex items-center space-x-1 text-sm text-gray-500">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span>Live</span>
+            </div>
+            <span className="text-gray-400">•</span>
+            <span className="text-sm text-gray-500">
+              {feedbacks.length > 0 ? `${feedbacks.length} feedback entries` : 'No feedback yet'}
+            </span>
+          </div>
         </div>
         <div className="flex items-center space-x-2">
           <Button
@@ -570,6 +609,20 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Debug Info - Remove this in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <Card className="rounded-xl shadow-lg border-2 border-yellow-200 bg-yellow-50">
+          <CardContent className="p-4">
+            <div className="text-sm text-yellow-800">
+              <strong>Debug Info:</strong> Feedbacks: {feedbacks.length} | 
+              Loading: {loading.toString()} | 
+              User: {user?.email} | 
+              Subscription: {subscription?.plan_name || 'None'}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Top Row - KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -710,7 +763,11 @@ export default function Dashboard() {
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-64 text-gray-500">
-                No volume data available
+                <div className="text-center">
+                  <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                  <p>No volume data available</p>
+                  <p className="text-sm text-gray-400">Start collecting feedback to see trends</p>
+                </div>
               </div>
             )}
           </CardContent>
@@ -870,18 +927,18 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Feedback Feed */}
-      {filteredFeedbacks.length > 0 ? (
-        <Card className="rounded-xl shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <MessageSquare className="h-5 w-5" />
-              <span>Recent Feedback Feed</span>
-            </CardTitle>
-            <CardDescription>
-              Latest feedback entries with sentiment analysis
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+      <Card className="rounded-xl shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <MessageSquare className="h-5 w-5" />
+            <span>Recent Feedback Feed</span>
+          </CardTitle>
+          <CardDescription>
+            Latest feedback entries with sentiment analysis
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {filteredFeedbacks.length > 0 ? (
             <div className="space-y-4">
               {filteredFeedbacks.slice(0, 10).map((feedback) => (
                 <div key={feedback.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
@@ -916,35 +973,33 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        /* Empty State */
-        <Card className="rounded-xl shadow-lg text-center py-12">
-          <CardContent>
-            <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                         <h3 className="text-xl font-medium text-gray-900 mb-2">
-               {searchTerm || sentimentFilter !== 'all' ? 'No feedback found' : 'No feedback yet'}
-             </h3>
-             <p className="text-gray-600 mb-4">
-               {searchTerm || sentimentFilter !== 'all' 
-                 ? 'Try adjusting your search or filters.'
-                 : 'Start collecting feedback through your widget to see insights and analytics.'
-               }
-             </p>
-             {!searchTerm && sentimentFilter === 'all' && (
-               <div className="flex justify-center space-x-2">
-                 <Button asChild>
-                   <a href="/feedback">Go to Feedback</a>
-                 </Button>
-                 <Button variant="outline" asChild>
-                   <a href="/feedback-settings">Configure Widget</a>
-                 </Button>
-               </div>
-             )}
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            /* Empty State */
+            <div className="text-center py-12">
+              <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-xl font-medium text-gray-900 mb-2">
+                {searchTerm || sentimentFilter !== 'all' ? 'No feedback found' : 'No feedback yet'}
+              </h3>
+              <p className="text-gray-600 mb-4">
+                {searchTerm || sentimentFilter !== 'all' 
+                  ? 'Try adjusting your search or filters.'
+                  : 'Start collecting feedback through your widget to see insights and analytics.'
+                }
+              </p>
+              {!searchTerm && sentimentFilter === 'all' && (
+                <div className="flex justify-center space-x-2">
+                  <Button asChild>
+                    <a href="/feedback">Go to Feedback</a>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <a href="/feedback-settings">Configure Widget</a>
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
