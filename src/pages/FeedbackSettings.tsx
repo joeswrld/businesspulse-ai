@@ -62,6 +62,8 @@ interface WidgetSettings {
   user_id: string;
   brand_color: string;
   greeting_text: string;
+  widget_position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' | 'center';
+  widget_location: 'fixed' | 'inline';
   anonymous_feedback: boolean;
   email_notifications: boolean;
   ai_auto_tagging: boolean;
@@ -153,6 +155,8 @@ const FeedbackSettings = () => {
           user_id: user.id,
           brand_color: '#2563eb',
           greeting_text: 'We\'d love to hear your feedback!',
+          widget_position: 'bottom-right',
+          widget_location: 'fixed',
           anonymous_feedback: false,
           email_notifications: true,
           ai_auto_tagging: true,
@@ -313,6 +317,8 @@ const FeedbackSettings = () => {
         .update({
           brand_color: widgetSettings.brand_color,
           greeting_text: widgetSettings.greeting_text,
+          widget_position: widgetSettings.widget_position,
+          widget_location: widgetSettings.widget_location,
           anonymous_feedback: widgetSettings.anonymous_feedback,
           email_notifications: widgetSettings.email_notifications,
           ai_auto_tagging: widgetSettings.ai_auto_tagging,
@@ -355,6 +361,8 @@ const FeedbackSettings = () => {
     script.setAttribute('data-project-id', '${settings.project_id}');
     script.setAttribute('data-brand-color', '${widgetSettings?.brand_color || '#2563eb'}');
     script.setAttribute('data-greeting-text', '${widgetSettings?.greeting_text || 'We\'d love to hear your feedback!'}');
+    script.setAttribute('data-widget-position', '${widgetSettings?.widget_position || 'bottom-right'}');
+    script.setAttribute('data-widget-location', '${widgetSettings?.widget_location || 'fixed'}');
     document.head.appendChild(script);
   })();
 </script>`;
@@ -487,24 +495,48 @@ const FeedbackSettings = () => {
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               <div>
-                <Label htmlFor="brandColor" className="text-sm font-medium">
-                  Brand Color
+                <Label htmlFor="widgetPosition" className="text-sm font-medium">
+                  Widget Position
                 </Label>
-                <div className="flex items-center space-x-3 mt-1">
-                  <input
-                    type="color"
-                    id="brandColor"
-                    value={widgetSettings?.brand_color || '#2563eb'}
-                    onChange={(e) => setWidgetSettings(prev => prev ? { ...prev, brand_color: e.target.value } : null)}
-                    className="w-12 h-10 rounded border-2 border-gray-200 cursor-pointer"
-                  />
-                  <Input
-                    value={widgetSettings?.brand_color || '#2563eb'}
-                    onChange={(e) => setWidgetSettings(prev => prev ? { ...prev, brand_color: e.target.value } : null)}
-                    placeholder="#2563eb"
-                    className="flex-1"
-                  />
-                </div>
+                <Select
+                  value={widgetSettings?.widget_position || 'bottom-right'}
+                  onValueChange={(value) => setWidgetSettings(prev => prev ? { ...prev, widget_position: value as any } : null)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select widget position" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bottom-right">Bottom Right</SelectItem>
+                    <SelectItem value="bottom-left">Bottom Left</SelectItem>
+                    <SelectItem value="top-right">Top Right</SelectItem>
+                    <SelectItem value="top-left">Top Left</SelectItem>
+                    <SelectItem value="center">Center</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-gray-600 mt-1">
+                  Choose where the widget appears on your website
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="widgetLocation" className="text-sm font-medium">
+                  Widget Location
+                </Label>
+                <Select
+                  value={widgetSettings?.widget_location || 'fixed'}
+                  onValueChange={(value) => setWidgetSettings(prev => prev ? { ...prev, widget_location: value as any } : null)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select widget location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fixed">Fixed Position (Stays in place when scrolling)</SelectItem>
+                    <SelectItem value="inline">Inline (Flows with page content)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-gray-600 mt-1">
+                  Fixed position stays visible while scrolling, inline flows with content
+                </p>
               </div>
 
               <div>
