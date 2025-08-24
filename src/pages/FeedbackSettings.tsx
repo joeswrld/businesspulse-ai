@@ -766,37 +766,7 @@ const FeedbackSettings = () => {
             </CardContent>
           </Card>
 
-          {/* Integrations */}
-          <Card className="rounded-xl shadow-lg border-2 border-gray-100">
-            <CardHeader className="bg-gray-50 rounded-t-xl">
-              <CardTitle className="flex items-center space-x-2 text-gray-900">
-                <Zap className="h-5 w-5" />
-                <span>Integrations</span>
-              </CardTitle>
-              <CardDescription className="text-gray-700">
-                Connect your feedback system with other tools
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="text-center py-8">
-                <div className="flex items-center justify-center space-x-2 mb-4">
-                  <MessageSquare className="h-8 w-8 text-gray-400" />
-                  <span className="text-lg font-medium text-gray-600">Slack</span>
-                </div>
-                <div className="flex items-center justify-center space-x-2 mb-4">
-                  <Mail className="h-8 w-8 text-gray-400" />
-                  <span className="text-lg font-medium text-gray-600">Email</span>
-                </div>
-                <div className="flex items-center justify-center space-x-2 mb-4">
-                  <ExternalLink className="h-8 w-8 text-gray-400" />
-                  <span className="text-lg font-medium text-gray-600">Webhooks</span>
-                </div>
-                <Badge variant="outline" className="text-blue-600 border-blue-200">
-                  Coming Soon 🚀
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
+
         </div>
       </div>
 
