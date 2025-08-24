@@ -29,7 +29,7 @@ import Profile from "./pages/Profile";
 import Feedback from "./pages/Feedback";
 import Billing from "./pages/Billing";
 import FeedbackSimple from "./pages/FeedbackSimple";
-import FeedbackSettings from "./pages/FeedbackSettingsSimple";
+import FeedbackSettings from "./pages/FeedbackSettings";
 import FeedbackSettingsSimpleTest from "./pages/FeedbackSettingsSimpleTest";
 import TestFeedbackSettings from "./pages/TestFeedbackSettings";
 import TestPage from "./pages/TestPage";
