@@ -357,7 +357,7 @@ const FeedbackSettings = () => {
     return `<script>
   (function() {
     var script = document.createElement('script');
-    script.src = '${window.location.origin}/widget.js';
+    script.src = 'https://notex.com.ng/feedback-widget.js';
     script.setAttribute('data-project-id', '${settings.project_id}');
     script.setAttribute('data-brand-color', '${widgetSettings?.brand_color || '#2563eb'}');
     script.setAttribute('data-greeting-text', '${widgetSettings?.greeting_text || 'We\'d love to hear your feedback!'}');
@@ -698,12 +698,35 @@ const FeedbackSettings = () => {
                 <span>Embed Code Generator</span>
               </CardTitle>
               <CardDescription className="text-blue-700">
-                Copy this code to your website to display the feedback widget
+                Copy this code to your website to display the feedback widget with your chosen positioning
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               {settings?.project_id && settings.project_id.trim() !== '' ? (
                 <>
+                  {/* Widget Configuration Summary */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h4 className="font-medium text-blue-900 mb-2">Widget Configuration Summary</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-blue-700 font-medium">Position:</span>
+                        <span className="ml-2 text-blue-800 capitalize">{widgetSettings?.widget_position || 'bottom-right'}</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 font-medium">Location:</span>
+                        <span className="ml-2 text-blue-800 capitalize">{widgetSettings?.widget_location || 'fixed'}</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 font-medium">Project ID:</span>
+                        <span className="ml-2 text-blue-800 font-mono">{settings.project_id}</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 font-medium">Script Source:</span>
+                        <span className="ml-2 text-blue-800 font-mono">notex.com.ng</span>
+                      </div>
+                    </div>
+                  </div>
+                  
                   <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
                     <pre>{generateEmbedCode()}</pre>
                   </div>
