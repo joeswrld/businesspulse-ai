@@ -240,9 +240,9 @@ const InsightsSimplePage: React.FC = () => {
           if (response.status === 401) {
             console.error('🔑 Authentication failed. Check JWT token.');
           } else if (response.status === 404) {
-            console.error('🔧 Function not found. Check if Edge Function is deployed.');
+            console.error('🔧 Function not found. Check if analyze-insights Edge Function is deployed.');
           } else if (response.status === 500) {
-            console.error('🔧 Server error. Check Edge Function logs.');
+            console.error('🔧 Server error. Check analyze-insights Edge Function logs.');
           }
           
           throw new Error(`Edge Function failed: ${response.status} ${errorText}`);
@@ -259,6 +259,8 @@ const InsightsSimplePage: React.FC = () => {
       throw error;
     }
   };
+
+
 
   // Generate mock analysis for testing when Edge Function is not available
   const generateMockAnalysis = (data: any, fileType: string): GeminiAnalysis => {
@@ -293,7 +295,7 @@ const InsightsSimplePage: React.FC = () => {
           "Processing efficiency: 92%",
           "Analysis accuracy: 88%",
           "Recommendation relevance: 90%"
-        ],
+          ],
         score: 87
       },
       sentiment: {
