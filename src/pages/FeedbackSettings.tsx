@@ -33,7 +33,8 @@ import {
   RefreshCw,
   X,
   Play,
-  Square
+  Square,
+  Lock
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -61,6 +62,8 @@ interface WidgetSettings {
   user_id: string;
   brand_color: string;
   greeting_text: string;
+  widget_position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' | 'center';
+  widget_location: 'fixed' | 'inline';
   anonymous_feedback: boolean;
   email_notifications: boolean;
   ai_auto_tagging: boolean;
@@ -152,6 +155,8 @@ const FeedbackSettings = () => {
           user_id: user.id,
           brand_color: '#2563eb',
           greeting_text: 'We\'d love to hear your feedback!',
+          widget_position: 'bottom-right',
+          widget_location: 'fixed',
           anonymous_feedback: false,
           email_notifications: true,
           ai_auto_tagging: true,
@@ -202,10 +207,10 @@ const FeedbackSettings = () => {
     setProjectIdStatus('checking');
 
     try {
+      // Check global uniqueness across all users
       const { data: existingSettings, error: checkError } = await supabase
         .from('feedback_settings')
-        .select('id, project_id')
-        .eq('user_id', user.id)
+        .select('id, project_id, user_id')
         .eq('project_id', projectId.trim())
         .neq('id', settings?.id || '');
 
@@ -253,6 +258,37 @@ const FeedbackSettings = () => {
 
   const handleSaveSettings = async () => {
     if (!user || !settings || !widgetSettings) return;
+    
+    // Validate that Project ID is provided
+    if (!settings.project_id || settings.project_id.trim() === '') {
+      toast.error('Project ID is required');
+      return;
+    }
+    
+    // Validate Project ID length
+    if (settings.project_id.trim().length < 3) {
+      toast.error('Project ID must be at least 3 characters long');
+      return;
+    }
+    
+    // Check if Project ID is available before saving
+    if (!settings.project_id_locked) {
+      const { data: existingSettings, error: checkError } = await supabase
+        .from('feedback_settings')
+        .select('id, project_id, user_id')
+        .eq('project_id', settings.project_id.trim())
+        .neq('id', settings.id);
+
+      if (checkError) {
+        toast.error('Failed to validate Project ID');
+        return;
+      }
+
+      if (existingSettings && existingSettings.length > 0) {
+        toast.error('Project ID is already taken by another user');
+        return;
+      }
+    }
 
     setSaving(true);
     try {
@@ -267,6 +303,8 @@ const FeedbackSettings = () => {
           redirect_url: settings.redirect_url,
           theme: settings.theme,
           brand_color: settings.brand_color,
+          project_id: settings.project_id,
+          project_id_locked: true, // Lock the project ID after first save
           updated_at: new Date().toISOString()
         })
         .eq('id', settings.id);
@@ -279,6 +317,8 @@ const FeedbackSettings = () => {
         .update({
           brand_color: widgetSettings.brand_color,
           greeting_text: widgetSettings.greeting_text,
+          widget_position: widgetSettings.widget_position,
+          widget_location: widgetSettings.widget_location,
           anonymous_feedback: widgetSettings.anonymous_feedback,
           email_notifications: widgetSettings.email_notifications,
           ai_auto_tagging: widgetSettings.ai_auto_tagging,
@@ -317,13 +357,33 @@ const FeedbackSettings = () => {
     return `<script>
   (function() {
     var script = document.createElement('script');
-    script.src = '${window.location.origin}/widget.js';
+    script.src = 'https://notex.com.ng/feedback-widget.js';
     script.setAttribute('data-project-id', '${settings.project_id}');
     script.setAttribute('data-brand-color', '${widgetSettings?.brand_color || '#2563eb'}');
     script.setAttribute('data-greeting-text', '${widgetSettings?.greeting_text || 'We\'d love to hear your feedback!'}');
+    script.setAttribute('data-widget-position', '${widgetSettings?.widget_position || 'bottom-right'}');
+    script.setAttribute('data-widget-location', '${widgetSettings?.widget_location || 'fixed'}');
     document.head.appendChild(script);
   })();
 </script>`;
+  };
+
+  // Helper function to get CSS positioning classes for widget preview
+  const getWidgetPositionClass = (position: string) => {
+    switch (position) {
+      case 'bottom-right':
+        return 'bottom-4 right-4';
+      case 'bottom-left':
+        return 'bottom-4 left-4';
+      case 'top-right':
+        return 'top-4 right-4';
+      case 'top-left':
+        return 'top-4 left-4';
+      case 'center':
+        return 'top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2';
+      default:
+        return 'bottom-4 right-4';
+    }
   };
 
   if (!user) {
@@ -404,7 +464,7 @@ const FeedbackSettings = () => {
             <CardContent className="p-6 space-y-4">
               <div>
                 <Label htmlFor="projectId" className="text-sm font-medium">
-                  Project ID
+                  Project ID <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="projectId"
@@ -412,15 +472,29 @@ const FeedbackSettings = () => {
                   onChange={(e) => setSettings(prev => prev ? { ...prev, project_id: e.target.value } : null)}
                   placeholder="Enter your unique project ID"
                   className="mt-1"
+                  disabled={settings?.project_id_locked || false}
+                  required
                 />
-                {projectIdStatus === 'available' && (
+                {settings?.project_id_locked && (
+                  <p className="text-sm text-blue-600 mt-1 flex items-center">
+                    <Lock className="h-4 w-4 mr-1" />
+                    Project ID is locked and cannot be changed
+                  </p>
+                )}
+                {!settings?.project_id_locked && projectIdStatus === 'available' && (
                   <p className="text-sm text-green-600 mt-1">✓ Project ID available</p>
                 )}
-                {projectIdStatus === 'taken' && (
-                  <p className="text-sm text-red-600 mt-1">✗ Project ID already taken</p>
+                {!settings?.project_id_locked && projectIdStatus === 'taken' && (
+                  <p className="text-sm text-red-600 mt-1">✗ Project ID already taken by another user</p>
                 )}
-                {projectIdStatus === 'checking' && (
+                {!settings?.project_id_locked && projectIdStatus === 'checking' && (
                   <p className="text-sm text-blue-600 mt-1">Checking availability...</p>
+                )}
+                {!settings?.project_id_locked && projectIdStatus === 'idle' && settings?.project_id && (
+                  <p className="text-sm text-gray-600 mt-1">Project ID will be locked after saving</p>
+                )}
+                {!settings?.project_id_locked && settings?.project_id && settings.project_id.length < 3 && (
+                  <p className="text-sm text-red-600 mt-1">Project ID must be at least 3 characters long</p>
                 )}
               </div>
             </CardContent>
@@ -439,24 +513,48 @@ const FeedbackSettings = () => {
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               <div>
-                <Label htmlFor="brandColor" className="text-sm font-medium">
-                  Brand Color
+                <Label htmlFor="widgetPosition" className="text-sm font-medium">
+                  Widget Position
                 </Label>
-                <div className="flex items-center space-x-3 mt-1">
-                  <input
-                    type="color"
-                    id="brandColor"
-                    value={widgetSettings?.brand_color || '#2563eb'}
-                    onChange={(e) => setWidgetSettings(prev => prev ? { ...prev, brand_color: e.target.value } : null)}
-                    className="w-12 h-10 rounded border-2 border-gray-200 cursor-pointer"
-                  />
-                  <Input
-                    value={widgetSettings?.brand_color || '#2563eb'}
-                    onChange={(e) => setWidgetSettings(prev => prev ? { ...prev, brand_color: e.target.value } : null)}
-                    placeholder="#2563eb"
-                    className="flex-1"
-                  />
-                </div>
+                <Select
+                  value={widgetSettings?.widget_position || 'bottom-right'}
+                  onValueChange={(value) => setWidgetSettings(prev => prev ? { ...prev, widget_position: value as any } : null)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select widget position" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bottom-right">Bottom Right</SelectItem>
+                    <SelectItem value="bottom-left">Bottom Left</SelectItem>
+                    <SelectItem value="top-right">Top Right</SelectItem>
+                    <SelectItem value="top-left">Top Left</SelectItem>
+                    <SelectItem value="center">Center</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-gray-600 mt-1">
+                  Choose where the widget appears on your website
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="widgetLocation" className="text-sm font-medium">
+                  Widget Location
+                </Label>
+                <Select
+                  value={widgetSettings?.widget_location || 'fixed'}
+                  onValueChange={(value) => setWidgetSettings(prev => prev ? { ...prev, widget_location: value as any } : null)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select widget location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fixed">Fixed Position (Stays in place when scrolling)</SelectItem>
+                    <SelectItem value="inline">Inline (Flows with page content)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-gray-600 mt-1">
+                  Fixed position stays visible while scrolling, inline flows with content
+                </p>
               </div>
 
               <div>
@@ -536,7 +634,7 @@ const FeedbackSettings = () => {
           {/* Save Button */}
           <Button
             onClick={handleSaveSettings}
-            disabled={saving || !settings?.project_id}
+            disabled={saving || !settings?.project_id || (settings?.project_id && settings.project_id.trim().length < 3)}
             className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700"
           >
             {saving ? (
@@ -567,17 +665,39 @@ const FeedbackSettings = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="bg-gray-50 rounded-lg p-4 border-2 border-dashed border-gray-300">
+              {/* Website Simulation */}
+              <div className="bg-white rounded-lg border-2 border-gray-200 mb-4">
+                <div className="bg-gray-100 px-4 py-2 border-b border-gray-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <span className="ml-2 text-xs text-gray-600">Your Website</span>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-medium text-gray-900 mb-2">Welcome to Your Website</h3>
+                  <p className="text-sm text-gray-600 mb-4">This is a preview of how the feedback widget will appear on your site.</p>
+                  
+                  {/* Sample Content */}
+                  <div className="bg-gray-50 rounded p-3 mb-4">
+                    <p className="text-xs text-gray-500">Sample website content area</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Widget Preview with Positioning */}
+              <div className="relative bg-gray-50 rounded-lg p-4 border-2 border-dashed border-gray-300 min-h-[200px]">
                 <div className="text-center text-gray-500 mb-4">
                   <MessageSquare className="h-8 w-8 mx-auto mb-2" />
-                  <p className="text-sm">Widget Preview</p>
+                  <p className="text-sm">Widget Preview Area</p>
                 </div>
-                
-                {/* Widget Button Preview */}
-                <div className="flex justify-center">
+
+                {/* Widget Button - Positioned based on settings */}
+                <div className={`absolute ${getWidgetPositionClass(widgetSettings?.widget_position || 'bottom-right')}`}>
                   <div
-                    className="inline-flex items-center space-x-2 px-4 py-2 rounded-full cursor-pointer shadow-lg hover:shadow-xl transition-all duration-200"
-                    style={{ backgroundColor: widgetSettings?.brand_color || '#2563eb' }}
+                    className="inline-flex items-center space-x-2 px-4 py-2 rounded-full cursor-pointer shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                    style={{ backgroundColor: '#2563eb' }}
                   >
                     <MessageSquare className="h-4 w-4 text-white" />
                     <span className="text-white font-medium text-sm">
@@ -586,26 +706,53 @@ const FeedbackSettings = () => {
                   </div>
                 </div>
 
-                {/* Greeting Text Preview */}
+                {/* Position Indicator */}
+                <div className="absolute top-2 right-2">
+                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                    {widgetSettings?.widget_position || 'bottom-right'}
+                  </Badge>
+                </div>
+
+                {/* Location Indicator */}
+                <div className="absolute top-2 left-2">
+                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                    {widgetSettings?.widget_location || 'fixed'}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Widget Information */}
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Position:</span>
+                  <span className="font-medium capitalize">{widgetSettings?.widget_position || 'bottom-right'}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Location:</span>
+                  <span className="font-medium capitalize">{widgetSettings?.widget_location || 'fixed'}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Button Text:</span>
+                  <span className="font-medium">{settings?.button_text || 'Send Feedback'}</span>
+                </div>
                 {widgetSettings?.greeting_text && (
-                  <div className="mt-4 p-3 bg-white rounded-lg border">
-                    <p className="text-sm text-gray-700 text-center">
-                      {widgetSettings.greeting_text}
-                    </p>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Greeting:</span>
+                    <span className="font-medium text-xs truncate max-w-[120px]">{widgetSettings.greeting_text}</span>
                   </div>
                 )}
+              </div>
 
-                <div className="mt-4 text-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowTestModal(true)}
-                    className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                  >
-                    <Play className="h-4 w-4 mr-2" />
-                    Test Widget
-                  </Button>
-                </div>
+              <div className="mt-4 text-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowTestModal(true)}
+                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Test Widget
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -618,12 +765,35 @@ const FeedbackSettings = () => {
                 <span>Embed Code Generator</span>
               </CardTitle>
               <CardDescription className="text-blue-700">
-                Copy this code to your website to display the feedback widget
+                Copy this code to your website to display the feedback widget with your chosen positioning
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
-              {settings?.project_id ? (
+              {settings?.project_id && settings.project_id.trim() !== '' ? (
                 <>
+                  {/* Widget Configuration Summary */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h4 className="font-medium text-blue-900 mb-2">Widget Configuration Summary</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-blue-700 font-medium">Position:</span>
+                        <span className="ml-2 text-blue-800 capitalize">{widgetSettings?.widget_position || 'bottom-right'}</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 font-medium">Location:</span>
+                        <span className="ml-2 text-blue-800 capitalize">{widgetSettings?.widget_location || 'fixed'}</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 font-medium">Project ID:</span>
+                        <span className="ml-2 text-blue-800 font-mono">{settings.project_id}</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 font-medium">Script Source:</span>
+                        <span className="ml-2 text-blue-800 font-mono">notex.com.ng</span>
+                      </div>
+                    </div>
+                  </div>
+                  
                   <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
                     <pre>{generateEmbedCode()}</pre>
                   </div>
@@ -663,37 +833,7 @@ const FeedbackSettings = () => {
             </CardContent>
           </Card>
 
-          {/* Integrations */}
-          <Card className="rounded-xl shadow-lg border-2 border-gray-100">
-            <CardHeader className="bg-gray-50 rounded-t-xl">
-              <CardTitle className="flex items-center space-x-2 text-gray-900">
-                <Zap className="h-5 w-5" />
-                <span>Integrations</span>
-              </CardTitle>
-              <CardDescription className="text-gray-700">
-                Connect your feedback system with other tools
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="text-center py-8">
-                <div className="flex items-center justify-center space-x-2 mb-4">
-                  <MessageSquare className="h-8 w-8 text-gray-400" />
-                  <span className="text-lg font-medium text-gray-600">Slack</span>
-                </div>
-                <div className="flex items-center justify-center space-x-2 mb-4">
-                  <Mail className="h-8 w-8 text-gray-400" />
-                  <span className="text-lg font-medium text-gray-600">Email</span>
-                </div>
-                <div className="flex items-center justify-center space-x-2 mb-4">
-                  <ExternalLink className="h-8 w-8 text-gray-400" />
-                  <span className="text-lg font-medium text-gray-600">Webhooks</span>
-                </div>
-                <Badge variant="outline" className="text-blue-600 border-blue-200">
-                  Coming Soon 🚀
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
+
         </div>
       </div>
 
