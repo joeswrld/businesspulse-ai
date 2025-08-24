@@ -45,6 +45,12 @@ CREATE TRIGGER trigger_update_insights_results_updated_at
 -- Enable Row Level Security (RLS)
 ALTER TABLE insights_results ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (for idempotency)
+DROP POLICY IF EXISTS "Users can view their own insights results" ON insights_results;
+DROP POLICY IF EXISTS "Users can insert their own insights results" ON insights_results;
+DROP POLICY IF EXISTS "Users can update their own insights results" ON insights_results;
+DROP POLICY IF EXISTS "Users can delete their own insights results" ON insights_results;
+
 -- Create RLS policies
 -- Users can only see their own insights results
 CREATE POLICY "Users can view their own insights results" ON insights_results
@@ -61,6 +67,12 @@ CREATE POLICY "Users can update their own insights results" ON insights_results
 -- Users can only delete their own insights results
 CREATE POLICY "Users can delete their own insights results" ON insights_results
     FOR DELETE USING (auth.uid() = user_id);
+
+-- Drop existing functions if they exist (for idempotency)
+DROP FUNCTION IF EXISTS get_user_insights_results(UUID);
+DROP FUNCTION IF EXISTS create_insights_result(UUID, TEXT, TEXT, TEXT, TEXT[], TEXT[], TEXT[], JSONB, JSONB);
+DROP FUNCTION IF EXISTS delete_insights_result(UUID, UUID);
+DROP FUNCTION IF EXISTS test_insights_results_table();
 
 -- Helper function to get insights results for a user
 CREATE OR REPLACE FUNCTION get_user_insights_results(p_user_id UUID)

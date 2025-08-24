@@ -59,7 +59,7 @@ Run the SQL migration to create the required table:
 
 ```sql
 -- Run this in your Supabase SQL editor
-\i create_insights_results_table.sql
+\i create_insights_results_table_fixed.sql
 ```
 
 ### **3. Supabase Edge Function**
@@ -103,7 +103,7 @@ supabase/
         └── index.ts                    # Edge Function
 
 sql/
-└── create_insights_results_table.sql   # Database migration
+└── create_insights_results_table_fixed.sql   # Database migration
 ```
 
 ## 🔧 **Configuration**
