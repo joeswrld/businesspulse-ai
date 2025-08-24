@@ -1,9 +1,14 @@
-"use client";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUsageEnforcement } from "@/hooks/useUsageEnforcement";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
-import { Brain } from "lucide-react";
+import { Brain, Upload, FileText, Download, RefreshCw, X, CheckCircle, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 // Light Platform Styling
 const dashboardStyles = `
@@ -258,7 +263,8 @@ interface InsightsData {
 
 export default function InsightsPage() {
   const { user } = useAuth();
-  const { checkUsage, incrementUsage, usage } = useUsageTracking();
+  const { checkUsage, enforceLimit, usage } = useUsageEnforcement();
+  const { trackUsage } = useUsageTracking();
   
   const [input, setInput] = useState("");
   const [result, setResult] = useState<InsightsData | null>(null);
@@ -562,7 +568,7 @@ Focus on transforming raw data into strategic business intelligence that drives 
 
       // Increment usage after successful analysis
       if (user) {
-        await incrementUsage('ai_insights', 1);
+        await trackUsage('insights');
       }
 
       setResult(json.result);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useUsageEnforcement } from '@/hooks/useUsageEnforcement';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,7 +72,8 @@ interface Insight {
 
 export default function Reports() {
   const { user } = useAuth();
-  const { checkUsage, incrementUsage, usage } = useUsageTracking();
+  const { checkUsage, enforceLimit, usage } = useUsageEnforcement();
+  const { trackUsage } = useUsageTracking();
   
   // State management
   const [reports, setReports] = useState<Report[]>([]);
@@ -344,7 +346,7 @@ description: `Strategic intelligence report based on ${selectedInsights.length} 
       }
 
       // Increment usage after successful report generation
-      await incrementUsage('ai_reports', 1);
+              await trackUsage('reports');
 
       console.log('Generated strategic report:', result.report);
 

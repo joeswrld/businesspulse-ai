@@ -15,6 +15,7 @@ import Dashboard from "./pages/Dashboard";
 import DataUpload from "./pages/DataUpload";
 import AIInsights from "./pages/AIInsights";
 import InsightsPage from "./pages/InsightsPage";
+import InsightsSimplePage from "./pages/InsightsSimplePage";
 import TestInsights from "./pages/TestInsights";
 import DemoInsights from "./pages/DemoInsights";
 import CompleteInsights from "./pages/CompleteInsights";
@@ -26,6 +27,7 @@ import Settings from "./pages/Settings";
 import Teams from "./pages/Teams";
 import Profile from "./pages/Profile";
 import Feedback from "./pages/Feedback";
+import Billing from "./pages/Billing";
 import FeedbackSimple from "./pages/FeedbackSimple";
 import FeedbackSettings from "./pages/FeedbackSettingsSimple";
 import FeedbackSettingsSimpleTest from "./pages/FeedbackSettingsSimpleTest";
@@ -60,7 +62,7 @@ const App = () => (
             <Route path="/insights-simple" element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <InsightsPage />
+                  <InsightsSimplePage />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
@@ -124,6 +126,13 @@ const App = () => (
               <ProtectedRoute>
                 <DashboardLayout>
                   <Teams />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/billing" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <Billing />
                 </DashboardLayout>
               </ProtectedRoute>
             } />

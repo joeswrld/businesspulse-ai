@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useUsageEnforcement } from '@/hooks/useUsageEnforcement';
+import { formatUsageDisplay, PLAN_LIMITS, PLAN_NAMES } from '@/lib/usageEnforcement';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -71,11 +73,19 @@ type PlanType = 'free' | 'pro' | 'business' | 'enterprise';
 
 const BillingPage: React.FC = () => {
   const { user } = useAuth();
+  const {
+    loading: usageLoading,
+    error: usageError,
+    usage: usageData,
+    subscription,
+    plan,
+    limits,
+    checks,
+    refreshUsage
+  } = useUsageEnforcement();
   
   // State
-  const [usageData, setUsageData] = useState<UsageData | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [updatingCard, setUpdatingCard] = useState(false);
@@ -168,46 +178,8 @@ const BillingPage: React.FC = () => {
     setError(null);
 
     try {
-      // Load usage data from usage_tracking table
-      const { data: usage, error: usageError } = await supabase
-        .from('usage_tracking')
-        .select('feedback_count, analytics_count, reports_count, insights_count, teams_count, created_at, updated_at')
-        .eq('user_id', user.id)
-        .single();
-
-      if (usageError && usageError.code !== 'PGRST116') {
-        console.error('Error loading usage data:', usageError);
-        toast.error('Failed to load usage data');
-      } else if (usage) {
-        setUsageData(usage);
-      } else {
-        // Create default usage data if none exists
-        setUsageData({
-          id: '',
-          user_id: user.id,
-          feedback_count: 0,
-          analytics_count: 0,
-          reports_count: 0,
-          insights_count: 0,
-          teams_count: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-      }
-
-      // Load subscription data from user_subscriptions table
-      const { data: subscriptionData, error: subscriptionError } = await supabase
-        .from('user_subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (subscriptionError && subscriptionError.code !== 'PGRST116') {
-        console.error('Error loading subscription:', subscriptionError);
-        toast.error('Failed to load subscription data');
-      } else if (subscriptionData) {
-        setSubscription(subscriptionData);
-      }
+      // Refresh usage data using the hook
+      await refreshUsage();
 
       // Load transactions from transactions table
       const { data: transactionsData, error: transactionsError } = await supabase
@@ -580,59 +552,131 @@ const BillingPage: React.FC = () => {
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {/* Feedback Usage */}
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+              <div className={`flex items-center justify-between p-3 rounded-lg ${
+                checks.feedback.canUse ? 'bg-blue-50' : 'bg-red-50 border border-red-200'
+              }`}>
                 <div className="flex items-center space-x-2">
-                  <MessageSquare className="h-5 w-5 text-blue-600" />
+                  <MessageSquare className={`h-5 w-5 ${
+                    checks.feedback.canUse ? 'text-blue-600' : 'text-red-600'
+                  }`} />
                   <div>
                     <p className="text-sm font-medium">Feedback</p>
-                    <p className="text-xs text-muted-foreground">Submissions</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatUsageDisplay(
+                        checks.feedback.currentUsage,
+                        checks.feedback.limit,
+                        plan,
+                        'feedback'
+                      )}
+                    </p>
                   </div>
                 </div>
-                <span className="text-lg font-bold text-blue-600">
-                  {usageData?.feedback_count || 0}
-                </span>
+                <div className="text-right">
+                  <span className={`text-lg font-bold ${
+                    checks.feedback.canUse ? 'text-blue-600' : 'text-red-600'
+                  }`}>
+                    {checks.feedback.currentUsage}
+                  </span>
+                  {!checks.feedback.canUse && (
+                    <div className="text-xs text-red-600 mt-1">Limit Reached</div>
+                  )}
+                </div>
               </div>
 
               {/* Analytics Usage */}
-              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+              <div className={`flex items-center justify-between p-3 rounded-lg ${
+                checks.analytics.canUse ? 'bg-green-50' : 'bg-red-50 border border-red-200'
+              }`}>
                 <div className="flex items-center space-x-2">
-                  <BarChart3 className="h-5 w-5 text-green-600" />
+                  <BarChart3 className={`h-5 w-5 ${
+                    checks.analytics.canUse ? 'text-green-600' : 'text-red-600'
+                  }`} />
                   <div>
                     <p className="text-sm font-medium">Analytics</p>
-                    <p className="text-xs text-muted-foreground">Generated</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatUsageDisplay(
+                        checks.analytics.currentUsage,
+                        checks.analytics.limit,
+                        plan,
+                        'analytics'
+                      )}
+                    </p>
                   </div>
                 </div>
-                <span className="text-lg font-bold text-green-600">
-                  {usageData?.analytics_count || 0}
-                </span>
+                <div className="text-right">
+                  <span className={`text-lg font-bold ${
+                    checks.analytics.canUse ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {checks.analytics.currentUsage}
+                  </span>
+                  {!checks.analytics.canUse && (
+                    <div className="text-xs text-red-600 mt-1">Limit Reached</div>
+                  )}
+                </div>
               </div>
 
               {/* Reports Usage */}
-              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+              <div className={`flex items-center justify-between p-3 rounded-lg ${
+                checks.reports.canUse ? 'bg-purple-50' : 'bg-red-50 border border-red-200'
+              }`}>
                 <div className="flex items-center space-x-2">
-                  <FileText className="h-5 w-5 text-purple-600" />
+                  <FileText className={`h-5 w-5 ${
+                    checks.reports.canUse ? 'text-purple-600' : 'text-red-600'
+                  }`} />
                   <div>
                     <p className="text-sm font-medium">Reports</p>
-                    <p className="text-xs text-muted-foreground">Generated</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatUsageDisplay(
+                        checks.reports.currentUsage,
+                        checks.reports.limit,
+                        plan,
+                        'reports'
+                      )}
+                    </p>
                   </div>
                 </div>
-                <span className="text-lg font-bold text-purple-600">
-                  {usageData?.reports_count || 0}
-                </span>
+                <div className="text-right">
+                  <span className={`text-lg font-bold ${
+                    checks.reports.canUse ? 'text-purple-600' : 'text-red-600'
+                  }`}>
+                    {checks.reports.currentUsage}
+                  </span>
+                  {!checks.reports.canUse && (
+                    <div className="text-xs text-red-600 mt-1">Limit Reached</div>
+                  )}
+                </div>
               </div>
 
               {/* Insights Usage */}
-              <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+              <div className={`flex items-center justify-between p-3 rounded-lg ${
+                checks.insights.canUse ? 'bg-orange-50' : 'bg-red-50 border border-red-200'
+              }`}>
                 <div className="flex items-center space-x-2">
-                  <Brain className="h-5 w-5 text-orange-600" />
+                  <Brain className={`h-5 w-5 ${
+                    checks.insights.canUse ? 'text-orange-600' : 'text-red-600'
+                  }`} />
                   <div>
                     <p className="text-sm font-medium">Insights</p>
-                    <p className="text-xs text-muted-foreground">Generated</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatUsageDisplay(
+                        checks.insights.currentUsage,
+                        checks.insights.limit,
+                        plan,
+                        'insights'
+                      )}
+                    </p>
                   </div>
                 </div>
-                <span className="text-lg font-bold text-orange-600">
-                  {usageData?.insights_count || 0}
-                </span>
+                <div className="text-right">
+                  <span className={`text-lg font-bold ${
+                    checks.insights.canUse ? 'text-orange-600' : 'text-red-600'
+                  }`}>
+                    {checks.insights.currentUsage}
+                  </span>
+                  {!checks.insights.canUse && (
+                    <div className="text-xs text-red-600 mt-1">Limit Reached</div>
+                  )}
+                </div>
               </div>
 
               {/* Teams Usage (Coming Soon) */}
@@ -651,6 +695,27 @@ const BillingPage: React.FC = () => {
                   <Badge variant="secondary" className="text-xs">
                     Soon
                   </Badge>
+                </div>
+              </div>
+              
+              {/* Usage Summary */}
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-blue-900">Current Plan: {PLAN_NAMES[plan]}</h4>
+                    <p className="text-sm text-blue-700">
+                      {Object.values(checks).some(check => !check.canUse) 
+                        ? 'Some features have reached their limits. Consider upgrading your plan.'
+                        : 'All features are within your plan limits.'
+                      }
+                    </p>
+                  </div>
+                  {Object.values(checks).some(check => !check.canUse) && (
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                      <Crown className="h-4 w-4 mr-2" />
+                      Upgrade Plan
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
