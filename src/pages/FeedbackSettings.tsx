@@ -33,7 +33,8 @@ import {
   RefreshCw,
   X,
   Play,
-  Square
+  Square,
+  Lock
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -202,10 +203,10 @@ const FeedbackSettings = () => {
     setProjectIdStatus('checking');
 
     try {
+      // Check global uniqueness across all users
       const { data: existingSettings, error: checkError } = await supabase
         .from('feedback_settings')
-        .select('id, project_id')
-        .eq('user_id', user.id)
+        .select('id, project_id, user_id')
         .eq('project_id', projectId.trim())
         .neq('id', settings?.id || '');
 
@@ -253,6 +254,37 @@ const FeedbackSettings = () => {
 
   const handleSaveSettings = async () => {
     if (!user || !settings || !widgetSettings) return;
+    
+    // Validate that Project ID is provided
+    if (!settings.project_id || settings.project_id.trim() === '') {
+      toast.error('Project ID is required');
+      return;
+    }
+    
+    // Validate Project ID length
+    if (settings.project_id.trim().length < 3) {
+      toast.error('Project ID must be at least 3 characters long');
+      return;
+    }
+    
+    // Check if Project ID is available before saving
+    if (!settings.project_id_locked) {
+      const { data: existingSettings, error: checkError } = await supabase
+        .from('feedback_settings')
+        .select('id, project_id, user_id')
+        .eq('project_id', settings.project_id.trim())
+        .neq('id', settings.id);
+
+      if (checkError) {
+        toast.error('Failed to validate Project ID');
+        return;
+      }
+
+      if (existingSettings && existingSettings.length > 0) {
+        toast.error('Project ID is already taken by another user');
+        return;
+      }
+    }
 
     setSaving(true);
     try {
@@ -267,6 +299,8 @@ const FeedbackSettings = () => {
           redirect_url: settings.redirect_url,
           theme: settings.theme,
           brand_color: settings.brand_color,
+          project_id: settings.project_id,
+          project_id_locked: true, // Lock the project ID after first save
           updated_at: new Date().toISOString()
         })
         .eq('id', settings.id);
@@ -404,7 +438,7 @@ const FeedbackSettings = () => {
             <CardContent className="p-6 space-y-4">
               <div>
                 <Label htmlFor="projectId" className="text-sm font-medium">
-                  Project ID
+                  Project ID <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="projectId"
@@ -412,15 +446,29 @@ const FeedbackSettings = () => {
                   onChange={(e) => setSettings(prev => prev ? { ...prev, project_id: e.target.value } : null)}
                   placeholder="Enter your unique project ID"
                   className="mt-1"
+                  disabled={settings?.project_id_locked || false}
+                  required
                 />
-                {projectIdStatus === 'available' && (
+                {settings?.project_id_locked && (
+                  <p className="text-sm text-blue-600 mt-1 flex items-center">
+                    <Lock className="h-4 w-4 mr-1" />
+                    Project ID is locked and cannot be changed
+                  </p>
+                )}
+                {!settings?.project_id_locked && projectIdStatus === 'available' && (
                   <p className="text-sm text-green-600 mt-1">✓ Project ID available</p>
                 )}
-                {projectIdStatus === 'taken' && (
-                  <p className="text-sm text-red-600 mt-1">✗ Project ID already taken</p>
+                {!settings?.project_id_locked && projectIdStatus === 'taken' && (
+                  <p className="text-sm text-red-600 mt-1">✗ Project ID already taken by another user</p>
                 )}
-                {projectIdStatus === 'checking' && (
+                {!settings?.project_id_locked && projectIdStatus === 'checking' && (
                   <p className="text-sm text-blue-600 mt-1">Checking availability...</p>
+                )}
+                {!settings?.project_id_locked && projectIdStatus === 'idle' && settings?.project_id && (
+                  <p className="text-sm text-gray-600 mt-1">Project ID will be locked after saving</p>
+                )}
+                {!settings?.project_id_locked && settings?.project_id && settings.project_id.length < 3 && (
+                  <p className="text-sm text-red-600 mt-1">Project ID must be at least 3 characters long</p>
                 )}
               </div>
             </CardContent>
@@ -536,7 +584,7 @@ const FeedbackSettings = () => {
           {/* Save Button */}
           <Button
             onClick={handleSaveSettings}
-            disabled={saving || !settings?.project_id}
+            disabled={saving || !settings?.project_id || (settings?.project_id && settings.project_id.trim().length < 3)}
             className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700"
           >
             {saving ? (
@@ -622,7 +670,7 @@ const FeedbackSettings = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
-              {settings?.project_id ? (
+              {settings?.project_id && settings.project_id.trim() !== '' ? (
                 <>
                   <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
                     <pre>{generateEmbedCode()}</pre>
