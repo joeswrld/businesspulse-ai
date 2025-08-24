@@ -1,81 +1,46 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useUsageEnforcement } from '@/hooks/useUsageEnforcement';
-import { useUsageTracking } from '@/hooks/useUsageTracking';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  BarChart3,
-  Brain,
-  FileText,
-  Loader2,
-  RefreshCw,
-  Sparkles,
-  Lightbulb,
-  TrendingUp,
-  TrendingDown,
+  BarChart3, 
+  FileText, 
+  Loader2, 
+  RefreshCw, 
+  TrendingUp, 
+  TrendingDown, 
   Minus,
-  AlertTriangle,
-  CheckCircle,
-  Target,
-  ArrowUpRight,
   Users,
-  Activity,
-  Zap,
-  Clock,
-  Database,
-  BarChart as BarChartIcon,
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  DollarSign,
-  Building,
-  Globe,
-  Rocket,
-  Shield,
-  Award,
-  PieChart as PieChartIcon,
-  Trash2,
-  Download,
-  FileDown,
+  MessageSquare,
+  Target,
   Calendar,
   Filter,
-  Play,
-  Pause,
-  Square,
-  RotateCcw,
-  Eye,
-  EyeOff,
-  Settings,
-  BarChart4,
+  Search,
+  Download,
+  FileDown,
+  FileText as FileTextIcon,
+  Activity,
+  PieChart,
+  BarChart,
   LineChart,
-  Scatter,
-  PieChart
+  Eye,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  XCircle
 } from 'lucide-react';
 
 import {
   BarChart as RechartsBarChart,
   Bar,
-  PieChart,
+  PieChart as RechartsPieChart,
   Cell,
   Pie,
   XAxis,
@@ -90,1038 +55,934 @@ import {
   Area
 } from 'recharts';
 
-interface AnalyticsData {
+// Types
+interface Feedback {
   id: string;
-  executive_summary: string;
-  key_insights: string[];
-  trends: string[];
-  performance_metrics: {
+  project_id: string;
+  name: string;
+  email: string;
+  message: string;
+  timestamp: string;
+  status: 'new' | 'reviewed' | 'resolved';
+}
+
+interface AnalyticsData {
+  totalFeedback: number;
+  sentimentDistribution: {
     positive: number;
     negative: number;
     neutral: number;
-    total_insights: number;
-    average_confidence: number;
-    data_quality_score: number;
   };
-  recommended_actions: string[];
-  sentiment_analysis: {
-    overall_sentiment: 'positive' | 'negative' | 'neutral';
-    sentiment_trend: 'improving' | 'declining' | 'stable';
-    key_positive_themes: string[];
-    key_negative_themes: string[];
+  avgSentimentScore: number;
+  topTheme: string;
+  statusDistribution: {
+    new: number;
+    reviewed: number;
+    resolved: number;
   };
-  business_impact: {
-    strategic_value: number;
-    risk_level: 'low' | 'medium' | 'high';
-    opportunities: string[];
-    threats: string[];
+  feedbackVolume: Array<{
+    date: string;
+    count: number;
+  }>;
+  topThemes: Array<{
+    theme: string;
+    count: number;
+  }>;
+  sentimentTrend: {
+    currentPeriod: number;
+    previousPeriod: number;
+    change: number;
+    trend: 'up' | 'down' | 'stable';
   };
-  real_time_metrics: {
-    processing_time: number;
-    data_freshness: string;
-    accuracy_score: number;
-  };
-  generated_at: string;
-  analysis_type: string;
-  time_range: string;
-  insights_analyzed: number;
 }
 
-interface AnalyticsHistoryItem {
-  id: string;
-  user_id: string;
-  analytics_data: AnalyticsData;
-  analysis_type: string;
-  time_range: string;
-  insights_count: number;
-  created_at: string;
-}
-
-const Analytics: React.FC = () => {
+export default function Analytics() {
   const { user } = useAuth();
-  const { checkUsage, enforceLimit } = useUsageEnforcement();
-  const { trackUsage } = useUsageTracking();
   
-  const [currentAnalytics, setCurrentAnalytics] = useState<AnalyticsData | null>(null);
-  const [analyticsHistory, setAnalyticsHistory] = useState<AnalyticsHistoryItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [realTimeMode, setRealTimeMode] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [selectedAnalysisType, setSelectedAnalysisType] = useState<'comprehensive' | 'sentiment' | 'trends' | 'performance'>('comprehensive');
-  const [selectedTimeRange, setSelectedTimeRange] = useState<'all' | 'week' | 'month' | 'quarter'>('all');
-  const [showHistory, setShowHistory] = useState(false);
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [exportType, setExportType] = useState<'json' | 'csv' | 'pdf' | 'excel'>('json');
-  const [exportLoading, setExportLoading] = useState(false);
-  
-  const realTimeInterval = useRef<NodeJS.Timeout | null>(null);
-  const insightsData = useRef<any[]>([]);
+  // State management
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
+  const [sentimentFilter, setSentimentFilter] = useState<'all' | 'positive' | 'negative' | 'neutral'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [exportingPDF, setExportingPDF] = useState(false);
+  const [exportingCSV, setExportingCSV] = useState(false);
 
-  // Refresh insights data from localStorage
-  const refreshInsightsData = () => {
-    try {
-      const saved = localStorage.getItem('insightsHistory');
-      if (saved) {
-        insightsData.current = JSON.parse(saved);
-        toast.success(`Loaded ${insightsData.current.length} insights from insights-simple page`);
-      } else {
-        insightsData.current = [];
-        toast.info('No insights data found. Generate insights in the insights-simple page first.');
-      }
-    } catch (err) {
-      console.error('Failed to refresh insights data:', err);
-      insightsData.current = [];
-      toast.error('Failed to load insights data');
-    }
-  };
-
-  // Load insights data from localStorage (from insights-simple page)
-  useEffect(() => {
-    refreshInsightsData();
-  }, []);
-
-  // Load analytics history
-  const loadAnalyticsHistory = useCallback(async () => {
+  // Load user's feedbacks
+  const loadFeedbacks = useCallback(async () => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
-        .from('analytics_history')
+      setLoading(true);
+      
+      // Get user's project IDs from feedback_settings
+      const { data: projectSettings, error: projectError } = await supabase
+        .from('feedback_settings')
+        .select('project_id')
+        .eq('user_id', user.id);
+
+      if (projectError) {
+        console.error('Error loading project settings:', projectError);
+        toast.error('Failed to load project settings');
+        return;
+      }
+
+      if (!projectSettings || projectSettings.length === 0) {
+        setFeedbacks([]);
+        return;
+      }
+
+      const projectIds = projectSettings.map(setting => setting.project_id).filter(Boolean);
+
+      // Get feedbacks for user's projects
+      const { data: feedbacksData, error: feedbacksError } = await supabase
+        .from('feedbacks')
         .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .in('project_id', projectIds)
+        .order('timestamp', { ascending: false });
 
-      if (error) throw error;
-      setAnalyticsHistory(data || []);
+      if (feedbacksError) {
+        console.error('Error loading feedbacks:', feedbacksError);
+        toast.error('Failed to load feedbacks');
+        return;
+      }
+
+      setFeedbacks(feedbacksData || []);
     } catch (error) {
-      console.error('Error loading analytics history:', error);
-      toast.error('Failed to load analytics history');
-    }
-  }, [user]);
-
-  useEffect(() => {
-    loadAnalyticsHistory();
-  }, [loadAnalyticsHistory]);
-
-  // Mock analytics generation for development
-  const generateMockAnalytics = () => {
-    const insights = insightsData.current;
-    
-    if (!insights || insights.length === 0) {
-      toast.error('No insights data available. Please generate insights first in the insights-simple page.');
-      return;
-    }
-
-    // Calculate real metrics from insights data
-    const totalInsights = insights.length;
-    const positiveCount = insights.filter((item: any) => item.sentiment === 'positive').length;
-    const negativeCount = insights.filter((item: any) => item.sentiment === 'negative').length;
-    const neutralCount = insights.filter((item: any) => item.sentiment === 'neutral').length;
-
-    const positivePercentage = Math.round((positiveCount / totalInsights) * 100);
-    const negativePercentage = Math.round((negativeCount / totalInsights) * 100);
-    const neutralPercentage = Math.round((neutralCount / totalInsights) * 100);
-
-    // Calculate average confidence
-    const totalConfidence = insights.reduce((sum: number, item: any) => sum + (item.overall_confidence || 0), 0);
-    const averageConfidence = Math.round(totalConfidence / totalInsights);
-
-    // Extract themes and actions from real data
-    const allThemes: string[] = [];
-    const allActions: string[] = [];
-    
-    insights.forEach((item: any) => {
-      if (Array.isArray(item.key_themes)) {
-        item.key_themes.forEach((theme: any) => {
-          const themeText = typeof theme === 'string' ? theme : theme.theme;
-          if (themeText && !allThemes.includes(themeText)) {
-            allThemes.push(themeText);
-          }
-        });
-      }
-      
-      if (Array.isArray(item.suggested_actions)) {
-        item.suggested_actions.forEach((action: any) => {
-          const actionText = typeof action === 'string' ? action : action.action;
-          if (actionText && !allActions.includes(actionText)) {
-            allActions.push(actionText);
-          }
-        });
-      }
-    });
-
-    // Determine overall sentiment trend
-    const sentimentTrend = positivePercentage > 60 ? 'improving' : 
-                          positivePercentage > 40 ? 'stable' : 'declining';
-
-    // Calculate strategic value based on real data
-    const strategicValue = Math.min(
-      averageConfidence * 0.4 + 
-      (allThemes.length * 5) + 
-      (allActions.length * 3) + 
-      (positivePercentage * 0.3), 
-      100
-    );
-
-    // Determine risk level
-    const riskLevel = negativePercentage > 40 ? 'high' : 
-                     negativePercentage > 20 ? 'medium' : 'low';
-
-    const mockAnalytics: AnalyticsData = {
-      id: Date.now().toString(),
-      executive_summary: `Based on analysis of ${totalInsights} real insights, your business shows a ${positivePercentage > 50 ? 'positive' : positivePercentage < 30 ? 'negative' : 'mixed'} sentiment trend. The data reveals ${allThemes.length} key themes and ${allActions.length} actionable recommendations for business improvement.`,
-      key_insights: [
-        `Sentiment distribution shows ${positivePercentage}% positive, ${negativePercentage}% negative, and ${neutralPercentage}% neutral feedback`,
-        `Average confidence score across all insights is ${averageConfidence}%`,
-        `${allThemes.length} distinct themes identified across your insights data`,
-        `${allActions.length} actionable recommendations generated for business improvement`,
-        `Data quality score indicates ${averageConfidence > 80 ? 'high' : averageConfidence > 60 ? 'medium' : 'low'} confidence in analysis results`
-      ],
-      trends: [
-        `Sentiment trend is ${sentimentTrend} based on recent insights analysis`,
-        `Most insights focus on ${allThemes.slice(0, 3).join(', ')}`,
-        `Customer feedback patterns suggest ${positivePercentage > 60 ? 'strong' : positivePercentage > 40 ? 'moderate' : 'needs improvement'} satisfaction levels`
-      ],
-      performance_metrics: {
-        positive: positivePercentage,
-        negative: negativePercentage,
-        neutral: neutralPercentage,
-        total_insights: totalInsights,
-        average_confidence: averageConfidence,
-        data_quality_score: Math.min(averageConfidence + 10, 100)
-      },
-      recommended_actions: allActions.slice(0, 5).map((action, index) => 
-        `${index + 1}. ${action}`
-      ),
-      sentiment_analysis: {
-        overall_sentiment: positivePercentage > 50 ? 'positive' : positivePercentage < 30 ? 'negative' : 'neutral',
-        sentiment_trend: sentimentTrend,
-        key_positive_themes: allThemes.slice(0, 3),
-        key_negative_themes: allThemes.slice(3, 6)
-      },
-      business_impact: {
-        strategic_value: Math.round(strategicValue),
-        risk_level: riskLevel,
-        opportunities: allThemes.slice(0, 3).map(theme => `${theme} improvement`),
-        threats: riskLevel === 'high' ? ['Customer churn risk', 'Service quality issues', 'Competitive pressure'] : 
-                riskLevel === 'medium' ? ['Service improvement needed', 'Market competition'] : 
-                ['Minimal risks identified']
-      },
-      real_time_metrics: {
-        processing_time: Math.random() * 2 + 1, // Random between 1-3 seconds
-        data_freshness: 'real-time',
-        accuracy_score: Math.min(averageConfidence + 5, 100)
-      },
-      generated_at: new Date().toISOString(),
-      analysis_type: selectedAnalysisType,
-      time_range: selectedTimeRange,
-      insights_analyzed: totalInsights
-    };
-
-    setCurrentAnalytics(mockAnalytics);
-    
-    // Add to mock history
-    const mockHistoryItem: AnalyticsHistoryItem = {
-      id: mockAnalytics.id,
-      user_id: user?.id || 'mock-user',
-      analytics_data: mockAnalytics,
-      analysis_type: selectedAnalysisType,
-      time_range: selectedTimeRange,
-      insights_count: totalInsights,
-      created_at: new Date().toISOString()
-    };
-    
-    setAnalyticsHistory(prev => [mockHistoryItem, ...prev]);
-    
-    toast.success('Analytics generated from real insights data!', {
-      description: `Analyzed ${totalInsights} insights with ${mockAnalytics.real_time_metrics.accuracy_score}% accuracy`
-    });
-  };
-
-  // Real-time analytics generation
-  const generateAnalytics = useCallback(async () => {
-    if (!user || insightsData.current.length === 0) {
-      toast.error('No insights data available for analysis');
-      return;
-    }
-
-    // Temporarily remove usage limit check until billing is implemented
-    // const canAnalyze = await checkUsage('analytics', 1);
-    // if (!canAnalyze) {
-    //   toast.error('Analytics limit reached. Please upgrade your plan.');
-    //   return;
-    // }
-
-    setLoading(true);
-
-    try {
-      // Try to use real API first, fallback to mock if it fails
-      const response = await fetch(
-        `${supabase.supabaseUrl}/functions/v1/generateAnalytics`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabase.supabaseKey}`,
-          },
-          body: JSON.stringify({
-            user_id: user.id,
-            insights_data: insightsData.current,
-            analysis_type: selectedAnalysisType,
-            time_range: selectedTimeRange
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`API not available (${response.status})`);
-      }
-
-      const analytics = await response.json();
-      
-      if (analytics.error) {
-        throw new Error(analytics.error);
-      }
-
-      setCurrentAnalytics(analytics);
-      
-      // Temporarily remove usage increment until billing is implemented
-              await trackUsage('analytics');
-      
-      // Reload history
-      await loadAnalyticsHistory();
-
-      toast.success('Analytics generated successfully!', {
-        description: `Analyzed ${analytics.insights_analyzed} insights with ${analytics.real_time_metrics.accuracy_score}% accuracy`
-      });
-
-    } catch (error) {
-      console.log('API not available, using mock analytics:', error);
-      // Fallback to mock analytics
-      generateMockAnalytics();
+      console.error('Error in loadFeedbacks:', error);
+      toast.error('Failed to load feedbacks');
     } finally {
       setLoading(false);
     }
-  }, [user, selectedAnalysisType, selectedTimeRange, loadAnalyticsHistory]);
+  }, [user]);
 
-  // Real-time mode
+  // Load feedbacks on component mount
   useEffect(() => {
-    if (realTimeMode && autoRefresh) {
-      realTimeInterval.current = setInterval(() => {
-        generateAnalytics();
-      }, 30000); // Refresh every 30 seconds
-    } else if (realTimeInterval.current) {
-      clearInterval(realTimeInterval.current);
-      realTimeInterval.current = null;
+    loadFeedbacks();
+  }, [loadFeedbacks]);
+
+  // Analyze sentiment from message content
+  const analyzeSentiment = (message: string): 'positive' | 'negative' | 'neutral' => {
+    const positiveWords = [
+      'great', 'good', 'excellent', 'amazing', 'wonderful', 'fantastic', 'love', 'like', 'happy', 'satisfied',
+      'perfect', 'awesome', 'outstanding', 'brilliant', 'superb', 'terrific', 'pleased', 'impressed', 'smooth',
+      'fast', 'easy', 'intuitive', 'beautiful', 'clean', 'modern', 'helpful', 'supportive', 'responsive'
+    ];
+    
+    const negativeWords = [
+      'bad', 'terrible', 'awful', 'horrible', 'hate', 'dislike', 'angry', 'frustrated', 'annoyed', 'disappointed',
+      'broken', 'slow', 'difficult', 'confusing', 'ugly', 'cluttered', 'buggy', 'crash', 'error', 'fail',
+      'useless', 'waste', 'problem', 'issue', 'complaint', 'unhappy', 'dissatisfied', 'poor', 'weak'
+    ];
+
+    const messageLower = message.toLowerCase();
+    const positiveCount = positiveWords.filter(word => messageLower.includes(word)).length;
+    const negativeCount = negativeWords.filter(word => messageLower.includes(word)).length;
+
+    if (positiveCount > negativeCount) return 'positive';
+    if (negativeCount > positiveCount) return 'negative';
+    return 'neutral';
+  };
+
+  // Extract themes from message content
+  const extractThemes = (message: string): string[] => {
+    const commonThemes = [
+      'user interface', 'ui', 'ux', 'design', 'performance', 'speed', 'loading', 'bug', 'error', 'crash',
+      'mobile', 'responsive', 'navigation', 'search', 'filter', 'dashboard', 'report', 'export', 'import',
+      'notification', 'email', 'login', 'authentication', 'security', 'privacy', 'data', 'storage',
+      'customer support', 'help', 'documentation', 'tutorial', 'onboarding', 'feature', 'functionality',
+      'pricing', 'billing', 'subscription', 'upgrade', 'downgrade', 'integration', 'api', 'webhook'
+    ];
+
+    const messageLower = message.toLowerCase();
+    const foundThemes = commonThemes.filter(theme => messageLower.includes(theme));
+    
+    // If no common themes found, try to extract from message content
+    if (foundThemes.length === 0) {
+      const words = messageLower.split(/\s+/).filter(word => word.length > 3);
+      const uniqueWords = [...new Set(words)].slice(0, 3);
+      return uniqueWords.map(word => word.charAt(0).toUpperCase() + word.slice(1));
     }
 
-    return () => {
-      if (realTimeInterval.current) {
-        clearInterval(realTimeInterval.current);
+    return foundThemes.slice(0, 3);
+  };
+
+  // Calculate analytics data
+  const analyticsData = useMemo((): AnalyticsData => {
+    if (feedbacks.length === 0) {
+      return {
+        totalFeedback: 0,
+        sentimentDistribution: { positive: 0, negative: 0, neutral: 0 },
+        avgSentimentScore: 0,
+        topTheme: 'No data',
+        statusDistribution: { new: 0, reviewed: 0, resolved: 0 },
+        feedbackVolume: [],
+        topThemes: [],
+        sentimentTrend: { currentPeriod: 0, previousPeriod: 0, change: 0, trend: 'stable' }
+      };
+    }
+
+    // Filter feedbacks based on date range
+    const now = new Date();
+    const filteredFeedbacks = feedbacks.filter(feedback => {
+      const feedbackDate = new Date(feedback.timestamp);
+      const diffTime = Math.abs(now.getTime() - feedbackDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      switch (dateRange) {
+        case '7d': return diffDays <= 7;
+        case '30d': return diffDays <= 30;
+        case '90d': return diffDays <= 90;
+        default: return true;
+      }
+    });
+
+    // Calculate sentiment distribution
+    const sentiments = filteredFeedbacks.map(feedback => analyzeSentiment(feedback.message));
+    const positiveCount = sentiments.filter(s => s === 'positive').length;
+    const negativeCount = sentiments.filter(s => s === 'negative').length;
+    const neutralCount = sentiments.filter(s => s === 'neutral').length;
+    const total = filteredFeedbacks.length;
+
+    // Calculate average sentiment score (0-100)
+    const avgSentimentScore = total > 0 
+      ? Math.round(((positiveCount * 100) + (neutralCount * 50) + (negativeCount * 0)) / total)
+      : 0;
+
+    // Calculate status distribution
+    const statusCounts = filteredFeedbacks.reduce((acc, feedback) => {
+      acc[feedback.status] = (acc[feedback.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Extract and count themes
+    const allThemes = filteredFeedbacks.flatMap(feedback => extractThemes(feedback.message));
+    const themeCounts: Record<string, number> = {};
+    allThemes.forEach(theme => {
+      themeCounts[theme] = (themeCounts[theme] || 0) + 1;
+    });
+
+    const topThemes = Object.entries(themeCounts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([theme, count]) => ({ theme, count }));
+
+    // Calculate feedback volume over time
+    const volumeData: Record<string, number> = {};
+    filteredFeedbacks.forEach(feedback => {
+      const date = new Date(feedback.timestamp).toISOString().split('T')[0];
+      volumeData[date] = (volumeData[date] || 0) + 1;
+    });
+
+    const feedbackVolume = Object.entries(volumeData)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, count]) => ({ date, count }));
+
+    // Calculate sentiment trend (last 7 days vs previous 7 days)
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    
+    const currentPeriodFeedbacks = filteredFeedbacks.filter(feedback => 
+      new Date(feedback.timestamp) >= sevenDaysAgo
+    );
+    const previousPeriodFeedbacks = filteredFeedbacks.filter(feedback => {
+      const feedbackDate = new Date(feedback.timestamp);
+      return feedbackDate >= fourteenDaysAgo && feedbackDate < sevenDaysAgo;
+    });
+
+    const currentPeriodPositive = currentPeriodFeedbacks.filter(f => 
+      analyzeSentiment(f.message) === 'positive'
+    ).length;
+    const previousPeriodPositive = previousPeriodFeedbacks.filter(f => 
+      analyzeSentiment(f.message) === 'positive'
+    ).length;
+
+    const currentPeriodTotal = currentPeriodFeedbacks.length;
+    const previousPeriodTotal = previousPeriodFeedbacks.length;
+
+    const currentPeriodPercentage = currentPeriodTotal > 0 
+      ? (currentPeriodPositive / currentPeriodTotal) * 100 
+      : 0;
+    const previousPeriodPercentage = previousPeriodTotal > 0 
+      ? (previousPeriodPositive / previousPeriodTotal) * 100 
+      : 0;
+
+    const change = currentPeriodPercentage - previousPeriodPercentage;
+    const trend: 'up' | 'down' | 'stable' = 
+      Math.abs(change) < 5 ? 'stable' : change > 0 ? 'up' : 'down';
+
+    return {
+      totalFeedback: total,
+      sentimentDistribution: {
+        positive: positiveCount,
+        negative: negativeCount,
+        neutral: neutralCount
+      },
+      avgSentimentScore,
+      topTheme: topThemes[0]?.theme || 'No data',
+      statusDistribution: {
+        new: statusCounts.new || 0,
+        reviewed: statusCounts.reviewed || 0,
+        resolved: statusCounts.resolved || 0
+      },
+      feedbackVolume,
+      topThemes,
+      sentimentTrend: {
+        currentPeriod: Math.round(currentPeriodPercentage),
+        previousPeriod: Math.round(previousPeriodPercentage),
+        change: Math.round(change),
+        trend
       }
     };
-  }, [realTimeMode, autoRefresh, generateAnalytics]);
+  }, [feedbacks, dateRange]);
 
-  // Mock delete analytics for development
-  const deleteMockAnalytics = (analyticsId?: string) => {
-    if (analyticsId) {
-      // Delete specific analytics
-      setAnalyticsHistory(prev => prev.filter(item => item.id !== analyticsId));
-      
-      // Clear current analytics if it was deleted
-      if (currentAnalytics?.id === analyticsId) {
-        setCurrentAnalytics(null);
-      }
-      
-      toast.success('Analytics deleted successfully');
-    } else {
-      // Delete all analytics
-      setAnalyticsHistory([]);
-      setCurrentAnalytics(null);
-      toast.success('All analytics deleted successfully');
-    }
+  // Filter feedbacks based on search and sentiment
+  const filteredFeedbacks = useMemo(() => {
+    return feedbacks.filter(feedback => {
+      const matchesSearch = searchTerm === '' || 
+        feedback.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        feedback.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        feedback.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      if (!matchesSearch) return false;
+
+      if (sentimentFilter === 'all') return true;
+
+      const sentiment = analyzeSentiment(feedback.message);
+      return sentiment === sentimentFilter;
+    });
+  }, [feedbacks, searchTerm, sentimentFilter]);
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
-  // Delete analytics
-  const deleteAnalytics = async (analyticsId?: string) => {
-    if (!user) return;
-
+  // Export to CSV
+  const exportToCSV = async () => {
+    setExportingCSV(true);
     try {
-      const response = await fetch(
-        `${supabase.supabaseUrl}/functions/v1/deleteAnalytics`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabase.supabaseKey}`,
-          },
-          body: JSON.stringify({
-            analytics_id: analyticsId,
-            delete_type: analyticsId ? 'single' : 'all'
-          }),
-        }
-      );
+      const csvData = [
+        ['ID', 'Project ID', 'Name', 'Email', 'Message', 'Timestamp', 'Status', 'Sentiment', 'Themes'],
+        ...filteredFeedbacks.map(feedback => [
+          feedback.id,
+          feedback.project_id || '',
+          feedback.name || '',
+          feedback.email || '',
+          `"${feedback.message.replace(/"/g, '""')}"`,
+          feedback.timestamp,
+          feedback.status,
+          analyzeSentiment(feedback.message),
+          extractThemes(feedback.message).join('; ')
+        ])
+      ];
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Request failed with status ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      toast.success(result.message || 'Analytics deleted successfully');
-      
-      // Reload history
-      await loadAnalyticsHistory();
-      
-      // Clear current analytics if it was deleted
-      if (analyticsId && currentAnalytics?.id === analyticsId) {
-        setCurrentAnalytics(null);
-      }
-
-    } catch (error) {
-      console.log('API not available, using mock delete:', error);
-      // Fallback to mock delete
-      deleteMockAnalytics(analyticsId);
-    }
-  };
-
-  // Mock export analytics for development
-  const exportMockAnalytics = (analyticsId?: string) => {
-    let dataToExport: any[] = [];
-    
-    if (analyticsId) {
-      // Export specific analytics
-      const item = analyticsHistory.find(item => item.id === analyticsId);
-      if (item) {
-        dataToExport = [item];
-      }
-    } else {
-      // Export all analytics
-      dataToExport = analyticsHistory;
-    }
-
-    if (dataToExport.length === 0) {
-      toast.error('No analytics data to export');
-      return;
-    }
-
-    let content: string;
-    let contentType: string;
-    let fileName: string;
-
-    switch (exportType) {
-      case 'json':
-        content = JSON.stringify(dataToExport, null, 2);
-        contentType = 'application/json';
-        fileName = `analytics-${new Date().toISOString().split('T')[0]}.json`;
-        break;
-      case 'csv':
-        const flattenedData = dataToExport.map(item => ({
-          id: item.id,
-          created_at: item.created_at,
-          analysis_type: item.analysis_type,
-          time_range: item.time_range,
-          insights_count: item.insights_count,
-          executive_summary: item.analytics_data.executive_summary,
-          positive_percentage: item.analytics_data.performance_metrics.positive,
-          negative_percentage: item.analytics_data.performance_metrics.negative,
-          neutral_percentage: item.analytics_data.performance_metrics.neutral,
-          strategic_value: item.analytics_data.business_impact.strategic_value,
-          risk_level: item.analytics_data.business_impact.risk_level,
-          accuracy_score: item.analytics_data.real_time_metrics.accuracy_score
-        }));
-        content = flattenedData.map(row => Object.values(row).join(',')).join('\n');
-        contentType = 'text/csv';
-        fileName = `analytics-${new Date().toISOString().split('T')[0]}.csv`;
-        break;
-      case 'pdf':
-        content = dataToExport.map(item => `
-# Analytics Report
-Generated: ${new Date().toISOString()}
-
-## Executive Summary
-${item.analytics_data.executive_summary}
-
-## Key Insights
-${item.analytics_data.key_insights.map((insight: string, index: number) => `${index + 1}. ${insight}`).join('\n')}
-
-## Performance Metrics
-- Positive: ${item.analytics_data.performance_metrics.positive}%
-- Negative: ${item.analytics_data.performance_metrics.negative}%
-- Neutral: ${item.analytics_data.performance_metrics.neutral}%
-- Total Insights: ${item.analytics_data.performance_metrics.total_insights}
-
-## Recommended Actions
-${item.analytics_data.recommended_actions.map((action: string, index: number) => `${index + 1}. ${action}`).join('\n')}
-
-## Business Impact
-- Strategic Value: ${item.analytics_data.business_impact.strategic_value}/100
-- Risk Level: ${item.analytics_data.business_impact.risk_level}
-- Opportunities: ${item.analytics_data.business_impact.opportunities.join(', ')}
-- Threats: ${item.analytics_data.business_impact.threats.join(', ')}
-
-## Real-time Metrics
-- Processing Time: ${item.analytics_data.real_time_metrics.processing_time}s
-- Data Freshness: ${item.analytics_data.real_time_metrics.data_freshness}
-- Accuracy Score: ${item.analytics_data.real_time_metrics.accuracy_score}%
-        `).join('\n\n---\n\n');
-        contentType = 'text/plain';
-        fileName = `analytics-${new Date().toISOString().split('T')[0]}.md`;
-        break;
-      case 'excel':
-        const excelData = dataToExport.map(item => ({
-          'Analytics ID': item.id,
-          'Created At': item.created_at,
-          'Analysis Type': item.analysis_type,
-          'Time Range': item.time_range,
-          'Insights Count': item.insights_count,
-          'Executive Summary': item.analytics_data.executive_summary,
-          'Positive %': item.analytics_data.performance_metrics.positive,
-          'Negative %': item.analytics_data.performance_metrics.negative,
-          'Neutral %': item.analytics_data.performance_metrics.neutral,
-          'Strategic Value': item.analytics_data.business_impact.strategic_value,
-          'Risk Level': item.analytics_data.business_impact.risk_level,
-          'Accuracy Score': item.analytics_data.real_time_metrics.accuracy_score,
-          'Key Insights': item.analytics_data.key_insights.join('; '),
-          'Recommended Actions': item.analytics_data.recommended_actions.join('; '),
-          'Opportunities': item.analytics_data.business_impact.opportunities.join('; '),
-          'Threats': item.analytics_data.business_impact.threats.join('; ')
-        }));
-        content = JSON.stringify(excelData, null, 2);
-        contentType = 'application/json';
-        fileName = `analytics-${new Date().toISOString().split('T')[0]}.json`;
-        break;
-      default:
-        throw new Error('Unsupported export type');
-    }
-
-    // Download the file
-    const blob = new Blob([content], { type: contentType });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    link.click();
-    URL.revokeObjectURL(url);
-
-    toast.success(`Analytics exported successfully! (${dataToExport.length} records)`);
-    setExportDialogOpen(false);
-  };
-
-  // Export analytics
-  const exportAnalytics = async (analyticsId?: string) => {
-    if (!user) return;
-
-    setExportLoading(true);
-
-    try {
-      const response = await fetch(
-        `${supabase.supabaseUrl}/functions/v1/exportAnalytics`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabase.supabaseKey}`,
-          },
-          body: JSON.stringify({
-            analytics_id: analyticsId,
-            export_type: exportType,
-            time_range: selectedTimeRange
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Request failed with status ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      // Download the file
-      const blob = new Blob([result.content], { type: result.content_type });
-      const url = URL.createObjectURL(blob);
+      const csvContent = csvData.map(row => row.join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
-      link.href = url;
-      link.download = result.file_name;
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `feedback-analytics-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(link);
 
-      toast.success(`Analytics exported successfully! (${result.records_count} records)`);
-      setExportDialogOpen(false);
-
+      toast.success('CSV exported successfully!');
     } catch (error) {
-      console.log('API not available, using mock export:', error);
-      // Fallback to mock export
-      exportMockAnalytics(analyticsId);
+      console.error('Error exporting CSV:', error);
+      toast.error('Failed to export CSV');
     } finally {
-      setExportLoading(false);
+      setExportingCSV(false);
     }
   };
 
-  // Chart data preparation
-  const prepareChartData = () => {
-    if (!currentAnalytics) return [];
+  // Export to PDF
+  const exportToPDF = async () => {
+    setExportingPDF(true);
+    try {
+      toast.info('Generating PDF...', {
+        description: 'Please wait while we create your dashboard snapshot.'
+      });
 
-    return [
-      { name: 'Positive', value: currentAnalytics.performance_metrics.positive, color: '#10b981' },
-      { name: 'Negative', value: currentAnalytics.performance_metrics.negative, color: '#ef4444' },
-      { name: 'Neutral', value: currentAnalytics.performance_metrics.neutral, color: '#6b7280' },
-    ];
+      const pdfContainer = document.createElement('div');
+      pdfContainer.style.position = 'absolute';
+      pdfContainer.style.left = '-9999px';
+      pdfContainer.style.top = '0';
+      pdfContainer.style.width = '800px';
+      pdfContainer.style.backgroundColor = 'white';
+      pdfContainer.style.padding = '40px';
+      pdfContainer.style.fontFamily = 'Arial, sans-serif';
+      pdfContainer.style.color = '#333';
+      document.body.appendChild(pdfContainer);
+
+      pdfContainer.innerHTML = `
+        <div style="margin-bottom: 30px;">
+          <h1 style="color: #1f2937; font-size: 28px; margin-bottom: 10px; border-bottom: 3px solid #3b82f6; padding-bottom: 10px;">
+            Feedback Analytics Dashboard
+          </h1>
+          <p style="color: #6b7280; font-size: 14px; margin-bottom: 20px;">
+            Generated on ${new Date().toLocaleDateString()} • Date Range: ${dateRange} • Total Feedback: ${analyticsData.totalFeedback}
+          </p>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 15px;">
+            Key Performance Indicators
+          </h2>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; background-color: #f9fafb;">
+              <div style="font-weight: 600; color: #1f2937; margin-bottom: 5px;">Total Feedback</div>
+              <div style="font-size: 24px; font-weight: bold; color: #3b82f6;">${analyticsData.totalFeedback}</div>
+            </div>
+            <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; background-color: #f9fafb;">
+              <div style="font-weight: 600; color: #1f2937; margin-bottom: 5px;">Avg Sentiment Score</div>
+              <div style="font-size: 24px; font-weight: bold; color: #10b981;">${analyticsData.avgSentimentScore}/100</div>
+            </div>
+            <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; background-color: #f9fafb;">
+              <div style="font-weight: 600; color: #1f2937; margin-bottom: 5px;">Top Theme</div>
+              <div style="font-size: 18px; color: #6b7280;">${analyticsData.topTheme}</div>
+            </div>
+            <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; background-color: #f9fafb;">
+              <div style="font-weight: 600; color: #1f2937; margin-bottom: 5px;">Sentiment Trend</div>
+              <div style="font-size: 18px; color: ${analyticsData.sentimentTrend.trend === 'up' ? '#10b981' : analyticsData.sentimentTrend.trend === 'down' ? '#ef4444' : '#6b7280'};">
+                ${analyticsData.sentimentTrend.change > 0 ? '+' : ''}${analyticsData.sentimentTrend.change}%
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #10b981; padding-left: 15px;">
+            Sentiment Distribution
+          </h2>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+            <div style="text-align: center; padding: 20px; background-color: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
+              <div style="font-size: 24px; font-weight: bold; color: #16a34a; margin-bottom: 5px;">${analyticsData.sentimentDistribution.positive}</div>
+              <div style="color: #16a34a; font-weight: 500;">Positive</div>
+            </div>
+            <div style="text-align: center; padding: 20px; background-color: #fefce8; border-radius: 8px; border: 1px solid #fde68a;">
+              <div style="font-size: 24px; font-weight: bold; color: #ca8a04; margin-bottom: 5px;">${analyticsData.sentimentDistribution.neutral}</div>
+              <div style="color: #ca8a04; font-weight: 500;">Neutral</div>
+            </div>
+            <div style="text-align: center; padding: 20px; background-color: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
+              <div style="font-size: 24px; font-weight: bold; color: #dc2626; margin-bottom: 5px;">${analyticsData.sentimentDistribution.negative}</div>
+              <div style="color: #dc2626; font-weight: 500;">Negative</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #f59e0b; padding-left: 15px;">
+            Top Themes
+          </h2>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            ${analyticsData.topThemes.map(theme => 
+              `<span style="background-color: #f3f4f6; color: #374151; padding: 6px 12px; border-radius: 16px; font-size: 12px; border: 1px solid #d1d5db;">
+                ${theme.theme} (${theme.count})
+              </span>`
+            ).join('')}
+          </div>
+        </div>
+      `;
+
+      const canvas = await html2canvas(pdfContainer, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`feedback-analytics-dashboard-${new Date().toISOString().split('T')[0]}.pdf`);
+      document.body.removeChild(pdfContainer);
+      toast.success('PDF exported successfully!');
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast.error('Failed to export PDF');
+    } finally {
+      setExportingPDF(false);
+    }
   };
 
-  const prepareTrendData = () => {
-    if (!analyticsHistory.length) return [];
-
-    return analyticsHistory.slice(0, 10).map(item => ({
-      date: new Date(item.created_at).toLocaleDateString(),
-      strategic_value: item.analytics_data.business_impact.strategic_value,
-      accuracy: item.analytics_data.real_time_metrics.accuracy_score,
-      insights_count: item.insights_count
-    }));
+  // Get sentiment badge variant
+  const getSentimentBadgeVariant = (sentiment: string) => {
+    switch (sentiment) {
+      case 'positive':
+        return 'default';
+      case 'negative':
+        return 'destructive';
+      default:
+        return 'secondary';
+    }
   };
+
+  // Get status badge variant
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'new':
+        return 'secondary';
+      case 'reviewed':
+        return 'default';
+      case 'resolved':
+        return 'outline';
+      default:
+        return 'secondary';
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <BarChart3 className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+              <p className="text-gray-600">Please log in to access your analytics dashboard.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Real-Time Analytics</h1>
-          <p className="text-muted-foreground">
-            AI-powered analytics with Gemini integration
+          <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
+          <p className="text-gray-600 mt-2">
+            Comprehensive insights into your feedback data and user sentiment
           </p>
         </div>
         <div className="flex items-center space-x-2">
           <Button
-            variant={realTimeMode ? "default" : "outline"}
-            size="sm"
-            onClick={() => setRealTimeMode(!realTimeMode)}
+            variant="outline"
+            onClick={loadFeedbacks}
+            disabled={loading}
           >
-            {realTimeMode ? <Eye className="h-4 w-4 mr-2" /> : <EyeOff className="h-4 w-4 mr-2" />}
-            {realTimeMode ? 'Real-time' : 'Static'}
-          </Button>
-          {realTimeMode && (
-            <Button
-              variant={autoRefresh ? "default" : "outline"}
-              size="sm"
-              onClick={() => setAutoRefresh(!autoRefresh)}
-            >
-              {autoRefresh ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
-              Auto-refresh
-            </Button>
-          )}
-          <Button onClick={generateAnalytics} disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-            Generate
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
           </Button>
         </div>
       </div>
 
-      {/* Controls */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center">
-              <Settings className="h-5 w-5 mr-2" />
-              Analytics Configuration
-            </span>
-            <div className="flex items-center space-x-2">
+      {/* Filters Bar */}
+      <Card className="rounded-xl shadow-lg">
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
+            {/* Search */}
+            <div className="flex-1 min-w-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search feedback by message, name, or email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            {/* Date Range Filter */}
+            <Select value={dateRange} onValueChange={(value: any) => setDateRange(value)}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Date Range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 Days</SelectItem>
+                <SelectItem value="30d">Last 30 Days</SelectItem>
+                <SelectItem value="90d">Last 90 Days</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Sentiment Filter */}
+            <Select value={sentimentFilter} onValueChange={(value: any) => setSentimentFilter(value)}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Sentiment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sentiments</SelectItem>
+                <SelectItem value="positive">Positive</SelectItem>
+                <SelectItem value="neutral">Neutral</SelectItem>
+                <SelectItem value="negative">Negative</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Export Buttons */}
+            <div className="flex space-x-2">
               <Button
                 variant="outline"
-                size="sm"
-                onClick={refreshInsightsData}
+                onClick={exportToCSV}
+                disabled={exportingCSV || filteredFeedbacks.length === 0}
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh Data
+                {exportingCSV ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileDown className="h-4 w-4 mr-2" />
+                )}
+                Export CSV
               </Button>
-              <Badge variant="secondary">
-                {insightsData.current.length} insights available
-              </Badge>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="text-sm font-medium">Analysis Type</label>
-              <Select value={selectedAnalysisType} onValueChange={(value: any) => setSelectedAnalysisType(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="comprehensive">Comprehensive</SelectItem>
-                  <SelectItem value="sentiment">Sentiment</SelectItem>
-                  <SelectItem value="trends">Trends</SelectItem>
-                  <SelectItem value="performance">Performance</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Time Range</label>
-              <Select value={selectedTimeRange} onValueChange={(value: any) => setSelectedTimeRange(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Time</SelectItem>
-                  <SelectItem value="week">Last Week</SelectItem>
-                  <SelectItem value="month">Last Month</SelectItem>
-                  <SelectItem value="quarter">Last Quarter</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowHistory(!showHistory)}
-                className="w-full"
+              <Button
+                variant="outline"
+                onClick={exportToPDF}
+                disabled={exportingPDF || filteredFeedbacks.length === 0}
               >
-                <FileText className="h-4 w-4 mr-2" />
-                {showHistory ? 'Hide' : 'Show'} History
+                {exportingPDF ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileTextIcon className="h-4 w-4 mr-2" />
+                )}
+                Export PDF
               </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Analytics History */}
-      {showHistory && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Analytics History</span>
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setExportDialogOpen(true)}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => deleteAnalytics()}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Clear All
-                </Button>
-              </div>
-            </CardTitle>
+      {/* KPIs Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Total Feedback */}
+        <Card className="rounded-xl shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Feedback</CardTitle>
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {analyticsHistory.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{item.analysis_type} Analysis</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(item.created_at).toLocaleString()} • {item.insights_count} insights
-                    </p>
+            <div className="text-2xl font-bold">{analyticsData.totalFeedback}</div>
+            <p className="text-xs text-muted-foreground">
+              {dateRange === 'all' ? 'All time' : `Last ${dateRange}`}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Positive Sentiment */}
+        <Card className="rounded-xl shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Positive %</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {analyticsData.totalFeedback > 0 
+                ? Math.round((analyticsData.sentimentDistribution.positive / analyticsData.totalFeedback) * 100)
+                : 0}%
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {analyticsData.sentimentDistribution.positive} feedbacks
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Negative Sentiment */}
+        <Card className="rounded-xl shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Negative %</CardTitle>
+            <XCircle className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              {analyticsData.totalFeedback > 0 
+                ? Math.round((analyticsData.sentimentDistribution.negative / analyticsData.totalFeedback) * 100)
+                : 0}%
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {analyticsData.sentimentDistribution.negative} feedbacks
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Average Sentiment Score */}
+        <Card className="rounded-xl shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg Sentiment</CardTitle>
+            <Activity className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {analyticsData.avgSentimentScore}/100
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {analyticsData.avgSentimentScore >= 70 ? 'Excellent' : 
+               analyticsData.avgSentimentScore >= 50 ? 'Good' : 'Needs Improvement'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Feedback Volume Over Time */}
+        <Card className="rounded-xl shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <LineChart className="h-5 w-5" />
+              <span>Feedback Volume Over Time</span>
+            </CardTitle>
+            <CardDescription>
+              Daily feedback count for the selected period
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {analyticsData.feedbackVolume.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={analyticsData.feedbackVolume}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="date" 
+                    tickFormatter={(value) => formatDate(value)}
+                    fontSize={12}
+                  />
+                  <YAxis fontSize={12} />
+                  <Tooltip 
+                    labelFormatter={(value) => formatDate(value)}
+                    formatter={(value: any) => [value, 'Feedback Count']}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="count" 
+                    stroke="#3b82f6" 
+                    fill="#3b82f6" 
+                    fillOpacity={0.3}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-gray-500">
+                No volume data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Sentiment Distribution */}
+        <Card className="rounded-xl shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <PieChart className="h-5 w-5" />
+              <span>Sentiment Distribution</span>
+            </CardTitle>
+            <CardDescription>
+              Breakdown of positive, negative, and neutral feedback
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {analyticsData.totalFeedback > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <RechartsPieChart>
+                  <Pie
+                    data={[
+                      { name: 'Positive', value: analyticsData.sentimentDistribution.positive, color: '#10b981' },
+                      { name: 'Neutral', value: analyticsData.sentimentDistribution.neutral, color: '#f59e0b' },
+                      { name: 'Negative', value: analyticsData.sentimentDistribution.negative, color: '#ef4444' }
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {[
+                      { name: 'Positive', value: analyticsData.sentimentDistribution.positive, color: '#10b981' },
+                      { name: 'Neutral', value: analyticsData.sentimentDistribution.neutral, color: '#f59e0b' },
+                      { name: 'Negative', value: analyticsData.sentimentDistribution.negative, color: '#ef4444' }
+                    ].map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-gray-500">
+                No sentiment data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top Themes Chart */}
+      <Card className="rounded-xl shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <BarChart className="h-5 w-5" />
+            <span>Top 5 Themes</span>
+          </CardTitle>
+          <CardDescription>
+            Most frequently mentioned themes in feedback
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {analyticsData.topThemes.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <RechartsBarChart data={analyticsData.topThemes}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="theme" fontSize={12} />
+                <YAxis fontSize={12} />
+                <Tooltip formatter={(value: any) => [value, 'Mentions']} />
+                <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </RechartsBarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-64 text-gray-500">
+              No theme data available
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Trends Section */}
+      <Card className="rounded-xl shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <TrendingUp className="h-5 w-5" />
+            <span>Sentiment Trends</span>
+          </CardTitle>
+          <CardDescription>
+            Sentiment change over the last 7 days vs previous 7 days
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Current Period */}
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">
+                {analyticsData.sentimentTrend.currentPeriod}%
+              </div>
+              <p className="text-sm text-gray-600">Current 7 Days</p>
+              <p className="text-xs text-gray-500">Positive sentiment</p>
+            </div>
+
+            {/* Previous Period */}
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-600">
+                {analyticsData.sentimentTrend.previousPeriod}%
+              </div>
+              <p className="text-sm text-gray-600">Previous 7 Days</p>
+              <p className="text-xs text-gray-500">Positive sentiment</p>
+            </div>
+
+            {/* Change */}
+            <div className="text-center">
+              <div className={`text-2xl font-bold flex items-center justify-center space-x-1 ${
+                analyticsData.sentimentTrend.trend === 'up' ? 'text-green-600' : 
+                analyticsData.sentimentTrend.trend === 'down' ? 'text-red-600' : 'text-gray-600'
+              }`}>
+                {analyticsData.sentimentTrend.trend === 'up' ? (
+                  <TrendingUp className="h-6 w-6" />
+                ) : analyticsData.sentimentTrend.trend === 'down' ? (
+                  <TrendingDown className="h-6 w-6" />
+                ) : (
+                  <Minus className="h-6 w-6" />
+                )}
+                <span>{analyticsData.sentimentTrend.change > 0 ? '+' : ''}{analyticsData.sentimentTrend.change}%</span>
+              </div>
+              <p className="text-sm text-gray-600">Change</p>
+              <p className="text-xs text-gray-500 capitalize">
+                {analyticsData.sentimentTrend.trend} trend
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Feedback List */}
+      {filteredFeedbacks.length > 0 && (
+        <Card className="rounded-xl shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <MessageSquare className="h-5 w-5" />
+              <span>Recent Feedback</span>
+            </CardTitle>
+            <CardDescription>
+              Showing {filteredFeedbacks.length} feedback entries
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {filteredFeedbacks.slice(0, 10).map((feedback) => (
+                <div key={feedback.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium text-gray-900">
+                        {feedback.name || 'Anonymous'}
+                      </span>
+                      <Badge variant={getSentimentBadgeVariant(analyzeSentiment(feedback.message))}>
+                        {analyzeSentiment(feedback.message)}
+                      </Badge>
+                      <Badge variant={getStatusBadgeVariant(feedback.status)}>
+                        {feedback.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm text-gray-500">
+                      <Clock className="h-4 w-4" />
+                      <span>{formatDate(feedback.timestamp)}</span>
+                    </div>
                   </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentAnalytics(item.analytics_data)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteAnalytics(item.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  <p className="text-gray-700 text-sm line-clamp-2">{feedback.message}</p>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <Target className="h-4 w-4 text-gray-400" />
+                    <div className="flex flex-wrap gap-1">
+                      {extractThemes(feedback.message).map((theme, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {theme}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))}
-              {analyticsHistory.length === 0 && (
-                <p className="text-center text-muted-foreground py-4">
-                  No analytics history found
-                </p>
-              )}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Current Analytics Display */}
-      {currentAnalytics && (
-        <>
-          {/* Key Metrics */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Strategic Value</CardTitle>
-                <Target className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{currentAnalytics.business_impact.strategic_value}/100</div>
-                <p className="text-xs text-muted-foreground">
-                  <TrendingUp className="inline h-3 w-3 text-green-500" /> High impact
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Accuracy Score</CardTitle>
-                <CheckCircle className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{currentAnalytics.real_time_metrics.accuracy_score}%</div>
-                <p className="text-xs text-muted-foreground">
-                  <Clock className="inline h-3 w-3 text-blue-500" /> Real-time
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Risk Level</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold capitalize">{currentAnalytics.business_impact.risk_level}</div>
-                <p className="text-xs text-muted-foreground">
-                  <Shield className="inline h-3 w-3 text-orange-500" /> Assessment
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Processing Time</CardTitle>
-                <Zap className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{currentAnalytics.real_time_metrics.processing_time.toFixed(1)}s</div>
-                <p className="text-xs text-muted-foreground">
-                  <Activity className="inline h-3 w-3 text-purple-500" /> Fast
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Executive Summary */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Brain className="h-5 w-5 mr-2" />
-                Executive Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">{currentAnalytics.executive_summary}</p>
-            </CardContent>
-          </Card>
-
-          {/* Charts */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Sentiment Distribution</CardTitle>
-                <CardDescription>Breakdown of insights by sentiment</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={prepareChartData()}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {prepareChartData().map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Strategic Value Trend</CardTitle>
-                <CardDescription>Historical strategic value progression</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <RechartsLineChart data={prepareTrendData()}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="strategic_value" stroke="#3b82f6" name="Strategic Value" />
-                    <Line type="monotone" dataKey="accuracy" stroke="#10b981" name="Accuracy" />
-                  </RechartsLineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Key Insights and Actions */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Key Insights</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {currentAnalytics.key_insights.map((insight, index) => (
-                    <li key={index} className="flex items-start">
-                      <Lightbulb className="h-4 w-4 text-yellow-500 mr-2 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm">{insight}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Recommended Actions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {currentAnalytics.recommended_actions.map((action, index) => (
-                    <li key={index} className="flex items-start">
-                      <Rocket className="h-4 w-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm">{action}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Business Impact */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Business Impact Analysis</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <h4 className="font-medium mb-2">Opportunities</h4>
-                  <ul className="space-y-1">
-                    {currentAnalytics.business_impact.opportunities.map((opportunity, index) => (
-                      <li key={index} className="flex items-center text-sm">
-                        <TrendingUp className="h-3 w-3 text-green-500 mr-2" />
-                        {opportunity}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="font-medium mb-2">Threats</h4>
-                  <ul className="space-y-1">
-                    {currentAnalytics.business_impact.threats.map((threat, index) => (
-                      <li key={index} className="flex items-center text-sm">
-                        <AlertTriangle className="h-3 w-3 text-red-500 mr-2" />
-                        {threat}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </>
-      )}
-
-      {/* No Insights Data Message */}
-      {!currentAnalytics && insightsData.current.length === 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Brain className="h-5 w-5 mr-2" />
-              No Insights Data Available
-            </CardTitle>
-          </CardHeader>
+      {/* Empty State */}
+      {!loading && filteredFeedbacks.length === 0 && (
+        <Card className="rounded-xl shadow-lg text-center py-12">
           <CardContent>
-            <div className="text-center py-8">
-              <Brain className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Generate Insights First</h3>
-              <p className="text-muted-foreground mb-4">
-                To create analytics, you need to generate insights first in the insights-simple page.
-              </p>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  1. Go to the <strong>insights-simple</strong> page
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  2. Upload data or enter text for analysis
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  3. Generate insights using the AI analysis
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  4. Return here to create analytics from your insights
-                </p>
-              </div>
-            </div>
+            <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+            <h3 className="text-xl font-medium text-gray-900 mb-2">
+              {searchTerm || sentimentFilter !== 'all' ? 'No feedback found' : 'No feedback data yet'}
+            </h3>
+            <p className="text-gray-600 mb-4">
+              {searchTerm || sentimentFilter !== 'all' 
+                ? 'Try adjusting your search or filters.'
+                : 'Collect feedback first to see analytics and insights.'
+              }
+            </p>
+            {!searchTerm && sentimentFilter === 'all' && (
+              <Button asChild>
+                <a href="/feedback">Go to Feedback</a>
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
-
-      {/* Export Dialog */}
-      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Export Analytics</DialogTitle>
-            <DialogDescription>
-              Choose the format and scope for your analytics export.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Export Format</label>
-              <Select value={exportType} onValueChange={(value: any) => setExportType(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="json">JSON</SelectItem>
-                  <SelectItem value="csv">CSV</SelectItem>
-                  <SelectItem value="pdf">PDF</SelectItem>
-                  <SelectItem value="excel">Excel</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => exportAnalytics()} disabled={exportLoading}>
-              {exportLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-              Export
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
-};
-
-export default Analytics;
+}
