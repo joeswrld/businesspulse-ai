@@ -15,6 +15,7 @@ import Dashboard from "./pages/Dashboard";
 import DataUpload from "./pages/DataUpload";
 import AIInsights from "./pages/AIInsights";
 import InsightsPage from "./pages/InsightsPage";
+import InsightsSimplePage from "./pages/InsightsSimplePage";
 import TestInsights from "./pages/TestInsights";
 import DemoInsights from "./pages/DemoInsights";
 import CompleteInsights from "./pages/CompleteInsights";
@@ -61,7 +62,7 @@ const App = () => (
             <Route path="/insights-simple" element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <InsightsPage />
+                  <InsightsSimplePage />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
