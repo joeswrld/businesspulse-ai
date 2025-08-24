@@ -347,20 +347,72 @@ const Profile: React.FC = () => {
         <CardContent className="p-8">
           <div className="text-center space-y-6">
             {/* Profile Picture */}
-            <div className="relative mx-auto">
-              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center overflow-hidden border-4 border-blue-200 shadow-lg">
+            <div className="relative mx-auto group">
+              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center overflow-hidden border-4 border-blue-200 shadow-lg transition-all duration-200 group-hover:border-blue-300 group-hover:shadow-xl">
                 {profile?.avatar_url ? (
                   <img
                     src={profile.avatar_url}
                     alt="Profile"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                    onError={(e) => {
+                      // Fallback to default icon if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const userIcon = target.parentElement?.querySelector('.user-icon');
+                      if (userIcon) {
+                        userIcon.classList.remove('hidden');
+                      }
+                    }}
                   />
-                ) : (
-                  <User className="h-16 w-16 text-blue-600" />
-                )}
+                ) : null}
+                <User className={`user-icon h-16 w-16 text-blue-600 ${profile?.avatar_url ? 'hidden' : ''}`} />
+                
+                {/* Upload Overlay */}
+                <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-full flex items-center justify-center">
+                  <div className="text-white text-center">
+                    <div className="w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-2">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                    </div>
+                    <span className="text-xs font-medium">Change Photo</span>
+                  </div>
+                </div>
               </div>
-              <div className="absolute -bottom-2 -right-2 bg-blue-500 text-white p-2 rounded-full shadow-lg">
-                <Settings className="h-4 w-4" />
+              
+              {/* Avatar Status Indicator */}
+              <div className="absolute -bottom-2 -right-2 bg-green-500 text-white p-2 rounded-full shadow-lg">
+                <div className="w-3 h-3 bg-white rounded-full"></div>
+              </div>
+              
+              {/* Upload Button */}
+              <label className="absolute inset-0 cursor-pointer rounded-full">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      // Handle file upload - you can implement this or redirect to settings
+                      window.location.href = '/settings';
+                    }
+                  }}
+                />
+              </label>
+            </div>
+            
+            {/* Avatar Instructions */}
+            <div className="text-center">
+              <p className="text-sm text-gray-500 mb-2">
+                {profile?.avatar_url ? 'Hover over photo to change' : 'Click to upload profile photo'}
+              </p>
+              <div className="flex items-center justify-center space-x-4 text-xs text-gray-400">
+                <span>• JPG, PNG, GIF up to 5MB</span>
+                <span>•</span>
+                <a href="/settings" className="text-blue-600 hover:text-blue-700 underline">
+                  Advanced editing in Settings
+                </a>
               </div>
             </div>
 
