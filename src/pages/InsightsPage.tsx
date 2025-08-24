@@ -1400,5 +1400,3 @@ Focus on transforming raw data into strategic business intelligence that drives 
     </div>
   );
 }
-
-export default InsightsPage;
