@@ -368,6 +368,24 @@ const FeedbackSettings = () => {
 </script>`;
   };
 
+  // Helper function to get CSS positioning classes for widget preview
+  const getWidgetPositionClass = (position: string) => {
+    switch (position) {
+      case 'bottom-right':
+        return 'bottom-4 right-4';
+      case 'bottom-left':
+        return 'bottom-4 left-4';
+      case 'top-right':
+        return 'top-4 right-4';
+      case 'top-left':
+        return 'top-4 left-4';
+      case 'center':
+        return 'top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2';
+      default:
+        return 'bottom-4 right-4';
+    }
+  };
+
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -647,17 +665,39 @@ const FeedbackSettings = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="bg-gray-50 rounded-lg p-4 border-2 border-dashed border-gray-300">
+              {/* Website Simulation */}
+              <div className="bg-white rounded-lg border-2 border-gray-200 mb-4">
+                <div className="bg-gray-100 px-4 py-2 border-b border-gray-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <span className="ml-2 text-xs text-gray-600">Your Website</span>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-medium text-gray-900 mb-2">Welcome to Your Website</h3>
+                  <p className="text-sm text-gray-600 mb-4">This is a preview of how the feedback widget will appear on your site.</p>
+                  
+                  {/* Sample Content */}
+                  <div className="bg-gray-50 rounded p-3 mb-4">
+                    <p className="text-xs text-gray-500">Sample website content area</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Widget Preview with Positioning */}
+              <div className="relative bg-gray-50 rounded-lg p-4 border-2 border-dashed border-gray-300 min-h-[200px]">
                 <div className="text-center text-gray-500 mb-4">
                   <MessageSquare className="h-8 w-8 mx-auto mb-2" />
-                  <p className="text-sm">Widget Preview</p>
+                  <p className="text-sm">Widget Preview Area</p>
                 </div>
-                
-                {/* Widget Button Preview */}
-                <div className="flex justify-center">
+
+                {/* Widget Button - Positioned based on settings */}
+                <div className={`absolute ${getWidgetPositionClass(widgetSettings?.widget_position || 'bottom-right')}`}>
                   <div
-                    className="inline-flex items-center space-x-2 px-4 py-2 rounded-full cursor-pointer shadow-lg hover:shadow-xl transition-all duration-200"
-                    style={{ backgroundColor: widgetSettings?.brand_color || '#2563eb' }}
+                    className="inline-flex items-center space-x-2 px-4 py-2 rounded-full cursor-pointer shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                    style={{ backgroundColor: '#2563eb' }}
                   >
                     <MessageSquare className="h-4 w-4 text-white" />
                     <span className="text-white font-medium text-sm">
@@ -666,26 +706,53 @@ const FeedbackSettings = () => {
                   </div>
                 </div>
 
-                {/* Greeting Text Preview */}
+                {/* Position Indicator */}
+                <div className="absolute top-2 right-2">
+                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                    {widgetSettings?.widget_position || 'bottom-right'}
+                  </Badge>
+                </div>
+
+                {/* Location Indicator */}
+                <div className="absolute top-2 left-2">
+                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                    {widgetSettings?.widget_location || 'fixed'}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Widget Information */}
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Position:</span>
+                  <span className="font-medium capitalize">{widgetSettings?.widget_position || 'bottom-right'}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Location:</span>
+                  <span className="font-medium capitalize">{widgetSettings?.widget_location || 'fixed'}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Button Text:</span>
+                  <span className="font-medium">{settings?.button_text || 'Send Feedback'}</span>
+                </div>
                 {widgetSettings?.greeting_text && (
-                  <div className="mt-4 p-3 bg-white rounded-lg border">
-                    <p className="text-sm text-gray-700 text-center">
-                      {widgetSettings.greeting_text}
-                    </p>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Greeting:</span>
+                    <span className="font-medium text-xs truncate max-w-[120px]">{widgetSettings.greeting_text}</span>
                   </div>
                 )}
+              </div>
 
-                <div className="mt-4 text-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowTestModal(true)}
-                    className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                  >
-                    <Play className="h-4 w-4 mr-2" />
-                    Test Widget
-                  </Button>
-                </div>
+              <div className="mt-4 text-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowTestModal(true)}
+                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Test Widget
+                </Button>
               </div>
             </CardContent>
           </Card>
