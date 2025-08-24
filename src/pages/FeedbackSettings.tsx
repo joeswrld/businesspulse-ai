@@ -360,9 +360,15 @@ const FeedbackSettings = () => {
     script.src = 'https://notex.com.ng/feedback-widget.js';
     script.setAttribute('data-project-id', '${settings.project_id}');
     script.setAttribute('data-brand-color', '${widgetSettings?.brand_color || '#2563eb'}');
-    script.setAttribute('data-greeting-text', '${widgetSettings?.greeting_text || 'We\'d love to hear your feedback!'}');
+    script.setAttribute('data-greeting-text', '${widgetSettings?.greeting_text || "We'd love to hear your feedback!"}');
     script.setAttribute('data-widget-position', '${widgetSettings?.widget_position || 'bottom-right'}');
     script.setAttribute('data-widget-location', '${widgetSettings?.widget_location || 'fixed'}');
+    script.onload = function() {
+      console.log('Feedback widget script loaded successfully');
+    };
+    script.onerror = function() {
+      console.error('Failed to load feedback widget script');
+    };
     document.head.appendChild(script);
   })();
 </script>`;
