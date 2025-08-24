@@ -385,8 +385,16 @@ const Profile: React.FC = () => {
                 <div className="w-3 h-3 bg-white rounded-full"></div>
               </div>
               
-              {/* Upload Button */}
-              <label className="absolute inset-0 cursor-pointer rounded-full">
+
+            </div>
+            
+            {/* Upload Button */}
+            <div className="text-center mb-4">
+              <label className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-xl cursor-pointer transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105">
+                <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Upload Logo
                 <input
                   type="file"
                   accept="image/*"
@@ -405,7 +413,7 @@ const Profile: React.FC = () => {
             {/* Avatar Instructions */}
             <div className="text-center">
               <p className="text-sm text-gray-500 mb-2">
-                {profile?.avatar_url ? 'Hover over photo to change' : 'Click to upload profile photo'}
+                {profile?.avatar_url ? 'Logo uploaded successfully!' : 'Click the button above to upload your logo'}
               </p>
               <div className="flex items-center justify-center space-x-4 text-xs text-gray-400">
                 <span>• JPG, PNG, GIF up to 5MB</span>
