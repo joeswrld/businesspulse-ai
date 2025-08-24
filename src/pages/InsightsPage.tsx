@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUsageEnforcement } from "@/hooks/useUsageEnforcement";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { Brain, Upload, FileText, Download, RefreshCw, X, CheckCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -262,7 +263,8 @@ interface InsightsData {
 
 export default function InsightsPage() {
   const { user } = useAuth();
-  const { checkUsage, incrementUsage, usage } = useUsageTracking();
+  const { checkUsage, enforceLimit, usage } = useUsageEnforcement();
+  const { trackUsage } = useUsageTracking();
   
   const [input, setInput] = useState("");
   const [result, setResult] = useState<InsightsData | null>(null);
@@ -566,7 +568,7 @@ Focus on transforming raw data into strategic business intelligence that drives 
 
       // Increment usage after successful analysis
       if (user) {
-        await incrementUsage('ai_insights', 1);
+        await trackUsage('insights');
       }
 
       setResult(json.result);

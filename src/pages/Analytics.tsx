@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useUsageEnforcement } from '@/hooks/useUsageEnforcement';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -138,7 +139,8 @@ interface AnalyticsHistoryItem {
 
 const Analytics: React.FC = () => {
   const { user } = useAuth();
-  const { checkUsage, incrementUsage } = useUsageTracking();
+  const { checkUsage, enforceLimit } = useUsageEnforcement();
+  const { trackUsage } = useUsageTracking();
   
   const [currentAnalytics, setCurrentAnalytics] = useState<AnalyticsData | null>(null);
   const [analyticsHistory, setAnalyticsHistory] = useState<AnalyticsHistoryItem[]>([]);
@@ -384,7 +386,7 @@ const Analytics: React.FC = () => {
       setCurrentAnalytics(analytics);
       
       // Temporarily remove usage increment until billing is implemented
-      // await incrementUsage('analytics', 1);
+              await trackUsage('analytics');
       
       // Reload history
       await loadAnalyticsHistory();
