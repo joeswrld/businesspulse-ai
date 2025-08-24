@@ -40,6 +40,14 @@
 
     
     <!-- NoteX Feedback Widget -->
-   <script src="https://notex.com.ng/feedback-widget.js" data-project-id="NoteX_home"></script>
-  </body>
+   <script>
+  (function() {
+    var script = document.createElement('script');
+    script.src = 'https://notex.com.ng/widget.js';
+    script.setAttribute('data-project-id', 'NoteX_home');
+    script.setAttribute('data-brand-color', '#506695');
+    script.setAttribute('data-greeting-text', 'We'd love to hear your feedback!');
+    document.head.appendChild(script);
+  })();
+</script>
 </html>
