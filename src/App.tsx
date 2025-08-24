@@ -29,11 +29,8 @@ import Profile from "./pages/Profile";
 import Feedback from "./pages/Feedback";
 import Billing from "./pages/Billing";
 import FeedbackSimple from "./pages/FeedbackSimple";
-import FeedbackSettings from "./pages/FeedbackSettingsSimple";
-import FeedbackSettingsSimpleTest from "./pages/FeedbackSettingsSimpleTest";
-import TestFeedbackSettings from "./pages/TestFeedbackSettings";
+import FeedbackSettings from "./pages/FeedbackSettings";
 import TestPage from "./pages/TestPage";
-import TestFeedbackSubmission from "./pages/TestFeedbackSubmission";
 import NotFound from "./pages/NotFound";
 import TeamInvitation from "./pages/TeamInvitation";
 
@@ -157,20 +154,7 @@ const App = () => (
                 </DashboardLayout>
               </ProtectedRoute>
             } />
-            <Route path="/feedback-settings-simple" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <FeedbackSettingsSimpleTest />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/test-feedback-settings" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <TestFeedbackSettings />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
+
             <Route path="/test" element={
               <ProtectedRoute>
                 <DashboardLayout>
@@ -178,13 +162,7 @@ const App = () => (
                 </DashboardLayout>
               </ProtectedRoute>
             } />
-            <Route path="/test-feedback-submission" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <TestFeedbackSubmission />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
+
             <Route path="/teams/invite/:token" element={<TeamInvitation />} />
 
             <Route path="/profile" element={

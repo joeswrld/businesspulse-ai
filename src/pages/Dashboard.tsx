@@ -1,17 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { 
   BarChart3, 
-  Database, 
   Users, 
   TrendingUp, 
-  Upload, 
   FileText, 
   BarChart, 
   Lightbulb,
@@ -24,862 +23,983 @@ import {
   Target,
   ArrowUpRight,
   ArrowDownRight,
-  RefreshCw
+  RefreshCw,
+  MessageSquare,
+  Crown,
+  CreditCard,
+  Calendar,
+  Filter,
+  Eye,
+  TrendingDown,
+  Minus,
+  PieChart,
+  LineChart,
+  BarChart as BarChartIcon,
+  Download,
+  Settings
 } from 'lucide-react';
 
+import {
+  BarChart as RechartsBarChart,
+  Bar,
+  PieChart as RechartsPieChart,
+  Cell,
+  Pie,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  LineChart as RechartsLineChart,
+  Line,
+  AreaChart,
+  Area
+} from 'recharts';
+
+// Types
+interface Feedback {
+  id: string;
+  project_id: string;
+  name: string;
+  email: string;
+  message: string;
+  timestamp: string;
+  status: 'new' | 'reviewed' | 'resolved';
+}
+
+interface UserSubscription {
+  id: string;
+  user_id: string;
+  plan_name: string;
+  plan_type: string;
+  status: string;
+  current_period_start: string;
+  current_period_end: string;
+  trial_end: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface DashboardStats {
-  totalInsights: number;
-  dataSources: number;
-  teamMembers: number;
-  growthRate: number;
-  processingJobs: number;
-  syncStatus: 'healthy' | 'warning' | 'error';
-  reportsStatus: 'available' | 'processing' | 'unavailable';
-  thisWeekInsights: number;
-  thisMonthInsights: number;
+  totalFeedback: number;
   positiveSentiment: number;
   negativeSentiment: number;
   neutralSentiment: number;
+  activeUsers: number;
+  topThemes: Array<{ theme: string; count: number }>;
+  feedbackVolume: Array<{ date: string; count: number }>;
+  sentimentTrend: {
+    currentPeriod: number;
+    previousPeriod: number;
+    change: number;
+    trend: 'up' | 'down' | 'stable';
+  };
 }
 
 interface AIInsight {
-  id: string;
   summary: string;
-  sentiment: 'positive' | 'negative' | 'neutral';
-  key_themes: Array<{
-    theme: string;
-    confidence: number;
-    frequency: string;
-    description: string;
-  } | string>;
-  suggested_actions: Array<{
-    action: string;
-    priority: string;
-    confidence: number;
-    impact: string;
-  } | string>;
-  created_at: string;
-  source_file?: string;
+  key_themes: string[];
+  suggested_actions: string[];
+  sentiment_overview: string;
 }
 
-interface DataSource {
-  id: string;
-  name: string;
-  type: string;
-  status: string;
-  created_at: string;
-  file_size?: number;
-}
-
-interface AIJob {
-  id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  created_at: string;
-  completed_at?: string;
-  input_length: number;
-}
-
-interface TeamMember {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  status: 'active' | 'inactive';
-  last_active: string;
-}
-
-const Dashboard: React.FC = () => {
+export default function Dashboard() {
   const { user } = useAuth();
   
-  // Custom dashboard styles
-  const dashboardStyles = `
-    .dashboard-card {
-      background: white;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      transition: all 0.2s ease;
-    }
-    
-    .dashboard-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      border-color: #d1d5db;
-    }
-    
-    .stat-number {
-      font-size: 2rem;
-      font-weight: 700;
-      line-height: 1;
-    }
-    
-    .stat-label {
-      font-size: 0.875rem;
-      color: #6b7280;
-      font-weight: 500;
-    }
-    
-    .sentiment-indicator {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      display: inline-block;
-      margin-right: 8px;
-    }
-    
-    .live-indicator {
-      animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-  `;
-  
-  // Real-time state
-  const [insights, setInsights] = useState<AIInsight[]>([]);
-  const [dataSources, setDataSources] = useState<DataSource[]>([]);
-  const [aiJobs, setAiJobs] = useState<AIJob[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [stats, setStats] = useState<DashboardStats>({
-    totalInsights: 0,
-    dataSources: 0,
-    teamMembers: 0,
-    growthRate: 0,
-    processingJobs: 0,
-    syncStatus: 'healthy',
-    reportsStatus: 'available',
-    thisWeekInsights: 0,
-    thisMonthInsights: 0,
-    positiveSentiment: 0,
-    negativeSentiment: 0,
-    neutralSentiment: 0
-  });
-  
+  // State management
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [growthRateUpdating, setGrowthRateUpdating] = useState(false);
-  const [weeklyInsightsUpdating, setWeeklyInsightsUpdating] = useState(false);
+  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
+  const [sentimentFilter, setSentimentFilter] = useState<'all' | 'positive' | 'negative' | 'neutral'>('all');
+  const [aiInsight, setAiInsight] = useState<AIInsight | null>(null);
+  const [generatingInsight, setGeneratingInsight] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Calculate derived stats with real-time growth rate and weekly tracking
-  const calculateStats = (insights: AIInsight[], dataSources: DataSource[], aiJobs: AIJob[], teamMembers: TeamMember[]) => {
-    const now = new Date();
-    
-    // Calculate current month (from 1st of current month to now)
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const currentMonthEnd = now;
-    
-    // Calculate previous month (full previous month)
-    const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const previousMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-    
-    // Calculate current week (from start of week to now)
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - now.getDay());
-    weekStart.setHours(0, 0, 0, 0);
-    
-    // Calculate previous week for comparison
-    const previousWeekStart = new Date(weekStart);
-    previousWeekStart.setDate(weekStart.getDate() - 7);
-    const previousWeekEnd = new Date(weekStart);
-    previousWeekEnd.setDate(weekStart.getDate() - 1);
-    previousWeekEnd.setHours(23, 59, 59, 999);
-
-    // Filter insights by time periods
-    const thisWeekInsights = insights.filter(i => {
-      const insightDate = new Date(i.created_at);
-      return insightDate >= weekStart && insightDate <= currentMonthEnd;
-    }).length;
-
-    const lastWeekInsights = insights.filter(i => {
-      const insightDate = new Date(i.created_at);
-      return insightDate >= previousWeekStart && insightDate <= previousWeekEnd;
-    }).length;
-
-    const thisMonthInsights = insights.filter(i => {
-      const insightDate = new Date(i.created_at);
-      return insightDate >= currentMonthStart && insightDate <= currentMonthEnd;
-    }).length;
-
-    const lastMonthInsights = insights.filter(i => {
-      const insightDate = new Date(i.created_at);
-      return insightDate >= previousMonthStart && insightDate <= previousMonthEnd;
-    }).length;
-
-    // Calculate real-time growth rates
-    let growthRate = 0;
-    if (lastMonthInsights > 0) {
-      growthRate = Math.round(((thisMonthInsights - lastMonthInsights) / lastMonthInsights) * 100);
-    } else if (thisMonthInsights > 0) {
-      // If no insights last month but we have some this month, it's 100% growth
-      growthRate = 100;
-    }
-
-    // Calculate weekly growth rate
-    let weeklyGrowthRate = 0;
-    if (lastWeekInsights > 0) {
-      weeklyGrowthRate = Math.round(((thisWeekInsights - lastWeekInsights) / lastWeekInsights) * 100);
-    } else if (thisWeekInsights > 0) {
-      weeklyGrowthRate = 100;
-    }
-
-    // Calculate sentiment breakdown
-    const positiveSentiment = insights.filter(i => i.sentiment === 'positive').length;
-    const negativeSentiment = insights.filter(i => i.sentiment === 'negative').length;
-    const neutralSentiment = insights.filter(i => i.sentiment === 'neutral').length;
-
-    // Calculate processing jobs
-    const processingJobs = aiJobs.filter(j => j.status === 'processing').length;
-
-    return {
-      totalInsights: insights.length,
-      dataSources: dataSources.length,
-      teamMembers: teamMembers.length,
-      growthRate,
-      weeklyGrowthRate,
-      processingJobs,
-      syncStatus: 'healthy' as const,
-      reportsStatus: 'available' as const,
-      thisWeekInsights,
-      lastWeekInsights,
-      thisMonthInsights,
-      positiveSentiment,
-      negativeSentiment,
-      neutralSentiment
-    };
-  };
-
-  // Fetch initial data
-  const fetchInitialData = async () => {
-    if (!user) {
-      console.log("No user found in fetchInitialData");
-      return;
-    }
+  // Load user's data
+  const loadDashboardData = useCallback(async () => {
+    if (!user) return;
 
     try {
-      console.log("Fetching dashboard data for user:", user.email);
+      setLoading(true);
+      console.log('Loading dashboard data for user:', user.id);
       
-      // Fetch user profile
-      try {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
+      // Get user's project IDs from feedback_settings
+      const { data: projectSettings, error: projectError } = await supabase
+        .from('feedback_settings')
+        .select('project_id')
+        .eq('user_id', user.id);
+
+      if (projectError) {
+        console.error('Error loading project settings:', projectError);
+        toast.error('Failed to load project settings');
+        return;
+      }
+
+      console.log('Project settings loaded:', projectSettings);
+      const projectIds = projectSettings?.map(setting => setting.project_id).filter(Boolean) || [];
+      console.log('Project IDs:', projectIds);
+
+      // Get latest 50 feedbacks for user's projects
+      let feedbacksData = [];
+      if (projectIds.length > 0) {
+        const { data, error: feedbacksError } = await supabase
+          .from('feedbacks')
           .select('*')
-          .eq('user_id', user.id)
-          .single();
+          .in('project_id', projectIds)
+          .order('timestamp', { ascending: false })
+          .limit(50);
 
-        if (profileError) {
-          console.warn('Profile fetch warning:', profileError);
-        } else if (profile) {
-          setUserProfile(profile);
-        }
-      } catch (profileError) {
-        console.warn('Profile fetch error:', profileError);
-      }
-
-      // Fetch insights from localStorage (since we're using localStorage for insights)
-      try {
-        const savedInsights = localStorage.getItem('insightsHistory');
-        if (savedInsights) {
-          const parsedInsights = JSON.parse(savedInsights);
-          // Validate and clean the insights data
-          const validInsights = parsedInsights.filter((insight: any) => {
-            return insight && 
-                   typeof insight === 'object' && 
-                   insight.id && 
-                   insight.summary && 
-                   insight.sentiment &&
-                   Array.isArray(insight.key_themes) &&
-                   Array.isArray(insight.suggested_actions);
-          });
-          setInsights(validInsights);
-          console.log('Loaded insights from localStorage:', validInsights.length);
-          if (validInsights.length !== parsedInsights.length) {
-            console.warn(`Filtered out ${parsedInsights.length - validInsights.length} invalid insights`);
-          }
+        if (feedbacksError) {
+          console.error('Error loading feedbacks:', feedbacksError);
+          toast.error('Failed to load feedbacks');
         } else {
-          console.log('No insights found in localStorage');
+          feedbacksData = data || [];
         }
-      } catch (insightsError) {
-        console.error('Error parsing insights from localStorage:', insightsError);
-        // Set empty array as fallback
-        setInsights([]);
+      } else {
+        console.log('No project IDs found, setting empty feedbacks');
       }
 
-      // Mock data for demonstration (replace with real Supabase queries)
-      const mockDataSources: DataSource[] = [
-        { id: '1', name: 'Customer Feedback CSV', type: 'csv', status: 'connected', created_at: new Date().toISOString(), file_size: 1024000 },
-        { id: '2', name: 'Support Tickets PDF', type: 'pdf', status: 'connected', created_at: new Date().toISOString(), file_size: 2048000 }
-      ];
-      setDataSources(mockDataSources);
+      console.log('Feedbacks loaded:', feedbacksData.length);
+      setFeedbacks(feedbacksData);
 
-      const mockAIJobs: AIJob[] = [
-        { id: '1', status: 'completed', created_at: new Date().toISOString(), completed_at: new Date().toISOString(), input_length: 1500 },
-        { id: '2', status: 'processing', created_at: new Date().toISOString(), input_length: 2300 }
-      ];
-      setAiJobs(mockAIJobs);
+      // Get user subscription
+      const { data: subscriptionData, error: subscriptionError } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
-      const mockTeamMembers: TeamMember[] = [
-        { id: '1', name: 'codexpress200', email: 'codexpress200@example.com', role: 'Admin', status: 'active', last_active: new Date().toISOString() }
-      ];
-      setTeamMembers(mockTeamMembers);
+      if (subscriptionError && subscriptionError.code !== 'PGRST116') {
+        console.error('Error loading subscription:', subscriptionError);
+      }
 
-      console.log('Dashboard data loaded successfully');
+      console.log('Subscription loaded:', subscriptionData);
+      setSubscription(subscriptionData);
 
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('Error in loadDashboardData:', error);
       toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  // Set up real-time subscriptions
+  // Load data on component mount
   useEffect(() => {
-    if (!user) {
-      console.log("No user in useEffect, skipping setup");
-      return;
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  // Analyze sentiment from message content
+  const analyzeSentiment = (message: string): 'positive' | 'negative' | 'neutral' => {
+    const positiveWords = [
+      'great', 'good', 'excellent', 'amazing', 'wonderful', 'fantastic', 'love', 'like', 'happy', 'satisfied',
+      'perfect', 'awesome', 'outstanding', 'brilliant', 'superb', 'terrific', 'pleased', 'impressed', 'smooth',
+      'fast', 'easy', 'intuitive', 'beautiful', 'clean', 'modern', 'helpful', 'supportive', 'responsive'
+    ];
+    
+    const negativeWords = [
+      'bad', 'terrible', 'awful', 'horrible', 'hate', 'dislike', 'angry', 'frustrated', 'annoyed', 'disappointed',
+      'broken', 'slow', 'difficult', 'confusing', 'ugly', 'cluttered', 'buggy', 'crash', 'error', 'fail',
+      'useless', 'waste', 'problem', 'issue', 'complaint', 'unhappy', 'dissatisfied', 'poor', 'weak'
+    ];
+
+    const messageLower = message.toLowerCase();
+    const positiveCount = positiveWords.filter(word => messageLower.includes(word)).length;
+    const negativeCount = negativeWords.filter(word => messageLower.includes(word)).length;
+
+    if (positiveCount > negativeCount) return 'positive';
+    if (negativeCount > positiveCount) return 'negative';
+    return 'neutral';
+  };
+
+  // Extract themes from message content
+  const extractThemes = (message: string): string[] => {
+    const commonThemes = [
+      'user interface', 'ui', 'ux', 'design', 'performance', 'speed', 'loading', 'bug', 'error', 'crash',
+      'mobile', 'responsive', 'navigation', 'search', 'filter', 'dashboard', 'report', 'export', 'import',
+      'notification', 'email', 'login', 'authentication', 'security', 'privacy', 'data', 'storage',
+      'customer support', 'help', 'documentation', 'tutorial', 'onboarding', 'feature', 'functionality',
+      'pricing', 'billing', 'subscription', 'upgrade', 'downgrade', 'integration', 'api', 'webhook'
+    ];
+
+    const messageLower = message.toLowerCase();
+    const foundThemes = commonThemes.filter(theme => messageLower.includes(theme));
+    
+    if (foundThemes.length === 0) {
+      const words = messageLower.split(/\s+/).filter(word => word.length > 3);
+      const uniqueWords = [...new Set(words)].slice(0, 3);
+      return uniqueWords.map(word => word.charAt(0).toUpperCase() + word.slice(1));
     }
 
-    console.log("Setting up real-time subscriptions for user:", user.email);
-    fetchInitialData();
+    return foundThemes.slice(0, 3);
+  };
 
-    // Set up real-time subscriptions for insights (localStorage-based)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'insightsHistory' && e.newValue) {
-        try {
-          const newInsights = JSON.parse(e.newValue);
-          setInsights(newInsights);
-          toast.success('New insight generated!', {
-            description: 'Your dashboard has been updated with the latest analysis.'
-          });
-        } catch (error) {
-          console.error('Error parsing storage change:', error);
-        }
+  // Calculate dashboard stats
+  const dashboardStats = useMemo((): DashboardStats => {
+    console.log('Calculating dashboard stats for', feedbacks.length, 'feedbacks');
+    
+    if (feedbacks.length === 0) {
+      console.log('No feedbacks, returning empty stats');
+      return {
+        totalFeedback: 0,
+        positiveSentiment: 0,
+        negativeSentiment: 0,
+        neutralSentiment: 0,
+        activeUsers: 0,
+        topThemes: [],
+        feedbackVolume: [],
+        sentimentTrend: { currentPeriod: 0, previousPeriod: 0, change: 0, trend: 'stable' }
+      };
+    }
+
+    // Filter feedbacks based on date range
+    const now = new Date();
+    const filteredFeedbacks = feedbacks.filter(feedback => {
+      const feedbackDate = new Date(feedback.timestamp);
+      const diffTime = Math.abs(now.getTime() - feedbackDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      switch (dateRange) {
+        case '7d': return diffDays <= 7;
+        case '30d': return diffDays <= 30;
+        case '90d': return diffDays <= 90;
+        default: return true;
       }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-
-        // Mock real-time updates for demonstration with realistic growth patterns
-    const interval = setInterval(() => {
-      try {
-        // Simulate new insights being added with varying sentiment
-        if (Math.random() > 0.92) { // 8% chance every interval for more frequent updates
-          const sentiments: ('positive' | 'negative' | 'neutral')[] = ['positive', 'negative', 'neutral'];
-          const randomSentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
-          
-          const insightTemplates = [
-            {
-              summary: 'Customer feedback shows positive sentiment about the new dashboard interface.',
-              themes: ['dashboard', 'user interface', 'usability'],
-              actions: ['Continue UI improvements', 'Monitor user adoption']
-            },
-            {
-              summary: 'Users report issues with mobile app performance and loading times.',
-              themes: ['mobile app', 'performance', 'loading speed'],
-              actions: ['Optimize mobile performance', 'Investigate loading issues']
-            },
-            {
-              summary: 'Mixed feedback on pricing structure with requests for more flexible options.',
-              themes: ['pricing', 'subscription', 'flexibility'],
-              actions: ['Review pricing strategy', 'Consider flexible plans']
-            },
-            {
-              summary: 'Excellent feedback on customer support response times and helpfulness.',
-              themes: ['customer support', 'response time', 'helpfulness'],
-              actions: ['Maintain support quality', 'Document best practices']
-            },
-            {
-              summary: 'Feature requests for dark mode and additional customization options.',
-              themes: ['dark mode', 'customization', 'feature requests'],
-              actions: ['Prioritize dark mode', 'Plan customization features']
-            }
-          ];
-          
-          const randomTemplate = insightTemplates[Math.floor(Math.random() * insightTemplates.length)];
-          
-          const newInsight: AIInsight = {
-            id: Date.now().toString(),
-            summary: randomTemplate.summary,
-            sentiment: randomSentiment,
-            key_themes: randomTemplate.themes,
-            suggested_actions: randomTemplate.actions,
-            created_at: new Date().toISOString()
-          };
-          
-          setInsights(prev => [newInsight, ...prev]);
-          
-          // Show update animations
-          setGrowthRateUpdating(true);
-          setWeeklyInsightsUpdating(true);
-          setTimeout(() => {
-            setGrowthRateUpdating(false);
-            setWeeklyInsightsUpdating(false);
-          }, 2000);
-          
-          // Calculate new stats
-          const newStats = calculateStats([newInsight, ...insights], dataSources, aiJobs, teamMembers);
-          
-          // Show detailed update notification
-          const weekChange = newStats.thisWeekInsights - stats.thisWeekInsights;
-          const weeklyGrowthChange = newStats.weeklyGrowthRate - stats.weeklyGrowthRate;
-          const growthChange = newStats.growthRate - stats.growthRate;
-          
-          let notificationMessage = `New ${newInsight.sentiment} insight added`;
-          if (weekChange > 0) {
-            notificationMessage += ` • +${weekChange} this week`;
-          }
-          if (weeklyGrowthChange !== 0) {
-            notificationMessage += ` • Weekly: ${newStats.weeklyGrowthRate > 0 ? '+' : ''}${newStats.weeklyGrowthRate}%`;
-          }
-          if (growthChange !== 0) {
-            notificationMessage += ` • Monthly: ${newStats.growthRate > 0 ? '+' : ''}${newStats.growthRate}%`;
-          }
-          
-          toast.success('📊 Dashboard Updated!', {
-            description: notificationMessage
-          });
-        }
-      } catch (error) {
-        console.error('Error in real-time update simulation:', error);
-      }
-    }, 8000); // Check every 8 seconds for more frequent updates
-
-    return () => {
-      console.log("Cleaning up real-time subscriptions");
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
-  }, [user, insights, dataSources, aiJobs, teamMembers, stats]);
-
-  // Update stats when data changes
-  useEffect(() => {
-    const newStats = calculateStats(insights, dataSources, aiJobs, teamMembers);
-    setStats(newStats);
-  }, [insights, dataSources, aiJobs, teamMembers]);
-
-  const handleUploadData = () => {
-    toast.info('Upload feature coming soon!', {
-      description: 'This will integrate with your file upload system.'
     });
-  };
 
-  const handleAnalyzeNow = () => {
-    toast.info('Analysis feature coming soon!', {
-      description: 'This will trigger AI analysis on your data.'
+    // Calculate sentiment distribution
+    const sentiments = filteredFeedbacks.map(feedback => analyzeSentiment(feedback.message));
+    const positiveCount = sentiments.filter(s => s === 'positive').length;
+    const negativeCount = sentiments.filter(s => s === 'negative').length;
+    const neutralCount = sentiments.filter(s => s === 'neutral').length;
+
+    // Calculate active users (unique names/emails)
+    const uniqueUsers = new Set();
+    filteredFeedbacks.forEach(feedback => {
+      if (feedback.name) uniqueUsers.add(feedback.name);
+      if (feedback.email) uniqueUsers.add(feedback.email);
     });
-  };
 
-  const handleGenerateReport = () => {
-    toast.info('Report generation coming soon!', {
-      description: 'This will create comprehensive reports from your insights.'
+    // Extract and count themes
+    const allThemes = filteredFeedbacks.flatMap(feedback => extractThemes(feedback.message));
+    const themeCounts: Record<string, number> = {};
+    allThemes.forEach(theme => {
+      themeCounts[theme] = (themeCounts[theme] || 0) + 1;
     });
-  };
 
-  const getSentimentColor = (sentiment: string) => {
-    switch (sentiment) {
-      case 'positive': return 'text-green-600 bg-green-100';
-      case 'negative': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
-  };
+    const topThemes = Object.entries(themeCounts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([theme, count]) => ({ theme, count }));
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'text-green-600 bg-green-100';
-      case 'processing': return 'text-blue-600 bg-blue-100';
-      case 'pending': return 'text-yellow-600 bg-yellow-100';
-      case 'failed': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
-  };
+    // Calculate feedback volume over time
+    const volumeData: Record<string, number> = {};
+    filteredFeedbacks.forEach(feedback => {
+      const date = new Date(feedback.timestamp).toISOString().split('T')[0];
+      volumeData[date] = (volumeData[date] || 0) + 1;
+    });
 
-  // Helper functions to safely extract data from insights
-  const getThemeText = (theme: any): string => {
-    if (typeof theme === 'string') return theme;
-    if (theme && typeof theme === 'object' && theme.theme) return theme.theme;
-    return 'Unknown theme';
-  };
+    const feedbackVolume = Object.entries(volumeData)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, count]) => ({ date, count }));
 
-  const getActionText = (action: any): string => {
-    if (typeof action === 'string') return action;
-    if (action && typeof action === 'object' && action.action) return action.action;
-    return 'Unknown action';
-  };
-
-  // Safe array access helper
-  const safeArraySlice = (arr: any[], start: number, end: number) => {
-    if (!Array.isArray(arr)) return [];
-    try {
-      return arr.slice(start, end);
-    } catch (error) {
-      console.error('Error slicing array:', error);
-      return [];
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <span className="text-gray-600">Loading dashboard...</span>
-        </div>
-      </div>
+    // Calculate sentiment trend (last 7 days vs previous 7 days)
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    
+    const currentPeriodFeedbacks = filteredFeedbacks.filter(feedback => 
+      new Date(feedback.timestamp) >= sevenDaysAgo
     );
-  }
+    const previousPeriodFeedbacks = filteredFeedbacks.filter(feedback => {
+      const feedbackDate = new Date(feedback.timestamp);
+      return feedbackDate >= fourteenDaysAgo && feedbackDate < sevenDaysAgo;
+    });
+
+    const currentPeriodPositive = currentPeriodFeedbacks.filter(f => 
+      analyzeSentiment(f.message) === 'positive'
+    ).length;
+    const previousPeriodPositive = previousPeriodFeedbacks.filter(f => 
+      analyzeSentiment(f.message) === 'positive'
+    ).length;
+
+    const currentPeriodTotal = currentPeriodFeedbacks.length;
+    const previousPeriodTotal = previousPeriodFeedbacks.length;
+
+    const currentPeriodPercentage = currentPeriodTotal > 0 
+      ? (currentPeriodPositive / currentPeriodTotal) * 100 
+      : 0;
+    const previousPeriodPercentage = previousPeriodTotal > 0 
+      ? (previousPeriodPositive / previousPeriodTotal) * 100 
+      : 0;
+
+    const change = currentPeriodPercentage - previousPeriodPercentage;
+    const trend: 'up' | 'down' | 'stable' = 
+      Math.abs(change) < 5 ? 'stable' : change > 0 ? 'up' : 'down';
+
+    return {
+      totalFeedback: filteredFeedbacks.length,
+      positiveSentiment: positiveCount,
+      negativeSentiment: negativeCount,
+      neutralSentiment: neutralCount,
+      activeUsers: uniqueUsers.size,
+      topThemes,
+      feedbackVolume,
+      sentimentTrend: {
+        currentPeriod: Math.round(currentPeriodPercentage),
+        previousPeriod: Math.round(previousPeriodPercentage),
+        change: Math.round(change),
+        trend
+      }
+    };
+  }, [feedbacks, dateRange]);
+
+  // Filter feedbacks based on sentiment
+  const filteredFeedbacks = useMemo(() => {
+    if (sentimentFilter === 'all') return feedbacks;
+    return feedbacks.filter(feedback => analyzeSentiment(feedback.message) === sentimentFilter);
+  }, [feedbacks, sentimentFilter]);
+
+  // Generate AI insight
+  const generateAIInsight = useCallback(async () => {
+    if (!user || feedbacks.length === 0) return;
+
+    setGeneratingInsight(true);
+    try {
+      // Call the analyze-insights Edge Function
+      const response = await fetch('/functions/v1/analyze-insights', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await supabase.auth.getSession().then(s => s.data.session?.access_token)}`
+        },
+        body: JSON.stringify({
+          data: feedbacks.slice(0, 10).map(f => f.message).join('\n\n'),
+          userId: user.id,
+          fileType: 'feedback-analysis'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Analysis failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.analysis) {
+        setAiInsight({
+          summary: result.analysis.summary,
+          key_themes: result.analysis.key_themes,
+          suggested_actions: result.analysis.suggested_actions,
+          sentiment_overview: `Overall sentiment: ${result.analysis.sentiment.overall} (${result.analysis.sentiment.positive}% positive, ${result.analysis.sentiment.negative}% negative, ${result.analysis.sentiment.neutral}% neutral)`
+        });
+      } else {
+        throw new Error(result.error || 'Analysis failed');
+      }
+    } catch (error) {
+      console.error('Error generating AI insight:', error);
+      toast.error('Failed to generate AI insight');
+    } finally {
+      setGeneratingInsight(false);
+    }
+  }, [user, feedbacks]);
+
+  // Generate insight on mount if feedbacks exist
+  useEffect(() => {
+    if (feedbacks.length > 0 && !aiInsight) {
+      generateAIInsight();
+    }
+  }, [feedbacks, aiInsight, generateAIInsight]);
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toISOString().split('T')[0];
+  };
+
+  // Get sentiment badge variant
+  const getSentimentBadgeVariant = (sentiment: string) => {
+    switch (sentiment) {
+      case 'positive':
+        return 'default';
+      case 'negative':
+        return 'destructive';
+      default:
+        return 'secondary';
+    }
+  };
+
+  // Get status badge variant
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'new':
+        return 'secondary';
+      case 'reviewed':
+        return 'default';
+      case 'resolved':
+        return 'outline';
+      default:
+        return 'secondary';
+    }
+  };
+
+  // Get plan display info
+  const getPlanInfo = () => {
+    if (!subscription) {
+      return {
+        planName: 'Free Trial',
+        planType: 'trial',
+        isTrial: true,
+        daysLeft: 0,
+        upgradeText: 'Upgrade to Pro',
+        upgradeLink: '/billing?plan=pro'
+      };
+    }
+
+    const isTrial = subscription.plan_name === 'free_trial';
+    const trialEnd = new Date(subscription.trial_end);
+    const now = new Date();
+    const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+    let upgradeText = '';
+    let upgradeLink = '';
+
+    if (isTrial) {
+      upgradeText = 'Upgrade to Pro';
+      upgradeLink = '/billing?plan=pro';
+    } else if (subscription.plan_name === 'pro') {
+      upgradeText = 'Upgrade to Business';
+      upgradeLink = '/billing?plan=business';
+    } else {
+      upgradeText = 'Manage Subscription';
+      upgradeLink = '/billing';
+    }
+
+    return {
+      planName: subscription.plan_name.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      planType: subscription.plan_type,
+      isTrial,
+      daysLeft: Math.max(0, daysLeft),
+      upgradeText,
+      upgradeLink
+    };
+  };
 
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <BarChart3 className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+              <p className="text-gray-600">Please log in to access your dashboard.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <RefreshCw className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Loading Dashboard...</h2>
+            <p className="text-gray-600">Please wait while we fetch your data.</p>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Required</h2>
-          <p className="text-gray-600 mb-4">Please log in to access the dashboard.</p>
-          <button 
-            onClick={() => window.location.href = '/auth'} 
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Go to Login
-          </button>
         </div>
       </div>
     );
   }
 
+  const planInfo = getPlanInfo();
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <style dangerouslySetInnerHTML={{ __html: dashboardStyles }} />
+    <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Hey {userProfile?.first_name || userProfile?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'there'}! ✨
-        </h1>
-        <p className="text-gray-600">Your real-time business intelligence dashboard is looking fire 🔥</p>
-        <div className="mt-4 flex items-center gap-2">
-          <div className="flex items-center gap-1 text-green-600">
-            <Activity className="h-4 w-4" />
-            <span className="text-sm font-medium">Live Updates Active</span>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600 mt-2">
+            Real-time overview of your feedback and insights
+          </p>
+          <div className="flex items-center space-x-2 mt-2">
+            <div className="flex items-center space-x-1 text-sm text-gray-500">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span>Live</span>
+            </div>
+            <span className="text-gray-400">•</span>
+            <span className="text-sm text-gray-500">
+              {feedbacks.length > 0 ? `${feedbacks.length} feedback entries` : 'No feedback yet'}
+            </span>
           </div>
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            onClick={loadDashboardData}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className={weeklyInsightsUpdating ? 'ring-2 ring-blue-500 ring-opacity-50 transition-all duration-300' : ''}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Insights</CardTitle>
-            <div className="flex items-center gap-2">
-              <Lightbulb className={`h-4 w-4 ${weeklyInsightsUpdating ? 'text-blue-500 animate-bounce' : 'text-blue-600'}`} />
-              <div className={`w-2 h-2 bg-blue-500 rounded-full ${weeklyInsightsUpdating ? 'animate-ping' : 'animate-pulse'}`}></div>
+      {/* Filters Bar */}
+      <Card className="rounded-xl shadow-lg">
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
+            {/* Date Range Filter */}
+            <Select value={dateRange} onValueChange={(value: any) => setDateRange(value)}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Date Range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 Days</SelectItem>
+                <SelectItem value="30d">Last 30 Days</SelectItem>
+                <SelectItem value="90d">Last 90 Days</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Sentiment Filter */}
+            <Select value={sentimentFilter} onValueChange={(value: any) => setSentimentFilter(value)}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Sentiment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sentiments</SelectItem>
+                <SelectItem value="positive">Positive</SelectItem>
+                <SelectItem value="neutral">Neutral</SelectItem>
+                <SelectItem value="negative">Negative</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Navigation Buttons */}
+            <div className="flex space-x-2 ml-auto">
+              <Button variant="outline" asChild>
+                <a href="/feedback">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Feedback
+                </a>
+              </Button>
+              <Button variant="outline" asChild>
+                <a href="/insights-simple">
+                  <Lightbulb className="h-4 w-4 mr-2" />
+                  Insights
+                </a>
+              </Button>
+              <Button variant="outline" asChild>
+                <a href="/reports">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Reports
+                </a>
+              </Button>
+              <Button variant="outline" asChild>
+                <a href="/billing">
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Billing
+                </a>
+              </Button>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Debug Info - Remove this in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <Card className="rounded-xl shadow-lg border-2 border-yellow-200 bg-yellow-50">
+          <CardContent className="p-4">
+            <div className="text-sm text-yellow-800">
+              <strong>Debug Info:</strong> Feedbacks: {feedbacks.length} | 
+              Loading: {loading.toString()} | 
+              User: {user?.email} | 
+              Subscription: {subscription?.plan_name || 'None'}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Top Row - KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        {/* Total Feedback */}
+        <Card className="rounded-xl shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Feedback</CardTitle>
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${weeklyInsightsUpdating ? 'scale-105 transition-transform duration-300' : ''}`}>
-              {stats.totalInsights}
-            </div>
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <span className={`${weeklyInsightsUpdating ? 'text-blue-600 font-medium' : 'text-muted-foreground'}`}>
-                +{stats.thisWeekInsights} this week
-              </span>
-              {stats.weeklyGrowthRate !== 0 && (
-                <span className={`text-xs ${stats.weeklyGrowthRate > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  ({stats.weeklyGrowthRate > 0 ? '+' : ''}{stats.weeklyGrowthRate}% vs last week)
-                </span>
-              )}
-              {weeklyInsightsUpdating && (
-                <span className="text-blue-600 animate-pulse">• Live</span>
-              )}
+            <div className="text-2xl font-bold">{dashboardStats.totalFeedback}</div>
+            <p className="text-xs text-muted-foreground">
+              {dateRange === 'all' ? 'All time' : `Last ${dateRange}`}
             </p>
           </CardContent>
         </Card>
 
-        <Card className={growthRateUpdating ? 'ring-2 ring-green-500 ring-opacity-50 transition-all duration-300' : ''}>
+        {/* Positive Sentiment */}
+        <Card className="rounded-xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Growth Rate</CardTitle>
-            <div className="flex items-center gap-2">
-              <TrendingUp className={`h-4 w-4 ${growthRateUpdating ? 'text-green-500 animate-bounce' : 'text-green-600'}`} />
-              <div className={`w-2 h-2 bg-green-500 rounded-full ${growthRateUpdating ? 'animate-ping' : 'animate-pulse'}`}></div>
-            </div>
+            <CardTitle className="text-sm font-medium">Positive</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold flex items-center gap-1 ${growthRateUpdating ? 'scale-105 transition-transform duration-300' : ''}`}>
-              {stats.growthRate > 0 ? (
-                <ArrowUpRight className="h-4 w-4 text-green-600" />
-              ) : (
-                <ArrowDownRight className="h-4 w-4 text-red-600" />
-              )}
-              {Math.abs(stats.growthRate)}%
+            <div className="text-2xl font-bold text-green-600">
+              {dashboardStats.totalFeedback > 0 
+                ? Math.round((dashboardStats.positiveSentiment / dashboardStats.totalFeedback) * 100)
+                : 0}%
             </div>
             <p className="text-xs text-muted-foreground">
-              vs last month • {growthRateUpdating ? 'Updating...' : 'Updates in real-time'}
+              {dashboardStats.positiveSentiment} feedbacks
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Negative Sentiment */}
+        <Card className="rounded-xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Data Sources</CardTitle>
-            <Database className="h-4 w-4 text-purple-600" />
+            <CardTitle className="text-sm font-medium">Negative</CardTitle>
+            <AlertCircle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.dataSources}</div>
+            <div className="text-2xl font-bold text-red-600">
+              {dashboardStats.totalFeedback > 0 
+                ? Math.round((dashboardStats.negativeSentiment / dashboardStats.totalFeedback) * 100)
+                : 0}%
+            </div>
             <p className="text-xs text-muted-foreground">
-              Connected sources
+              {dashboardStats.negativeSentiment} feedbacks
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Active Users */}
+        <Card className="rounded-xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">AI Processing</CardTitle>
-            <Zap className="h-4 w-4 text-orange-600" />
+            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+            <Users className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.processingJobs}</div>
+            <div className="text-2xl font-bold text-blue-600">
+              {dashboardStats.activeUsers}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Active jobs
+              Unique feedback providers
             </p>
+          </CardContent>
+        </Card>
+
+        {/* Plan Status */}
+        <Card className="rounded-xl shadow-lg border-2 border-blue-200 bg-blue-50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Plan Status</CardTitle>
+            {planInfo.planName === 'Business' ? (
+              <Crown className="h-4 w-4 text-yellow-600" />
+            ) : (
+              <CreditCard className="h-4 w-4 text-blue-600" />
+            )}
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold text-blue-900">
+              {planInfo.planName}
+            </div>
+            {planInfo.isTrial && planInfo.daysLeft > 0 && (
+              <p className="text-xs text-blue-700 mt-1">
+                {planInfo.daysLeft} days left
+              </p>
+            )}
+            <Button 
+              size="sm" 
+              className="mt-2 w-full text-xs"
+              asChild
+            >
+              <a href={planInfo.upgradeLink}>
+                {planInfo.upgradeText}
+              </a>
+            </Button>
           </CardContent>
         </Card>
       </div>
 
-      {/* Sentiment Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card>
+      {/* Middle Row - Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Feedback Volume Over Time */}
+        <Card className="rounded-xl shadow-lg lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              Positive Sentiment
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.positiveSentiment}</div>
-            <Progress value={stats.totalInsights > 0 ? (stats.positiveSentiment / stats.totalInsights) * 100 : 0} className="mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-              Negative Sentiment
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.negativeSentiment}</div>
-            <Progress value={stats.totalInsights > 0 ? (stats.negativeSentiment / stats.totalInsights) * 100 : 0} className="mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
-              Neutral Sentiment
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{stats.neutralSentiment}</div>
-            <Progress value={stats.totalInsights > 0 ? (stats.neutralSentiment / stats.totalInsights) * 100 : 0} className="mt-2" />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex flex-wrap gap-4 mb-8">
-        <Button onClick={handleUploadData} className="flex items-center gap-2">
-          <Upload className="h-4 w-4" />
-          Upload Data
-        </Button>
-        <Button onClick={handleAnalyzeNow} variant="outline" className="flex items-center gap-2">
-          <Target className="h-4 w-4" />
-          Analyze Now
-        </Button>
-        <Button onClick={handleGenerateReport} variant="outline" className="flex items-center gap-2">
-          <FileText className="h-4 w-4" />
-          Generate Report
-        </Button>
-      </div>
-
-      {/* Recent Insights */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lightbulb className="h-5 w-5" />
-              Recent AI Insights
+            <CardTitle className="flex items-center space-x-2">
+              <LineChart className="h-5 w-5" />
+              <span>Feedback Volume Over Time</span>
             </CardTitle>
             <CardDescription>
-              Latest insights generated from your data
+              Daily feedback count for the selected period
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {insights.length > 0 ? (
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {safeArraySlice(insights, 0, 5).map((insight) => {
-                  try {
-                    return (
-                      <div key={insight.id || `insight-${Date.now()}`} className="border rounded-lg p-4 hover:shadow-sm transition-shadow">
-                        <div className="flex items-start justify-between mb-2">
-                          <Badge className={getSentimentColor(insight.sentiment || 'neutral')}>
-                            {insight.sentiment || 'neutral'}
-                          </Badge>
-                          <span className="text-xs text-gray-500">
-                            {insight.created_at ? new Date(insight.created_at).toLocaleTimeString() : 'Unknown time'}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-700 mb-2">{insight.summary || 'No summary available'}</p>
-                        {insight.key_themes && Array.isArray(insight.key_themes) && insight.key_themes.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            {safeArraySlice(insight.key_themes, 0, 3).map((theme, index) => (
-                              <span key={index} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                {getThemeText(theme)}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {insight.source_file && (
-                          <div className="text-xs text-gray-500">
-                            📎 {insight.source_file}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  } catch (error) {
-                    console.error('Error rendering insight:', error, insight);
-                    return (
-                      <div key={`error-${Date.now()}`} className="border border-red-200 rounded-lg p-4 bg-red-50">
-                        <p className="text-sm text-red-600">Error displaying insight</p>
-                        <p className="text-xs text-red-500 mt-1">ID: {insight.id || 'Unknown'}</p>
-                      </div>
-                    );
-                  }
-                })}
-              </div>
+            {dashboardStats.feedbackVolume.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={dashboardStats.feedbackVolume}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="date" 
+                    tickFormatter={(value) => formatDate(value)}
+                    fontSize={12}
+                  />
+                  <YAxis fontSize={12} />
+                  <Tooltip 
+                    labelFormatter={(value) => formatDate(value)}
+                    formatter={(value: any) => [value, 'Feedback Count']}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="count" 
+                    stroke="#3b82f6" 
+                    fill="#3b82f6" 
+                    fillOpacity={0.3}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Lightbulb className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p>No insights yet</p>
-                <p className="text-sm">Upload some data to get started!</p>
+              <div className="flex items-center justify-center h-64 text-gray-500">
+                <div className="text-center">
+                  <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                  <p>No volume data available</p>
+                  <p className="text-sm text-gray-400">Start collecting feedback to see trends</p>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* AI Jobs Status */}
-        <Card>
+        {/* Sentiment Distribution */}
+        <Card className="rounded-xl shadow-lg">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <RefreshCw className="h-5 w-5" />
-              AI Processing Jobs
+            <CardTitle className="flex items-center space-x-2">
+              <PieChart className="h-5 w-5" />
+              <span>Sentiment Breakdown</span>
             </CardTitle>
             <CardDescription>
-              Real-time status of analysis jobs
+              Distribution of feedback sentiment
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {aiJobs.length > 0 ? (
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {aiJobs.map((job) => (
-                  <div key={job.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {job.status === 'processing' && (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                        )}
-                        {job.status === 'completed' && (
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        )}
-                        {job.status === 'failed' && (
-                          <AlertCircle className="h-4 w-4 text-red-600" />
-                        )}
-                        <Badge className={getStatusColor(job.status)}>
-                          {job.status}
-                        </Badge>
-                      </div>
-                      <span className="text-xs text-gray-500">
-                        {new Date(job.created_at).toLocaleTimeString()}
-                      </span>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Input length: {job.input_length} characters
-                    </div>
-                    {job.completed_at && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        Completed: {new Date(job.completed_at).toLocaleTimeString()}
-                      </div>
-                    )}
+            {dashboardStats.totalFeedback > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <RechartsPieChart>
+                  <Pie
+                    data={[
+                      { name: 'Positive', value: dashboardStats.positiveSentiment, color: '#10b981' },
+                      { name: 'Neutral', value: dashboardStats.neutralSentiment, color: '#f59e0b' },
+                      { name: 'Negative', value: dashboardStats.negativeSentiment, color: '#ef4444' }
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {[
+                      { name: 'Positive', value: dashboardStats.positiveSentiment, color: '#10b981' },
+                      { name: 'Neutral', value: dashboardStats.neutralSentiment, color: '#f59e0b' },
+                      { name: 'Negative', value: dashboardStats.negativeSentiment, color: '#ef4444' }
+                    ].map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-gray-500">
+                No sentiment data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Bottom Row - Charts and AI Insights */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Top Themes */}
+        <Card className="rounded-xl shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <BarChartIcon className="h-5 w-5" />
+              <span>Top 5 Themes</span>
+            </CardTitle>
+            <CardDescription>
+              Most frequently mentioned themes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {dashboardStats.topThemes.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <RechartsBarChart data={dashboardStats.topThemes}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="theme" fontSize={12} />
+                  <YAxis fontSize={12} />
+                  <Tooltip formatter={(value: any) => [value, 'Mentions']} />
+                  <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                </RechartsBarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-gray-500">
+                No theme data available
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* AI Insights Summary */}
+        <Card className="rounded-xl shadow-lg lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Lightbulb className="h-5 w-5 text-yellow-600" />
+              <span>AI Insights Summary</span>
+            </CardTitle>
+            <CardDescription>
+              AI-generated analysis of your feedback data
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {generatingInsight ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-blue-600" />
+                  <p className="text-gray-600">Generating insights...</p>
+                </div>
+              </div>
+            ) : aiInsight ? (
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Summary</h4>
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    {aiInsight.summary}
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Key Themes</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {aiInsight.key_themes.slice(0, 5).map((theme, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        {theme}
+                      </Badge>
+                    ))}
                   </div>
-                ))}
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Suggested Actions</h4>
+                  <ul className="text-sm text-gray-700 space-y-1">
+                    {aiInsight.suggested_actions.slice(0, 3).map((action, index) => (
+                      <li key={index} className="flex items-start">
+                        <Target className="h-3 w-3 text-blue-600 mr-2 mt-1 flex-shrink-0" />
+                        {action}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="pt-2 border-t">
+                  <p className="text-xs text-gray-600">
+                    {aiInsight.sentiment_overview}
+                  </p>
+                </div>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                <RefreshCw className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p>No active jobs</p>
-                <p className="text-sm">Jobs will appear here when processing</p>
+              <div className="text-center py-8">
+                <Lightbulb className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">No insights available</p>
+                <Button 
+                  size="sm" 
+                  onClick={generateAIInsight}
+                  className="mt-2"
+                >
+                  Generate Insights
+                </Button>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Data Sources */}
-      <Card className="mt-8">
+      {/* Recent Feedback Feed */}
+      <Card className="rounded-xl shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database className="h-5 w-5" />
-            Connected Data Sources
+          <CardTitle className="flex items-center space-x-2">
+            <MessageSquare className="h-5 w-5" />
+            <span>Recent Feedback Feed</span>
           </CardTitle>
           <CardDescription>
-            Files and data sources ready for analysis
+            Latest feedback entries with sentiment analysis
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {dataSources.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {dataSources.map((source) => (
-                <div key={source.id} className="border rounded-lg p-4 hover:shadow-sm transition-shadow">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-blue-600" />
-                      <span className="font-medium">{source.name}</span>
+          {filteredFeedbacks.length > 0 ? (
+            <div className="space-y-4">
+              {filteredFeedbacks.slice(0, 10).map((feedback) => (
+                <div key={feedback.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium text-gray-900">
+                        {feedback.name || 'Anonymous'}
+                      </span>
+                      <Badge variant={getSentimentBadgeVariant(analyzeSentiment(feedback.message))}>
+                        {analyzeSentiment(feedback.message)}
+                      </Badge>
+                      <Badge variant={getStatusBadgeVariant(feedback.status)}>
+                        {feedback.status}
+                      </Badge>
                     </div>
-                    <Badge className="text-green-600 bg-green-100">
-                      {source.status}
-                    </Badge>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    Type: {source.type.toUpperCase()}
-                  </div>
-                  {source.file_size && (
-                    <div className="text-sm text-gray-600">
-                      Size: {(source.file_size / 1024 / 1024).toFixed(2)} MB
+                    <div className="flex items-center space-x-2 text-sm text-gray-500">
+                      <Clock className="h-4 w-4" />
+                      <span>{formatDate(feedback.timestamp)}</span>
                     </div>
-                  )}
-                  <div className="text-xs text-gray-500 mt-2">
-                    Added: {new Date(source.created_at).toLocaleDateString()}
+                  </div>
+                  <p className="text-gray-700 text-sm line-clamp-2">{feedback.message}</p>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <Target className="h-4 w-4 text-gray-400" />
+                    <div className="flex flex-wrap gap-1">
+                      {extractThemes(feedback.message).map((theme, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {theme}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-500">
-              <Database className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p>No data sources connected</p>
-              <p className="text-sm">Upload files to start analyzing</p>
+            /* Empty State */
+            <div className="text-center py-12">
+              <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-xl font-medium text-gray-900 mb-2">
+                {searchTerm || sentimentFilter !== 'all' ? 'No feedback found' : 'No feedback yet'}
+              </h3>
+              <p className="text-gray-600 mb-4">
+                {searchTerm || sentimentFilter !== 'all' 
+                  ? 'Try adjusting your search or filters.'
+                  : 'Start collecting feedback through your widget to see insights and analytics.'
+                }
+              </p>
+              {!searchTerm && sentimentFilter === 'all' && (
+                <div className="flex justify-center space-x-2">
+                  <Button asChild>
+                    <a href="/feedback">Go to Feedback</a>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <a href="/feedback-settings">Configure Widget</a>
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
     </div>
   );
-};
-
-export default Dashboard;
+}

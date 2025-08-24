@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.24.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -154,20 +153,32 @@ serve(async (req) => {
     } else {
       dataString = String(data)
     }
+    
+    // Log analysis type and data length for debugging
+    console.log(`🔍 Analysis type: ${fileType}`)
+    console.log(`📊 Data length: ${dataString.length} characters`)
+    if (fileType === 'feedback-analysis') {
+      console.log(`👥 Feedback analysis mode enabled`)
+      // Count feedback entries if data is a string
+      if (typeof dataString === 'string') {
+        const feedbackCount = (dataString.match(/\[.*?\]/g) || []).length
+        console.log(`📝 Detected ${feedbackCount} feedback entries`)
+      }
+    }
 
     // Create the prompt for Gemini AI
     const prompt = `
-You are an expert business analyst and data scientist. Analyze the following data and provide comprehensive insights.
+You are an expert business analyst specializing in customer feedback analysis and user experience insights. Analyze the following user feedback data and provide comprehensive, actionable insights.
 
 Data to analyze:
 ${dataString}
 
-File type: ${fileType}
+Analysis type: ${fileType === 'feedback-analysis' ? 'User Feedback Analysis' : 'General Data Analysis'}
 
 Please provide a detailed analysis in the following JSON format:
 
 {
-  "summary": "A comprehensive 2-3 paragraph summary of the key findings and insights from the data",
+  "summary": "A comprehensive 2-3 paragraph summary of the key findings and insights from the user feedback. Focus on patterns, pain points, satisfaction levels, and opportunities for improvement.",
   "key_themes": ["Theme 1", "Theme 2", "Theme 3", "Theme 4", "Theme 5"],
   "suggested_actions": ["Action 1", "Action 2", "Action 3", "Action 4", "Action 5"],
   "trends": ["Trend 1", "Trend 2", "Trend 3", "Trend 4"],
@@ -183,29 +194,58 @@ Please provide a detailed analysis in the following JSON format:
   }
 }
 
-Guidelines:
-- Summary should be insightful and actionable
-- Key themes should identify the main patterns or topics
-- Suggested actions should be practical and implementable
-- Trends should highlight directional changes or patterns
-- Performance metrics should be relevant to the data type
-- Performance score should be 0-100 based on overall data quality and insights
-- Sentiment should be calculated based on the tone and content of the data
+Guidelines for feedback analysis:
+- Summary should focus on user experience insights, common issues, and satisfaction patterns
+- Key themes should identify recurring feedback topics, user pain points, and positive experiences
+- Suggested actions should be practical improvements that address user feedback
+- Trends should highlight patterns in user sentiment and feedback over time
+- Performance metrics should focus on user satisfaction, feedback quality, and response rates
+- Performance score should be 0-100 based on overall feedback sentiment and actionable insights
+- Sentiment should be calculated based on the tone and content of the feedback messages
 - Ensure all percentages in sentiment add up to 100
 - Overall sentiment should be "positive", "negative", or "neutral"
+
+For feedback analysis, pay special attention to:
+- User pain points and frustrations
+- Feature requests and improvement suggestions
+- Positive experiences and what users love
+- Common patterns across multiple feedback entries
+- Urgency and priority of issues mentioned
+- User satisfaction levels and sentiment trends
 
 Return only valid JSON without any additional text or formatting.
 `
 
-    // Initialize Gemini AI
-    const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!)
-
-    // Call Gemini AI
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
+    // Initialize Gemini AI with current API
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')!
     
-    const result = await model.generateContent(prompt)
-    const response = await result.response
-    const text = response.text()
+    // Use the current Gemini API endpoint with gemini-1.5-flash model
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": GEMINI_API_KEY
+        },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            topK: 50,
+            topP: 0.9,
+            maxOutputTokens: 1000
+          }
+        })
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Gemini API request failed: ${response.status}`);
+    }
+
+    const geminiData = await response.json();
+    const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
 
     // Parse the JSON response
     let analysis
@@ -236,6 +276,36 @@ Return only valid JSON without any additional text or formatting.
       
       // Ensure performance score is within bounds
       analysis.performance.score = Math.max(0, Math.min(100, analysis.performance.score))
+      
+      // For feedback analysis, enhance the analysis with additional insights
+      if (fileType === 'feedback-analysis') {
+        // Ensure themes are feedback-focused
+        if (analysis.key_themes && analysis.key_themes.length > 0) {
+          analysis.key_themes = analysis.key_themes.map(theme => 
+            theme.includes('feedback') || theme.includes('user') || theme.includes('customer') 
+              ? theme 
+              : `User ${theme.toLowerCase()}`
+          );
+        }
+        
+        // Ensure actions are user-focused
+        if (analysis.suggested_actions && analysis.suggested_actions.length > 0) {
+          analysis.suggested_actions = analysis.suggested_actions.map(action => 
+            action.includes('user') || action.includes('customer') || action.includes('feedback')
+              ? action
+              : `Improve user ${action.toLowerCase()}`
+          );
+        }
+        
+        // Ensure trends are feedback-relevant
+        if (analysis.trends && analysis.trends.length > 0) {
+          analysis.trends = analysis.trends.map(trend => 
+            trend.includes('feedback') || trend.includes('user') || trend.includes('satisfaction')
+              ? trend
+              : `User ${trend.toLowerCase()} trends`
+          );
+        }
+      }
       
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError)

@@ -1,20 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useUsageEnforcement } from '@/hooks/useUsageEnforcement';
-import { useUsageTracking } from '@/hooks/useUsageTracking';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { jsPDF  } from 'jspdf';
+import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { 
   FileText, 
-  Plus, 
   Clock, 
-  CheckCircle, 
-  AlertCircle, 
   TrendingUp, 
   Lightbulb, 
   Target,
@@ -22,450 +20,142 @@ import {
   Search,
   Filter,
   Calendar,
-  BarChart3,
   RefreshCw,
   Eye,
-  EyeOff,
-  Brain,
-  BarChart,
-  TrendingDown,
-  DollarSign,
-  Users,
-  Building,
-  Globe,
-  Rocket,
-  Shield,
-  Award
+  BarChart3,
+  MessageSquare,
+  CalendarDays,
+  SortAsc,
+  SortDesc,
+  FileDown,
+  FileText as FileTextIcon
 } from 'lucide-react';
 
-interface Report {
+// Types
+interface InsightHistory {
   id: string;
   user_id: string;
-  title: string;
-  description?: string;
-  insights_ids: string[];
-  generated_at: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  content?: {
-    executive_summary: string;
-    key_insights: string[];
+  selected_feedback_ids: string[];
+  analysis_result: {
+    summary: string;
+    key_themes: string[];
+    suggested_actions: string[];
     trends: string[];
-    recommended_actions: string[];
-    sentiment_breakdown: {
+    performance: {
+      metrics: string[];
+      score: number;
+    };
+    sentiment: {
       positive: number;
       negative: number;
       neutral: number;
+      overall: 'positive' | 'negative' | 'neutral';
     };
-    top_themes: string[];
   };
-}
-
-interface Insight {
-  id: string;
-  summary: string;
-  sentiment: 'positive' | 'negative' | 'neutral';
-  key_themes: string[];
-  suggested_actions: string[];
   created_at: string;
-  source_file?: string;
 }
 
 export default function Reports() {
   const { user } = useAuth();
-  const { checkUsage, enforceLimit, usage } = useUsageEnforcement();
-  const { trackUsage } = useUsageTracking();
   
   // State management
-  const [reports, setReports] = useState<Report[]>([]);
-  const [insights, setInsights] = useState<Insight[]>([]);
+  const [reports, setReports] = useState<InsightHistory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generatingReport, setGeneratingReport] = useState(false);
-  const [selectedInsights, setSelectedInsights] = useState<string[]>([]);
-  const [showInsightSelector, setShowInsightSelector] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<InsightHistory | null>(null);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'processing' | 'completed' | 'failed'>('all');
-  const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<'all' | '7d' | '30d' | '90d'>('all');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [exportingPDF, setExportingPDF] = useState(false);
+  const [exportingCSV, setExportingCSV] = useState(false);
 
-  // Load insights from localStorage and Supabase
-  useEffect(() => {
-    const loadInsights = async () => {
-      try {
-        // First try to load from localStorage for immediate display
-        const savedInsights = localStorage.getItem('insightsHistory');
-        if (savedInsights) {
-          const parsedInsights = JSON.parse(savedInsights);
-          setInsights(parsedInsights);
-        }
+  // Load user's insights history
+  const loadReports = useCallback(async () => {
+    if (!user) return;
 
-        // Then try to load from Supabase if user is authenticated
-        if (user?.id) {
-          try {
-            const { data: supabaseInsights, error } = await supabase
-              .from('ai_insights')
-              .select('*')
-              .eq('user_id', user.id)
-              .order('created_at', { ascending: false });
-
-            if (error) {
-              console.error('Error loading insights from Supabase:', error);
-            } else if (supabaseInsights && supabaseInsights.length > 0) {
-              // Transform Supabase data to match our Insight interface
-              const transformedInsights: Insight[] = supabaseInsights.map(item => ({
-                id: item.id,
-                summary: item.summary || item.insight_text || 'No summary available',
-                sentiment: item.sentiment || 'neutral',
-                key_themes: item.key_themes || item.themes || [],
-                suggested_actions: item.suggested_actions || item.actions || [],
-                created_at: item.created_at,
-                source_file: item.source_file || item.file_name
-              }));
-
-              console.log('Loaded insights from Supabase:', transformedInsights);
-              setInsights(transformedInsights);
-            }
-          } catch (supabaseError) {
-            console.error('Failed to load insights from Supabase:', supabaseError);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load insights:', err);
-      }
-    };
-
-    loadInsights();
-  }, [user?.id]);
-
-  // Load user reports from localStorage (since we're using localStorage for now)
-  useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        // For now, we'll use localStorage to store user reports
-        // In a real implementation, this would be Supabase queries
-        const savedReports = localStorage.getItem('userReports');
-        if (savedReports) {
-          const parsedReports = JSON.parse(savedReports);
-          // Filter reports for current user
-          const userReports = parsedReports.filter((report: Report) => report.user_id === user?.id);
-          setReports(userReports);
-        } else {
-          setReports([]);
-        }
-      } catch (error) {
-        console.error('Error fetching reports:', error);
-        toast.error('Failed to load reports');
-        setReports([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (user) {
-      fetchReports();
-    }
-  }, [user]);
-
-  // Save reports to localStorage when reports change
-  useEffect(() => {
-    if (reports.length > 0) {
-      try {
-        // Get existing reports from localStorage
-        const existingReports = localStorage.getItem('userReports');
-        let allReports: Report[] = [];
-        
-        if (existingReports) {
-          allReports = JSON.parse(existingReports);
-          // Remove old reports for this user
-          allReports = allReports.filter((report: Report) => report.user_id !== user?.id);
-        }
-        
-        // Add current user's reports
-        allReports = [...allReports, ...reports];
-        
-        localStorage.setItem('userReports', JSON.stringify(allReports));
-      } catch (error) {
-        console.error('Error saving reports to localStorage:', error);
-      }
-    }
-  }, [reports, user?.id]);
-
-  // Debug: Log reports when they change
-  useEffect(() => {
-    console.log('Reports state updated:', reports);
-  }, [reports]);
-
-  // Debug: Log expandedReport when it changes
-  useEffect(() => {
-    console.log('expandedReport state changed to:', expandedReport);
-  }, [expandedReport]);
-
-  // Function to create sample report data for testing
-  const createSampleReport = () => {
-    const sampleReport: Report = {
-      id: `sample-${Date.now()}`,
-      user_id: user?.id || 'sample-user',
-      title: 'Sample AI Report',
-      description: 'This is a sample report for testing the preview functionality',
-      insights_ids: ['sample-insight-1', 'sample-insight-2'],
-      generated_at: new Date().toISOString(),
-      status: 'completed',
-      content: {
-        executive_summary: 'This is a comprehensive analysis of your data insights, providing actionable recommendations for improvement.',
-        key_insights: [
-          'Customer satisfaction has improved by 15% over the last quarter',
-          'Product usage patterns show increased engagement during evening hours',
-          'Support ticket resolution time has decreased by 20%'
-        ],
-        trends: [
-          'Growing adoption of mobile features',
-          'Seasonal variations in user activity',
-          'Increasing demand for premium features'
-        ],
-        recommended_actions: [
-          'Implement mobile-first design improvements',
-          'Optimize evening-time user experience',
-          'Expand premium feature offerings'
-        ],
-        sentiment_breakdown: {
-          positive: 65,
-          negative: 15,
-          neutral: 20
-        },
-        top_themes: ['User Experience', 'Mobile Optimization', 'Feature Development', 'Customer Support']
-      }
-    };
-    
-    setReports(prev => [sampleReport, ...prev]);
-    toast.success('Sample report created! Click the eye icon to preview it.');
-  };
-
-  const handleGenerateReport = async () => {
-    if (selectedInsights.length === 0) {
-      toast.error('Please select at least one insight to include in the report');
-      return;
-    }
-
-    if (!user?.id) {
-      toast.error('User authentication required');
-      return;
-    }
-
-    // Check usage limits before proceeding
-    const canGenerateReport = await checkUsage('ai_reports', 1);
-    if (!canGenerateReport) {
-      toast.error("AI Reports limit reached. Please upgrade your plan to continue generating strategic executive reports.");
-      return;
-    }
-
-    setGeneratingReport(true);
     try {
-      // Get the actual insights data for the selected insights
-      const selectedInsightsData = insights.filter(insight => 
-        selectedInsights.includes(insight.id)
-      );
-
-      if (selectedInsightsData.length === 0) {
-        throw new Error('No insights data found for selected insights');
-      }
-
-      // Aggregate sentiment data from insights
-      const sentimentCounts = { positive: 0, negative: 0, neutral: 0 };
-      selectedInsightsData.forEach(insight => {
-        if (insight.sentiment in sentimentCounts) {
-          sentimentCounts[insight.sentiment]++;
-        }
-      });
-
-      // Calculate sentiment percentages
-      const totalInsights = selectedInsightsData.length;
-      const sentimentBreakdown = {
-        positive: Math.round((sentimentCounts.positive / totalInsights) * 100),
-        negative: Math.round((sentimentCounts.negative / totalInsights) * 100),
-        neutral: Math.round((sentimentCounts.neutral / totalInsights) * 100)
-      };
-
-      // Extract and aggregate themes from insights
-      const themeCounts: { [key: string]: number } = {};
-      selectedInsightsData.forEach(insight => {
-        if (insight.key_themes && Array.isArray(insight.key_themes)) {
-          insight.key_themes.forEach(theme => {
-            themeCounts[theme] = (themeCounts[theme] || 0) + 1;
-          });
-        }
-      });
-
-      // Get top themes (top 5 by frequency)
-      const topThemes = Object.entries(themeCounts)
-        .sort(([,a], [,b]) => b - a)
-        .slice(0, 5)
-        .map(([theme]) => theme);
-
-      // Enhanced strategic analysis
-      const strategicMetrics = {
-        totalInsights,
-        sentimentBreakdown,
-        topThemes,
-        businessImpact: calculateBusinessImpact(selectedInsightsData),
-        strategicValue: calculateStrategicValue(selectedInsightsData),
-        riskAssessment: assessRiskLevel(selectedInsightsData),
-        opportunityScore: calculateOpportunityScore(selectedInsightsData)
-      };
-
-      console.log('Strategic data for executive report:', strategicMetrics);
-
-      // Call the generateReport Edge Function with enhanced strategic data
-      const response = await fetch(
-        "https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/generateReport",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84"
-          },
-          body: JSON.stringify({
-            user_id: user.id,
-            insights_ids: selectedInsights,insights_data: selectedInsightsData, // Send actual insights data
-sentimentBreakdown,
-topThemes,
-strategicMetrics,
-title: `Strategic Executive Report - ${new Date().toLocaleDateString()}`,
-description: `Strategic intelligence report based on ${selectedInsights.length} insights - Transforming data into executive decision-making insights`,
-
-          })
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Strategic report generation failed: ${response.status}`);
-      }
-
-      const result = await response.json();
+      setLoading(true);
       
-      if (!result.success) {
-        throw new Error(result.error || 'Strategic report generation failed');
+      const { data: reportsData, error: reportsError } = await supabase
+        .from('insights_history')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: sortOrder === 'oldest' });
+
+      if (reportsError) {
+        console.error('Error loading reports:', reportsError);
+        toast.error('Failed to load reports');
+        return;
       }
 
-      // Increment usage after successful report generation
-              await trackUsage('reports');
-
-      console.log('Generated strategic report:', result.report);
-
-      // Add the new report to the list
-      setReports(prev => [result.report, ...prev]);
-      setSelectedInsights([]);
-      setShowInsightSelector(false);
-      
-      toast.success('Report generated successfully!', {
-        description: `AI report based on ${selectedInsights.length} insights is ready.`
-      });
-
+      setReports(reportsData || []);
     } catch (error) {
-      console.error('Error generating report:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to generate report');
+      console.error('Error in loadReports:', error);
+      toast.error('Failed to load reports');
     } finally {
-      setGeneratingReport(false);
+      setLoading(false);
     }
-  };
+  }, [user, sortOrder]);
 
-  // Helper functions for strategic analysis
-  const calculateBusinessImpact = (insights: Insight[]): 'high' | 'medium' | 'low' => {
-    let impact = 0;
-    
-    insights.forEach(insight => {
-      // Sentiment impact
-      if (insight.sentiment === 'positive') impact += 3;
-      else if (insight.sentiment === 'negative') impact += 2; // Negative insights can be valuable for risk mitigation
-      else impact += 1;
-      
-      // Theme complexity impact
-      if (insight.key_themes && insight.key_themes.length > 3) impact += 2;
-      else if (insight.key_themes && insight.key_themes.length > 1) impact += 1;
-      
-      // Action impact
-      if (insight.suggested_actions && insight.suggested_actions.length > 2) impact += 2;
-      else if (insight.suggested_actions && insight.suggested_actions.length > 0) impact += 1;
-    });
-    
-    const averageImpact = impact / insights.length;
-    if (averageImpact >= 6) return 'high';
-    if (averageImpact >= 3) return 'medium';
-    return 'low';
-  };
+  // Load reports on component mount and when sort order changes
+  useEffect(() => {
+    loadReports();
+  }, [loadReports]);
 
-  const calculateStrategicValue = (insights: Insight[]): number => {
-    let value = 0;
-    
-    insights.forEach(insight => {
-      // Base value from sentiment
-      if (insight.sentiment === 'positive') value += 25;
-      else if (insight.sentiment === 'negative') value += 20;
-      else value += 15;
-      
-      // Value from themes
-      if (insight.key_themes && insight.key_themes.length > 0) {
-        value += Math.min(insight.key_themes.length * 8, 40);
-      }
-      
-      // Value from actions
-      if (insight.suggested_actions && insight.suggested_actions.length > 0) {
-        value += Math.min(insight.suggested_actions.length * 6, 30);
-      }
-    });
-    
-    return Math.min(Math.round(value / insights.length), 100);
-  };
+  // Filter reports based on search term and date range
+  const filteredReports = reports.filter(report => {
+    const matchesSearch = searchTerm === '' || 
+      report.analysis_result.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      report.analysis_result.key_themes.some(theme => 
+        theme.toLowerCase().includes(searchTerm.toLowerCase())
+      );
 
-  const assessRiskLevel = (insights: Insight[]): 'low' | 'medium' | 'high' => {
-    const negativeCount = insights.filter(insight => insight.sentiment === 'negative').length;
-    const negativePercentage = (negativeCount / insights.length) * 100;
-    
-    if (negativePercentage >= 60) return 'high';
-    if (negativePercentage >= 30) return 'medium';
-    return 'low';
-  };
+    if (!matchesSearch) return false;
 
-  const calculateOpportunityScore = (insights: Insight[]): number => {
-    let score = 0;
-    
-    insights.forEach(insight => {
-      // Positive sentiment opportunities
-      if (insight.sentiment === 'positive') score += 30;
-      
-      // Theme diversity opportunities
-      if (insight.key_themes && insight.key_themes.length > 2) score += 20;
-      
-      // Actionable insights opportunities
-      if (insight.suggested_actions && insight.suggested_actions.length > 1) score += 25;
-      
-      // Balanced insights (mix of positive/negative) can indicate growth opportunities
-      if (insight.sentiment === 'neutral') score += 15;
-    });
-    
-    return Math.min(Math.round(score / insights.length), 100);
-  };
+    if (dateRange === 'all') return true;
 
-  const handleSelectAllInsights = () => {
-    setSelectedInsights(insights.map(insight => insight.id));
-  };
+    const reportDate = new Date(report.created_at);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - reportDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  const handleDeselectAllInsights = () => {
-    setSelectedInsights([]);
-  };
-
-  const handleToggleInsight = (insightId: string) => {
-    setSelectedInsights(prev => 
-      prev.includes(insightId) 
-        ? prev.filter(id => id !== insightId)
-        : [...prev, insightId]
-    );
-  };
-
-  const exportToPDF = async (report: Report) => {
-    if (!report.content) {
-      toast.error('Report content not available for export');
-      return;
+    switch (dateRange) {
+      case '7d':
+        return diffDays <= 7;
+      case '30d':
+        return diffDays <= 30;
+      case '90d':
+        return diffDays <= 90;
+      default:
+        return true;
     }
+  });
 
+  // Format date
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Get summary preview (first 1-2 sentences)
+  const getSummaryPreview = (summary: string) => {
+    const sentences = summary.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    return sentences.slice(0, 2).join('. ') + (sentences.length > 2 ? '...' : '');
+  };
+
+  // Get themes preview (comma separated, truncated)
+  const getThemesPreview = (themes: string[]) => {
+    if (themes.length <= 3) return themes.join(', ');
+    return themes.slice(0, 3).join(', ') + ` +${themes.length - 3} more`;
+  };
+
+  // Export to PDF
+  const exportToPDF = async (report: InsightHistory) => {
     setExportingPDF(true);
     try {
       toast.info('Generating PDF...', {
@@ -488,30 +178,30 @@ description: `Strategic intelligence report based on ${selectedInsights.length} 
       pdfContainer.innerHTML = `
         <div style="margin-bottom: 30px;">
           <h1 style="color: #1f2937; font-size: 28px; margin-bottom: 10px; border-bottom: 3px solid #3b82f6; padding-bottom: 10px;">
-            ${report.title}
+            AI Insights Analysis Report
           </h1>
           <p style="color: #6b7280; font-size: 14px; margin-bottom: 20px;">
-            Generated on ${new Date(report.generated_at).toLocaleDateString()} • 
-            Based on ${report.insights_ids.length} insights
+            Generated on ${formatDate(report.created_at)} • 
+            Based on ${report.selected_feedback_ids.length} feedback entries
           </p>
         </div>
 
         <div style="margin-bottom: 30px;">
           <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 15px;">
-            Executive Summary
+            Summary
           </h2>
           <p style="font-size: 16px; line-height: 1.6; color: #374151;">
-            ${report.content.executive_summary}
+            ${report.analysis_result.summary}
           </p>
         </div>
 
         <div style="margin-bottom: 30px;">
           <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #10b981; padding-left: 15px;">
-            Key Insights
+            Key Themes
           </h2>
           <ul style="font-size: 14px; line-height: 1.6; color: #374151; padding-left: 20px;">
-            ${report.content.key_insights.map(insight => 
-              `<li style="margin-bottom: 8px;">${insight}</li>`
+            ${report.analysis_result.key_themes.map(theme => 
+              `<li style="margin-bottom: 8px;">${theme}</li>`
             ).join('')}
           </ul>
         </div>
@@ -521,7 +211,7 @@ description: `Strategic intelligence report based on ${selectedInsights.length} 
             Trends
           </h2>
           <ul style="font-size: 14px; line-height: 1.6; color: #374151; padding-left: 20px;">
-            ${report.content.trends.map(trend => 
+            ${report.analysis_result.trends.map(trend => 
               `<li style="margin-bottom: 8px;">${trend}</li>`
             ).join('')}
           </ul>
@@ -529,10 +219,10 @@ description: `Strategic intelligence report based on ${selectedInsights.length} 
 
         <div style="margin-bottom: 30px;">
           <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #ef4444; padding-left: 15px;">
-            Recommended Actions
+            Suggested Actions
           </h2>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            ${report.content.recommended_actions.map((action, index) => `
+            ${report.analysis_result.suggested_actions.map((action, index) => `
               <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; background-color: #f9fafb;">
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
                   <div style="width: 24px; height: 24px; background-color: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 12px;">
@@ -548,37 +238,51 @@ description: `Strategic intelligence report based on ${selectedInsights.length} 
 
         <div style="margin-bottom: 30px;">
           <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #8b5cf6; padding-left: 15px;">
-            Top Themes
+            Performance Metrics
           </h2>
-          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-            ${report.content.top_themes.map(theme => 
-              `<span style="background-color: #f3f4f6; color: #374151; padding: 6px 12px; border-radius: 16px; font-size: 12px; border: 1px solid #d1d5db;">${theme}</span>`
-            ).join('')}
+          <div style="margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+              <span style="font-weight: 600; color: #1f2937; margin-right: 15px;">Overall Score:</span>
+              <div style="width: 100px; height: 20px; background-color: #e5e7eb; border-radius: 10px; overflow: hidden;">
+                <div style="width: ${report.analysis_result.performance.score}%; height: 100%; background-color: #10b981;"></div>
+              </div>
+              <span style="margin-left: 10px; font-weight: 600; color: #1f2937;">${report.analysis_result.performance.score}/100</span>
+            </div>
           </div>
+          <ul style="font-size: 14px; line-height: 1.6; color: #374151; padding-left: 20px;">
+            ${report.analysis_result.performance.metrics.map(metric => 
+              `<li style="margin-bottom: 8px;">${metric}</li>`
+            ).join('')}
+          </ul>
         </div>
 
         <div style="margin-bottom: 30px;">
-          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #10b981; padding-left: 15px;">
-            Sentiment Breakdown
+          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #ec4899; padding-left: 15px;">
+            Sentiment Analysis
           </h2>
           <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
-            <div style="text-align: center;">
-              <div style="font-size: 24px; font-weight: bold; color: #10b981;">${report.content.sentiment_breakdown.positive}%</div>
-              <div style="color: #6b7280; font-size: 14px;">Positive</div>
+            <div style="text-align: center; padding: 20px; background-color: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
+              <div style="font-size: 24px; font-weight: bold; color: #16a34a; margin-bottom: 5px;">${report.analysis_result.sentiment.positive}%</div>
+              <div style="color: #16a34a; font-weight: 500;">Positive</div>
             </div>
-            <div style="text-align: center;">
-              <div style="font-size: 24px; font-weight: bold; color: #ef4444;">${report.content.sentiment_breakdown.negative}%</div>
-              <div style="color: #6b7280; font-size: 14px;">Negative</div>
+            <div style="text-align: center; padding: 20px; background-color: #fefce8; border-radius: 8px; border: 1px solid #fde68a;">
+              <div style="font-size: 24px; font-weight: bold; color: #ca8a04; margin-bottom: 5px;">${report.analysis_result.sentiment.neutral}%</div>
+              <div style="color: #ca8a04; font-weight: 500;">Neutral</div>
             </div>
-            <div style="text-align: center;">
-              <div style="font-size: 24px; font-weight: bold; color: #6b7280;">${report.content.sentiment_breakdown.neutral}%</div>
-              <div style="color: #6b7280; font-size: 14px;">Neutral</div>
+            <div style="text-align: center; padding: 20px; background-color: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
+              <div style="font-size: 24px; font-weight: bold; color: #dc2626; margin-bottom: 5px;">${report.analysis_result.sentiment.negative}%</div>
+              <div style="color: #dc2626; font-weight: 500;">Negative</div>
             </div>
+          </div>
+          <div style="text-align: center; margin-top: 20px;">
+            <Badge style="background-color: #3b82f6; color: white; padding: 8px 16px; border-radius: 16px; font-size: 14px;">
+              Overall: ${report.analysis_result.sentiment.overall}
+            </Badge>
           </div>
         </div>
       `;
 
-      // Convert to canvas and then to PDF
+      // Generate PDF
       const canvas = await html2canvas(pdfContainer, {
         scale: 2,
         useCORS: true,
@@ -604,14 +308,12 @@ description: `Strategic intelligence report based on ${selectedInsights.length} 
         heightLeft -= pageHeight;
       }
 
-      // Clean up
+      // Download PDF
+      pdf.save(`insights-report-${report.id}-${new Date(report.created_at).toISOString().split('T')[0]}.pdf`);
+
+      // Cleanup
       document.body.removeChild(pdfContainer);
-
-      // Download the PDF
-      pdf.save(`${report.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${new Date().toISOString().split('T')[0]}.pdf`);
-
       toast.success('PDF exported successfully!');
-
     } catch (error) {
       console.error('Error exporting PDF:', error);
       toast.error('Failed to export PDF');
@@ -620,582 +322,475 @@ description: `Strategic intelligence report based on ${selectedInsights.length} 
     }
   };
 
-  const exportAllCompletedReports = async () => {
-    const completedReports = reports.filter(report => report.status === 'completed' && report.content);
-    
-    if (completedReports.length === 0) {
-      toast.error('No completed reports available for export');
-      return;
-    }
-
-    setExportingPDF(true);
+  // Export to CSV
+  const exportToCSV = async (report: InsightHistory) => {
+    setExportingCSV(true);
     try {
-      toast.info(`Generating ${completedReports.length} PDFs...`, {
-        description: 'Please wait while we create your reports.'
-      });
+      // Flatten the analysis result into CSV format
+      const csvData = [
+        ['Report ID', report.id],
+        ['Generated Date', formatDate(report.created_at)],
+        ['Feedback Entries Analyzed', report.selected_feedback_ids.length.toString()],
+        ['Summary', report.analysis_result.summary],
+        ['Key Themes', report.analysis_result.key_themes.join('; ')],
+        ['Suggested Actions', report.analysis_result.suggested_actions.join('; ')],
+        ['Trends', report.analysis_result.trends.join('; ')],
+        ['Performance Score', report.analysis_result.performance.score.toString()],
+        ['Performance Metrics', report.analysis_result.performance.metrics.join('; ')],
+        ['Sentiment Positive', report.analysis_result.sentiment.positive.toString()],
+        ['Sentiment Neutral', report.analysis_result.sentiment.neutral.toString()],
+        ['Sentiment Negative', report.analysis_result.sentiment.negative.toString()],
+        ['Overall Sentiment', report.analysis_result.sentiment.overall]
+      ];
 
-      for (let i = 0; i < completedReports.length; i++) {
-        const report = completedReports[i];
-        await exportToPDF(report);
-        
-        // Small delay between exports to prevent browser overload
-        if (i < completedReports.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
+      // Convert to CSV string
+      const csvContent = csvData.map(row => 
+        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+      ).join('\n');
 
-      toast.success(`Successfully exported ${completedReports.length} reports!`);
+      // Create and download CSV file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `insights-report-${report.id}-${new Date(report.created_at).toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success('CSV exported successfully!');
     } catch (error) {
-      console.error('Error in bulk export:', error);
-      toast.error('Failed to export some reports');
+      console.error('Error exporting CSV:', error);
+      toast.error('Failed to export CSV');
     } finally {
-      setExportingPDF(false);
+      setExportingCSV(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-      case 'processing': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'failed': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+  // View full report
+  const viewFullReport = (report: InsightHistory) => {
+    setSelectedReport(report);
+    setShowViewModal(true);
+  };
+
+  // Get sentiment badge variant
+  const getSentimentBadgeVariant = (sentiment: string) => {
+    switch (sentiment) {
+      case 'positive':
+        return 'default';
+      case 'negative':
+        return 'destructive';
+      default:
+        return 'secondary';
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed': return <CheckCircle className="h-4 w-4" />;
-      case 'processing': return <RefreshCw className="h-4 w-4 animate-spin" />;
-      case 'pending': return <Clock className="h-4 w-4" />;
-      case 'failed': return <AlertCircle className="h-4 w-4" />;
-      default: return <Clock className="h-4 w-4" />;
-    }
-  };
-
-  const filteredReports = reports.filter(report => {
-    const matchesSearch = report.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         report.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || report.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  if (loading) {
+  if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2">Loading reports...</span>
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <FileText className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+              <p className="text-gray-600">Please log in to access your reports.</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">🚀 Strategic Executive Reports</h1>
-        <p className="text-gray-600">Transform insights into strategic intelligence with AI-powered executive reports</p>
-        
-        {/* Real-Time Usage Indicator */}
-        {user && (
-          <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="h-8 w-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <FileText className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-purple-900">AI Reports Usage</h4>
-                  <p className="text-sm text-purple-700">
-                    {usage.ai_reports.current} of {usage.ai_reports.limit === -1 ? '∞' : usage.ai_reports.limit} reports generated
-                    {usage.ai_reports.limit !== -1 && (
-                      <span className="ml-2 text-xs">
-                        ({Math.round((usage.ai_reports.current / usage.ai_reports.limit) * 100)}%)
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-purple-600 font-medium">Real-time</span>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Insights Reports</h1>
+          <p className="text-gray-600 mt-2">
+            View and export your AI-generated insights analysis reports
+          </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            onClick={loadReports}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {/* Filters Bar */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
+            {/* Search */}
+            <div className="flex-1 min-w-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search reports by summary or themes..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
             </div>
-            {usage.ai_reports.limit !== -1 && (
-              <div className="mt-3">
-                <div className="flex items-center justify-between text-xs text-purple-600 mb-1">
-                  <span>Usage Progress</span>
-                  <span>{usage.ai_reports.remaining} remaining</span>
-                </div>
-                <div className="w-full bg-purple-200 rounded-full h-2">
-                  <div 
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      usage.ai_reports.current / usage.ai_reports.limit >= 0.9 
-                        ? 'bg-red-500' 
-                        : usage.ai_reports.current / usage.ai_reports.limit >= 0.75 
-                          ? 'bg-yellow-500' 
-                          : 'bg-purple-500'
-                    }`}
-                    style={{ 
-                      width: `${Math.min((usage.ai_reports.current / usage.ai_reports.limit) * 100, 100)}%` 
-                    }}
-                  ></div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
-      {/* Controls */}
-      <div className="flex flex-wrap gap-4 mb-6">
-        <Button 
-          onClick={() => setShowInsightSelector(!showInsightSelector)}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Generate New Report
-        </Button>
+            {/* Date Range Filter */}
+            <Select value={dateRange} onValueChange={(value: any) => setDateRange(value)}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Date Range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="7d">Last 7 Days</SelectItem>
+                <SelectItem value="30d">Last 30 Days</SelectItem>
+                <SelectItem value="90d">Last 90 Days</SelectItem>
+              </SelectContent>
+            </Select>
 
-        
-
-        <Button 
-          onClick={async () => {
-            try {
-              if (user?.id) {
-                const { data: supabaseInsights, error } = await supabase
-                  .from('ai_insights')
-                  .select('*')
-                  .eq('user_id', user.id)
-                  .order('created_at', { ascending: false });
-
-                if (error) {
-                  toast.error('Failed to refresh insights');
-                } else if (supabaseInsights && supabaseInsights.length > 0) {
-                  const transformedInsights: Insight[] = supabaseInsights.map(item => ({
-                    id: item.id,
-                    summary: item.summary || item.insight_text || 'No summary available',
-                    sentiment: item.sentiment || 'neutral',
-                    key_themes: item.key_themes || item.themes || [],
-                    suggested_actions: item.suggested_actions || item.actions || [],
-                    created_at: item.created_at,
-                    source_file: item.source_file || item.file_name
-                  }));
-
-                  setInsights(transformedInsights);
-                  toast.success(`Refreshed ${transformedInsights.length} insights from database`);
-                } else {
-                  toast.info('No insights found in database');
-                }
-              }
-            } catch (error) {
-              toast.error('Failed to refresh insights');
-            }
-          }}
-          variant="outline"
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Refresh Insights
-        </Button>
-
-        <Button 
-          onClick={exportAllCompletedReports}
-          variant="outline"
-          className="flex items-center gap-2"
-          disabled={exportingPDF || reports.filter(r => r.status === 'completed').length === 0}
-        >
-          {exportingPDF ? (
-            <>
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              Exporting...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4" />
-              Export All Completed
-            </>
-          )}
-        </Button>
-
-        <div className="flex items-center gap-2">
-          <Search className="h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search reports..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as any)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="all">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="processing">Processing</option>
-          <option value="completed">Completed</option>
-          <option value="failed">Failed</option>
-        </select>
-      </div>
-
-      {/* Insight Selector */}
-      {showInsightSelector && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lightbulb className="h-5 w-5" />
-              Select Insights for Report
-            </CardTitle>
-            <CardDescription>
-              Choose which insights to include in your AI-generated report
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {insights.length === 0 ? (
-              <div className="text-center py-8">
-                <Lightbulb className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 mb-4">No insights available</p>
-                <p className="text-xs">Generate some insights first to create reports</p>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={handleSelectAllInsights}>
-                      Select All
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleDeselectAllInsights}>
-                      Deselect All
-                    </Button>
+            {/* Sort Order */}
+            <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Sort Order" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">
+                  <div className="flex items-center space-x-2">
+                    <SortDesc className="h-4 w-4" />
+                    <span>Newest First</span>
                   </div>
-                  <span className="text-sm text-gray-600">
-                    {selectedInsights.length} of {insights.length} insights selected
-                  </span>
-                </div>
+                </SelectItem>
+                <SelectItem value="oldest">
+                  <div className="flex items-center space-x-2">
+                    <SortAsc className="h-4 w-4" />
+                    <span>Oldest First</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-                  {insights.map((insight) => (
-                    <Card 
-                      key={insight.id} 
-                      className={`cursor-pointer transition-all ${
-                        selectedInsights.includes(insight.id) 
-                          ? 'ring-2 ring-blue-500 bg-blue-50' 
-                          : 'hover:shadow-md'
-                      }`}
-                      onClick={() => handleToggleInsight(insight.id)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedInsights.includes(insight.id)}
-                            onChange={() => handleToggleInsight(insight.id)}
-                            className="mt-1"
-                          />
-                          <div className="flex-1">
-                            <p className="text-sm text-gray-700 line-clamp-3">
-                              {insight.summary}
-                            </p>
-                            <div className="flex items-center gap-2 mt-2">
-                              <Badge 
-                                variant="secondary" 
-                                className={`text-xs ${
-                                  insight.sentiment === 'positive' ? 'bg-green-100 text-green-800' :
-                                  insight.sentiment === 'negative' ? 'bg-red-100 text-red-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }`}
-                              >
-                                {insight.sentiment}
-                              </Badge>
-                              {insight.source_file && (
-                                <span className="text-xs text-gray-500">
-                                  {insight.source_file}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-
-                <div className="flex justify-end gap-3 mt-6">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowInsightSelector(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={handleGenerateReport}
-                    disabled={generatingReport || selectedInsights.length === 0}
-                    className="flex items-center gap-2"
-                  >
-                    {generatingReport ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="h-4 w-4" />
-                        Generate Report
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </>
+      {/* Reports Grid */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <RefreshCw className="h-8 w-8 animate-spin mr-3" />
+          <span className="text-lg">Loading reports...</span>
+        </div>
+      ) : filteredReports.length === 0 ? (
+        <Card className="text-center py-12">
+          <CardContent>
+            <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+            <h3 className="text-xl font-medium text-gray-900 mb-2">
+              {searchTerm || dateRange !== 'all' ? 'No reports found' : 'No reports yet'}
+            </h3>
+            <p className="text-gray-600 mb-4">
+              {searchTerm || dateRange !== 'all' 
+                ? 'Try adjusting your search or filters.'
+                : 'Generate your first insights report from the Insights page.'
+              }
+            </p>
+            {!searchTerm && dateRange === 'all' && (
+              <Button asChild>
+                <a href="/insights-simple">Go to Insights</a>
+              </Button>
             )}
           </CardContent>
         </Card>
-      )}
-
-      {/* Reports List */}
-      <div className="space-y-4">
-        {filteredReports.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No reports found</h3>
-              <p className="text-gray-500 mb-4">
-                {searchTerm || statusFilter !== 'all' 
-                  ? 'Try adjusting your search or filters'
-                  : insights.length === 0 
-                    ? 'First, generate some insights to create reports'
-                    : 'Generate your first report from your insights'
-                }
-              </p>
-              {!searchTerm && statusFilter === 'all' && insights.length > 0 && (
-                <Button onClick={() => setShowInsightSelector(true)}>
-                  Generate First Report
-                </Button>
-              )}
-              {!searchTerm && statusFilter === 'all' && insights.length === 0 && (
-                <Button onClick={() => window.location.href = '/insights'}>
-                  Go to Insights
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          filteredReports.map((report) => (
-            <Card key={report.id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-blue-600" />
-                      {report.title}
-                    </CardTitle>
-                    <CardDescription className="mt-1">
-                      {report.description}
-                    </CardDescription>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {new Date(report.generated_at).toLocaleDateString()}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Lightbulb className="h-4 w-4" />
-                        {report.insights_ids.length} insights
-                      </span>
-                    </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredReports.map((report) => (
+            <Card key={report.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm text-gray-600">
+                      {formatDate(report.created_at)}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge className={`flex items-center gap-1 ${getStatusColor(report.status)}`}>
-                      {getStatusIcon(report.status)}
-                      {report.status}
-                    </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {report.selected_feedback_ids.length} feedbacks
+                  </Badge>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="space-y-4">
+                {/* Summary Preview */}
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-2">Summary</h3>
+                  <p className="text-sm text-gray-600 line-clamp-3">
+                    {getSummaryPreview(report.analysis_result.summary)}
+                  </p>
+                </div>
+
+                {/* Key Themes Preview */}
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-2">Key Themes</h3>
+                  <p className="text-sm text-gray-600">
+                    {getThemesPreview(report.analysis_result.key_themes)}
+                  </p>
+                </div>
+
+                {/* Performance Score */}
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-2">Performance Score</h3>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${report.analysis_result.performance.score}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">
+                      {report.analysis_result.performance.score}/100
+                    </span>
+                  </div>
+                </div>
+
+                {/* Sentiment */}
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-2">Overall Sentiment</h3>
+                  <Badge variant={getSentimentBadgeVariant(report.analysis_result.sentiment.overall)}>
+                    {report.analysis_result.sentiment.overall}
+                  </Badge>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col space-y-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => viewFullReport(report)}
+                    className="w-full"
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Full
+                  </Button>
+                  
+                  <div className="grid grid-cols-2 gap-2">
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      onClick={() => {
-                        console.log('Eye icon clicked for report:', report.id);
-                        console.log('Report data:', report);
-                        console.log('Report content:', report.content);
-                        console.log('Current expandedReport:', expandedReport);
-                        
-                        const newExpandedState = expandedReport === report.id ? null : report.id;
-                        console.log('Setting expandedReport to:', newExpandedState);
-                        setExpandedReport(newExpandedState);
-                      }}
+                      onClick={() => exportToPDF(report)}
+                      disabled={exportingPDF}
+                      className="w-full"
                     >
-                      {expandedReport === report.id ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {exportingPDF ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileTextIcon className="h-4 w-4" />
+                      )}
+                      PDF
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => exportToCSV(report)}
+                      disabled={exportingCSV}
+                      className="w-full"
+                    >
+                      {exportingCSV ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileDown className="h-4 w-4" />
+                      )}
+                      CSV
                     </Button>
                   </div>
                 </div>
-              </CardHeader>
-
-              {expandedReport === report.id && (
-                <CardContent className="border-t pt-6">
-                  {!report.content ? (
-                    <div className="text-center py-8">
-                      <div className="text-gray-400 mb-4">
-                        <BarChart3 className="h-16 w-16 mx-auto" />
-                      </div>
-                      <h4 className="text-lg font-medium text-gray-900 mb-2">Report Content Not Available</h4>
-                      <p className="text-gray-600 text-sm mb-4">
-                        This report doesn't have content yet or the content structure is incomplete.
-                      </p>
-                      <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg">
-                        <p className="mb-2"><strong>Report ID:</strong> {report.id}</p>
-                        <p className="mb-2"><strong>Status:</strong> {report.status}</p>
-                        <p className="mb-2"><strong>Generated:</strong> {new Date(report.generated_at).toLocaleDateString()}</p>
-                        <p><strong>Insights Count:</strong> {report.insights_ids.length}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Executive Summary */}
-                        <div>
-                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                            <BarChart3 className="h-4 w-4" />
-                            Executive Summary
-                          </h4>
-                          <p className="text-gray-700 text-sm leading-relaxed">
-                            {report.content.executive_summary || 'No executive summary available'}
-                          </p>
-                        </div>
-
-                        {/* Sentiment Breakdown */}
-                        <div>
-                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                            <TrendingUp className="h-4 w-4" />
-                            Sentiment Breakdown
-                          </h4>
-                          {report.content.sentiment_breakdown ? (
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm text-green-600">Positive</span>
-                                <span className="text-sm font-medium">{report.content.sentiment_breakdown.positive || 0}%</span>
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm text-red-600">Negative</span>
-                                <span className="text-sm font-medium">{report.content.sentiment_breakdown.negative || 0}%</span>
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm text-gray-600">Neutral</span>
-                                <span className="text-sm font-medium">{report.content.sentiment_breakdown.neutral || 0}%</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="text-gray-500 text-sm">Sentiment data not available</p>
-                          )}
-                        </div>
-
-                        {/* Key Insights */}
-                        <div>
-                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                            <Lightbulb className="h-4 w-4" />
-                            Key Insights
-                          </h4>
-                          {report.content.key_insights && report.content.key_insights.length > 0 ? (
-                            <ul className="space-y-1">
-                              {report.content.key_insights.map((insight, index) => (
-                                <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
-                                  <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
-                                  {insight}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="text-gray-500 text-sm">No key insights available</p>
-                          )}
-                        </div>
-
-                        {/* Trends */}
-                        <div>
-                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                            <TrendingUp className="h-4 w-4" />
-                            Trends
-                          </h4>
-                          {report.content.trends && report.content.trends.length > 0 ? (
-                            <ul className="space-y-1">
-                              {report.content.trends.map((trend, index) => (
-                                <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
-                                  <div className="w-1.5 h-1.5 bg-green-600 rounded-full mt-2 flex-shrink-0"></div>
-                                  {trend}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="text-gray-500 text-sm">No trends data available</p>
-                          )}
-                        </div>
-
-                        {/* Recommended Actions */}
-                        <div className="lg:col-span-2">
-                          <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                            <Target className="h-4 w-4" />
-                            Recommended Actions
-                          </h4>
-                          {report.content.recommended_actions && report.content.recommended_actions.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {report.content.recommended_actions.map((action, index) => (
-                                <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border">
-                                  <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <span className="text-blue-600 text-sm font-bold">{index + 1}</span>
-                                  </div>
-                                  <span className="text-sm text-gray-700">{action}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-gray-500 text-sm">No recommended actions available</p>
-                          )}
-                        </div>
-
-                        {/* Top Themes */}
-                        <div className="lg:col-span-2">
-                          <h4 className="font-semibold text-gray-900 mb-2">Top Themes</h4>
-                          {report.content.top_themes && report.content.top_themes.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                              {report.content.top_themes.map((theme, index) => (
-                                <Badge key={index} variant="secondary" className="bg-purple-100 text-purple-800">
-                                  {theme}
-                                </Badge>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-gray-500 text-sm">No themes data available</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="mt-6 flex justify-end">
-                        <Button 
-                          variant="outline" 
-                          className="flex items-center gap-2"
-                          onClick={() => exportToPDF(report)}
-                          disabled={exportingPDF}
-                        >
-                          {exportingPDF ? (
-                            <>
-                              <RefreshCw className="h-4 w-4 animate-spin" />
-                              Generating PDF...
-                            </>
-                          ) : (
-                            <>
-                              <Download className="h-4 w-4" />
-                              Export PDF
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              )}
+              </CardContent>
             </Card>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {/* View Full Report Modal */}
+      <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <FileText className="h-5 w-5" />
+              <span>Full Report - {selectedReport && formatDate(selectedReport.created_at)}</span>
+            </DialogTitle>
+            <DialogDescription>
+              Complete analysis based on {selectedReport?.selected_feedback_ids.length} feedback entries
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedReport && (
+            <div className="space-y-6">
+              {/* Summary */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
+                  <Lightbulb className="h-5 w-5 text-yellow-600" />
+                  <span>Summary</span>
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  {selectedReport.analysis_result.summary}
+                </p>
+              </div>
+
+              {/* Key Themes */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
+                  <Target className="h-5 w-5 text-blue-600" />
+                  <span>Key Themes</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {selectedReport.analysis_result.key_themes.map((theme, index) => (
+                    <div key={index} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
+                      <Target className="h-4 w-4 text-blue-600" />
+                      <span className="text-gray-700">{theme}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Suggested Actions */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
+                  <TrendingUp className="h-5 w-5 text-green-600" />
+                  <span>Suggested Actions</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {selectedReport.analysis_result.suggested_actions.map((action, index) => (
+                    <div key={index} className="flex items-center space-x-2 p-3 bg-green-50 rounded-lg">
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      <span className="text-gray-700">{action}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Trends */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
+                  <BarChart3 className="h-5 w-5 text-purple-600" />
+                  <span>Trends</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {selectedReport.analysis_result.trends.map((trend, index) => (
+                    <div key={index} className="flex items-center space-x-2 p-3 bg-purple-50 rounded-lg">
+                      <BarChart3 className="h-4 w-4 text-purple-600" />
+                      <span className="text-gray-700">{trend}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Performance */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
+                  <BarChart3 className="h-5 w-5 text-indigo-600" />
+                  <span>Performance Metrics</span>
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Overall Score</span>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-24 bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${selectedReport.analysis_result.performance.score}%` }}
+                        />
+                      </div>
+                      <span className="font-semibold">{selectedReport.analysis_result.performance.score}/100</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {selectedReport.analysis_result.performance.metrics.map((metric, index) => (
+                      <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                        <span className="text-sm text-gray-700">{metric}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Sentiment */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
+                  <MessageSquare className="h-5 w-5 text-pink-600" />
+                  <span>Sentiment Analysis</span>
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Overall Sentiment</span>
+                    <Badge 
+                      variant={getSentimentBadgeVariant(selectedReport.analysis_result.sentiment.overall)}
+                      className="text-sm"
+                    >
+                      {selectedReport.analysis_result.sentiment.overall}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">
+                        {selectedReport.analysis_result.sentiment.positive}%
+                      </div>
+                      <div className="text-sm text-gray-600">Positive</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-gray-600">
+                        {selectedReport.analysis_result.sentiment.neutral}%
+                      </div>
+                      <div className="text-sm text-gray-600">Neutral</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-red-600">
+                        {selectedReport.analysis_result.sentiment.negative}%
+                      </div>
+                      <div className="text-sm text-gray-600">Negative</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Export Actions */}
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="text-sm text-gray-500">
+                  Report ID: {selectedReport.id}
+                </div>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => exportToPDF(selectedReport)}
+                    disabled={exportingPDF}
+                  >
+                    {exportingPDF ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <FileTextIcon className="h-4 w-4 mr-2" />
+                    )}
+                    Export PDF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => exportToCSV(selectedReport)}
+                    disabled={exportingCSV}
+                  >
+                    {exportingCSV ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <FileDown className="h-4 w-4 mr-2" />
+                    )}
+                    Export CSV
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
