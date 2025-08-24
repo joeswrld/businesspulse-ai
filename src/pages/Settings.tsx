@@ -211,12 +211,30 @@ const Settings = () => {
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        toast.error('Please select a valid image file (JPG, PNG, GIF, or WebP)');
+        event.target.value = '';
+        return;
+      }
+
+      // Validate file size (5MB limit)
+      const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+      if (file.size > maxSize) {
+        toast.error('File size must be less than 5MB');
+        event.target.value = '';
+        return;
+      }
+
       setAvatarFile(file);
       const reader = new FileReader();
       reader.onload = (e) => {
         setAvatarPreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
+      
+      toast.success('File selected successfully! Click Upload to save.');
     }
   };
 
@@ -227,29 +245,88 @@ const Settings = () => {
     try {
       setUploadingAvatar(true);
       
-      const fileExt = avatarFile.name.split('.').pop();
+      // Validate file size (5MB limit)
+      const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+      if (avatarFile.size > maxSize) {
+        toast.error('File size must be less than 5MB');
+        return;
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(avatarFile.type)) {
+        toast.error('Please select a valid image file (JPG, PNG, GIF, or WebP)');
+        return;
+      }
+
+      const fileExt = avatarFile.name.split('.').pop()?.toLowerCase();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
 
-      // Upload to Supabase storage
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, avatarFile);
+      console.log('Attempting to upload to path:', filePath);
 
-      if (uploadError) throw uploadError;
+      // First, check if the avatars bucket exists
+      const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
+      if (bucketError) {
+        console.error('Error checking buckets:', bucketError);
+        toast.error('Storage service unavailable. Please try again later.');
+        return;
+      }
+
+      const avatarsBucket = buckets.find(bucket => bucket.name === 'avatars');
+      if (!avatarsBucket) {
+        console.error('Avatars bucket not found');
+        toast.error('Avatar storage not configured. Please contact support.');
+        return;
+      }
+
+      // Upload to Supabase storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, avatarFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        
+        // Provide specific error messages
+        if (uploadError.message.includes('bucket')) {
+          toast.error('Storage bucket not found. Please contact support.');
+        } else if (uploadError.message.includes('policy')) {
+          toast.error('Upload permission denied. Please contact support.');
+        } else if (uploadError.message.includes('size')) {
+          toast.error('File size too large. Please select a smaller image.');
+        } else {
+          toast.error(`Upload failed: ${uploadError.message}`);
+        }
+        return;
+      }
+
+      console.log('Upload successful:', uploadData);
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
+      console.log('Public URL:', publicUrl);
+
       // Update profile with new avatar URL
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ avatar_url: publicUrl })
+        .update({ 
+          avatar_url: publicUrl,
+          updated_at: new Date().toISOString()
+        })
         .eq('user_id', user.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Profile update error:', updateError);
+        toast.error('Avatar uploaded but profile update failed. Please try again.');
+        return;
+      }
 
       // Update local state
       setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null);
@@ -257,9 +334,25 @@ const Settings = () => {
       setAvatarPreview(null);
 
       toast.success('Profile picture updated successfully!');
+      
+      // Refresh the page data
+      await loadUserData();
+      
     } catch (error) {
       console.error('Error uploading avatar:', error);
-      toast.error('Failed to upload profile picture');
+      
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('network')) {
+          toast.error('Network error. Please check your connection and try again.');
+        } else if (error.message.includes('timeout')) {
+          toast.error('Upload timeout. Please try again with a smaller image.');
+        } else {
+          toast.error(`Upload failed: ${error.message}`);
+        }
+      } else {
+        toast.error('An unexpected error occurred. Please try again.');
+      }
     } finally {
       setUploadingAvatar(false);
     }
