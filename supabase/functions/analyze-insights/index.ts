@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.24.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -217,15 +216,36 @@ For feedback analysis, pay special attention to:
 Return only valid JSON without any additional text or formatting.
 `
 
-    // Initialize Gemini AI
-    const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!)
-
-    // Call Gemini AI
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
+    // Initialize Gemini AI with current API
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')!
     
-    const result = await model.generateContent(prompt)
-    const response = await result.response
-    const text = response.text()
+    // Use the current Gemini API endpoint with gemini-1.5-flash model
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": GEMINI_API_KEY
+        },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            topK: 50,
+            topP: 0.9,
+            maxOutputTokens: 1000
+          }
+        })
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Gemini API request failed: ${response.status}`);
+    }
+
+    const geminiData = await response.json();
+    const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
 
     // Parse the JSON response
     let analysis
