@@ -23,7 +23,17 @@ import {
   Copy,
   Check,
   Save,
-  AlertCircle
+  AlertCircle,
+  MessageSquare,
+  Sparkles,
+  Mail,
+  Tag,
+  CheckCircle,
+  ExternalLink,
+  RefreshCw,
+  X,
+  Play,
+  Square
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -46,51 +56,60 @@ interface FeedbackSettings {
   updated_at: string;
 }
 
+interface WidgetSettings {
+  id: string;
+  user_id: string;
+  brand_color: string;
+  greeting_text: string;
+  anonymous_feedback: boolean;
+  email_notifications: boolean;
+  ai_auto_tagging: boolean;
+  auto_resolve_after_reply: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 const FeedbackSettings = () => {
-  console.log('FeedbackSettings component rendering...');
   const { user } = useAuth();
-  console.log('User from AuthContext:', user);
+  
+  // State management
   const [settings, setSettings] = useState<FeedbackSettings | null>(null);
+  const [widgetSettings, setWidgetSettings] = useState<WidgetSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [projectIdStatus, setProjectIdStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
 
+  // Load settings and widget settings
   const loadSettings = useCallback(async () => {
-    console.log('loadSettings called, user:', user);
-    if (!user) {
-      console.log('No user, returning early');
-      return;
-    }
+    if (!user) return;
 
     try {
-      console.log('Loading settings for user:', user.id);
+      setLoading(true);
       
-      const { data, error } = await supabase
+      // Load feedback settings
+      const { data: feedbackData, error: feedbackError } = await supabase
         .from('feedback_settings')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1);
 
-      console.log('Query result:', { data, error });
-
-      if (error) {
-        console.error('Error loading settings:', error);
-        throw error;
+      if (feedbackError) {
+        console.error('Error loading feedback settings:', feedbackError);
+        throw feedbackError;
       }
 
-      if (data && Array.isArray(data) && data.length > 0) {
-        console.log('Settings loaded successfully:', data[0]);
-        setSettings(data[0]);
+      if (feedbackData && feedbackData.length > 0) {
+        setSettings(feedbackData[0]);
       } else {
-        // No settings found, create default ones with blank project_id
-        console.log('No settings found, creating default settings...');
-        
-        const newSettingsData = {
+        // Create default feedback settings
+        const newFeedbackSettings = {
           user_id: user.id,
-          project_id: '', // Leave blank for user input
+          project_id: '',
           project_id_locked: false,
           title: 'Share your thoughts with us',
           show_name: true,
@@ -100,27 +119,61 @@ const FeedbackSettings = () => {
           brand_color: '#2563eb'
         };
         
-        console.log('Creating settings with data:', newSettingsData);
-        
-        const { data: newSettings, error: createError } = await supabase
+        const { data: newFeedbackData, error: createFeedbackError } = await supabase
           .from('feedback_settings')
-          .insert(newSettingsData)
+          .insert(newFeedbackSettings)
           .select()
           .single();
 
-        console.log('Create result:', { newSettings, createError });
-
-        if (createError) {
-          console.error('Error creating settings:', createError);
-          throw createError;
+        if (createFeedbackError) {
+          throw createFeedbackError;
         }
         
-        setSettings(newSettings);
+        setSettings(newFeedbackData);
       }
+
+      // Load widget settings
+      const { data: widgetData, error: widgetError } = await supabase
+        .from('widget_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (widgetError && widgetError.code !== 'PGRST116') {
+        console.error('Error loading widget settings:', widgetError);
+        // Don't throw error for widget settings, create default ones
+      }
+
+      if (widgetData) {
+        setWidgetSettings(widgetData);
+      } else {
+        // Create default widget settings
+        const newWidgetSettings = {
+          user_id: user.id,
+          brand_color: '#2563eb',
+          greeting_text: 'We\'d love to hear your feedback!',
+          anonymous_feedback: false,
+          email_notifications: true,
+          ai_auto_tagging: true,
+          auto_resolve_after_reply: false
+        };
+        
+        const { data: newWidgetData, error: createWidgetError } = await supabase
+          .from('widget_settings')
+          .insert(newWidgetSettings)
+          .select()
+          .single();
+
+        if (createWidgetError) {
+          console.error('Error creating widget settings:', createWidgetError);
+          // Continue without widget settings for now
+        } else {
+          setWidgetSettings(newWidgetData);
+        }
+      }
+
     } catch (error) {
       console.error('Error in loadSettings:', error);
-      
-      // Provide more specific error messages
       let errorMessage = 'Failed to load settings. Please try again.';
       
       if (error instanceof Error) {
@@ -154,7 +207,7 @@ const FeedbackSettings = () => {
         .select('id, project_id')
         .eq('user_id', user.id)
         .eq('project_id', projectId.trim())
-        .neq('id', settings?.id || ''); // Exclude current settings
+        .neq('id', settings?.id || '');
 
       if (checkError) {
         console.error('Error checking project ID availability:', checkError);
@@ -175,8 +228,7 @@ const FeedbackSettings = () => {
 
   // Load settings on component mount
   useEffect(() => {
-    console.log('useEffect for loadSettings triggered, user:', user);
-    setError(null); // Clear any previous errors
+    setError(null);
     loadSettings();
   }, [user, loadSettings]);
 
@@ -185,7 +237,7 @@ const FeedbackSettings = () => {
     if (!settings?.project_id_locked && settings?.project_id) {
       const timeoutId = setTimeout(() => {
         checkProjectIdAvailability(settings.project_id);
-      }, 500); // Debounce for 500ms
+      }, 500);
 
       return () => clearTimeout(timeoutId);
     } else {
@@ -199,145 +251,105 @@ const FeedbackSettings = () => {
     loadSettings();
   };
 
-  const handleSave = async () => {
-    if (!settings || !user) return;
-
-    // Validate project ID if not locked
-    if (!settings.project_id_locked) {
-      if (!settings.project_id || settings.project_id.trim() === '') {
-        toast.error('Please enter a Project ID before saving');
-        return;
-      }
-      
-      if (settings.project_id.length < 3) {
-        toast.error('Project ID must be at least 3 characters long');
-        return;
-      }
-      
-      // Check for valid characters (alphanumeric, hyphens, underscores)
-      if (!/^[a-zA-Z0-9_-]+$/.test(settings.project_id)) {
-        toast.error('Project ID can only contain letters, numbers, hyphens, and underscores');
-        return;
-      }
-
-      // Check if project ID is already used by this user
-      const { data: existingSettings, error: checkError } = await supabase
-        .from('feedback_settings')
-        .select('id, project_id')
-        .eq('user_id', user.id)
-        .eq('project_id', settings.project_id.trim())
-        .neq('id', settings.id); // Exclude current settings
-
-      if (checkError) {
-        console.error('Error checking project ID uniqueness:', checkError);
-        toast.error('Failed to validate Project ID. Please try again.');
-        return;
-      }
-
-      if (existingSettings && existingSettings.length > 0) {
-        toast.error('This Project ID is already used by you. Please choose a different one.');
-        return;
-      }
-    }
+  const handleSaveSettings = async () => {
+    if (!user || !settings || !widgetSettings) return;
 
     setSaving(true);
     try {
-      console.log('Saving settings:', settings);
-      
-      // Prepare update data
-      const updateData = {
-        title: settings.title,
-        show_name: settings.show_name,
-        show_email: settings.show_email,
-        button_text: settings.button_text,
-        theme: settings.theme,
-        brand_color: settings.brand_color,
-        notify_email: settings.notify_email,
-        redirect_url: settings.redirect_url
-      };
-
-      // Only update project_id if it's not locked yet
-      if (!settings.project_id_locked) {
-        updateData.project_id = settings.project_id;
-        updateData.project_id_locked = true;
-      }
-
-      const { error } = await supabase
+      // Save feedback settings
+      const { error: feedbackError } = await supabase
         .from('feedback_settings')
-        .update(updateData)
+        .update({
+          title: settings.title,
+          show_name: settings.show_name,
+          show_email: settings.show_email,
+          button_text: settings.button_text,
+          redirect_url: settings.redirect_url,
+          theme: settings.theme,
+          brand_color: settings.brand_color,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', settings.id);
 
-      if (error) {
-        console.error('Error updating settings:', error);
-        // Surface clearer errors for common cases
-        if (error.code === '23505' || (error.message && error.message.includes('duplicate'))) {
-          throw new Error('This Project ID is already used by you. Please choose a different one.');
-        }
-        throw new Error(error.message || 'Unknown database error while saving settings');
-      }
+      if (feedbackError) throw feedbackError;
 
-      // Update local state to reflect the locked status
-      if (!settings.project_id_locked) {
-        setSettings(prev => ({ ...prev, project_id_locked: true }));
-      }
+      // Save widget settings
+      const { error: widgetError } = await supabase
+        .from('widget_settings')
+        .update({
+          brand_color: widgetSettings.brand_color,
+          greeting_text: widgetSettings.greeting_text,
+          anonymous_feedback: widgetSettings.anonymous_feedback,
+          email_notifications: widgetSettings.email_notifications,
+          ai_auto_tagging: widgetSettings.ai_auto_tagging,
+          auto_resolve_after_reply: widgetSettings.auto_resolve_after_reply,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', widgetSettings.id);
 
+      if (widgetError) throw widgetError;
+
+      setLastSaved(new Date().toLocaleString());
       toast.success('Settings saved successfully!');
     } catch (error) {
       console.error('Error saving settings:', error);
-      
-      if (error instanceof Error) {
-        if (error.message.includes('relation "feedback_settings" does not exist')) {
-          toast.error('Database tables not set up. Please run the database setup script first.');
-        } else if (error.message.includes('permission denied')) {
-          toast.error('Permission denied. Please check your database permissions.');
-        } else if (
-          error.message.includes('duplicate key') ||
-          error.message.includes('unique constraint') ||
-          error.message.includes('already used by you')
-        ) {
-          toast.error('This Project ID is already used by you. Please choose a different one.');
-        } else {
-          toast.error(`Failed to save settings: ${error.message}`);
-        }
-      } else {
-        toast.error('Failed to save settings. Please try again.');
-      }
+      toast.error('Failed to save settings');
     } finally {
       setSaving(false);
     }
   };
 
-  const copyEmbedCode = async () => {
-    if (!settings) return;
-
-    const embedCode = `<script src="https://notex.com.ng/feedback-widget.js" data-project-id="${settings.project_id}"></script>`;
-    
+  const copyToClipboard = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(embedCode);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
-      toast.success('Embed code copied to clipboard!');
+      toast.success('Copied to clipboard!');
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      toast.error('Failed to copy embed code');
+      console.error('Failed to copy:', error);
+      toast.error('Failed to copy to clipboard');
     }
   };
 
   const generateEmbedCode = () => {
-    if (!settings) return '';
-
-    return `<script src="https://notex.com.ng/feedback-widget.js" data-project-id="${settings.project_id}"></script>`;
+    if (!settings?.project_id) return '';
+    
+    return `<script>
+  (function() {
+    var script = document.createElement('script');
+    script.src = '${window.location.origin}/widget.js';
+    script.setAttribute('data-project-id', '${settings.project_id}');
+    script.setAttribute('data-brand-color', '${widgetSettings?.brand_color || '#2563eb'}');
+    script.setAttribute('data-greeting-text', '${widgetSettings?.greeting_text || 'We\'d love to hear your feedback!'}');
+    document.head.appendChild(script);
+  })();
+</script>`;
   };
 
-  console.log('Render conditions - loading:', loading, 'error:', error, 'settings:', settings);
-  
-  if (loading) {
-    console.log('Rendering loading state');
+  if (!user) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <Settings className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+              <p className="text-gray-600">Please log in to access feedback settings.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading feedback settings...</p>
+            <RefreshCw className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Loading Settings...</h2>
+            <p className="text-gray-600">Please wait while we fetch your configuration.</p>
           </div>
         </div>
       </div>
@@ -345,364 +357,403 @@ const FeedbackSettings = () => {
   }
 
   if (error) {
-    console.log('Rendering error state');
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center max-w-md">
-            <div className="p-4 bg-red-100 rounded-full w-16 h-16 mx-auto mb-6 flex items-center justify-center">
-              <AlertCircle className="h-8 w-8 text-red-600" />
+      <div className="container mx-auto p-6">
+        <Card className="max-w-2xl mx-auto">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-4">Error Loading Settings</h2>
+              <p className="text-gray-600 mb-6">{error}</p>
+              <Button onClick={handleRetry}>Try Again</Button>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Settings</h2>
-            <p className="text-gray-600 mb-6">{error}</p>
-            <div className="space-y-3">
-              <Button onClick={handleRetry} className="w-full">
-                Try Again
-              </Button>
-              {error.includes('Database tables not set up') && (
-                <div className="text-sm text-gray-500">
-                  <p>To fix this, run the database setup script in your Supabase SQL Editor:</p>
-                  <code className="block mt-2 p-2 bg-gray-100 rounded text-xs">
-                    setup-feedback-system.sql
-                  </code>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  if (!settings) {
-    console.log('Rendering no settings state');
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <p className="text-gray-600">Failed to load settings. Please try again.</p>
-        </div>
-      </div>
-    );
-  }
-
-  console.log('Rendering main content');
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="text-center mb-8">
-        <div className="flex items-center justify-center mb-4">
-          <div className="p-3 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full mr-4">
-            <SlidersHorizontal className="h-8 w-8 text-white" />
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Feedback Widget Settings</h1>
+        <p className="text-gray-600">Configure your feedback widget and customize its appearance</p>
+        {lastSaved && (
+          <div className="mt-2 text-sm text-green-600">
+            Last updated on {lastSaved}
           </div>
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">Feedback Settings</h1>
-            <Badge variant="secondary" className="mt-2">
-              Live
-            </Badge>
-          </div>
-        </div>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Customize your feedback widget and configure how you receive feedback from your website visitors.
-        </p>
+        )}
       </div>
 
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* Project ID Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Code className="h-5 w-5" />
-              Project Configuration
-            </CardTitle>
-            <CardDescription>
-              Your unique project ID is used to identify feedback from your website.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-                <Label htmlFor="project-id">Project ID</Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      id="project-id"
-                      value={settings.project_id}
-                      onChange={(e) => setSettings({ ...settings, project_id: e.target.value })}
-                      disabled={settings.project_id_locked}
-                      className={`font-mono ${
-                        !settings.project_id_locked && settings.project_id && settings.project_id.length >= 3
-                          ? projectIdStatus === 'available'
-                            ? 'border-green-500 focus:border-green-500'
-                            : projectIdStatus === 'taken'
-                            ? 'border-red-500 focus:border-red-500'
-                            : ''
-                          : ''
-                      }`}
-                      placeholder={settings.project_id_locked ? settings.project_id : "e.g., my-website-2024, company-feedback"}
-                    />
-                    {!settings.project_id_locked && settings.project_id && settings.project_id.length >= 3 && (
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        {projectIdStatus === 'checking' && (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                        )}
-                        {projectIdStatus === 'available' && (
-                          <Check className="h-4 w-4 text-green-600" />
-                        )}
-                        {projectIdStatus === 'taken' && (
-                          <AlertCircle className="h-4 w-4 text-red-600" />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {settings.project_id_locked && (
-                    <Badge variant="outline" className="flex items-center gap-1 bg-green-50 text-green-700 border-green-200">
-                      <Check className="h-3 w-3" />
-                      Locked
-                    </Badge>
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-500">
-                    {settings.project_id_locked 
-                      ? "✅ Project ID is locked and cannot be changed. This ensures consistent feedback collection."
-                      : "⚠️ Enter a unique project ID before saving. It will be permanently locked after the first save."
-                    }
-                  </p>
-                  {!settings.project_id_locked && (
-                    <>
-                      <p className="text-xs text-amber-600">
-                        💡 Choose a unique, memorable ID using letters, numbers, hyphens, and underscores only
-                      </p>
-                      {settings.project_id && settings.project_id.length >= 3 && (
-                        <p className={`text-xs ${
-                          projectIdStatus === 'available' 
-                            ? 'text-green-600' 
-                            : projectIdStatus === 'taken' 
-                            ? 'text-red-600' 
-                            : 'text-gray-500'
-                        }`}>
-                          {projectIdStatus === 'checking' && '🔄 Checking availability...'}
-                          {projectIdStatus === 'available' && '✅ This Project ID is available'}
-                          {projectIdStatus === 'taken' && '❌ This Project ID is already used by you'}
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-          </CardContent>
-        </Card>
-
-        {/* Widget Customization */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="h-5 w-5" />
-              Widget Customization
-            </CardTitle>
-            <CardDescription>
-              Customize the appearance and behavior of your feedback widget.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="title">Widget Title</Label>
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Left Column - Settings */}
+        <div className="space-y-6">
+          {/* Project Configuration */}
+          <Card className="rounded-xl shadow-lg border-2 border-blue-100">
+            <CardHeader className="bg-blue-50 rounded-t-xl">
+              <CardTitle className="flex items-center space-x-2 text-blue-900">
+                <Globe className="h-5 w-5" />
+                <span>Project Configuration</span>
+              </CardTitle>
+              <CardDescription className="text-blue-700">
+                Your unique project ID identifies feedback from your website
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div>
+                <Label htmlFor="projectId" className="text-sm font-medium">
+                  Project ID
+                </Label>
                 <Input
-                  id="title"
-                  value={settings.title}
-                  onChange={(e) => setSettings({ ...settings, title: e.target.value })}
-                  placeholder="Share your thoughts with us"
+                  id="projectId"
+                  value={settings?.project_id || ''}
+                  onChange={(e) => setSettings(prev => prev ? { ...prev, project_id: e.target.value } : null)}
+                  placeholder="Enter your unique project ID"
+                  className="mt-1"
                 />
+                {projectIdStatus === 'available' && (
+                  <p className="text-sm text-green-600 mt-1">✓ Project ID available</p>
+                )}
+                {projectIdStatus === 'taken' && (
+                  <p className="text-sm text-red-600 mt-1">✗ Project ID already taken</p>
+                )}
+                {projectIdStatus === 'checking' && (
+                  <p className="text-sm text-blue-600 mt-1">Checking availability...</p>
+                )}
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="button-text">Button Text</Label>
-                <Input
-                  id="button-text"
-                  value={settings.button_text}
-                  onChange={(e) => setSettings({ ...settings, button_text: e.target.value })}
-                  placeholder="Send Feedback"
-                />
-              </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="theme">Theme</Label>
-                <Select 
-                  value={settings.theme} 
-                  onValueChange={(value: 'light' | 'dark') => setSettings({ ...settings, theme: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="light">Light</SelectItem>
-                    <SelectItem value="dark">Dark</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="brand-color">Brand Color</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="brand-color"
+          {/* Widget Customization */}
+          <Card className="rounded-xl shadow-lg border-2 border-blue-100">
+            <CardHeader className="bg-blue-50 rounded-t-xl">
+              <CardTitle className="flex items-center space-x-2 text-blue-900">
+                <Palette className="h-5 w-5" />
+                <span>Widget Customization</span>
+              </CardTitle>
+              <CardDescription className="text-blue-700">
+                Customize the appearance and behavior of your feedback widget
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div>
+                <Label htmlFor="brandColor" className="text-sm font-medium">
+                  Brand Color
+                </Label>
+                <div className="flex items-center space-x-3 mt-1">
+                  <input
                     type="color"
-                    value={settings.brand_color}
-                    onChange={(e) => setSettings({ ...settings, brand_color: e.target.value })}
-                    className="w-16 h-10 p-1"
+                    id="brandColor"
+                    value={widgetSettings?.brand_color || '#2563eb'}
+                    onChange={(e) => setWidgetSettings(prev => prev ? { ...prev, brand_color: e.target.value } : null)}
+                    className="w-12 h-10 rounded border-2 border-gray-200 cursor-pointer"
                   />
                   <Input
-                    value={settings.brand_color}
-                    onChange={(e) => setSettings({ ...settings, brand_color: e.target.value })}
+                    value={widgetSettings?.brand_color || '#2563eb'}
+                    onChange={(e) => setWidgetSettings(prev => prev ? { ...prev, brand_color: e.target.value } : null)}
                     placeholder="#2563eb"
+                    className="flex-1"
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Show Name Field</Label>
-                  <p className="text-sm text-gray-500">Display name input field in the feedback form</p>
-                </div>
-                <Switch
-                  checked={settings.show_name}
-                  onCheckedChange={(checked) => setSettings({ ...settings, show_name: checked })}
+              <div>
+                <Label htmlFor="greetingText" className="text-sm font-medium">
+                  Greeting Text
+                </Label>
+                <Textarea
+                  id="greetingText"
+                  value={widgetSettings?.greeting_text || ''}
+                  onChange={(e) => setWidgetSettings(prev => prev ? { ...prev, greeting_text: e.target.value } : null)}
+                  placeholder="We'd love to hear your feedback!"
+                  className="mt-1"
+                  rows={3}
                 />
               </div>
-              
+            </CardContent>
+          </Card>
+
+          {/* Collection Settings */}
+          <Card className="rounded-xl shadow-lg border-2 border-blue-100">
+            <CardHeader className="bg-blue-50 rounded-t-xl">
+              <CardTitle className="flex items-center space-x-2 text-blue-900">
+                <SlidersHorizontal className="h-5 w-5" />
+                <span>Collection Settings</span>
+              </CardTitle>
+              <CardDescription className="text-blue-700">
+                Configure how feedback is collected and processed
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Show Email Field</Label>
-                  <p className="text-sm text-gray-500">Display email input field in the feedback form</p>
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">Anonymous Feedback</Label>
+                  <p className="text-xs text-gray-500">Allow users to submit feedback without providing contact information</p>
                 </div>
                 <Switch
-                  checked={settings.show_email}
-                  onCheckedChange={(checked) => setSettings({ ...settings, show_email: checked })}
+                  checked={widgetSettings?.anonymous_feedback || false}
+                  onCheckedChange={(checked) => setWidgetSettings(prev => prev ? { ...prev, anonymous_feedback: checked } : null)}
                 />
               </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Notifications */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              Notifications
-            </CardTitle>
-            <CardDescription>
-              Configure how you receive notifications for new feedback.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="notify-email">Email Notifications</Label>
-              <Input
-                id="notify-email"
-                type="email"
-                value={settings.notify_email || ''}
-                onChange={(e) => setSettings({ ...settings, notify_email: e.target.value || null })}
-                placeholder="your@email.com"
-              />
-              <p className="text-sm text-gray-500">
-                Receive email notifications when new feedback is submitted (optional)
-              </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="redirect-url">Redirect URL</Label>
-              <Input
-                id="redirect-url"
-                type="url"
-                value={settings.redirect_url || ''}
-                onChange={(e) => setSettings({ ...settings, redirect_url: e.target.value || null })}
-                placeholder="https://your-website.com/thank-you"
-              />
-              <p className="text-sm text-gray-500">
-                URL to redirect users after submitting feedback (optional)
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">Email Notifications</Label>
+                  <p className="text-xs text-gray-500">Receive email alerts when new feedback is submitted</p>
+                </div>
+                <Switch
+                  checked={widgetSettings?.email_notifications || false}
+                  onCheckedChange={(checked) => setWidgetSettings(prev => prev ? { ...prev, email_notifications: checked } : null)}
+                />
+              </div>
 
-        {/* Save Button */}
-        <div className="flex justify-end">
-          <Button 
-            onClick={handleSave} 
-            disabled={saving || (!settings.project_id_locked && projectIdStatus === 'taken')}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">AI Auto-Tagging</Label>
+                  <p className="text-xs text-gray-500">Automatically categorize feedback using AI analysis</p>
+                </div>
+                <Switch
+                  checked={widgetSettings?.ai_auto_tagging || false}
+                  onCheckedChange={(checked) => setWidgetSettings(prev => prev ? { ...prev, ai_auto_tagging: checked } : null)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">Auto-Resolve After Reply</Label>
+                  <p className="text-xs text-gray-500">Automatically mark feedback as resolved when you reply</p>
+                </div>
+                <Switch
+                  checked={widgetSettings?.auto_resolve_after_reply || false}
+                  onCheckedChange={(checked) => setWidgetSettings(prev => prev ? { ...prev, auto_resolve_after_reply: checked } : null)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Save Button */}
+          <Button
+            onClick={handleSaveSettings}
+            disabled={saving || !settings?.project_id}
+            className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700"
           >
             {saving ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
                 Saving...
               </>
             ) : (
               <>
-                <Save className="h-4 w-4 mr-2" />
-                {settings.project_id_locked ? 'Update Settings' : 'Save & Lock Project ID'}
+                <Save className="h-5 w-5 mr-2" />
+                Save Settings
               </>
             )}
           </Button>
         </div>
 
-        {/* Embed Code */}
-        {settings.project_id_locked && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Code className="h-5 w-5" />
-                Embed Code
+        {/* Right Column - Preview & Code */}
+        <div className="space-y-6">
+          {/* Live Widget Preview */}
+          <Card className="rounded-xl shadow-lg border-2 border-blue-100">
+            <CardHeader className="bg-blue-50 rounded-t-xl">
+              <CardTitle className="flex items-center space-x-2 text-blue-900">
+                <Eye className="h-5 w-5" />
+                <span>Live Widget Preview</span>
               </CardTitle>
-              <CardDescription>
-                Copy and paste this code into your website to display the feedback widget.
+              <CardDescription className="text-blue-700">
+                See how your widget will look on your website
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="relative">
-                <Textarea
-                  value={generateEmbedCode()}
-                  readOnly
-                  rows={3}
-                  className="font-mono text-sm"
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={copyEmbedCode}
-                  className="absolute top-2 right-2"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="h-4 w-4 mr-2" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy
-                    </>
-                  )}
-                </Button>
-              </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-900 mb-2">How to use:</h4>
-                <ol className="text-sm text-blue-800 space-y-1">
-                  <li>1. Copy the embed code above</li>
-                  <li>2. Paste it into your website's HTML (before the closing &lt;/body&gt; tag)</li>
-                  <li>3. The feedback widget will appear as a floating button on your website</li>
-                  <li>4. All feedback will be collected and displayed in your Feedback page</li>
-                </ol>
+            <CardContent className="p-6">
+              <div className="bg-gray-50 rounded-lg p-4 border-2 border-dashed border-gray-300">
+                <div className="text-center text-gray-500 mb-4">
+                  <MessageSquare className="h-8 w-8 mx-auto mb-2" />
+                  <p className="text-sm">Widget Preview</p>
+                </div>
+                
+                {/* Widget Button Preview */}
+                <div className="flex justify-center">
+                  <div
+                    className="inline-flex items-center space-x-2 px-4 py-2 rounded-full cursor-pointer shadow-lg hover:shadow-xl transition-all duration-200"
+                    style={{ backgroundColor: widgetSettings?.brand_color || '#2563eb' }}
+                  >
+                    <MessageSquare className="h-4 w-4 text-white" />
+                    <span className="text-white font-medium text-sm">
+                      {settings?.button_text || 'Send Feedback'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Greeting Text Preview */}
+                {widgetSettings?.greeting_text && (
+                  <div className="mt-4 p-3 bg-white rounded-lg border">
+                    <p className="text-sm text-gray-700 text-center">
+                      {widgetSettings.greeting_text}
+                    </p>
+                  </div>
+                )}
+
+                <div className="mt-4 text-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowTestModal(true)}
+                    className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Test Widget
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
-        )}
+
+          {/* Embed Code Generator */}
+          <Card className="rounded-xl shadow-lg border-2 border-blue-100">
+            <CardHeader className="bg-blue-50 rounded-t-xl">
+              <CardTitle className="flex items-center space-x-2 text-blue-900">
+                <Code className="h-5 w-5" />
+                <span>Embed Code Generator</span>
+              </CardTitle>
+              <CardDescription className="text-blue-700">
+                Copy this code to your website to display the feedback widget
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              {settings?.project_id ? (
+                <>
+                  <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm overflow-x-auto">
+                    <pre>{generateEmbedCode()}</pre>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      onClick={() => copyToClipboard(generateEmbedCode())}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="h-4 w-4 mr-2" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy to Clipboard
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowTestModal(true)}
+                      className="border-blue-200 text-blue-600 hover:bg-blue-50"
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      Test
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Code className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>Enter a Project ID to generate embed code</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Integrations */}
+          <Card className="rounded-xl shadow-lg border-2 border-gray-100">
+            <CardHeader className="bg-gray-50 rounded-t-xl">
+              <CardTitle className="flex items-center space-x-2 text-gray-900">
+                <Zap className="h-5 w-5" />
+                <span>Integrations</span>
+              </CardTitle>
+              <CardDescription className="text-gray-700">
+                Connect your feedback system with other tools
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="text-center py-8">
+                <div className="flex items-center justify-center space-x-2 mb-4">
+                  <MessageSquare className="h-8 w-8 text-gray-400" />
+                  <span className="text-lg font-medium text-gray-600">Slack</span>
+                </div>
+                <div className="flex items-center justify-center space-x-2 mb-4">
+                  <Mail className="h-8 w-8 text-gray-400" />
+                  <span className="text-lg font-medium text-gray-600">Email</span>
+                </div>
+                <div className="flex items-center justify-center space-x-2 mb-4">
+                  <ExternalLink className="h-8 w-8 text-gray-400" />
+                  <span className="text-lg font-medium text-gray-600">Webhooks</span>
+                </div>
+                <Badge variant="outline" className="text-blue-600 border-blue-200">
+                  Coming Soon 🚀
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      {/* Test Widget Modal */}
+      {showTestModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-lg font-semibold">Test Widget Preview</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowTestModal(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="p-6">
+              <div className="bg-gray-50 rounded-lg p-6 border-2 border-dashed border-gray-300">
+                <div className="text-center mb-6">
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">Your Website</h4>
+                  <p className="text-sm text-gray-500">This is how the widget will appear on your site</p>
+                </div>
+                
+                {/* Simulated Website Content */}
+                <div className="bg-white rounded-lg p-4 mb-4">
+                  <h5 className="font-medium text-gray-900 mb-2">Welcome to Your Website</h5>
+                  <p className="text-gray-600 text-sm">This is sample content to show how the feedback widget integrates with your site.</p>
+                </div>
+                
+                {/* Widget Button */}
+                <div className="flex justify-end">
+                  <div
+                    className="inline-flex items-center space-x-2 px-4 py-2 rounded-full cursor-pointer shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                    style={{ backgroundColor: widgetSettings?.brand_color || '#2563eb' }}
+                  >
+                    <MessageSquare className="h-4 w-4 text-white" />
+                    <span className="text-white font-medium text-sm">
+                      {settings?.button_text || 'Send Feedback'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="text-center mt-4">
+                <p className="text-sm text-gray-500">
+                  The widget will appear as a floating button on your website
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex justify-end p-6 border-t bg-gray-50">
+              <Button onClick={() => setShowTestModal(false)}>
+                Close Preview
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
