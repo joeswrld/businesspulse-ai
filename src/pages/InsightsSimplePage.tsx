@@ -203,6 +203,11 @@ const InsightsSimplePage: React.FC = () => {
 
       // Try to call the Edge Function first
       try {
+        console.log('🔧 Attempting to call Edge Function...');
+        console.log('📡 URL:', `${supabase.supabaseUrl}/functions/v1/analyze-insights`);
+        console.log('👤 User ID:', userId);
+        console.log('📄 File Type:', currentFile?.type || 'unknown');
+        
         const response = await fetch(`${supabase.supabaseUrl}/functions/v1/analyze-insights`, {
           method: 'POST',
           headers: {
@@ -216,19 +221,35 @@ const InsightsSimplePage: React.FC = () => {
           }),
         });
 
+        console.log('📡 Response status:', response.status);
+        console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+
         if (response.ok) {
           const result = await response.json();
+          console.log('✅ Edge Function success!');
+          console.log('📊 Analysis result:', result.analysis);
           
           // Track usage after successful analysis
           await trackUsage('insights');
           
           return result.analysis;
         } else {
-          console.warn('Edge Function failed, using mock analysis:', response.statusText);
-          throw new Error('Edge Function not available');
+          const errorText = await response.text();
+          console.warn('❌ Edge Function failed:', response.status, errorText);
+          
+          if (response.status === 401) {
+            console.error('🔑 Authentication failed. Check JWT token.');
+          } else if (response.status === 404) {
+            console.error('🔧 Function not found. Check if Edge Function is deployed.');
+          } else if (response.status === 500) {
+            console.error('🔧 Server error. Check Edge Function logs.');
+          }
+          
+          throw new Error(`Edge Function failed: ${response.status} ${errorText}`);
         }
       } catch (edgeFunctionError) {
-        console.warn('Edge Function error, using mock analysis:', edgeFunctionError);
+        console.warn('❌ Edge Function error, using mock analysis:', edgeFunctionError);
+        console.log('🔄 Falling back to mock analysis...');
         
         // Fallback to mock analysis for testing
         return generateMockAnalysis(data, currentFile?.type || 'unknown');
