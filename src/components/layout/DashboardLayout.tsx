@@ -25,16 +25,16 @@ import { useAuth } from "@/contexts/AuthContext";
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [newFeedbackCount, setNewFeedbackCount] = useState(0);
+  const [userProjectIds, setUserProjectIds] = useState<string[]>([]);
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Fetch new feedback count
-  const fetchNewFeedbackCount = async () => {
+  // Fetch user's project IDs
+  const fetchUserProjectIds = async () => {
     if (!user) return;
 
     try {
-      // Get user's project IDs from feedback_settings
       const { data: projectData, error: projectError } = await supabase
         .from('feedback_settings')
         .select('project_id')
@@ -47,53 +47,112 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
       if (projectData && projectData.length > 0) {
         const projectIds = projectData.map(p => p.project_id);
-        
-        // Count feedback that hasn't been marked as read/reviewed
-        const { count, error: feedbackError } = await supabase
-          .from('feedbacks')
-          .select('*', { count: 'exact', head: true })
-          .in('project_id', projectIds)
-          .eq('status', 'new');
-
-        if (feedbackError) {
-          console.error('Error loading feedback count:', feedbackError);
-          return;
-        }
-
-        setNewFeedbackCount(count || 0);
+        setUserProjectIds(projectIds);
+        return projectIds;
       }
+    } catch (error) {
+      console.error('Error fetching project IDs:', error);
+    }
+    return [];
+  };
+
+  // Fetch new feedback count
+  const fetchNewFeedbackCount = async () => {
+    if (!user || userProjectIds.length === 0) return;
+
+    try {
+      // Count feedback that hasn't been marked as read/reviewed
+      const { count, error: feedbackError } = await supabase
+        .from('feedbacks')
+        .select('*', { count: 'exact', head: true })
+        .in('project_id', userProjectIds)
+        .eq('status', 'new');
+
+      if (feedbackError) {
+        console.error('Error loading feedback count:', feedbackError);
+        return;
+      }
+
+      setNewFeedbackCount(count || 0);
     } catch (error) {
       console.error('Error fetching feedback count:', error);
     }
   };
 
-  // Fetch feedback count on mount and set up real-time subscription
+  // Fetch project IDs and feedback count on mount
   useEffect(() => {
     if (user) {
-      fetchNewFeedbackCount();
+      fetchUserProjectIds().then((projectIds) => {
+        if (projectIds.length > 0) {
+          fetchNewFeedbackCount();
+        }
+      });
+    }
+  }, [user]);
 
-      // Set up real-time subscription for new feedback
+  // Set up real-time subscription for new feedback
+  useEffect(() => {
+    if (user && userProjectIds.length > 0) {
+      console.log('Setting up real-time subscription for projects:', userProjectIds);
+
+      // Set up real-time subscription for new feedback with more specific events
       const channel = supabase
         .channel('feedback-updates')
         .on(
           'postgres_changes',
           {
-            event: '*',
+            event: 'INSERT',
             schema: 'public',
-            table: 'feedbacks'
+            table: 'feedbacks',
+            filter: `project_id=in.(${userProjectIds.join(',')})`
           },
-          () => {
-            // Refresh count when feedback changes
+          (payload) => {
+            console.log('New feedback received:', payload);
+            // Immediately increment the count for new feedback
+            setNewFeedbackCount(prev => prev + 1);
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'feedbacks',
+            filter: `project_id=in.(${userProjectIds.join(',')})`
+          },
+          (payload) => {
+            console.log('Feedback updated:', payload);
+            // Refresh count when feedback status changes
             fetchNewFeedbackCount();
           }
         )
-        .subscribe();
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'feedbacks',
+            filter: `project_id=in.(${userProjectIds.join(',')})`
+          },
+          (payload) => {
+            console.log('Feedback deleted:', payload);
+            // Refresh count when feedback is deleted
+            fetchNewFeedbackCount();
+          }
+        )
+        .subscribe((status) => {
+          console.log('Real-time subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('Successfully subscribed to feedback updates');
+          }
+        });
 
       return () => {
+        console.log('Cleaning up real-time subscription');
         supabase.removeChannel(channel);
       };
     }
-  }, [user]);
+  }, [user, userProjectIds]);
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
