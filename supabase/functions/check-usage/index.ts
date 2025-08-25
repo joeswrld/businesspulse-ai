@@ -146,27 +146,6 @@ serve(async (req) => {
 
     const userId = projectSettings.user_id
 
-    // Get user's usage data
-    const { data: usageData, error: usageError } = await supabase
-      .from('usage_tracking')
-      .select('*')
-      .eq('user_id', userId)
-      .single()
-
-    if (usageError && usageError.code !== 'PGRST116') {
-      console.error('Error fetching usage data:', usageError)
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Failed to fetch usage data' 
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
     // Get user's subscription data
     const { data: subscription, error: subscriptionError } = await supabase
       .from('user_subscriptions')
@@ -179,9 +158,69 @@ serve(async (req) => {
       console.error('Error fetching subscription:', subscriptionError)
     }
 
-    // Determine plan and check usage
+    // Determine plan
     const plan = getUserPlan(subscription)
-    const currentUsage = usageData ? usageData[`${feature}_count` as keyof typeof usageData] as number : 0
+
+    // Determine rolling window in days based on plan
+    const windowDays = plan === 'free' ? 8 : (plan === 'pro' ? 30 : (plan === 'business' ? 30 : -1))
+
+    // If unlimited, short-circuit success
+    if (PLAN_LIMITS[plan][feature as keyof typeof PLAN_LIMITS[typeof plan]] === -1) {
+      const response: CheckUsageResponse = {
+        success: true,
+        canUse: true,
+        currentUsage: 0,
+        limit: -1,
+        plan,
+        remaining: -1,
+        isUnlimited: true
+      }
+      return new Response(
+        JSON.stringify(response),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Count feedback entries for this project in the rolling window
+    let currentUsage = 0
+    if (feature === 'feedback') {
+      const fromDate = new Date()
+      fromDate.setDate(fromDate.getDate() - windowDays)
+      const { count, error: countError } = await supabase
+        .from('feedbacks')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', project_id)
+        .gte('timestamp', fromDate.toISOString())
+
+      if (countError) {
+        console.error('Error counting feedbacks:', countError)
+        return new Response(
+          JSON.stringify({ success: false, error: 'Failed to count feedback entries' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      currentUsage = count || 0
+    } else {
+      // For non-feedback features, fall back to usage_tracking if present
+      const { data: usageData, error: usageError } = await supabase
+        .from('usage_tracking')
+        .select('*')
+        .eq('user_id', userId)
+        .single()
+
+      if (usageError && usageError.code !== 'PGRST116') {
+        console.error('Error fetching usage data:', usageError)
+        return new Response(
+          JSON.stringify({ success: false, error: 'Failed to fetch usage data' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      currentUsage = usageData ? usageData[`${feature}_count` as keyof typeof usageData] as number : 0
+    }
+
     const { canUse, remaining, isUnlimited } = checkUsageLimit(feature, currentUsage, plan)
     const limit = PLAN_LIMITS[plan][feature as keyof typeof PLAN_LIMITS[typeof plan]]
 
