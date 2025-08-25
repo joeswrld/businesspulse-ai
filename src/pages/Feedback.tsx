@@ -36,6 +36,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 interface Feedback {
   id: string;
@@ -71,6 +72,8 @@ const Feedback = () => {
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
   const [showTagInput, setShowTagInput] = useState<string | null>(null);
   const [newTag, setNewTag] = useState('');
+  const [selectedFeedbacks, setSelectedFeedbacks] = useState<Set<string>>(new Set());
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   // Load project ID and feedbacks
   const loadProjectAndFeedbacks = useCallback(async () => {
@@ -337,6 +340,67 @@ const Feedback = () => {
     }
   };
 
+  // Select all feedbacks
+  const selectAllFeedbacks = () => {
+    if (selectedFeedbacks.size === filteredFeedbacks.length) {
+      setSelectedFeedbacks(new Set());
+    } else {
+      setSelectedFeedbacks(new Set(filteredFeedbacks.map(f => f.id)));
+    }
+  };
+
+  // Select individual feedback
+  const toggleFeedbackSelection = (feedbackId: string) => {
+    const newSelected = new Set(selectedFeedbacks);
+    if (newSelected.has(feedbackId)) {
+      newSelected.delete(feedbackId);
+    } else {
+      newSelected.add(feedbackId);
+    }
+    setSelectedFeedbacks(newSelected);
+  };
+
+  // Bulk update feedback status
+  const bulkUpdateFeedbackStatus = async (newStatus: 'reviewed' | 'resolved') => {
+    if (selectedFeedbacks.size === 0) return;
+
+    setBulkUpdating(true);
+    
+    try {
+      const feedbackIds = Array.from(selectedFeedbacks);
+      
+      // Update all selected feedbacks
+      const { error } = await supabase
+        .from('feedbacks')
+        .update({ status: newStatus })
+        .in('id', feedbackIds);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update local state
+      setFeedbacks(prev => prev.map(f => 
+        selectedFeedbacks.has(f.id) ? { ...f, status: newStatus } : f
+      ));
+
+      // Clear selection
+      setSelectedFeedbacks(new Set());
+      
+      toast.success(`${feedbackIds.length} feedback items marked as ${newStatus}`);
+    } catch (error) {
+      console.error('Error bulk updating feedback status:', error);
+      toast.error('Failed to update feedback status');
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  // Clear selection when filters change
+  useEffect(() => {
+    setSelectedFeedbacks(new Set());
+  }, [searchTerm, statusFilter, sentimentFilter, dateFilter]);
+
   // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -549,6 +613,69 @@ const Feedback = () => {
         </CardContent>
       </Card>
 
+      {/* Bulk Actions */}
+      {filteredFeedbacks.length > 0 && (
+        <Card className="rounded-xl shadow-lg border-2 border-green-100 bg-green-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedFeedbacks.size === filteredFeedbacks.length && filteredFeedbacks.length > 0}
+                    onChange={selectAllFeedbacks}
+                    className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                  />
+                  <label className="text-sm font-medium text-green-900">
+                    Select All ({filteredFeedbacks.length})
+                  </label>
+                </div>
+                
+                {selectedFeedbacks.size > 0 && (
+                  <span className="text-sm text-green-700">
+                    {selectedFeedbacks.size} item{selectedFeedbacks.size !== 1 ? 's' : ''} selected
+                  </span>
+                )}
+              </div>
+              
+              {selectedFeedbacks.size > 0 && (
+                <div className="flex items-center space-x-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => bulkUpdateFeedbackStatus('reviewed')}
+                    disabled={bulkUpdating}
+                    className="border-green-300 text-green-700 hover:bg-green-100"
+                  >
+                    {bulkUpdating ? (
+                      <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <Eye className="h-3 w-3 mr-1" />
+                    )}
+                    Mark Reviewed ({selectedFeedbacks.size})
+                  </Button>
+                  
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => bulkUpdateFeedbackStatus('resolved')}
+                    disabled={bulkUpdating}
+                    className="border-green-300 text-green-700 hover:bg-green-100"
+                  >
+                    {bulkUpdating ? (
+                      <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                    )}
+                    Mark Resolved ({selectedFeedbacks.size})
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Results Summary */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-gray-600">
@@ -565,10 +692,26 @@ const Feedback = () => {
       {filteredFeedbacks.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {filteredFeedbacks.map((feedback) => (
-            <Card key={feedback.id} className="rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+            <Card 
+              key={feedback.id} 
+              className={cn(
+                "rounded-xl shadow-lg hover:shadow-xl transition-all duration-200",
+                selectedFeedbacks.has(feedback.id) 
+                  ? "ring-2 ring-green-500 bg-green-50 border-green-200" 
+                  : "hover:shadow-xl"
+              )}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-2">
+                    {/* Selection Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={selectedFeedbacks.has(feedback.id)}
+                      onChange={() => toggleFeedbackSelection(feedback.id)}
+                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                    />
+                    
                     <Badge variant={getStatusBadgeVariant(feedback.status)}>
                       {getStatusIcon(feedback.status)}
                       <span className="ml-1 capitalize">{feedback.status}</span>
