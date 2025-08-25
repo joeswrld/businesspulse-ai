@@ -85,6 +85,94 @@ serve(async (req) => {
 
     const projectSettings = settings[0];
 
+    // Check usage limits before allowing feedback submission
+    const userId = projectSettings.user_id;
+    
+    // Get user's subscription and plan
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (subscriptionError && subscriptionError.code !== 'PGRST116') {
+      console.error('Error checking subscription:', subscriptionError);
+      return new Response(
+        JSON.stringify({ error: 'Database error while checking subscription' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // Determine user's plan
+    let userPlan = 'free';
+    if (subscription) {
+      if (subscription.plan_id.includes('pro')) {
+        userPlan = 'pro';
+      } else if (subscription.plan_id.includes('business')) {
+        userPlan = 'business';
+      }
+    }
+
+    // Get current month's feedback count
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const { count: currentMonthCount, error: countError } = await supabase
+      .from('feedbacks')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', projectId)
+      .gte('created_at', startOfMonth.toISOString())
+      .lte('created_at', endOfMonth.toISOString());
+
+    if (countError) {
+      console.error('Error counting monthly feedback:', countError);
+      return new Response(
+        JSON.stringify({ error: 'Database error while checking usage limits' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // Check if user has reached their limit
+    const monthlyLimit = userPlan === 'free' ? 50 : userPlan === 'pro' ? 200 : -1; // -1 means unlimited
+    const currentCount = currentMonthCount || 0;
+
+    if (monthlyLimit !== -1 && currentCount >= monthlyLimit) {
+      // User has reached their limit
+      let upgradeMessage = '';
+      
+      if (userPlan === 'free') {
+        upgradeMessage = `Feedback entries limit reached (${currentCount}/${monthlyLimit}). Upgrade to Pro Plan to get 200 feedback submissions per month.`;
+      } else if (userPlan === 'pro') {
+        upgradeMessage = `Feedback entries limit reached (${currentCount}/${monthlyLimit}). Upgrade to Business Plan for unlimited feedback submissions.`;
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          error: 'Usage limit reached',
+          message: upgradeMessage,
+          currentUsage: currentCount,
+          limit: monthlyLimit,
+          plan: userPlan,
+          needsUpgrade: true,
+          upgradeUrl: 'https://notex.com.ng/billing'
+        }),
+        { 
+          status: 429, // Too Many Requests
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
     // Insert feedback into database
     const { data: feedback, error: insertError } = await supabase
       .from('feedbacks')

@@ -51,14 +51,14 @@ export interface UsageCheckResult {
 // Plan limits configuration
 export const PLAN_LIMITS: Record<PlanType, UsageLimits> = {
   free: {
-    feedback: 20,
+    feedback: 50,
     analytics: 5,
     reports: 2,
     insights: 5,
     teams: 1
   },
   pro: {
-    feedback: 500,
+    feedback: 200,
     analytics: 100,
     reports: 20,
     insights: 50,
@@ -364,4 +364,105 @@ export function getFeaturesNeedingUpgrade(checks: Record<FeatureType, UsageCheck
   return Object.entries(checks)
     .filter(([_, check]) => !check.canUse)
     .map(([feature, _]) => feature as FeatureType);
+}
+
+// Check if feedback submission should be blocked
+export async function checkFeedbackSubmissionAllowed(userId: string): Promise<{
+  allowed: boolean;
+  message?: string;
+  currentUsage: number;
+  limit: number;
+  plan: PlanType;
+  needsUpgrade: boolean;
+}> {
+  try {
+    const result = await checkFeatureUsage(userId, 'feedback');
+    
+    if (!result) {
+      return {
+        allowed: false,
+        message: 'Unable to verify usage limits. Please contact support.',
+        currentUsage: 0,
+        limit: 0,
+        plan: 'free',
+        needsUpgrade: true
+      };
+    }
+
+    if (result.canUse) {
+      return {
+        allowed: true,
+        currentUsage: result.currentUsage,
+        limit: result.limit,
+        plan: result.plan,
+        needsUpgrade: false
+      };
+    }
+
+    // Feedback limit reached
+    const planName = PLAN_NAMES[result.plan];
+    const nextPlan = UPGRADE_PATHS[result.plan]?.[0];
+    const nextPlanName = nextPlan ? PLAN_NAMES[nextPlan] : 'Business Plan';
+    
+    let message = `Feedback entries limit reached (${result.currentUsage}/${result.limit}). `;
+    
+    if (result.plan === 'free') {
+      message += `Upgrade to ${nextPlanName} to get ${nextPlan === 'pro' ? '200' : 'unlimited'} feedback submissions per month.`;
+    } else if (result.plan === 'pro') {
+      message += `Upgrade to ${nextPlanName} for unlimited feedback submissions.`;
+    } else {
+      message += 'Please contact support to increase your limits.';
+    }
+
+    return {
+      allowed: false,
+      message,
+      currentUsage: result.currentUsage,
+      limit: result.limit,
+      plan: result.plan,
+      needsUpgrade: true
+    };
+  } catch (error) {
+    console.error('Error checking feedback submission:', error);
+    return {
+      allowed: false,
+      message: 'Unable to verify usage limits. Please contact support.',
+      currentUsage: 0,
+      limit: 0,
+      plan: 'free',
+      needsUpgrade: true
+    };
+  }
+}
+
+// Block feedback submission and enforce limits
+export async function enforceFeedbackLimit(userId: string): Promise<{
+  success: boolean;
+  message?: string;
+  blocked: boolean;
+}> {
+  try {
+    const check = await checkFeedbackSubmissionAllowed(userId);
+    
+    if (check.allowed) {
+      return {
+        success: true,
+        blocked: false
+      };
+    }
+
+    // Block the submission
+    return {
+      success: false,
+      message: check.message,
+      blocked: true
+    };
+  } catch (error) {
+    console.error('Error enforcing feedback limit:', error);
+    return {
+      success: false,
+      message: 'Unable to verify usage limits. Please contact support.',
+      blocked: true
+    };
+  }
 }

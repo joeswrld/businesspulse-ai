@@ -31,7 +31,8 @@ import {
   TrendingUp,
   DollarSign,
   Receipt,
-  RefreshCw
+  RefreshCw,
+  Activity
 } from 'lucide-react';
 
 // Types
@@ -562,12 +563,9 @@ const BillingPage: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium">Feedback</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatUsageDisplay(
-                        checks.feedback.currentUsage,
-                        checks.feedback.limit,
-                        plan,
-                        'feedback'
-                      )}
+                      {plan === 'free' ? '50 submissions/month' : 
+                       plan === 'pro' ? '200 submissions/month' : 
+                       'Unlimited submissions'}
                     </p>
                   </div>
                 </div>
@@ -580,6 +578,9 @@ const BillingPage: React.FC = () => {
                   {!checks.feedback.canUse && (
                     <div className="text-xs text-red-600 mt-1">Limit Reached</div>
                   )}
+                  <div className="text-xs text-gray-500 mt-1">
+                    / {checks.feedback.limit === -1 ? '∞' : checks.feedback.limit}
+                  </div>
                 </div>
               </div>
 
@@ -699,210 +700,370 @@ const BillingPage: React.FC = () => {
               </div>
               
               {/* Usage Summary */}
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-blue-900">Current Plan: {PLAN_NAMES[plan]}</h4>
-                    <p className="text-sm text-blue-700">
-                      {Object.values(checks).some(check => !check.canUse) 
-                        ? 'Some features have reached their limits. Consider upgrading your plan.'
-                        : 'All features are within your plan limits.'
-                      }
+              <Card className="rounded-xl shadow-lg border-2 border-blue-100 bg-blue-50">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2 text-blue-900">
+                    <Activity className="h-5 w-5" />
+                    <span>Current Usage</span>
+                  </CardTitle>
+                  <CardDescription className="text-blue-700">
+                    Track your usage across all features. Limits reset monthly.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {/* Feedback Usage */}
+                    <div className={`flex items-center justify-between p-3 rounded-lg ${
+                      checks.feedback.canUse ? 'bg-blue-50' : 'bg-red-50 border border-red-200'
+                    }`}>
+                      <div className="flex items-center space-x-2">
+                        <MessageSquare className={`h-5 w-5 ${
+                          checks.feedback.canUse ? 'text-blue-600' : 'text-red-600'
+                        }`} />
+                        <div>
+                          <p className="text-sm font-medium">Feedback</p>
+                          <p className="text-xs text-muted-foreground">
+                            {plan === 'free' ? '50 submissions/month' : 
+                             plan === 'pro' ? '200 submissions/month' : 
+                             'Unlimited submissions'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-lg font-bold ${
+                          checks.feedback.canUse ? 'text-blue-600' : 'text-red-600'
+                        }`}>
+                          {checks.feedback.currentUsage}
+                        </span>
+                        {!checks.feedback.canUse && (
+                          <div className="text-xs text-red-600 mt-1">Limit Reached</div>
+                        )}
+                        <div className="text-xs text-gray-500 mt-1">
+                          / {checks.feedback.limit === -1 ? '∞' : checks.feedback.limit}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Analytics Usage */}
+                    <div className={`flex items-center justify-between p-3 rounded-lg ${
+                      checks.analytics.canUse ? 'bg-green-50' : 'bg-red-50 border border-red-200'
+                    }`}>
+                      <div className="flex items-center space-x-2">
+                        <BarChart3 className={`h-5 w-5 ${
+                          checks.analytics.canUse ? 'text-green-600' : 'text-red-600'
+                        }`} />
+                        <div>
+                          <p className="text-sm font-medium">Analytics</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatUsageDisplay(
+                              checks.analytics.currentUsage,
+                              checks.analytics.limit,
+                              plan,
+                              'analytics'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-lg font-bold ${
+                          checks.analytics.canUse ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {checks.analytics.currentUsage}
+                        </span>
+                        {!checks.analytics.canUse && (
+                          <div className="text-xs text-red-600 mt-1">Limit Reached</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Reports Usage */}
+                    <div className={`flex items-center justify-between p-3 rounded-lg ${
+                      checks.reports.canUse ? 'bg-purple-50' : 'bg-red-50 border border-red-200'
+                    }`}>
+                      <div className="flex items-center space-x-2">
+                        <FileText className={`h-5 w-5 ${
+                          checks.reports.canUse ? 'text-purple-600' : 'text-red-600'
+                        }`} />
+                        <div>
+                          <p className="text-sm font-medium">Reports</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatUsageDisplay(
+                              checks.reports.currentUsage,
+                              checks.reports.limit,
+                              plan,
+                              'reports'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-lg font-bold ${
+                          checks.reports.canUse ? 'text-purple-600' : 'text-red-600'
+                        }`}>
+                          {checks.reports.currentUsage}
+                        </span>
+                        {!checks.reports.canUse && (
+                          <div className="text-xs text-red-600 mt-1">Limit Reached</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Insights Usage */}
+                    <div className={`flex items-center justify-between p-3 rounded-lg ${
+                      checks.insights.canUse ? 'bg-orange-50' : 'bg-red-50 border border-red-200'
+                    }`}>
+                      <div className="flex items-center space-x-2">
+                        <Brain className={`h-5 w-5 ${
+                          checks.insights.canUse ? 'text-orange-600' : 'text-red-600'
+                        }`} />
+                        <div>
+                          <p className="text-sm font-medium">Insights</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatUsageDisplay(
+                              checks.insights.currentUsage,
+                              checks.insights.limit,
+                              plan,
+                              'insights'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-lg font-bold ${
+                          checks.insights.canUse ? 'text-orange-600' : 'text-red-600'
+                        }`}>
+                          {checks.insights.currentUsage}
+                        </span>
+                        {!checks.insights.canUse && (
+                          <div className="text-xs text-red-600 mt-1">Limit Reached</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Teams Usage (Coming Soon) */}
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg opacity-60">
+                      <div className="flex items-center space-x-2">
+                        <Users className="h-5 w-5 text-gray-600" />
+                        <div>
+                          <p className="text-sm font-medium">Teams</p>
+                          <p className="text-xs text-muted-foreground">Coming Soon</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-lg font-bold text-gray-600">
+                          {usageData?.teams_count || 0}
+                        </span>
+                        <Badge variant="secondary" className="text-xs">
+                          Soon
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    {/* Usage Summary */}
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium text-blue-900">Current Plan: {PLAN_NAMES[plan]}</h4>
+                          <p className="text-sm text-blue-700">
+                            {Object.values(checks).some(check => !check.canUse) 
+                              ? 'Some features have reached their limits. Consider upgrading your plan.'
+                              : 'All features are within your plan limits.'
+                            }
+                          </p>
+                        </div>
+                        {Object.values(checks).some(check => !check.canUse) && (
+                          <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                            <Crown className="h-4 w-4 mr-2" />
+                            Upgrade Plan
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Current Plan Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <CreditCard className="h-5 w-5" />
+                    <span>Current Plan</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Your subscription details and billing information
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Plan Status */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Plan</span>
+                    <Badge className={currentPlan.color}>
+                      {currentPlan.label}
+                    </Badge>
+                  </div>
+
+                  {/* Trial Days Left */}
+                  {trialDaysLeft > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Trial Days Left</span>
+                      <span className="text-sm text-blue-600 font-medium">
+                        {trialDaysLeft} days
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Subscription Period */}
+                  {subscription && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Next Billing</span>
+                      <span className="text-sm text-muted-foreground">
+                        {formatDate(subscription.current_period_end)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="space-y-2 pt-4">
+                    {subscription && subscription.status === 'active' && (
+                      <Button
+                        variant="outline"
+                        onClick={handleCancelSubscription}
+                        disabled={cancelling}
+                        className="w-full"
+                      >
+                        {cancelling ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <XCircle className="h-4 w-4 mr-2" />
+                        )}
+                        Cancel Subscription
+                      </Button>
+                    )}
+
+                    {subscription && (
+                      <Button
+                        variant="outline"
+                        onClick={handleUpdateCard}
+                        disabled={updatingCard}
+                        className="w-full"
+                      >
+                        {updatingCard ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <CreditCard className="h-4 w-4 mr-2" />
+                        )}
+                        Update Card
+                      </Button>
+                    )}
+
+                    {!subscription && trialDaysLeft === 0 && (
+                      <div className="space-y-2">
+                        <Button className="w-full">
+                          <Crown className="h-4 w-4 mr-2" />
+                          Upgrade to Pro
+                        </Button>
+                        <Button variant="outline" className="w-full">
+                          <Zap className="h-4 w-4 mr-2" />
+                          Upgrade to Business
+                        </Button>
+                      </div>
+                    )}
+
+                    {subscription && subscription.status === 'active' && currentPlan.type === 'pro' && (
+                      <Button variant="outline" className="w-full">
+                        <Zap className="h-4 w-4 mr-2" />
+                        Upgrade to Business
+                      </Button>
+                    )}
+
+                    {subscription && subscription.status === 'active' && currentPlan.type === 'business' && (
+                      <Button variant="outline" className="w-full">
+                        <Shield className="h-4 w-4 mr-2" />
+                        Upgrade to Enterprise
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Transaction History Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Receipt className="h-5 w-5" />
+                  <span>Transaction History</span>
+                </CardTitle>
+                <CardDescription>
+                  View your payment history and download invoices
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {transactions.length === 0 ? (
+                  <div className="text-center py-8">
+                    <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No transactions yet</h3>
+                    <p className="text-muted-foreground">
+                      Your transaction history will appear here once you make your first payment.
                     </p>
                   </div>
-                  {Object.values(checks).some(check => !check.canUse) && (
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                      <Crown className="h-4 w-4 mr-2" />
-                      Upgrade Plan
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Current Plan Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <CreditCard className="h-5 w-5" />
-              <span>Current Plan</span>
-            </CardTitle>
-            <CardDescription>
-              Your subscription details and billing information
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Plan Status */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Plan</span>
-              <Badge className={currentPlan.color}>
-                {currentPlan.label}
-              </Badge>
-            </div>
-
-            {/* Trial Days Left */}
-            {trialDaysLeft > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Trial Days Left</span>
-                <span className="text-sm text-blue-600 font-medium">
-                  {trialDaysLeft} days
-                </span>
-              </div>
-            )}
-
-            {/* Subscription Period */}
-            {subscription && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Next Billing</span>
-                <span className="text-sm text-muted-foreground">
-                  {formatDate(subscription.current_period_end)}
-                </span>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="space-y-2 pt-4">
-              {subscription && subscription.status === 'active' && (
-                <Button
-                  variant="outline"
-                  onClick={handleCancelSubscription}
-                  disabled={cancelling}
-                  className="w-full"
-                >
-                  {cancelling ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <XCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Cancel Subscription
-                </Button>
-              )}
-
-              {subscription && (
-                <Button
-                  variant="outline"
-                  onClick={handleUpdateCard}
-                  disabled={updatingCard}
-                  className="w-full"
-                >
-                  {updatingCard ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <CreditCard className="h-4 w-4 mr-2" />
-                  )}
-                  Update Card
-                </Button>
-              )}
-
-              {!subscription && trialDaysLeft === 0 && (
-                <div className="space-y-2">
-                  <Button className="w-full">
-                    <Crown className="h-4 w-4 mr-2" />
-                    Upgrade to Pro
-                  </Button>
-                  <Button variant="outline" className="w-full">
-                    <Zap className="h-4 w-4 mr-2" />
-                    Upgrade to Business
-                  </Button>
-                </div>
-              )}
-
-              {subscription && subscription.status === 'active' && currentPlan.type === 'pro' && (
-                <Button variant="outline" className="w-full">
-                  <Zap className="h-4 w-4 mr-2" />
-                  Upgrade to Business
-                </Button>
-              )}
-
-              {subscription && subscription.status === 'active' && currentPlan.type === 'business' && (
-                <Button variant="outline" className="w-full">
-                  <Shield className="h-4 w-4 mr-2" />
-                  Upgrade to Enterprise
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Transaction History Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Receipt className="h-5 w-5" />
-            <span>Transaction History</span>
-          </CardTitle>
-          <CardDescription>
-            View your payment history and download invoices
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {transactions.length === 0 ? (
-            <div className="text-center py-8">
-              <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No transactions yet</h3>
-              <p className="text-muted-foreground">
-                Your transaction history will appear here once you make your first payment.
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.map((transaction) => {
-                  const statusDisplay = getStatusDisplay(transaction.status);
-                  
-                  return (
-                    <TableRow key={transaction.id}>
-                      <TableCell className="font-medium">
-                        {formatDate(transaction.created_at)}
-                      </TableCell>
-                      <TableCell>
-                        {transaction.description || 'Subscription Payment'}
-                      </TableCell>
-                      <TableCell>
-                        {formatCurrency(transaction.amount, transaction.currency)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <span className={statusDisplay.color}>
-                            {statusDisplay.icon}
-                          </span>
-                          <span className="capitalize">{transaction.status}</span>
-                        </div>
-                      </TableCell>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {transactions.map((transaction) => {
+                        const statusDisplay = getStatusDisplay(transaction.status);
+                        
+                        return (
+                          <TableRow key={transaction.id}>
+                            <TableCell className="font-medium">
+                              {formatDate(transaction.created_at)}
+                            </TableCell>
+                            <TableCell>
+                              {transaction.description || 'Subscription Payment'}
+                            </TableCell>
+                            <TableCell>
+                              {formatCurrency(transaction.amount, transaction.currency)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <span className={statusDisplay.color}>
+                                  {statusDisplay.icon}
+                                </span>
+                                <span className="capitalize">{transaction.status}</span>
+                              </div>
+                            </TableCell>
                                              <TableCell className="text-right">
-                         {transaction.invoice_url && (
-                           <Button
-                             variant="ghost"
-                             size="sm"
-                             onClick={() => handleDownloadInvoice(transaction.id, transaction.invoice_url)}
-                           >
-                             <Download className="h-4 w-4 mr-2" />
-                             Invoice
-                           </Button>
-                         )}
-                       </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
+                               {transaction.invoice_url && (
+                                 <Button
+                                   variant="ghost"
+                                   size="sm"
+                                   onClick={() => handleDownloadInvoice(transaction.id, transaction.invoice_url)}
+                                 >
+                                   <Download className="h-4 w-4 mr-2" />
+                                   Invoice
+                                 </Button>
+                               )}
+                             </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        );
+      };
 
-export default BillingPage;
+      export default BillingPage;
