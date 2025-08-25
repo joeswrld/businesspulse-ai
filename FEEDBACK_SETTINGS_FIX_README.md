@@ -121,6 +121,7 @@ supabase db push
 - `supabase/migrations/20250120000002_fix_trigger_function.sql` - Fix for trigger function syntax
 - `supabase/migrations/20250120000003_fix_profiles_table.sql` - Fix for profiles table structure
 - `supabase/migrations/20250120000004_safe_profiles_handling.sql` - Safe profiles table handling
+- `supabase/migrations/20250120000005_final_profiles_fix.sql` - Final safe profiles handling
 - `create_feedback_settings_for_user.sql` - Database functions
 - `setup-feedback-for-new-users.sh` - Setup script
 
@@ -162,6 +163,9 @@ supabase db push
 
 **Issue**: null value in column "user_id" of relation "profiles" violates not-null constraint
 **Solution**: The fix has been applied in migration `20250120000004_safe_profiles_handling.sql`. This uses dynamic SQL to handle different profiles table structures.
+
+**Issue**: duplicate key value violates unique constraint "profiles_user_id_key"
+**Solution**: The fix has been applied in migration `20250120000005_final_profiles_fix.sql`. This safely handles existing profiles without creating duplicates.
 
 ### Support
 

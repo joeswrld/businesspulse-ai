@@ -8,13 +8,16 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-    profile_exists BOOLEAN;
+    profile_exists_by_id BOOLEAN;
+    profile_exists_by_user_id BOOLEAN;
     has_user_id_col BOOLEAN;
     has_email_col BOOLEAN;
     has_full_name_col BOOLEAN;
+    primary_key_col TEXT;
 BEGIN
-    -- Check if profile already exists
-    SELECT EXISTS(SELECT 1 FROM profiles WHERE id = user_id_param) INTO profile_exists;
+    -- Check if profile already exists by id or user_id
+    SELECT EXISTS(SELECT 1 FROM profiles WHERE id = user_id_param) INTO profile_exists_by_id;
+    SELECT EXISTS(SELECT 1 FROM profiles WHERE user_id = user_id_param) INTO profile_exists_by_user_id;
     
     -- Check which columns exist in profiles table
     SELECT EXISTS(
@@ -38,14 +41,27 @@ BEGIN
         AND table_schema = 'public'
     ) INTO has_full_name_col;
     
-    -- If profile doesn't exist, create it
-    IF NOT profile_exists THEN
-        -- Build dynamic INSERT statement based on available columns
-        IF has_user_id_col THEN
-            -- Insert with user_id column
+    -- Determine the primary key column
+    SELECT column_name INTO primary_key_col
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.key_column_usage kcu 
+        ON tc.constraint_name = kcu.constraint_name
+    WHERE tc.table_name = 'profiles' 
+        AND tc.constraint_type = 'PRIMARY KEY'
+        AND tc.table_schema = 'public'
+    LIMIT 1;
+    
+    -- If profile doesn't exist by either id or user_id, create it
+    IF NOT profile_exists_by_id AND NOT profile_exists_by_user_id THEN
+        -- Build dynamic INSERT statement based on available columns and primary key
+        IF has_user_id_col AND primary_key_col = 'user_id' THEN
+            -- Insert with user_id as primary key
+            EXECUTE format('INSERT INTO profiles (user_id) VALUES (%L)', user_id_param);
+        ELSIF has_user_id_col AND primary_key_col = 'id' THEN
+            -- Insert with both id and user_id
             EXECUTE format('INSERT INTO profiles (id, user_id) VALUES (%L, %L)', user_id_param, user_id_param);
         ELSE
-            -- Insert without user_id column
+            -- Insert with only id
             EXECUTE format('INSERT INTO profiles (id) VALUES (%L)', user_id_param);
         END IF;
     END IF;
@@ -56,6 +72,7 @@ BEGIN
         DECLARE
             update_sql TEXT := 'UPDATE profiles SET ';
             update_parts TEXT[] := ARRAY[]::TEXT[];
+            where_clause TEXT;
         BEGIN
             IF has_email_col THEN
                 update_parts := array_append(update_parts, 'email = auth_users.email');
@@ -66,9 +83,18 @@ BEGIN
             END IF;
             
             IF array_length(update_parts, 1) > 0 THEN
+                -- Determine the WHERE clause based on which key exists
+                IF profile_exists_by_id THEN
+                    where_clause := 'profiles.id = auth_users.id';
+                ELSIF profile_exists_by_user_id THEN
+                    where_clause := 'profiles.user_id = auth_users.id';
+                ELSE
+                    where_clause := 'profiles.id = auth_users.id';
+                END IF;
+                
                 update_sql := update_sql || array_to_string(update_parts, ', ') || 
                              ' FROM auth.users auth_users ' ||
-                             'WHERE profiles.id = auth_users.id AND auth_users.id = ' || quote_literal(user_id_param);
+                             'WHERE ' || where_clause || ' AND auth_users.id = ' || quote_literal(user_id_param);
                 EXECUTE update_sql;
             END IF;
         END;
