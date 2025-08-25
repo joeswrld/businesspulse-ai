@@ -7,12 +7,14 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  error: string | null;
 }
 
 const AuthContext = React.createContext<AuthContextType>({
   user: null,
   session: null,
   loading: true,
+  error: null,
 });
 
 export const useAuth = () => {
@@ -31,18 +33,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
+    console.log("🔐 AuthProvider: Initializing authentication...");
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log("Auth state changed:", event, session);
+        console.log("🔐 Auth state changed:", event, session?.user?.email);
+        
         if (mounted) {
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
+          setError(null);
+          
+          if (event === 'SIGNED_IN') {
+            console.log("✅ User signed in successfully:", session?.user?.email);
+          } else if (event === 'SIGNED_OUT') {
+            console.log("🚪 User signed out");
+          } else if (event === 'TOKEN_REFRESHED') {
+            console.log("🔄 Token refreshed");
+          }
         }
       }
     );
@@ -50,20 +65,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // THEN check for existing session
     const getInitialSession = async () => {
       try {
+        console.log("🔐 Checking for existing session...");
         const { data: { session }, error } = await supabase.auth.getSession();
+        
         if (mounted) {
           if (error) {
-            console.error("Error getting session:", error);
+            console.error("❌ Error getting session:", error);
+            setError(error.message);
             setLoading(false);
             return;
           }
+          
+          console.log("🔐 Initial session check:", session ? "Found" : "None");
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
         }
       } catch (error) {
-        console.error("Error in getInitialSession:", error);
+        console.error("❌ Error in getInitialSession:", error);
         if (mounted) {
+          setError(error instanceof Error ? error.message : "Unknown error");
           setLoading(false);
         }
       }
@@ -80,13 +101,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading authentication...</p>
+          {error && (
+            <p className="text-red-500 text-sm mt-2">Error: {error}</p>
+          )}
+        </div>
       </div>
     );
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, loading }}>
+    <AuthContext.Provider value={{ user, session, loading, error }}>
       {children}
     </AuthContext.Provider>
   );
