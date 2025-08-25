@@ -7,8 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import AuthDebugger from "@/components/AuthDebugger";
-import AuthTest from "@/components/AuthTest";
+
 
 // Pages
 import Index from "./pages/Index";
@@ -45,8 +44,6 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <AuthDebugger />
-          <AuthTest />
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<Index />} />
