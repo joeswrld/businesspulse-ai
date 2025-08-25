@@ -338,13 +338,13 @@
         errorMessage.innerHTML = `
           <div style="text-align: center;">
             <div style="font-weight: 600; margin-bottom: 8px; color: #dc2626;">
-              ⚠️ Feedback Limit Reached
+              ⚠️ Limit reached — contact admin
             </div>
             <div style="font-size: 13px; color: #991b1b; margin-bottom: 12px;">
-              You have reached your monthly feedback submission limit.
+              You have reached your feedback submission limit.
             </div>
             <div style="font-size: 12px; color: #7c2d12; background: #fef3c7; padding: 8px; border-radius: 4px; border: 1px solid #f59e0b;">
-              <strong>Admin:</strong> Please upgrade your plan to continue receiving feedback from your website visitors.
+              Please contact the admin to increase your limit or upgrade your plan.
             </div>
           </div>
         `;

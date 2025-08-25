@@ -562,9 +562,9 @@ const BillingPage: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium">Feedback</p>
                     <p className="text-xs text-muted-foreground">
-                      {plan === 'free' && '50 submissions/month (Free Trial)'}
-                      {plan === 'pro' && '200 submissions/month (Pro Plan)'}
-                      {plan === 'business' && 'Unlimited submissions (Business Plan)'}
+                      {plan === 'free' && '50 submissions / 8 days (Free Trial)'}
+                      {plan === 'pro' && '300 submissions / 30 days (Pro Plan)'}
+                      {plan === 'business' && 'Unlimited submissions / 30 days (Business Plan)'}
                       {plan === 'enterprise' && 'Unlimited submissions (Enterprise Plan)'}
                     </p>
                   </div>

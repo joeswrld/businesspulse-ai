@@ -58,7 +58,7 @@ export const PLAN_LIMITS: Record<PlanType, UsageLimits> = {
     teams: 1
   },
   pro: {
-    feedback: 200,
+    feedback: 300,
     analytics: 100,
     reports: 20,
     insights: 50,
