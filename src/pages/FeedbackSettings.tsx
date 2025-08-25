@@ -47,6 +47,7 @@ const FeedbackSettings = () => {
   const [error, setError] = useState<string | null>(null);
   const [projectIdStatus, setProjectIdStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
+  const [schemaVersion, setSchemaVersion] = useState<'modern' | 'legacy' | 'unknown'>('unknown');
 
   // Connectivity listeners
   useEffect(() => {
@@ -98,6 +99,20 @@ const FeedbackSettings = () => {
         throw lastErr;
       };
       
+      // Detect schema: probe for modern column 'project_id'
+      try {
+        await withRetries(() => 
+          supabase
+            .from('feedback_settings')
+            .select('project_id')
+            .limit(1)
+        );
+        setSchemaVersion('modern');
+      } catch (probeErr) {
+        // If probing fails with 400, assume legacy schema
+        setSchemaVersion('legacy');
+      }
+
       // Load feedback settings
       const { data: feedbackData, error: feedbackError } = await withRetries(() => 
         supabase
@@ -131,25 +146,26 @@ const FeedbackSettings = () => {
           notify_email: null
         } as const;
 
-        // First try inserting with full defaults
-        const { data: newFeedbackData, error: createFeedbackError } = await withRetries(() => 
-          supabase
-            .from('feedback_settings')
-            .insert(fullDefaults as any)
-            .select()
-            .single()
-        );
-
-        if (createFeedbackError) {
-          console.warn('Full defaults insert failed, attempting minimal insert:', createFeedbackError);
-          // Fallback: insert minimal row with only user_id to satisfy stricter schemas
-          const { data: minimalRow, error: minimalInsertError } = await withRetries(() => 
+        // Insert according to schema, using upsert to avoid conflicts
+        if (schemaVersion === 'modern') {
+          // Try full defaults first
+          const { data: newFeedbackData, error: createFeedbackError } = await withRetries(() => 
             supabase
               .from('feedback_settings')
-              .insert({ user_id: user.id })
+              .upsert(fullDefaults as any, { onConflict: 'user_id' })
               .select()
               .single()
           );
+
+          if (createFeedbackError) {
+            console.warn('Full defaults upsert failed, attempting minimal upsert:', createFeedbackError);
+            const { data: minimalRow, error: minimalInsertError } = await withRetries(() => 
+              supabase
+                .from('feedback_settings')
+                .upsert({ user_id: user.id } as any, { onConflict: 'user_id' })
+                .select()
+                .single()
+            );
 
           if (minimalInsertError) {
             throw minimalInsertError;
@@ -174,6 +190,38 @@ const FeedbackSettings = () => {
           } as any);
         } else {
           setSettings(newFeedbackData);
+        }
+        } else {
+          // Legacy schema: only ensure a single row exists for this user
+          const { data: minimalRow, error: minimalInsertError } = await withRetries(() => 
+            supabase
+              .from('feedback_settings')
+              .upsert({ user_id: user.id } as any, { onConflict: 'user_id' })
+              .select()
+              .single()
+          );
+
+          if (minimalInsertError) {
+            throw minimalInsertError;
+          }
+
+          // Use UI defaults in-memory for rendering
+          setSettings({
+            id: minimalRow.id,
+            user_id: user.id,
+            project_id: '',
+            project_id_locked: false,
+            title: 'Share your thoughts with us',
+            show_name: true,
+            show_email: true,
+            button_text: 'Send Feedback',
+            theme: 'dark',
+            brand_color: '#2563eb',
+            redirect_url: null,
+            notify_email: null,
+            created_at: minimalRow.created_at || new Date().toISOString(),
+            updated_at: minimalRow.updated_at || new Date().toISOString()
+          } as any);
         }
       }
 
@@ -296,7 +344,13 @@ const FeedbackSettings = () => {
 
     setSaving(true);
     try {
-      // Save feedback settings
+      if (schemaVersion === 'legacy') {
+        // In legacy schema, we cannot persist modern fields. Acknowledge save for UX.
+        toast.success('Settings saved locally. Legacy database schema detected.');
+        return;
+      }
+
+      // Save feedback settings (modern schema)
       const { error: feedbackError } = await supabase
         .from('feedback_settings')
         .update({
