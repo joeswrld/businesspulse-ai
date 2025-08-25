@@ -199,6 +199,14 @@ export default function Dashboard() {
       }
 
       console.log('Subscription loaded:', subscriptionData);
+      console.log('Subscription properties:', {
+        plan_name: subscriptionData?.plan_name,
+        plan_type: subscriptionData?.plan_type,
+        subscription_type: subscriptionData?.subscription_type,
+        status: subscriptionData?.status,
+        trial_end: subscriptionData?.trial_end,
+        current_period_end: subscriptionData?.current_period_end
+      });
       setSubscription(subscriptionData);
 
     } catch (error) {
@@ -475,7 +483,10 @@ export default function Dashboard() {
 
   // Get plan display info
   const getPlanInfo = () => {
+    console.log('🔍 getPlanInfo called with subscription:', subscription);
+    
     if (!subscription) {
+      console.log('🔍 No subscription, returning default');
       return {
         planName: 'Free Trial',
         planType: 'trial',
@@ -486,10 +497,17 @@ export default function Dashboard() {
       };
     }
 
-    const isTrial = subscription.plan_name === 'free_trial';
-    const trialEnd = new Date(subscription.trial_end);
+    // Safely get subscription properties with defaults
+    const planName = subscription.plan_name || subscription.subscription_type || 'free';
+    const planType = subscription.plan_type || 'free';
+    const trialEnd = subscription.trial_end || subscription.current_period_end;
+    
+    console.log('🔍 Plan info extracted:', { planName, planType, trialEnd });
+    
+    const isTrial = planName === 'free_trial' || planName === 'free';
+    const trialEndDate = trialEnd ? new Date(trialEnd) : new Date();
     const now = new Date();
-    const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const daysLeft = Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
     let upgradeText = '';
     let upgradeLink = '';
@@ -497,7 +515,7 @@ export default function Dashboard() {
     if (isTrial) {
       upgradeText = 'Upgrade to Pro';
       upgradeLink = '/billing?plan=pro';
-    } else if (subscription.plan_name === 'pro') {
+    } else if (planName === 'pro') {
       upgradeText = 'Upgrade to Business';
       upgradeLink = '/billing?plan=business';
     } else {
@@ -505,9 +523,23 @@ export default function Dashboard() {
       upgradeLink = '/billing';
     }
 
+    // Safely format plan name
+    const formattedPlanName = planName 
+      ? planName.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+      : 'Free Plan';
+
+    console.log('🔍 Returning plan info:', {
+      planName: formattedPlanName,
+      planType,
+      isTrial,
+      daysLeft: Math.max(0, daysLeft),
+      upgradeText,
+      upgradeLink
+    });
+
     return {
-      planName: subscription.plan_name.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      planType: subscription.plan_type,
+      planName: formattedPlanName,
+      planType: planType,
       isTrial,
       daysLeft: Math.max(0, daysLeft),
       upgradeText,
