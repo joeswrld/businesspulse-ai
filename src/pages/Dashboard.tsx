@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { checkAndSetupDatabase } from '@/utils/databaseCheck';
 import { 
   BarChart3, 
   Users, 
@@ -111,6 +112,7 @@ export default function Dashboard() {
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
   const [sentimentFilter, setSentimentFilter] = useState<'all' | 'positive' | 'negative' | 'neutral'>('all');
   const [aiInsight, setAiInsight] = useState<AIInsight | null>(null);
@@ -126,15 +128,22 @@ export default function Dashboard() {
       console.log('Loading dashboard data for user:', user.id);
       
       // Get user's project IDs from feedback_settings
-      const { data: projectSettings, error: projectError } = await supabase
-        .from('feedback_settings')
-        .select('project_id')
-        .eq('user_id', user.id);
+      let projectSettings = [];
+      try {
+        const { data, error: projectError } = await supabase
+          .from('feedback_settings')
+          .select('project_id')
+          .eq('user_id', user.id);
 
-      if (projectError) {
-        console.error('Error loading project settings:', projectError);
-        toast.error('Failed to load project settings');
-        return;
+        if (projectError) {
+          console.error('Error loading project settings:', projectError);
+          // Don't show error toast, just continue with empty data
+        } else {
+          projectSettings = data || [];
+        }
+      } catch (error) {
+        console.error('Exception loading project settings:', error);
+        // Continue with empty data
       }
 
       console.log('Project settings loaded:', projectSettings);
@@ -144,18 +153,23 @@ export default function Dashboard() {
       // Get latest 50 feedbacks for user's projects
       let feedbacksData = [];
       if (projectIds.length > 0) {
-        const { data, error: feedbacksError } = await supabase
-          .from('feedbacks')
-          .select('*')
-          .in('project_id', projectIds)
-          .order('timestamp', { ascending: false })
-          .limit(50);
+        try {
+          const { data, error: feedbacksError } = await supabase
+            .from('feedbacks')
+            .select('*')
+            .in('project_id', projectIds)
+            .order('timestamp', { ascending: false })
+            .limit(50);
 
-        if (feedbacksError) {
-          console.error('Error loading feedbacks:', feedbacksError);
-          toast.error('Failed to load feedbacks');
-        } else {
-          feedbacksData = data || [];
+          if (feedbacksError) {
+            console.error('Error loading feedbacks:', feedbacksError);
+            // Don't show error toast, just continue with empty data
+          } else {
+            feedbacksData = data || [];
+          }
+        } catch (error) {
+          console.error('Exception loading feedbacks:', error);
+          // Continue with empty data
         }
       } else {
         console.log('No project IDs found, setting empty feedbacks');
@@ -165,14 +179,23 @@ export default function Dashboard() {
       setFeedbacks(feedbacksData);
 
       // Get user subscription
-      const { data: subscriptionData, error: subscriptionError } = await supabase
-        .from('user_subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      let subscriptionData = null;
+      try {
+        const { data, error: subscriptionError } = await supabase
+          .from('user_subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
 
-      if (subscriptionError && subscriptionError.code !== 'PGRST116') {
-        console.error('Error loading subscription:', subscriptionError);
+        if (subscriptionError && subscriptionError.code !== 'PGRST116') {
+          console.error('Error loading subscription:', subscriptionError);
+          // Don't show error toast, just continue with null subscription
+        } else {
+          subscriptionData = data;
+        }
+      } catch (error) {
+        console.error('Exception loading subscription:', error);
+        // Continue with null subscription
       }
 
       console.log('Subscription loaded:', subscriptionData);
@@ -180,7 +203,8 @@ export default function Dashboard() {
 
     } catch (error) {
       console.error('Error in loadDashboardData:', error);
-      toast.error('Failed to load dashboard data');
+      setError(error instanceof Error ? error.message : 'An error occurred while loading dashboard data');
+      // Don't show error toast, just continue with empty data
     } finally {
       setLoading(false);
     }
@@ -188,8 +212,14 @@ export default function Dashboard() {
 
   // Load data on component mount
   useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    if (user) {
+      // First check and setup database if needed
+      checkAndSetupDatabase(user.id).then(() => {
+        // Then load dashboard data
+        loadDashboardData();
+      });
+    }
+  }, [loadDashboardData, user]);
 
   // Analyze sentiment from message content
   const analyzeSentiment = (message: string): 'positive' | 'negative' | 'neutral' => {
@@ -509,6 +539,31 @@ export default function Dashboard() {
             <RefreshCw className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Loading Dashboard...</h2>
             <p className="text-gray-600">Please wait while we fetch your data.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Dashboard Error</h2>
+            <p className="text-gray-600 mb-4">There was an issue loading your dashboard data.</p>
+            <div className="space-y-2">
+              <Button onClick={() => {
+                setError(null);
+                setLoading(true);
+                loadDashboardData();
+              }}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+              <p className="text-xs text-gray-500">Error: {error}</p>
+            </div>
           </div>
         </div>
       </div>
