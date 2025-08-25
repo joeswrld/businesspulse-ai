@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   Globe, 
   Palette, 
-  Bell, 
   Code, 
   Copy,
   Check,
@@ -413,26 +412,7 @@ const FeedbackSettings = () => {
               </Select>
             </div>
 
-            <div>
-              <Label htmlFor="brandColor" className="text-sm font-medium">
-                Brand Color
-              </Label>
-              <div className="flex items-center space-x-2 mt-1">
-                <Input
-                  id="brandColor"
-                  type="color"
-                  value={settings?.brand_color || '#2563eb'}
-                  onChange={(e) => setSettings(prev => prev ? { ...prev, brand_color: e.target.value } : null)}
-                  className="w-16 h-10 p-1"
-                />
-                <Input
-                  value={settings?.brand_color || '#2563eb'}
-                  onChange={(e) => setSettings(prev => prev ? { ...prev, brand_color: e.target.value } : null)}
-                  placeholder="#2563eb"
-                  className="flex-1"
-                />
-              </div>
-            </div>
+            
 
             <div className="flex items-center justify-between">
               <div className="space-y-1">
@@ -458,53 +438,7 @@ const FeedbackSettings = () => {
           </CardContent>
         </Card>
 
-        {/* Notifications */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Bell className="h-5 w-5" />
-              <span>Notifications</span>
-            </CardTitle>
-            <CardDescription>
-              Configure how you receive notifications for new feedback.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="emailNotifications" className="text-sm font-medium">
-                Email Notifications
-              </Label>
-              <Input
-                id="emailNotifications"
-                type="email"
-                value={settings?.notify_email || ''}
-                onChange={(e) => setSettings(prev => prev ? { ...prev, notify_email: e.target.value } : null)}
-                placeholder="your@email.com"
-                className="mt-1"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Receive email notifications when new feedback is submitted (optional)
-              </p>
-            </div>
 
-            <div>
-              <Label htmlFor="redirectUrl" className="text-sm font-medium">
-                Redirect URL
-              </Label>
-              <Input
-                id="redirectUrl"
-                type="url"
-                value={settings?.redirect_url || ''}
-                onChange={(e) => setSettings(prev => prev ? { ...prev, redirect_url: e.target.value } : null)}
-                placeholder="https://your-website.com/thank-you"
-                className="mt-1"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                URL to redirect users after submitting feedback (optional)
-              </p>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Update Settings Button */}
         <div className="text-center">
