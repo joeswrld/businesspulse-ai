@@ -829,22 +829,39 @@ const BillingPage: React.FC = () => {
               </Badge>
             </div>
 
-            {/* Trial Days Left */}
+            {/* Trial Info */}
             {trialDaysLeft > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Trial Days Left</span>
-                <span className="text-sm text-blue-600 font-medium">
-                  {trialDaysLeft} days
-                </span>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Trial Days Left</span>
+                  <span className="text-sm text-blue-600 font-medium">
+                    {trialDaysLeft} days
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Trial Ends</span>
+                  <span className="text-sm text-muted-foreground">
+                    {(() => {
+                      if (!user?.created_at) return '';
+                      const trialEnd = new Date(user.created_at);
+                      trialEnd.setDate(trialEnd.getDate() + 8);
+                      return formatDate(trialEnd.toISOString());
+                    })()}
+                  </span>
+                </div>
               </div>
             )}
 
             {/* Subscription Period */}
             {subscription && (
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Next Billing</span>
+                <span className="text-sm font-medium">
+                  {subscription.status === 'trialing' ? 'Trial Ends' : 'Next Billing'}
+                </span>
                 <span className="text-sm text-muted-foreground">
-                  {formatDate(subscription.current_period_end)}
+                  {subscription.status === 'trialing' && subscription.trial_end
+                    ? formatDate(subscription.trial_end)
+                    : formatDate(subscription.current_period_end)}
                 </span>
               </div>
             )}
