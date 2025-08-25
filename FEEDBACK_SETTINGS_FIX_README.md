@@ -118,6 +118,7 @@ supabase db push
 ### Database Changes
 - `supabase/migrations/20250120000000_ensure_feedback_system.sql` - Migration for feedback system setup
 - `supabase/migrations/20250120000001_ensure_all_tables.sql` - Comprehensive migration for all tables
+- `supabase/migrations/20250120000002_fix_trigger_function.sql` - Fix for trigger function syntax
 - `create_feedback_settings_for_user.sql` - Database functions
 - `setup-feedback-for-new-users.sh` - Setup script
 
@@ -150,6 +151,9 @@ supabase db push
 
 **Issue**: Users still see errors
 **Solution**: Clear browser cache and try again, or check if the migration was applied successfully
+
+**Issue**: SQL syntax error with trigger functions
+**Solution**: The fix has been applied in migration `20250120000002_fix_trigger_function.sql`. Run all migrations in order.
 
 ### Support
 

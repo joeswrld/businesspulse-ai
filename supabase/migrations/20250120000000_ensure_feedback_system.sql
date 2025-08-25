@@ -58,21 +58,7 @@ BEGIN
     CREATE POLICY "Users can update their own feedback settings" ON feedback_settings
       FOR UPDATE USING (auth.uid() = user_id);
 
-    -- Create function to update updated_at timestamp if it doesn't exist
-    IF NOT EXISTS (SELECT FROM pg_proc WHERE proname = 'update_updated_at_column') THEN
-      CREATE OR REPLACE FUNCTION update_updated_at_column()
-      RETURNS TRIGGER AS $$
-      BEGIN
-        NEW.updated_at = NOW();
-        RETURN NEW;
-      END;
-      $$ language 'plpgsql';
-    END IF;
-
-    -- Create trigger for updated_at
-    DROP TRIGGER IF EXISTS update_feedback_settings_updated_at ON feedback_settings;
-    CREATE TRIGGER update_feedback_settings_updated_at BEFORE UPDATE ON feedback_settings
-      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    -- Note: Triggers will be created in a separate migration to avoid syntax errors
 
     -- Grant necessary permissions
     GRANT USAGE ON SCHEMA public TO anon, authenticated;

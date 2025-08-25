@@ -195,33 +195,7 @@ BEGIN
       FOR INSERT WITH CHECK (auth.uid() = user_id);
   END IF;
 
-  -- Create update_updated_at_column function if it doesn't exist
-  IF NOT EXISTS (SELECT FROM pg_proc WHERE proname = 'update_updated_at_column') THEN
-    CREATE OR REPLACE FUNCTION update_updated_at_column()
-    RETURNS TRIGGER AS $$
-    BEGIN
-      NEW.updated_at = NOW();
-      RETURN NEW;
-    END;
-    $$ language 'plpgsql';
-  END IF;
-
-  -- Create triggers for updated_at columns
-  DROP TRIGGER IF EXISTS update_feedback_settings_updated_at ON feedback_settings;
-  CREATE TRIGGER update_feedback_settings_updated_at BEFORE UPDATE ON feedback_settings
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-  DROP TRIGGER IF EXISTS update_data_sources_updated_at ON data_sources;
-  CREATE TRIGGER update_data_sources_updated_at BEFORE UPDATE ON data_sources
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-  DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
-  CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-  DROP TRIGGER IF EXISTS update_user_subscriptions_updated_at ON user_subscriptions;
-  CREATE TRIGGER update_user_subscriptions_updated_at BEFORE UPDATE ON user_subscriptions
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  -- Note: Triggers will be created in a separate migration to avoid syntax errors
 
   -- Grant necessary permissions
   GRANT USAGE ON SCHEMA public TO anon, authenticated;
