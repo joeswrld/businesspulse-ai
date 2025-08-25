@@ -479,36 +479,45 @@ const Settings = () => {
 
   // Get plan info for display
   const getPlanInfo = () => {
+    // No subscription: treat as Free Trial based on account creation date
     if (!subscription) {
+      const createdAt = user?.created_at ? new Date(user.created_at) : null;
+      let daysLeft = 0;
+      if (createdAt) {
+        const trialEnd = new Date(createdAt);
+        trialEnd.setDate(trialEnd.getDate() + 8);
+        const now = new Date();
+        daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+      }
       return {
         planName: 'Free Trial',
         planType: 'trial',
         isTrial: true,
-        daysLeft: 0,
+        daysLeft,
         upgradeText: 'Upgrade to Pro',
         upgradeLink: '/billing?plan=pro'
       };
     }
 
-    const planName = subscription.plan_name || 'Free Trial';
-    const isTrial = subscription.plan_type === 'trial';
-    
-    if (isTrial && subscription.trial_end) {
-      const trialEnd = new Date(subscription.trial_end);
+    // With subscription: show trial badge if status is trialing, else show paid plan
+    const isTrialing = subscription.status === 'trialing';
+    if (isTrialing) {
+      const trialEnd = subscription.trial_end ? new Date(subscription.trial_end) : null;
       const now = new Date();
-      const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      
+      const daysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) : 0;
       return {
-        planName,
+        planName: 'Free Trial',
         planType: 'trial',
         isTrial: true,
-        daysLeft: Math.max(0, daysLeft),
+        daysLeft,
         upgradeText: 'Upgrade to Pro',
         upgradeLink: '/billing?plan=pro'
       };
     }
 
-    if (subscription.plan_type === 'pro') {
+    // Determine paid plan label
+    const planType = (subscription.plan_type || '').toLowerCase();
+    if (planType === 'pro') {
       return {
         planName: 'Pro',
         planType: 'pro',
