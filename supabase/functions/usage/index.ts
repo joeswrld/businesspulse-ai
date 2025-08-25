@@ -9,14 +9,14 @@ const corsHeaders = {
 // Plan limits configuration
 const PLAN_LIMITS = {
   free: {
-    feedback: 20,
+    feedback: 50,
     analytics: 5,
     reports: 2,
     insights: 5,
     teams: 1
   },
   pro: {
-    feedback: 500,
+    feedback: 200,
     analytics: 100,
     reports: 20,
     insights: 50,

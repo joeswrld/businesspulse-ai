@@ -109,6 +109,24 @@ serve(async (req) => {
       )
     }
 
+    // Increment feedback usage counter for the user
+    try {
+      const { error: usageError } = await supabase.rpc('increment_usage', {
+        p_user_id: projectSettings.user_id,
+        p_action: 'feedback'
+      })
+
+      if (usageError) {
+        console.error('Error incrementing usage counter:', usageError)
+        // Don't fail the request if usage tracking fails
+      } else {
+        console.log('Successfully incremented feedback usage counter for user:', projectSettings.user_id)
+      }
+    } catch (usageError) {
+      console.error('Error in usage tracking:', usageError)
+      // Don't fail the request if usage tracking fails
+    }
+
     // Send email notification if notify_email is set
     if (projectSettings.notify_email) {
       try {
