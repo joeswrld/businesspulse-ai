@@ -46,6 +46,19 @@ const FeedbackSettings = () => {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [projectIdStatus, setProjectIdStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
+
+  // Connectivity listeners
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Load settings
   const loadSettings = useCallback(async () => {
@@ -53,14 +66,47 @@ const FeedbackSettings = () => {
 
     try {
       setLoading(true);
+      setError(null);
+
+      // Guard against offline states for clearer UX
+      if (!navigator.onLine) {
+        setError('You appear to be offline. Please check your internet connection and try again.');
+        return;
+      }
+      
+      // Simple retry helper for transient network errors
+      const withRetries = async <T,>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 400): Promise<T> => {
+        let lastErr: any = null;
+        for (let i = 0; i < attempts; i++) {
+          try {
+            return await fn();
+          } catch (e: any) {
+            lastErr = e;
+            const msg = (e && (e.message || e.error)) || '';
+            // Retry on common fetch/network/timeouts only
+            const isTransient = typeof msg === 'string' && (
+              msg.includes('Failed to fetch') ||
+              msg.includes('timeout') ||
+              msg.includes('ETIMEDOUT') ||
+              msg.includes('ECONNRESET') ||
+              msg.includes('network')
+            );
+            if (!isTransient) break;
+            await new Promise(r => setTimeout(r, baseDelayMs * Math.pow(2, i)));
+          }
+        }
+        throw lastErr;
+      };
       
       // Load feedback settings
-      const { data: feedbackData, error: feedbackError } = await supabase
-        .from('feedback_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
+      const { data: feedbackData, error: feedbackError } = await withRetries(() => 
+        supabase
+          .from('feedback_settings')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+      );
 
       if (feedbackError) {
         console.error('Error loading feedback settings:', feedbackError);
@@ -86,20 +132,24 @@ const FeedbackSettings = () => {
         } as const;
 
         // First try inserting with full defaults
-        const { data: newFeedbackData, error: createFeedbackError } = await supabase
-          .from('feedback_settings')
-          .insert(fullDefaults as any)
-          .select()
-          .single();
+        const { data: newFeedbackData, error: createFeedbackError } = await withRetries(() => 
+          supabase
+            .from('feedback_settings')
+            .insert(fullDefaults as any)
+            .select()
+            .single()
+        );
 
         if (createFeedbackError) {
           console.warn('Full defaults insert failed, attempting minimal insert:', createFeedbackError);
           // Fallback: insert minimal row with only user_id to satisfy stricter schemas
-          const { data: minimalRow, error: minimalInsertError } = await supabase
-            .from('feedback_settings')
-            .insert({ user_id: user.id })
-            .select()
-            .single();
+          const { data: minimalRow, error: minimalInsertError } = await withRetries(() => 
+            supabase
+              .from('feedback_settings')
+              .insert({ user_id: user.id })
+              .select()
+              .single()
+          );
 
           if (minimalInsertError) {
             throw minimalInsertError;
@@ -136,9 +186,13 @@ const FeedbackSettings = () => {
           errorMessage = 'Database tables not set up. Please run the database setup script first.';
         } else if (error.message.includes('permission denied')) {
           errorMessage = 'Permission denied. Please check your database permissions.';
+        } else if (error.message.includes('Failed to fetch')) {
+          errorMessage = 'Network error. Please check your internet connection and try again.';
         } else {
           errorMessage = `Failed to load settings: ${error.message}`;
         }
+      } else if (isOffline) {
+        errorMessage = 'You appear to be offline. Please check your internet connection and try again.';
       }
       
       setError(errorMessage);
