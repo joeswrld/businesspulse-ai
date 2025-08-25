@@ -611,11 +611,21 @@ const BillingPage: React.FC = () => {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {/* Feedback Usage */}
               <div className={`flex items-center justify-between p-3 rounded-lg ${
-                checks.feedback.canUse ? 'bg-blue-50' : 'bg-red-50 border border-red-200'
+                (() => {
+                  const limitVal = checks.feedback.limit;
+                  const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                  const over = limitVal !== -1 && current >= limitVal;
+                  return over ? 'bg-red-50 border border-red-200' : 'bg-blue-50';
+                })()
               }`}>
                 <div className="flex items-center space-x-2">
                   <MessageSquare className={`h-5 w-5 ${
-                    checks.feedback.canUse ? 'text-blue-600' : 'text-red-600'
+                    (() => {
+                      const limitVal = checks.feedback.limit;
+                      const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                      const over = limitVal !== -1 && current >= limitVal;
+                      return over ? 'text-red-600' : 'text-blue-600';
+                    })()
                   }`} />
                   <div>
                     <p className="text-sm font-medium">Feedback</p>
@@ -629,16 +639,28 @@ const BillingPage: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <span className={`text-lg font-bold ${
-                    checks.feedback.canUse ? 'text-blue-600' : 'text-red-600'
+                    (() => {
+                      const limitVal = checks.feedback.limit;
+                      const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                      const over = limitVal !== -1 && current >= limitVal;
+                      return over ? 'text-red-600' : 'text-blue-600';
+                    })()
                   }`}>
-                    {realtimeFeedbackCount ?? checks.feedback.currentUsage}
+                    {(() => {
+                      const limitVal = checks.feedback.limit;
+                      const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                      return limitVal === -1 ? current : Math.min(current, limitVal);
+                    })()}
                   </span>
                   <span className="text-xs text-muted-foreground block">
                     {checks.feedback.limit === -1 ? 'Unlimited' : `/${checks.feedback.limit}`}
                   </span>
-                  {!checks.feedback.canUse && (
-                    <div className="text-xs text-red-600 mt-1">Limit Reached</div>
-                  )}
+                  {(() => {
+                    const limitVal = checks.feedback.limit;
+                    const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                    const over = limitVal !== -1 && current >= limitVal;
+                    return over ? (<div className="text-xs text-red-600 mt-1">Limit Reached</div>) : null;
+                  })()}
                 </div>
               </div>
 
