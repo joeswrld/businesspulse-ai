@@ -13,7 +13,9 @@ import {
   Copy,
   Check,
   Save,
-  Lock
+  Lock,
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -46,6 +48,44 @@ const FeedbackSettings = () => {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [projectIdStatus, setProjectIdStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [setupAttempted, setSetupAttempted] = useState(false);
+
+  // Check if feedback_settings table exists and create it if needed
+  const ensureTableExists = useCallback(async () => {
+    if (!user) return false;
+
+    try {
+      // First, try to check if the table exists by attempting a simple query
+      const { data: testData, error: testError } = await supabase
+        .from('feedback_settings')
+        .select('id')
+        .limit(1);
+
+      // If we get a "relation does not exist" error, we need to create the table
+      if (testError && testError.message.includes('relation "feedback_settings" does not exist')) {
+        console.log('Feedback settings table does not exist, creating it...');
+        
+        // Call the setup function to create the table
+        const { error: setupError } = await supabase.rpc('create_feedback_settings_for_user', {
+          user_id_param: user.id
+        });
+
+        if (setupError) {
+          console.error('Error setting up feedback system:', setupError);
+          // If the RPC function doesn't exist, we'll handle it in the main load function
+          return false;
+        }
+
+        console.log('Feedback settings table created successfully');
+        return true;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error checking/creating table:', error);
+      return false;
+    }
+  }, [user]);
 
   // Load settings
   const loadSettings = useCallback(async () => {
@@ -53,6 +93,10 @@ const FeedbackSettings = () => {
 
     try {
       setLoading(true);
+      setError(null);
+      
+      // Ensure the table exists first
+      const tableExists = await ensureTableExists();
       
       // Load feedback settings
       const { data: feedbackData, error: feedbackError } = await supabase
@@ -64,7 +108,41 @@ const FeedbackSettings = () => {
 
       if (feedbackError) {
         console.error('Error loading feedback settings:', feedbackError);
-        throw feedbackError;
+        
+        // Handle specific error cases
+        if (feedbackError.message.includes('relation "feedback_settings" does not exist')) {
+          if (!setupAttempted) {
+            setSetupAttempted(true);
+            // Try to create the table using a direct SQL approach
+            const { error: createError } = await supabase.rpc('create_feedback_settings_for_user', {
+              user_id_param: user.id
+            });
+            
+            if (createError) {
+              throw new Error('Database tables not set up. Please contact support to set up the feedback system.');
+            } else {
+              // Retry loading settings after table creation
+              const { data: retryData, error: retryError } = await supabase
+                .from('feedback_settings')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+              if (retryError) throw retryError;
+              if (retryData && retryData.length > 0) {
+                setSettings(retryData[0]);
+                return;
+              }
+            }
+          } else {
+            throw new Error('Database tables not set up. Please contact support to set up the feedback system.');
+          }
+        } else if (feedbackError.message.includes('permission denied')) {
+          throw new Error('Permission denied. Please check your database permissions or contact support.');
+        } else {
+          throw feedbackError;
+        }
       }
 
       if (feedbackData && feedbackData.length > 0) {
@@ -92,7 +170,8 @@ const FeedbackSettings = () => {
           .single();
 
         if (createFeedbackError) {
-          throw createFeedbackError;
+          console.error('Error creating default settings:', createFeedbackError);
+          throw new Error(`Failed to create default settings: ${createFeedbackError.message}`);
         }
         
         setSettings(newFeedbackData);
@@ -103,13 +182,7 @@ const FeedbackSettings = () => {
       let errorMessage = 'Failed to load settings. Please try again.';
       
       if (error instanceof Error) {
-        if (error.message.includes('relation "feedback_settings" does not exist')) {
-          errorMessage = 'Database tables not set up. Please run the database setup script first.';
-        } else if (error.message.includes('permission denied')) {
-          errorMessage = 'Permission denied. Please check your database permissions.';
-        } else {
-          errorMessage = `Failed to load settings: ${error.message}`;
-        }
+        errorMessage = error.message;
       }
       
       setError(errorMessage);
@@ -117,7 +190,7 @@ const FeedbackSettings = () => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, ensureTableExists, setupAttempted]);
 
   const checkProjectIdAvailability = useCallback(async (projectId: string) => {
     if (!user || !projectId || projectId.trim() === '' || projectId.length < 3) {
@@ -173,6 +246,7 @@ const FeedbackSettings = () => {
 
   const handleRetry = () => {
     setError(null);
+    setSetupAttempted(false);
     setLoading(true);
     loadSettings();
   };
@@ -280,6 +354,7 @@ const FeedbackSettings = () => {
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
             <h2 className="text-xl font-semibold mb-2">Loading Settings...</h2>
             <p className="text-gray-600">Please wait while we fetch your configuration.</p>
           </div>
@@ -294,9 +369,18 @@ const FeedbackSettings = () => {
         <Card className="max-w-2xl mx-auto">
           <CardContent className="p-6">
             <div className="text-center">
+              <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
               <h2 className="text-xl font-semibold mb-4">Error Loading Settings</h2>
               <p className="text-gray-600 mb-6">{error}</p>
-              <Button onClick={handleRetry}>Try Again</Button>
+              <div className="space-y-2">
+                <Button onClick={handleRetry} className="w-full">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Try Again
+                </Button>
+                <p className="text-xs text-gray-500">
+                  If the problem persists, please contact support.
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
