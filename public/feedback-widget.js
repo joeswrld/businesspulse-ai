@@ -150,6 +150,8 @@
       ></textarea>
     </div>
 
+    <div id="notex-quota" style="margin: 8px 0 12px 0; color: #374151; font-size: 12px; display: none;"></div>
+
     <div style="display: flex; gap: 12px; justify-content: flex-end;">
       <button 
         type="button" 
@@ -253,6 +255,39 @@
   function openModal() {
     modalOverlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    // Fetch remaining quota on open
+    const quotaEl = document.getElementById('notex-quota');
+    const submitButton = document.getElementById('notex-submit-button');
+    const projectIdField = form.querySelector('input[name="project_id"]');
+    const pid = projectIdField ? projectIdField.value : null;
+    if (!pid) return;
+
+    quotaEl.style.display = 'none';
+    quotaEl.textContent = '';
+    submitButton.disabled = false;
+    submitButton.style.opacity = '1';
+
+    const usageCheckUrl = 'https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/check-usage';
+    fetch(usageCheckUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: pid, feature: 'feedback' })
+    })
+      .then(r => r.json().catch(() => ({})))
+      .then(result => {
+        if (!result || result.success !== true) return;
+        quotaEl.style.display = 'block';
+        if (result.isUnlimited || result.limit === -1) {
+          quotaEl.textContent = 'Quota: Unlimited';
+        } else {
+          quotaEl.textContent = `Quota: ${Math.max(0, result.remaining)} remaining`;
+          if (result.remaining <= 0) {
+            submitButton.disabled = true;
+            submitButton.style.opacity = '0.6';
+          }
+        }
+      })
+      .catch(() => {});
   }
 
   function closeModal() {
