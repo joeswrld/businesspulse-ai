@@ -579,28 +579,7 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
 
-            {/* Navigation Buttons */}
-            <div className="flex space-x-2 ml-auto">
-
-              <Button variant="outline" asChild>
-                <a href="/insights-simple">
-                  <Lightbulb className="h-4 w-4 mr-2" />
-                  Insights
-                </a>
-              </Button>
-              <Button variant="outline" asChild>
-                <a href="/reports">
-                  <FileText className="h-4 w-4 mr-2" />
-                  Reports
-                </a>
-              </Button>
-              <Button variant="outline" asChild>
-                <a href="/billing">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Billing
-                </a>
-              </Button>
-            </div>
+            
           </div>
         </CardContent>
       </Card>
