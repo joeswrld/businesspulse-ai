@@ -206,7 +206,7 @@ const FeedbackSettings = () => {
         .from('feedback_settings')
         .select('id, project_id, user_id')
         .eq('project_id', projectId.trim())
-        .neq('id', settings?.id || '');
+        .neq('user_id', user.id); // Check against other users, not just other records
 
       if (checkError) {
         console.error('Error checking project ID availability:', checkError);
@@ -216,6 +216,7 @@ const FeedbackSettings = () => {
 
       if (existingSettings && existingSettings.length > 0) {
         setProjectIdStatus('taken');
+        console.log('Project ID taken by:', existingSettings);
       } else {
         setProjectIdStatus('available');
       }
@@ -223,7 +224,7 @@ const FeedbackSettings = () => {
       console.error('Error checking project ID availability:', error);
       setProjectIdStatus('idle');
     }
-  }, [user, settings?.id]);
+  }, [user]);
 
   // Load settings on component mount
   useEffect(() => {
@@ -272,7 +273,7 @@ const FeedbackSettings = () => {
         .from('feedback_settings')
         .select('id, project_id, user_id')
         .eq('project_id', settings.project_id.trim())
-        .neq('id', settings.id);
+        .neq('user_id', user.id); // Check against other users
 
       if (checkError) {
         toast.error('Failed to validate Project ID');
@@ -429,13 +430,27 @@ const FeedbackSettings = () => {
                 </p>
               )}
               {!settings?.project_id_locked && projectIdStatus === 'available' && (
-                <p className="text-sm text-green-600 mt-1">✓ Project ID available</p>
+                <p className="text-sm text-green-600 mt-1 flex items-center">
+                  <Check className="h-4 w-4 mr-1" />
+                  ✓ Project ID available - you can save to lock it
+                </p>
               )}
               {!settings?.project_id_locked && projectIdStatus === 'taken' && (
-                <p className="text-sm text-red-600 mt-1">✗ Project ID already taken by another user</p>
+                <p className="text-sm text-red-600 mt-1 flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  ✗ Project ID already taken by another user - please choose a different one
+                </p>
               )}
               {!settings?.project_id_locked && projectIdStatus === 'checking' && (
-                <p className="text-sm text-blue-600 mt-1">Checking availability...</p>
+                <p className="text-sm text-blue-600 mt-1 flex items-center">
+                  <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                  Checking availability...
+                </p>
+              )}
+              {!settings?.project_id_locked && projectIdStatus === 'idle' && settings?.project_id && settings.project_id.length >= 3 && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Type at least 3 characters to check availability
+                </p>
               )}
             </div>
           </CardContent>
@@ -594,7 +609,12 @@ const FeedbackSettings = () => {
         <div className="text-center">
           <Button
             onClick={handleSaveSettings}
-            disabled={saving || !settings?.project_id || (settings?.project_id && settings.project_id.trim().length < 3)}
+            disabled={
+              saving || 
+              !settings?.project_id || 
+              (settings?.project_id && settings.project_id.trim().length < 3) ||
+              (!settings?.project_id_locked && projectIdStatus === 'taken')
+            }
             className="px-8 py-3 text-lg"
           >
             {saving ? (
@@ -605,10 +625,15 @@ const FeedbackSettings = () => {
             ) : (
               <>
                 <Save className="h-5 w-5 mr-2" />
-                Update Settings
+                {settings?.project_id_locked ? 'Update Settings' : 'Save & Lock Project ID'}
               </>
             )}
           </Button>
+          {!settings?.project_id_locked && projectIdStatus === 'taken' && (
+            <p className="text-sm text-red-600 mt-2">
+              Cannot save: Project ID is already taken by another user
+            </p>
+          )}
         </div>
 
         {/* Embed Code */}
