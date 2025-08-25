@@ -1,7 +1,87 @@
--- Comprehensive migration to ensure all necessary tables exist for new users
--- This migration creates all required tables and functions for the platform
+-- Safe profiles table handling
+-- This migration ensures profiles table works correctly regardless of existing structure
 
--- Function to ensure all required tables exist
+-- Function to safely create or update user profile
+CREATE OR REPLACE FUNCTION safe_create_user_profile(user_id_param UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    profile_exists BOOLEAN;
+    has_user_id_col BOOLEAN;
+    has_email_col BOOLEAN;
+    has_full_name_col BOOLEAN;
+BEGIN
+    -- Check if profile already exists
+    SELECT EXISTS(SELECT 1 FROM profiles WHERE id = user_id_param) INTO profile_exists;
+    
+    -- Check which columns exist in profiles table
+    SELECT EXISTS(
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'profiles' 
+        AND column_name = 'user_id'
+        AND table_schema = 'public'
+    ) INTO has_user_id_col;
+    
+    SELECT EXISTS(
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'profiles' 
+        AND column_name = 'email'
+        AND table_schema = 'public'
+    ) INTO has_email_col;
+    
+    SELECT EXISTS(
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'profiles' 
+        AND column_name = 'full_name'
+        AND table_schema = 'public'
+    ) INTO has_full_name_col;
+    
+    -- If profile doesn't exist, create it
+    IF NOT profile_exists THEN
+        -- Build dynamic INSERT statement based on available columns
+        IF has_user_id_col THEN
+            -- Insert with user_id column
+            EXECUTE format('INSERT INTO profiles (id, user_id) VALUES (%L, %L)', user_id_param, user_id_param);
+        ELSE
+            -- Insert without user_id column
+            EXECUTE format('INSERT INTO profiles (id) VALUES (%L)', user_id_param);
+        END IF;
+    END IF;
+    
+    -- Update profile with user data if columns exist
+    IF has_email_col OR has_full_name_col THEN
+        -- Build dynamic UPDATE statement
+        DECLARE
+            update_sql TEXT := 'UPDATE profiles SET ';
+            update_parts TEXT[] := ARRAY[]::TEXT[];
+        BEGIN
+            IF has_email_col THEN
+                update_parts := array_append(update_parts, 'email = auth_users.email');
+            END IF;
+            
+            IF has_full_name_col THEN
+                update_parts := array_append(update_parts, 'full_name = auth_users.raw_user_meta_data->>''full_name''');
+            END IF;
+            
+            IF array_length(update_parts, 1) > 0 THEN
+                update_sql := update_sql || array_to_string(update_parts, ', ') || 
+                             ' FROM auth.users auth_users ' ||
+                             'WHERE profiles.id = auth_users.id AND auth_users.id = ' || quote_literal(user_id_param);
+                EXECUTE update_sql;
+            END IF;
+        END;
+    END IF;
+    
+    RAISE NOTICE 'Profile handled successfully for user %', user_id_param;
+END;
+$$;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION safe_create_user_profile(UUID) TO authenticated;
+
+-- Update the main function to use the safe profile creation
 CREATE OR REPLACE FUNCTION ensure_all_tables_for_user(user_id_param UUID)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -132,37 +212,6 @@ BEGIN
       FOR DELETE USING (auth.uid() = user_id);
   END IF;
 
-  -- Ensure profiles table exists
-  IF NOT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'profiles') THEN
-    CREATE TABLE profiles (
-      id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-      email TEXT,
-      full_name TEXT,
-      avatar_url TEXT,
-      company TEXT,
-      role TEXT,
-      preferences JSONB DEFAULT '{}',
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-
-    -- Create indexes
-    CREATE INDEX idx_profiles_email ON profiles(email);
-
-    -- Enable RLS
-    ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-
-    -- Create RLS policies
-    CREATE POLICY "Users can view their own profile" ON profiles
-      FOR SELECT USING (auth.uid() = id);
-
-    CREATE POLICY "Users can update their own profile" ON profiles
-      FOR UPDATE USING (auth.uid() = id);
-
-    CREATE POLICY "Users can insert their own profile" ON profiles
-      FOR INSERT WITH CHECK (auth.uid() = id);
-  END IF;
-
   -- Ensure user_subscriptions table exists
   IF NOT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'user_subscriptions') THEN
     CREATE TABLE user_subscriptions (
@@ -202,29 +251,9 @@ BEGIN
   GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
   GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 
-  -- Create default records for the user
-  -- Ensure user has a profile (safely handle existing table structure)
-  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = user_id_param) THEN
-    -- Check if profiles table has user_id column
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'user_id') THEN
-      -- Insert profile with both id and user_id
-      INSERT INTO profiles (id, user_id)
-      VALUES (user_id_param, user_id_param);
-    ELSE
-      -- Insert profile with only the id
-      INSERT INTO profiles (id)
-      VALUES (user_id_param);
-    END IF;
-    
-    -- Update with additional data if columns exist
-    UPDATE profiles 
-    SET 
-        email = COALESCE(profiles.email, auth_users.email),
-        full_name = COALESCE(profiles.full_name, auth_users.raw_user_meta_data->>'full_name')
-    FROM auth.users auth_users
-    WHERE profiles.id = auth_users.id
-    AND auth_users.id = user_id_param;
-  END IF;
+  -- Create default records for the user using safe functions
+  -- Ensure user has a profile using the safe function
+  PERFORM safe_create_user_profile(user_id_param);
 
   -- Ensure user has feedback settings
   IF NOT EXISTS (SELECT 1 FROM feedback_settings WHERE user_id = user_id_param) THEN
@@ -279,13 +308,3 @@ $$;
 
 -- Grant execute permission to authenticated users
 GRANT EXECUTE ON FUNCTION ensure_all_tables_for_user(UUID) TO authenticated;
-
--- Ensure all existing users have the necessary records
-DO $$
-DECLARE
-    user_record RECORD;
-BEGIN
-    FOR user_record IN SELECT id FROM auth.users LOOP
-        PERFORM ensure_all_tables_for_user(user_record.id);
-    END LOOP;
-END $$;

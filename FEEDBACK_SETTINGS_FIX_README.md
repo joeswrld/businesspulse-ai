@@ -120,6 +120,7 @@ supabase db push
 - `supabase/migrations/20250120000001_ensure_all_tables.sql` - Comprehensive migration for all tables
 - `supabase/migrations/20250120000002_fix_trigger_function.sql` - Fix for trigger function syntax
 - `supabase/migrations/20250120000003_fix_profiles_table.sql` - Fix for profiles table structure
+- `supabase/migrations/20250120000004_safe_profiles_handling.sql` - Safe profiles table handling
 - `create_feedback_settings_for_user.sql` - Database functions
 - `setup-feedback-for-new-users.sh` - Setup script
 
@@ -158,6 +159,9 @@ supabase db push
 
 **Issue**: Column "email" of relation "profiles" does not exist
 **Solution**: The fix has been applied in migration `20250120000003_fix_profiles_table.sql`. This safely handles existing profiles table structure.
+
+**Issue**: null value in column "user_id" of relation "profiles" violates not-null constraint
+**Solution**: The fix has been applied in migration `20250120000004_safe_profiles_handling.sql`. This uses dynamic SQL to handle different profiles table structures.
 
 ### Support
 

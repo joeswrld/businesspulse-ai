@@ -13,6 +13,7 @@ DECLARE
     has_preferences BOOLEAN := FALSE;
     has_created_at BOOLEAN := FALSE;
     has_updated_at BOOLEAN := FALSE;
+    has_user_id BOOLEAN := FALSE;
 BEGIN
     -- Check which columns exist
     FOR column_record IN 
@@ -30,6 +31,10 @@ BEGIN
             WHEN 'preferences' THEN has_preferences := TRUE;
             WHEN 'created_at' THEN has_created_at := TRUE;
             WHEN 'updated_at' THEN has_updated_at := TRUE;
+            WHEN 'user_id' THEN has_user_id := TRUE;
+            ELSE
+                -- Handle any other columns that might exist
+                RAISE NOTICE 'Found additional column: %', column_record.column_name;
         END CASE;
     END LOOP;
 
@@ -64,6 +69,11 @@ BEGIN
 
     IF NOT has_updated_at THEN
         ALTER TABLE profiles ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
+
+    -- If user_id column exists and is NOT NULL, we need to handle it properly
+    IF has_user_id THEN
+        RAISE NOTICE 'Profiles table has user_id column - will handle in main migration';
     END IF;
 
     RAISE NOTICE 'Profiles table structure updated successfully';
