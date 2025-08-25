@@ -119,6 +119,7 @@ supabase db push
 - `supabase/migrations/20250120000000_ensure_feedback_system.sql` - Migration for feedback system setup
 - `supabase/migrations/20250120000001_ensure_all_tables.sql` - Comprehensive migration for all tables
 - `supabase/migrations/20250120000002_fix_trigger_function.sql` - Fix for trigger function syntax
+- `supabase/migrations/20250120000003_fix_profiles_table.sql` - Fix for profiles table structure
 - `create_feedback_settings_for_user.sql` - Database functions
 - `setup-feedback-for-new-users.sh` - Setup script
 
@@ -154,6 +155,9 @@ supabase db push
 
 **Issue**: SQL syntax error with trigger functions
 **Solution**: The fix has been applied in migration `20250120000002_fix_trigger_function.sql`. Run all migrations in order.
+
+**Issue**: Column "email" of relation "profiles" does not exist
+**Solution**: The fix has been applied in migration `20250120000003_fix_profiles_table.sql`. This safely handles existing profiles table structure.
 
 ### Support
 

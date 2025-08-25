@@ -6,7 +6,7 @@
 echo "🔧 Running comprehensive platform fix for new users..."
 
 # Check if we're in the right directory
-if [ ! -f "supabase/migrations/20250120000000_ensure_feedback_system.sql" ] || [ ! -f "supabase/migrations/20250120000001_ensure_all_tables.sql" ] || [ ! -f "supabase/migrations/20250120000002_fix_trigger_function.sql" ]; then
+if [ ! -f "supabase/migrations/20250120000000_ensure_feedback_system.sql" ] || [ ! -f "supabase/migrations/20250120000001_ensure_all_tables.sql" ] || [ ! -f "supabase/migrations/20250120000002_fix_trigger_function.sql" ] || [ ! -f "supabase/migrations/20250120000003_fix_profiles_table.sql" ]; then
     echo "❌ Error: Migration files not found. Please run this script from the project root."
     exit 1
 fi

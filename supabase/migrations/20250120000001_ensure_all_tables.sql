@@ -203,12 +203,20 @@ BEGIN
   GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 
   -- Create default records for the user
-  -- Ensure user has a profile
+  -- Ensure user has a profile (safely handle existing table structure)
   IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = user_id_param) THEN
-    INSERT INTO profiles (id, email, full_name)
-    SELECT id, email, raw_user_meta_data->>'full_name'
-    FROM auth.users
-    WHERE id = user_id_param;
+    -- Insert profile with only the id first, then update with additional data
+    INSERT INTO profiles (id)
+    VALUES (user_id_param);
+    
+    -- Update with additional data if columns exist
+    UPDATE profiles 
+    SET 
+        email = COALESCE(profiles.email, auth_users.email),
+        full_name = COALESCE(profiles.full_name, auth_users.raw_user_meta_data->>'full_name')
+    FROM auth.users auth_users
+    WHERE profiles.id = auth_users.id
+    AND auth_users.id = user_id_param;
   END IF;
 
   -- Ensure user has feedback settings
