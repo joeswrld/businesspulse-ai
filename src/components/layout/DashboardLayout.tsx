@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { 
   LayoutDashboard, 
   FileText, 
@@ -19,16 +20,89 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [newFeedbackCount, setNewFeedbackCount] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
+  // Fetch new feedback count
+  const fetchNewFeedbackCount = async () => {
+    if (!user) return;
+
+    try {
+      // Get user's project IDs from feedback_settings
+      const { data: projectData, error: projectError } = await supabase
+        .from('feedback_settings')
+        .select('project_id')
+        .eq('user_id', user.id);
+
+      if (projectError) {
+        console.error('Error loading project IDs:', projectError);
+        return;
+      }
+
+      if (projectData && projectData.length > 0) {
+        const projectIds = projectData.map(p => p.project_id);
+        
+        // Count feedback that hasn't been marked as read/reviewed
+        const { count, error: feedbackError } = await supabase
+          .from('feedbacks')
+          .select('*', { count: 'exact', head: true })
+          .in('project_id', projectIds)
+          .eq('status', 'new');
+
+        if (feedbackError) {
+          console.error('Error loading feedback count:', feedbackError);
+          return;
+        }
+
+        setNewFeedbackCount(count || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching feedback count:', error);
+    }
+  };
+
+  // Fetch feedback count on mount and set up real-time subscription
+  useEffect(() => {
+    if (user) {
+      fetchNewFeedbackCount();
+
+      // Set up real-time subscription for new feedback
+      const channel = supabase
+        .channel('feedback-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'feedbacks'
+          },
+          () => {
+            // Refresh count when feedback changes
+            fetchNewFeedbackCount();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [user]);
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Feedback", href: "/feedback", icon: MessageSquare }, 
+    { 
+      name: "Feedback", 
+      href: "/feedback", 
+      icon: MessageSquare,
+      badge: newFeedbackCount > 0 ? newFeedbackCount : undefined
+    }, 
     { name: "AI Analytics", href: "/insights-simple", icon: Brain },
     { name: "Executive Reports", href: "/reports", icon: FileText },
     { name: "Business Intelligence", href: "/analytics", icon: BarChart3 },
@@ -102,7 +176,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                     <Link
                       to={item.href}
                       className={cn(
-                        "flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                        "flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors relative",
                         isActive
                           ? "bg-primary text-primary-foreground shadow-soft"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -111,6 +185,16 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                     >
                       <item.icon className="h-5 w-5" />
                       <span>{item.name}</span>
+                      
+                      {/* Notification Badge */}
+                      {item.badge && (
+                        <Badge 
+                          variant="destructive" 
+                          className="ml-auto h-5 min-w-5 px-1.5 text-xs font-medium"
+                        >
+                          {item.badge > 99 ? '99+' : item.badge}
+                        </Badge>
+                      )}
                     </Link>
                   )}
                 </div>
