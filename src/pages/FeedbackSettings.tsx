@@ -70,8 +70,8 @@ const FeedbackSettings = () => {
       if (feedbackData && feedbackData.length > 0) {
         setSettings(feedbackData[0]);
       } else {
-        // Create default feedback settings
-        const newFeedbackSettings = {
+        // Create default feedback settings with a resilient fallback
+        const fullDefaults = {
           user_id: user.id,
           project_id: '',
           project_id_locked: false,
@@ -83,19 +83,48 @@ const FeedbackSettings = () => {
           brand_color: '#2563eb',
           redirect_url: null,
           notify_email: null
-        };
-        
+        } as const;
+
+        // First try inserting with full defaults
         const { data: newFeedbackData, error: createFeedbackError } = await supabase
           .from('feedback_settings')
-          .insert(newFeedbackSettings)
+          .insert(fullDefaults as any)
           .select()
           .single();
 
         if (createFeedbackError) {
-          throw createFeedbackError;
+          console.warn('Full defaults insert failed, attempting minimal insert:', createFeedbackError);
+          // Fallback: insert minimal row with only user_id to satisfy stricter schemas
+          const { data: minimalRow, error: minimalInsertError } = await supabase
+            .from('feedback_settings')
+            .insert({ user_id: user.id })
+            .select()
+            .single();
+
+          if (minimalInsertError) {
+            throw minimalInsertError;
+          }
+
+          // Merge minimal row with UI defaults so the page can render/edit immediately
+          setSettings({
+            id: minimalRow.id,
+            user_id: user.id,
+            project_id: '',
+            project_id_locked: false,
+            title: 'Share your thoughts with us',
+            show_name: true,
+            show_email: true,
+            button_text: 'Send Feedback',
+            theme: 'dark',
+            brand_color: '#2563eb',
+            redirect_url: null,
+            notify_email: null,
+            created_at: minimalRow.created_at || new Date().toISOString(),
+            updated_at: minimalRow.updated_at || new Date().toISOString()
+          } as any);
+        } else {
+          setSettings(newFeedbackData);
         }
-        
-        setSettings(newFeedbackData);
       }
 
     } catch (error) {
