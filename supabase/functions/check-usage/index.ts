@@ -125,13 +125,14 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Get user ID from project_id
-    const { data: projectSettings, error: projectError } = await supabase
+    const { data: projectSettingsRows, error: projectError } = await supabase
       .from('feedback_settings')
-      .select('user_id')
+      .select('user_id, created_at')
       .eq('project_id', project_id)
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1)
 
-    if (projectError || !projectSettings) {
+    if (projectError || !projectSettingsRows || projectSettingsRows.length === 0) {
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -144,6 +145,7 @@ serve(async (req) => {
       )
     }
 
+    const projectSettings = projectSettingsRows[0]
     const userId = projectSettings.user_id
 
     // Get user's subscription data

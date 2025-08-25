@@ -361,14 +361,15 @@
         })
       });
 
-      if (!usageResponse.ok) {
-        throw new Error('Failed to check usage limits');
+      let usageResult = null;
+      if (usageResponse.ok) {
+        usageResult = await usageResponse.json();
+      } else {
+        console.warn('NoteX Feedback Widget: Usage check failed, proceeding optimistically');
       }
-
-      const usageResult = await usageResponse.json();
       console.log('NoteX Feedback Widget: Usage check result', usageResult);
 
-      if (!usageResult.canUse) {
+      if (usageResult && usageResult.success === true && usageResult.canUse === false) {
         // Show limit reached message
         errorMessage.innerHTML = `
           <div style="text-align: center;">
