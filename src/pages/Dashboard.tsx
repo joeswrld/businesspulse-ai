@@ -581,12 +581,7 @@ export default function Dashboard() {
 
             {/* Navigation Buttons */}
             <div className="flex space-x-2 ml-auto">
-              <Button variant="outline" asChild>
-                <a href="/feedback">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Feedback
-                </a>
-              </Button>
+
               <Button variant="outline" asChild>
                 <a href="/insights-simple">
                   <Lightbulb className="h-4 w-4 mr-2" />
