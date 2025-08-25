@@ -45,14 +45,14 @@ export function useUsageEnforcement(): UseUsageEnforcementReturn {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [plan, setPlan] = useState<PlanType>('free');
   const [limits, setLimits] = useState<UsageLimits>({
-    feedback: 20,
+    feedback: 50,
     analytics: 5,
     reports: 2,
     insights: 5,
     teams: 1
   });
   const [checks, setChecks] = useState<Record<FeatureType, UsageCheckResult>>({
-    feedback: { canUse: true, currentUsage: 0, limit: 20, plan: 'free', feature: 'feedback', isUnlimited: false, remaining: 20 },
+    feedback: { canUse: true, currentUsage: 0, limit: 50, plan: 'free', feature: 'feedback', isUnlimited: false, remaining: 50 },
     analytics: { canUse: true, currentUsage: 0, limit: 5, plan: 'free', feature: 'analytics', isUnlimited: false, remaining: 5 },
     reports: { canUse: true, currentUsage: 0, limit: 2, plan: 'free', feature: 'reports', isUnlimited: false, remaining: 2 },
     insights: { canUse: true, currentUsage: 0, limit: 5, plan: 'free', feature: 'insights', isUnlimited: false, remaining: 5 },

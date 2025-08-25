@@ -311,6 +311,47 @@
         message: formData.get('message')
       });
 
+      // First check usage limits before submitting
+      const usageCheckUrl = 'https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/check-usage';
+      console.log('NoteX Feedback Widget: Checking usage limits...');
+      
+      const usageResponse = await fetch(usageCheckUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: formData.get('project_id'),
+          feature: 'feedback'
+        })
+      });
+
+      if (!usageResponse.ok) {
+        throw new Error('Failed to check usage limits');
+      }
+
+      const usageResult = await usageResponse.json();
+      console.log('NoteX Feedback Widget: Usage check result', usageResult);
+
+      if (!usageResult.canUse) {
+        // Show limit reached message
+        errorMessage.innerHTML = `
+          <div style="text-align: center;">
+            <div style="font-weight: 600; margin-bottom: 8px; color: #dc2626;">
+              ⚠️ Feedback Limit Reached
+            </div>
+            <div style="font-size: 13px; color: #991b1b; margin-bottom: 12px;">
+              You have reached your monthly feedback submission limit.
+            </div>
+            <div style="font-size: 12px; color: #7c2d12; background: #fef3c7; padding: 8px; border-radius: 4px; border: 1px solid #f59e0b;">
+              <strong>Admin:</strong> Please upgrade your plan to continue receiving feedback from your website visitors.
+            </div>
+          </div>
+        `;
+        errorMessage.style.display = 'block';
+        return;
+      }
+
       // Use the correct Supabase URL
       const apiUrl = 'https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/feedback-api';
       console.log('NoteX Feedback Widget: Submitting to', apiUrl);

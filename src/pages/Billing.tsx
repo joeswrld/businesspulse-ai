@@ -562,12 +562,10 @@ const BillingPage: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium">Feedback</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatUsageDisplay(
-                        checks.feedback.currentUsage,
-                        checks.feedback.limit,
-                        plan,
-                        'feedback'
-                      )}
+                      {plan === 'free' && '50 submissions/month (Free Trial)'}
+                      {plan === 'pro' && '200 submissions/month (Pro Plan)'}
+                      {plan === 'business' && 'Unlimited submissions (Business Plan)'}
+                      {plan === 'enterprise' && 'Unlimited submissions (Enterprise Plan)'}
                     </p>
                   </div>
                 </div>
@@ -576,6 +574,9 @@ const BillingPage: React.FC = () => {
                     checks.feedback.canUse ? 'text-blue-600' : 'text-red-600'
                   }`}>
                     {checks.feedback.currentUsage}
+                  </span>
+                  <span className="text-xs text-muted-foreground block">
+                    {checks.feedback.limit === -1 ? 'Unlimited' : `/${checks.feedback.limit}`}
                   </span>
                   {!checks.feedback.canUse && (
                     <div className="text-xs text-red-600 mt-1">Limit Reached</div>
@@ -709,6 +710,12 @@ const BillingPage: React.FC = () => {
                         : 'All features are within your plan limits.'
                       }
                     </p>
+                    {checks.feedback && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        Feedback Widget: {checks.feedback.currentUsage} submissions this month
+                        {checks.feedback.limit !== -1 && ` (${checks.feedback.remaining} remaining)`}
+                      </p>
+                    )}
                   </div>
                   {Object.values(checks).some(check => !check.canUse) && (
                     <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
