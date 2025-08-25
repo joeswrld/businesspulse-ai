@@ -150,6 +150,8 @@
       ></textarea>
     </div>
 
+    <div id="notex-quota" style="margin: 8px 0 12px 0; color: #374151; font-size: 12px; display: none;"></div>
+
     <div style="display: flex; gap: 12px; justify-content: flex-end;">
       <button 
         type="button" 
@@ -253,6 +255,39 @@
   function openModal() {
     modalOverlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    // Fetch remaining quota on open
+    const quotaEl = document.getElementById('notex-quota');
+    const submitButton = document.getElementById('notex-submit-button');
+    const projectIdField = form.querySelector('input[name="project_id"]');
+    const pid = projectIdField ? projectIdField.value : null;
+    if (!pid) return;
+
+    quotaEl.style.display = 'none';
+    quotaEl.textContent = '';
+    submitButton.disabled = false;
+    submitButton.style.opacity = '1';
+
+    const usageCheckUrl = 'https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/check-usage';
+    fetch(usageCheckUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: pid, feature: 'feedback' })
+    })
+      .then(r => r.json().catch(() => ({})))
+      .then(result => {
+        if (!result || result.success !== true) return;
+        quotaEl.style.display = 'block';
+        if (result.isUnlimited || result.limit === -1) {
+          quotaEl.textContent = 'Quota: Unlimited';
+        } else {
+          quotaEl.textContent = `Quota: ${Math.max(0, result.remaining)} remaining`;
+          if (result.remaining <= 0) {
+            submitButton.disabled = true;
+            submitButton.style.opacity = '0.6';
+          }
+        }
+      })
+      .catch(() => {});
   }
 
   function closeModal() {
@@ -326,25 +361,26 @@
         })
       });
 
-      if (!usageResponse.ok) {
-        throw new Error('Failed to check usage limits');
+      let usageResult = null;
+      if (usageResponse.ok) {
+        usageResult = await usageResponse.json();
+      } else {
+        console.warn('NoteX Feedback Widget: Usage check failed, proceeding optimistically');
       }
-
-      const usageResult = await usageResponse.json();
       console.log('NoteX Feedback Widget: Usage check result', usageResult);
 
-      if (!usageResult.canUse) {
+      if (usageResult && usageResult.success === true && usageResult.canUse === false) {
         // Show limit reached message
         errorMessage.innerHTML = `
           <div style="text-align: center;">
             <div style="font-weight: 600; margin-bottom: 8px; color: #dc2626;">
-              ⚠️ Feedback Limit Reached
+              ⚠️ Limit reached — contact admin
             </div>
             <div style="font-size: 13px; color: #991b1b; margin-bottom: 12px;">
-              You have reached your monthly feedback submission limit.
+              You have reached your feedback submission limit.
             </div>
             <div style="font-size: 12px; color: #7c2d12; background: #fef3c7; padding: 8px; border-radius: 4px; border: 1px solid #f59e0b;">
-              <strong>Admin:</strong> Please upgrade your plan to continue receiving feedback from your website visitors.
+              Please contact the admin to increase your limit or upgrade your plan.
             </div>
           </div>
         `;

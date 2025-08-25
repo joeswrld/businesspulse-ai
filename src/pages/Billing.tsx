@@ -91,6 +91,8 @@ const BillingPage: React.FC = () => {
   const [updatingCard, setUpdatingCard] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [realtimeFeedbackCount, setRealtimeFeedbackCount] = useState<number | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
 
   // Load data on component mount and when user changes
   useEffect(() => {
@@ -166,6 +168,62 @@ const BillingPage: React.FC = () => {
       supabase.removeChannel(subscriptionChannel);
     };
   }, [user]);
+
+  // Load project id and subscribe to feedback count in real-time
+  useEffect(() => {
+    if (!user) return;
+
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    (async () => {
+      // fetch latest project_id from feedback_settings
+      const { data: settings } = await supabase
+        .from('feedback_settings')
+        .select('project_id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const pid = settings && settings.length > 0 ? settings[0].project_id : null;
+      setProjectId(pid);
+
+      if (!pid) return;
+
+      // compute initial count within window
+      const computeCount = async () => {
+        const now = new Date();
+        const planType = plan;
+        const windowDays = planType === 'free' ? 8 : (planType === 'pro' ? 30 : 30);
+        const fromDate = new Date(now);
+        fromDate.setDate(fromDate.getDate() - windowDays);
+
+        const { count } = await supabase
+          .from('feedbacks')
+          .select('id', { count: 'exact', head: true })
+          .eq('project_id', pid)
+          .gte('timestamp', fromDate.toISOString());
+
+        setRealtimeFeedbackCount(count || 0);
+      };
+
+      await computeCount();
+
+      channel = supabase
+        .channel(`feedbacks-${pid}-billing`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'feedbacks', filter: `project_id=eq.${pid}` },
+          () => {
+            computeCount();
+          }
+        )
+        .subscribe();
+    })();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [user, plan]);
 
   const loadBillingData = async (isRefresh = false) => {
     if (!user) return;
@@ -553,34 +611,56 @@ const BillingPage: React.FC = () => {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {/* Feedback Usage */}
               <div className={`flex items-center justify-between p-3 rounded-lg ${
-                checks.feedback.canUse ? 'bg-blue-50' : 'bg-red-50 border border-red-200'
+                (() => {
+                  const limitVal = checks.feedback.limit;
+                  const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                  const over = limitVal !== -1 && current >= limitVal;
+                  return over ? 'bg-red-50 border border-red-200' : 'bg-blue-50';
+                })()
               }`}>
                 <div className="flex items-center space-x-2">
                   <MessageSquare className={`h-5 w-5 ${
-                    checks.feedback.canUse ? 'text-blue-600' : 'text-red-600'
+                    (() => {
+                      const limitVal = checks.feedback.limit;
+                      const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                      const over = limitVal !== -1 && current >= limitVal;
+                      return over ? 'text-red-600' : 'text-blue-600';
+                    })()
                   }`} />
                   <div>
                     <p className="text-sm font-medium">Feedback</p>
                     <p className="text-xs text-muted-foreground">
-                      {plan === 'free' && '50 submissions/month (Free Trial)'}
-                      {plan === 'pro' && '200 submissions/month (Pro Plan)'}
-                      {plan === 'business' && 'Unlimited submissions (Business Plan)'}
+                      {plan === 'free' && '50 submissions / 8 days (Free Trial)'}
+                      {plan === 'pro' && '300 submissions / 30 days (Pro Plan)'}
+                      {plan === 'business' && 'Unlimited submissions / 30 days (Business Plan)'}
                       {plan === 'enterprise' && 'Unlimited submissions (Enterprise Plan)'}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className={`text-lg font-bold ${
-                    checks.feedback.canUse ? 'text-blue-600' : 'text-red-600'
+                    (() => {
+                      const limitVal = checks.feedback.limit;
+                      const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                      const over = limitVal !== -1 && current >= limitVal;
+                      return over ? 'text-red-600' : 'text-blue-600';
+                    })()
                   }`}>
-                    {checks.feedback.currentUsage}
+                    {(() => {
+                      const limitVal = checks.feedback.limit;
+                      const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                      return limitVal === -1 ? current : Math.min(current, limitVal);
+                    })()}
                   </span>
                   <span className="text-xs text-muted-foreground block">
                     {checks.feedback.limit === -1 ? 'Unlimited' : `/${checks.feedback.limit}`}
                   </span>
-                  {!checks.feedback.canUse && (
-                    <div className="text-xs text-red-600 mt-1">Limit Reached</div>
-                  )}
+                  {(() => {
+                    const limitVal = checks.feedback.limit;
+                    const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                    const over = limitVal !== -1 && current >= limitVal;
+                    return over ? (<div className="text-xs text-red-600 mt-1">Limit Reached</div>) : null;
+                  })()}
                 </div>
               </div>
 
@@ -712,8 +792,8 @@ const BillingPage: React.FC = () => {
                     </p>
                     {checks.feedback && (
                       <p className="text-xs text-blue-600 mt-1">
-                        Feedback Widget: {checks.feedback.currentUsage} submissions this month
-                        {checks.feedback.limit !== -1 && ` (${checks.feedback.remaining} remaining)`}
+                        Feedback Widget: {realtimeFeedbackCount ?? checks.feedback.currentUsage} submissions in current period
+                        {checks.feedback.limit !== -1 && ` (${Math.max(0, (checks.feedback.limit) - (realtimeFeedbackCount ?? checks.feedback.currentUsage))} remaining)`}
                       </p>
                     )}
                   </div>
