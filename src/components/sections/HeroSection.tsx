@@ -9,7 +9,7 @@ const HeroSection = () => {
   return (
     <section className="relative pt-20 pb-16 overflow-hidden">
       {/* Background Gradient */}
-      <div className="absolute inset-0 bg-gradient-subtle"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-white via-primary/5 to-secondary/5"></div>
       
       <div className="container mx-auto px-4 relative z-10">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -25,7 +25,7 @@ const HeroSection = () => {
             <div className="space-y-4">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
                 Turn Customer{" "}
-                <span className="gradient-text">Feedback</span> Into
+                <span className="bg-gradient-to-r from-primary via-secondary to-neon bg-clip-text text-transparent">Feedback</span> Into
                 Business Growth
               </h1>
               <p className="text-lg text-muted-foreground leading-relaxed max-w-xl">
@@ -35,7 +35,7 @@ const HeroSection = () => {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button variant="hero" size="lg" className="w-full sm:w-auto" asChild>
+              <Button variant="premium" size="lg" className="w-full sm:w-auto" asChild>
                 <Link to="/auth">Start Collecting Feedback ✨ <ArrowRight className="h-5 w-5 ml-2" /></Link>
               </Button>
             </div>
@@ -56,7 +56,7 @@ const HeroSection = () => {
 
           {/* Right Column - Hero Image */}
           <div className="relative animate-fade-in">
-            <div className="relative rounded-2xl overflow-hidden shadow-large hero-glow">
+            <div className="relative rounded-2xl overflow-hidden shadow-large">
               <img
                 src={heroImage}
                 alt="NoteX AI Feedback Analytics Dashboard"

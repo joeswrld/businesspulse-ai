@@ -121,32 +121,10 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    background: var(--gradient-subtle);
-    background-attachment: fixed;
   }
   
   h1, h2, h3, h4, h5, h6 {
     @apply font-bold tracking-tight;
-  }
-
-  /* Custom Scrollbar */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: hsl(262 83% 95%);
-    border-radius: 4px;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: var(--gradient-primary);
-    border-radius: 4px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--gradient-secondary);
   }
 }
 
@@ -193,7 +171,6 @@
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    animation: textGlow 3s ease-in-out infinite alternate;
   }
 
   .neon-text {
@@ -373,55 +350,5 @@
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
-  }
-
-  @keyframes textGlow {
-    from { filter: drop-shadow(0 0 5px hsl(262 83% 58% / 0.5)); }
-    to { filter: drop-shadow(0 0 20px hsl(262 83% 58% / 0.8)); }
-  }
-
-  /* Premium Input Styles */
-  .input-premium {
-    background: hsla(0, 0%, 100%, 0.8);
-    border: 2px solid hsla(262, 83%, 58%, 0.1);
-    border-radius: var(--radius);
-    padding: 12px 16px;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    backdrop-filter: blur(10px);
-  }
-
-  .input-premium:focus {
-    outline: none;
-    border-color: hsl(262 83% 58%);
-    box-shadow: 0 0 0 4px hsl(262 83% 58% / 0.1);
-    transform: scale(1.02);
-  }
-
-  /* Premium Badge Styles */
-  .badge-premium {
-    background: var(--gradient-secondary);
-    color: white;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-    box-shadow: var(--shadow-soft);
-  }
-
-  /* Loading Animations */
-  .loading-dots {
-    display: inline-block;
-  }
-
-  .loading-dots::after {
-    content: '';
-    animation: loadingDots 1.5s infinite;
-  }
-
-  @keyframes loadingDots {
-    0%, 20% { content: ''; }
-    40% { content: '.'; }
-    60% { content: '..'; }
-    80%, 100% { content: '...'; }
   }
 }
