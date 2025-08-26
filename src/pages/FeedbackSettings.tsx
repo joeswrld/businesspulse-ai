@@ -394,21 +394,41 @@ const FeedbackSettings = () => {
         return;
       }
 
-      // Check if Project ID is taken by another user
-      const { data: existingSettings, error: checkError } = await supabase
-        .from('feedback_settings')
-        .select('id, user_id, project_id')
-        .eq('project_id', settings.project_id.trim())
-        .neq('user_id', user.id) // Exclude current user
-        .limit(1);
+      // If status is idle, check availability first
+      if (projectIdStatus === 'idle') {
+        setProjectIdStatus('checking');
+        try {
+          const { data: existingSettings, error: checkError } = await supabase
+            .from('feedback_settings')
+            .select('id, user_id, project_id')
+            .eq('project_id', settings.project_id.trim())
+            .neq('user_id', user.id) // Exclude current user
+            .limit(1);
 
-      if (checkError) {
-        toast.error('Failed to validate Project ID');
-        return;
-      }
+          if (checkError) {
+            toast.error('Failed to validate Project ID');
+            setProjectIdStatus('idle');
+            return;
+          }
 
-      if (existingSettings && existingSettings.length > 0) {
+          if (existingSettings && existingSettings.length > 0) {
+            setProjectIdStatus('taken');
+            toast.error('Project ID is already taken by another user');
+            return;
+          } else {
+            setProjectIdStatus('available');
+          }
+        } catch (error) {
+          console.error('Error checking project ID availability:', error);
+          toast.error('Failed to validate Project ID');
+          setProjectIdStatus('idle');
+          return;
+        }
+      } else if (projectIdStatus === 'taken') {
         toast.error('Project ID is already taken by another user');
+        return;
+      } else if (projectIdStatus === 'checking') {
+        toast.error('Please wait while we check Project ID availability');
         return;
       }
     }
@@ -821,8 +841,7 @@ const FeedbackSettings = () => {
               !settings?.project_id || 
               (settings?.project_id && settings.project_id.trim().length < 3) ||
               (!settings?.project_id_locked && projectIdStatus === 'taken') ||
-              (!settings?.project_id_locked && projectIdStatus === 'checking') ||
-              (!settings?.project_id_locked && projectIdStatus === 'idle' && settings?.project_id && settings.project_id.length >= 3)
+              (!settings?.project_id_locked && projectIdStatus === 'checking')
             }
             className="px-8 py-3 text-lg"
           >
@@ -849,8 +868,8 @@ const FeedbackSettings = () => {
             </p>
           )}
           {!settings?.project_id_locked && projectIdStatus === 'idle' && settings?.project_id && settings.project_id.length >= 3 && (
-            <p className="text-sm text-orange-600 mt-2">
-              Please check Project ID availability before saving
+            <p className="text-sm text-blue-600 mt-2">
+              Click "Save & Lock Project ID" to check availability and save
             </p>
           )}
           {!settings?.project_id_locked && projectIdStatus === 'available' && (
