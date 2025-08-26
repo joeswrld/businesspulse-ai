@@ -41,7 +41,7 @@ const CTASection = () => {
 
             {/* Subheadline */}
             <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
-              Join hundreds of successful businesses using FeedbackFlow to understand their customers better. Start your free trial today and see the difference AI-powered feedback analytics can make.
+              Join hundreds of successful businesses using NoteX to understand their customers better. Start your free trial today and see the difference AI-powered feedback analytics can make.
             </p>
 
             {/* Benefits */}

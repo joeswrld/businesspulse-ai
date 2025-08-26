@@ -85,7 +85,7 @@ const About = () => {
           
           <div className="text-center max-w-3xl mx-auto">
             <Badge variant="outline" className="mb-4">
-              About FeedbackFlow
+              About NoteX
             </Badge>
             <h1 className="text-4xl md:text-5xl font-bold mb-6">
               Transforming Customer{" "}
@@ -231,7 +231,7 @@ const About = () => {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Join Us?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Start your journey with FeedbackFlow today and see how AI-powered feedback analytics 
+            Start your journey with NoteX today and see how AI-powered feedback analytics 
             can transform your business and help you understand your customers better.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

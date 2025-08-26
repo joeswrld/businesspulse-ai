@@ -29,7 +29,7 @@ const HeroSection = () => {
                 Business Growth
               </h1>
               <p className="text-lg text-muted-foreground leading-relaxed max-w-xl">
-                FeedbackFlow helps businesses collect, analyze, and act on customer feedback with AI-powered insights. Get real-time sentiment analysis, trend detection, and actionable recommendations to boost customer satisfaction and drive growth.
+                NoteX helps businesses collect, analyze, and act on customer feedback with AI-powered insights. Get real-time sentiment analysis, trend detection, and actionable recommendations to boost customer satisfaction and drive growth.
               </p>
             </div>
 
@@ -59,7 +59,7 @@ const HeroSection = () => {
             <div className="relative rounded-2xl overflow-hidden shadow-large hero-glow">
               <img
                 src={heroImage}
-                alt="NoteX AI Business Intelligence Dashboard"
+                alt="NoteX AI Feedback Analytics Dashboard"
                 className="w-full h-auto object-cover"
               />
               

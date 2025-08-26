@@ -52,8 +52,8 @@ const Footer = () => {
             {/* Brand Section */}
             <div className="lg:col-span-2 space-y-6">
               <div className="flex items-center space-x-2">
-                <img src="/favicon.ico" alt="FeedbackFlow" className="h-8 w-8" />
-                <span className="font-bold text-lg text-white">FeedbackFlow</span>
+                <img src="/favicon.ico" alt="NoteX" className="h-8 w-8" />
+                <span className="font-bold text-lg text-white">NoteX</span>
               </div>
               <p className="text-secondary-foreground/80 max-w-md">
                 AI-powered feedback analytics platform that transforms customer feedback into actionable insights. Understand your customers better and drive growth through data-driven decisions.
@@ -63,7 +63,7 @@ const Footer = () => {
               <div className="space-y-3">
                 <div className="flex items-center space-x-3 text-sm">
                   <Mail className="h-4 w-4 text-primary" />
-                  <span>hello@feedbackflow.com</span>
+                  <span>hello@notex.com</span>
                 </div>
               </div>
             </div>
@@ -199,7 +199,7 @@ const Footer = () => {
         <div className="py-6 border-t border-secondary-foreground/20">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-secondary-foreground/80">
-              © 2024 FeedbackFlow. All rights reserved.
+              © 2024 NoteX. All rights reserved.
             </div>
             
             {/* Social Links */}

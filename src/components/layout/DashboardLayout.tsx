@@ -172,8 +172,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
               </div>
               {!sidebarCollapsed && (
                 <div className="transition-opacity duration-300">
-                  <h1 className="text-lg font-bold text-slate-900">FeedbackFlow</h1>
-                  <p className="text-xs text-slate-500">Turn feedback into growth ✨</p>
+                               <h1 className="text-lg font-bold text-slate-900">NoteX</h1>
+             <p className="text-xs text-slate-500">Turn feedback into growth ✨</p>
                 </div>
               )}
             </Link>

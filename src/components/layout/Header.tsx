@@ -19,8 +19,8 @@ const Header = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <img src="/favicon.ico" alt="FeedbackFlow" className="h-8 w-8" />
-            <span className="font-bold text-lg">FeedbackFlow</span>
+            <img src="/favicon.ico" alt="NoteX" className="h-8 w-8" />
+            <span className="font-bold text-lg">NoteX</span>
           </Link>
 
           {/* Desktop Navigation */}

@@ -31,7 +31,7 @@ const TestimonialsSection = () => {
     {
       name: "Jennifer Kim",
       role: "Marketing Director",
-      content: "FeedbackFlow's reports save us 15+ hours per week. The actionable insights help us create better campaigns and our customer retention improved by 35%.",
+      content: "NoteX's reports save us 15+ hours per week. The actionable insights help us create better campaigns and our customer retention improved by 35%.",
       rating: 5,
     },
     {
@@ -55,7 +55,7 @@ const TestimonialsSection = () => {
             <span className="gradient-text">Worldwide</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            See how businesses across the US, Canada, and Nigeria are using FeedbackFlow to understand their customers better and drive growth through actionable feedback insights.
+            See how businesses across the US, Canada, and Nigeria are using NoteX to understand their customers better and drive growth through actionable feedback insights.
           </p>
         </div>
 

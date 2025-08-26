@@ -120,7 +120,7 @@ const Partners = () => {
             </Badge>
             <h1 className="text-4xl md:text-5xl font-bold mb-6">
               Partner with{" "}
-              <span className="gradient-text">FeedbackFlow</span>
+              <span className="gradient-text">NoteX</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-8">
               Join our partner ecosystem and grow your business while helping customers 

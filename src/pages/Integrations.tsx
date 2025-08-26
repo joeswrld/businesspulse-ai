@@ -233,7 +233,7 @@ const Integrations = () => {
               Integrations
             </Badge>
             <h1 className="text-4xl md:text-5xl font-bold mb-6">
-              Connect FeedbackFlow{" "}
+              Connect NoteX{" "}
               <span className="gradient-text">Everywhere</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-8">

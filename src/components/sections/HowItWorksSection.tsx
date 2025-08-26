@@ -135,7 +135,7 @@ const HowItWorksSection = () => {
           <div className="grid lg:grid-cols-2 gap-8 items-center">
             <div>
               <h3 className="text-2xl md:text-3xl font-bold mb-4">
-                See FeedbackFlow in Action
+                See NoteX in Action
               </h3>
               <p className="text-muted-foreground mb-6">
                 Watch how easy it is to collect, analyze, and act on customer feedback with our AI-powered platform.

@@ -111,7 +111,7 @@ const FeaturesSection = () => {
               Ready to transform your customer feedback?
             </h3>
             <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
-              Join hundreds of businesses already using FeedbackFlow to understand their customers better and drive growth through actionable insights.
+              Join hundreds of businesses already using NoteX to understand their customers better and drive growth through actionable insights.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" asChild>

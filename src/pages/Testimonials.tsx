@@ -51,7 +51,7 @@ const Testimonials = () => {
       role: "Marketing Director",
       company: "Growth Marketing Pro",
       industry: "Marketing",
-      content: "FeedbackFlow's reports save us 15+ hours per week. The actionable insights help us create better campaigns and our customer retention improved by 35%.",
+      content: "NoteX's reports save us 15+ hours per week. The actionable insights help us create better campaigns and our customer retention improved by 35%.",
       rating: 5,
       image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face",
     },
@@ -78,7 +78,7 @@ const Testimonials = () => {
       role: "Operations Director",
       company: "Service Excellence Inc",
       industry: "Service",
-      content: "FeedbackFlow helped us identify service gaps we didn't know existed. Our customer satisfaction scores improved by 60% in the first quarter.",
+      content: "NoteX helped us identify service gaps we didn't know existed. Our customer satisfaction scores improved by 60% in the first quarter.",
       rating: 5,
       image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face",
     },
@@ -136,7 +136,7 @@ const Testimonials = () => {
               <span className="gradient-text">Worldwide</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-8">
-              See how businesses across different industries are using FeedbackFlow to understand their customers better and drive growth through actionable feedback insights.
+              See how businesses across different industries are using NoteX to understand their customers better and drive growth through actionable feedback insights.
             </p>
 
             {/* Stats */}
@@ -247,7 +247,7 @@ const Testimonials = () => {
         <div className="text-center py-12 mt-12">
           <h3 className="text-2xl font-bold mb-4">Ready to join our success stories?</h3>
           <p className="text-muted-foreground mb-6">
-            Start collecting feedback today and see how FeedbackFlow can transform your business.
+            Start collecting feedback today and see how NoteX can transform your business.
           </p>
           <Button size="lg" asChild>
             <Link to="/auth">Start Your Free Trial ✨</Link>
