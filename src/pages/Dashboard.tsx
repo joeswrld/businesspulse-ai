@@ -402,42 +402,70 @@ export default function Dashboard() {
     return feedbacks.filter(feedback => analyzeSentiment(feedback.message) === sentimentFilter);
   }, [feedbacks, sentimentFilter]);
 
-  // Generate AI insight
+  // Generate AI insight using client-side analysis
   const generateAIInsight = useCallback(async () => {
     if (!user || feedbacks.length === 0) return;
 
     setGeneratingInsight(true);
     try {
-      // Call the analyze-insights Edge Function
-      const response = await fetch('/functions/v1/analyze-insights', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await supabase.auth.getSession().then(s => s.data.session?.access_token)}`
-        },
-        body: JSON.stringify({
-          data: feedbacks.slice(0, 10).map(f => f.message).join('\n\n'),
-          userId: user.id,
-          fileType: 'feedback-analysis'
-        })
+      // Simulate processing time
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Analyze feedback data client-side
+      const recentFeedbacks = feedbacks.slice(0, 10);
+      const sentiments = recentFeedbacks.map(f => analyzeSentiment(f.message));
+      const themes = recentFeedbacks.flatMap(f => extractThemes(f.message));
+      
+      // Calculate sentiment percentages
+      const positiveCount = sentiments.filter(s => s === 'positive').length;
+      const negativeCount = sentiments.filter(s => s === 'negative').length;
+      const neutralCount = sentiments.filter(s => s === 'neutral').length;
+      const total = sentiments.length;
+      
+      const positivePercent = total > 0 ? Math.round((positiveCount / total) * 100) : 0;
+      const negativePercent = total > 0 ? Math.round((negativeCount / total) * 100) : 0;
+      const neutralPercent = total > 0 ? Math.round((neutralCount / total) * 100) : 0;
+
+      // Count theme frequency
+      const themeCounts: Record<string, number> = {};
+      themes.forEach(theme => {
+        themeCounts[theme] = (themeCounts[theme] || 0) + 1;
       });
 
-      if (!response.ok) {
-        throw new Error(`Analysis failed: ${response.status}`);
+      const topThemes = Object.entries(themeCounts)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+        .map(([theme]) => theme);
+
+      // Generate summary based on data
+      let summary = '';
+      if (positivePercent > 60) {
+        summary = `Your feedback shows overwhelmingly positive sentiment with ${positivePercent}% positive responses. Users are generally satisfied with your product or service.`;
+      } else if (negativePercent > 40) {
+        summary = `There are significant concerns in your feedback with ${negativePercent}% negative responses. Immediate attention to user issues is recommended.`;
+      } else {
+        summary = `Your feedback shows a balanced sentiment distribution. There's room for improvement while maintaining current strengths.`;
       }
 
-      const result = await response.json();
-      
-      if (result.success && result.analysis) {
-        setAiInsight({
-          summary: result.analysis.summary,
-          key_themes: result.analysis.key_themes,
-          suggested_actions: result.analysis.suggested_actions,
-          sentiment_overview: `Overall sentiment: ${result.analysis.sentiment.overall} (${result.analysis.sentiment.positive}% positive, ${result.analysis.sentiment.negative}% negative, ${result.analysis.sentiment.neutral}% neutral)`
-        });
-      } else {
-        throw new Error(result.error || 'Analysis failed');
+      // Generate suggested actions
+      const suggestedActions = [];
+      if (negativePercent > 30) {
+        suggestedActions.push('Address negative feedback promptly to improve user satisfaction');
       }
+      if (topThemes.length > 0) {
+        suggestedActions.push(`Focus on improving ${topThemes[0]} based on frequent mentions`);
+      }
+      if (recentFeedbacks.length < 5) {
+        suggestedActions.push('Collect more feedback to get better insights');
+      }
+
+      setAiInsight({
+        summary,
+        key_themes: topThemes,
+        suggested_actions: suggestedActions,
+        sentiment_overview: `Overall sentiment analysis: ${positivePercent}% positive, ${negativePercent}% negative, ${neutralPercent}% neutral`
+      });
+
     } catch (error) {
       console.error('Error generating AI insight:', error);
       toast.error('Failed to generate AI insight');
@@ -703,33 +731,7 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
 
-            {/* Navigation Buttons */}
-            <div className="flex space-x-2 ml-auto">
-              <Button variant="outline" asChild>
-                <a href="/feedback">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Feedback
-                </a>
-              </Button>
-              <Button variant="outline" asChild>
-                <a href="/insights-simple">
-                  <Lightbulb className="h-4 w-4 mr-2" />
-                  Insights
-                </a>
-              </Button>
-              <Button variant="outline" asChild>
-                <a href="/reports">
-                  <FileText className="h-4 w-4 mr-2" />
-                  Reports
-                </a>
-              </Button>
-              <Button variant="outline" asChild>
-                <a href="/billing">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Billing
-                </a>
-              </Button>
-            </div>
+
           </div>
         </CardContent>
       </Card>
@@ -1112,9 +1114,6 @@ export default function Dashboard() {
               </p>
               {!searchTerm && sentimentFilter === 'all' && (
                 <div className="flex justify-center space-x-2">
-                  <Button asChild>
-                    <a href="/feedback">Go to Feedback</a>
-                  </Button>
                   <Button variant="outline" asChild>
                     <a href="/feedback-settings">Configure Widget</a>
                   </Button>
