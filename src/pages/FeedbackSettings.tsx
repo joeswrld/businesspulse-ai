@@ -372,7 +372,17 @@ const FeedbackSettings = () => {
   };
 
   const handleSaveSettings = async () => {
-    if (!user || !settings) return;
+    if (!user || !settings) {
+      console.error('Cannot save: user or settings not available', { user: !!user, settings: !!settings });
+      return;
+    }
+    
+    console.log('Starting save process:', { 
+      userId: user.id, 
+      settingsId: settings.id, 
+      projectId: settings.project_id,
+      projectIdLocked: settings.project_id_locked 
+    });
     
     // Validate that Project ID is provided
     if (!settings.project_id || settings.project_id.trim() === '') {
@@ -441,30 +451,152 @@ const FeedbackSettings = () => {
         return;
       }
 
-      // Save feedback settings (modern schema)
-      const { error: feedbackError } = await supabase
-        .from('feedback_settings')
-        .update({
-          title: settings.title,
-          show_name: settings.show_name,
-          show_email: settings.show_email,
-          button_text: settings.button_text,
-          redirect_url: settings.redirect_url,
-          theme: settings.theme,
-          brand_color: settings.brand_color,
-          project_id: settings.project_id,
-          project_id_locked: true, // Lock the project ID after first save
-          notify_email: settings.notify_email,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', settings.id);
+      // Check if we have a temporary ID (created when database insert failed)
+      const isTemporaryId = settings.id && settings.id.toString().startsWith('temp-');
+      console.log('Save operation:', { 
+        isTemporaryId, 
+        settingsId: settings.id, 
+        schemaVersion 
+      });
+      
+      if (isTemporaryId) {
+        // Try to create a new record since the previous insert failed
+        console.log('Attempting to create new settings record...');
+        
+        const { data: newSettings, error: insertError } = await supabase
+          .from('feedback_settings')
+          .insert({
+            user_id: user.id,
+            title: settings.title,
+            show_name: settings.show_name,
+            show_email: settings.show_email,
+            button_text: settings.button_text,
+            redirect_url: settings.redirect_url,
+            theme: settings.theme,
+            brand_color: settings.brand_color,
+            project_id: settings.project_id,
+            project_id_locked: true, // Lock the project ID after first save
+            notify_email: settings.notify_email,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
 
-      if (feedbackError) throw feedbackError;
+        if (insertError) {
+          console.error('Error creating settings:', insertError);
+          
+          // If there's a conflict, try to update existing record
+          if (insertError.code === '23505') { // Unique violation
+            console.log('Unique constraint violation, trying to update existing record...');
+            
+            const { data: existingSettings, error: updateError } = await supabase
+              .from('feedback_settings')
+              .update({
+                title: settings.title,
+                show_name: settings.show_name,
+                show_email: settings.show_email,
+                button_text: settings.button_text,
+                redirect_url: settings.redirect_url,
+                theme: settings.theme,
+                brand_color: settings.brand_color,
+                project_id: settings.project_id,
+                project_id_locked: true,
+                notify_email: settings.notify_email,
+                updated_at: new Date().toISOString()
+              })
+              .eq('user_id', user.id)
+              .select()
+              .single();
 
-      toast.success('Settings saved successfully!');
+            if (updateError) {
+              console.error('Error updating existing settings:', updateError);
+              throw new Error(`Failed to update settings: ${updateError.message}`);
+            }
+
+            setSettings(existingSettings);
+            toast.success('Settings saved successfully!');
+          } else {
+            throw new Error(`Failed to create settings: ${insertError.message}`);
+          }
+        } else {
+          // Update the settings state with the new record
+          setSettings(newSettings);
+          toast.success('Settings saved successfully!');
+        }
+      } else {
+        // Update existing record
+        console.log('Updating existing settings record...');
+        
+        const { data: updatedSettings, error: feedbackError } = await supabase
+          .from('feedback_settings')
+          .update({
+            title: settings.title,
+            show_name: settings.show_name,
+            show_email: settings.show_email,
+            button_text: settings.button_text,
+            redirect_url: settings.redirect_url,
+            theme: settings.theme,
+            brand_color: settings.brand_color,
+            project_id: settings.project_id,
+            project_id_locked: true, // Lock the project ID after first save
+            notify_email: settings.notify_email,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', settings.id)
+          .select()
+          .single();
+
+        if (feedbackError) {
+          console.error('Error updating settings:', feedbackError);
+          
+          // If the record doesn't exist, try to create it
+          if (feedbackError.code === 'PGRST116') { // Record not found
+            console.log('Record not found, trying to create new record...');
+            
+            const { data: newSettings, error: insertError } = await supabase
+              .from('feedback_settings')
+              .insert({
+                user_id: user.id,
+                title: settings.title,
+                show_name: settings.show_name,
+                show_email: settings.show_email,
+                button_text: settings.button_text,
+                redirect_url: settings.redirect_url,
+                theme: settings.theme,
+                brand_color: settings.brand_color,
+                project_id: settings.project_id,
+                project_id_locked: true,
+                notify_email: settings.notify_email,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .select()
+              .single();
+
+            if (insertError) {
+              console.error('Error creating settings after update failed:', insertError);
+              throw new Error(`Failed to create settings: ${insertError.message}`);
+            }
+
+            setSettings(newSettings);
+            toast.success('Settings saved successfully!');
+          } else {
+            throw new Error(`Failed to update settings: ${feedbackError.message}`);
+          }
+        } else {
+          // Update the settings state with the updated record
+          setSettings(updatedSettings);
+          toast.success('Settings saved successfully!');
+        }
+      }
     } catch (error) {
       console.error('Error saving settings:', error);
-      toast.error('Failed to save settings');
+      if (error instanceof Error) {
+        toast.error(`Failed to save settings: ${error.message}`);
+      } else {
+        toast.error('Failed to save settings');
+      }
     } finally {
       setSaving(false);
     }
