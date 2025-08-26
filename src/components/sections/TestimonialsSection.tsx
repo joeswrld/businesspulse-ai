@@ -7,37 +7,37 @@ const TestimonialsSection = () => {
     {
       name: "Sarah Johnson",
       role: "CEO",
-      content: "NoteX BI transformed how we make strategic decisions. The AI-powered analytics helped us identify a 40% increase in operational efficiency opportunities we never knew existed.",
+      content: "FeedbackFlow transformed how we understand our customers. The AI sentiment analysis helped us identify pain points we never knew existed, leading to a 40% increase in customer satisfaction.",
       rating: 5,
     },
     {
       name: "Michael Chen",
-      role: "Operations Director",
-      content: "The real-time BI dashboard is a game-changer. We can now track our KPIs live and make strategic adjustments instantly. Our revenue grew 25% in just 3 months.",
+      role: "Product Manager",
+      content: "The real-time feedback analytics is a game-changer. We can now track customer sentiment live and make product adjustments instantly. Our NPS score grew from 45 to 78 in just 3 months.",
       rating: 5,
     },
     {
       name: "Emily Rodriguez",
       role: "Founder",
-      content: "Finally, a BI platform that speaks our language. The industry-specific analytics models are spot-on, and the team collaboration features keep everyone aligned.",
+      content: "Finally, a feedback platform that speaks our language. The AI insights are spot-on, and the widget integration is so seamless our customers love using it.",
       rating: 5,
     },
     {
       name: "David Okafor",
-      role: "Business Intelligence Manager",
-      content: "The data pipeline integration is incredibly powerful. It processes our business metrics in minutes and gives strategic insights that would take our team days to discover.",
+      role: "Customer Success Manager",
+      content: "The feedback collection is incredibly powerful. It processes customer responses in minutes and gives insights that would take our team days to discover manually.",
       rating: 5,
     },
     {
       name: "Jennifer Kim",
       role: "Marketing Director",
-      content: "NoteX BI's executive reports save us 15+ hours per week. The branded PDF exports look professional and impress our board members every time.",
+      content: "FeedbackFlow's reports save us 15+ hours per week. The actionable insights help us create better campaigns and our customer retention improved by 35%.",
       rating: 5,
     },
     {
       name: "Alex Thompson",
       role: "Co-founder",
-      content: "The trial convinced us immediately. The AI-powered BI suggestions helped us optimize our pricing strategy and increase our conversion rate by 35%. Absolutely worth it.",
+      content: "The trial convinced us immediately. The AI-powered feedback analysis helped us optimize our product features and increase our customer satisfaction by 45%. Absolutely worth it.",
       rating: 5,
     }
   ];
@@ -48,14 +48,14 @@ const TestimonialsSection = () => {
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <Badge variant="outline" className="mb-4">
-            Enterprise Success Stories
+            Customer Success Stories
           </Badge>
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Trusted by Enterprise Leaders{" "}
+            Trusted by Businesses{" "}
             <span className="gradient-text">Worldwide</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            See how enterprises across the US, Canada, and Nigeria are using NoteX BI to build data-driven strategies and make informed strategic decisions that accelerate their growth.
+            See how businesses across the US, Canada, and Nigeria are using FeedbackFlow to understand their customers better and drive growth through actionable feedback insights.
           </p>
         </div>
 
@@ -103,15 +103,15 @@ const TestimonialsSection = () => {
         <div className="mt-16 grid md:grid-cols-4 gap-8 text-center">
           <div className="space-y-2">
             <div className="text-3xl font-bold gradient-text">500+</div>
-            <div className="text-sm text-muted-foreground">Active Enterprises</div>
+            <div className="text-sm text-muted-foreground">Active Businesses</div>
           </div>
           <div className="space-y-2">
             <div className="text-3xl font-bold gradient-text">4.9/5</div>
-            <div className="text-sm text-muted-foreground">Enterprise Rating</div>
+            <div className="text-sm text-muted-foreground">Customer Rating</div>
           </div>
           <div className="space-y-2">
-            <div className="text-3xl font-bold gradient-text">250k+</div>
-            <div className="text-sm text-muted-foreground">Data Sources Connected</div>
+            <div className="text-3xl font-bold gradient-text">1M+</div>
+            <div className="text-sm text-muted-foreground">Feedback Responses</div>
           </div>
           <div className="space-y-2">
             <div className="text-3xl font-bold gradient-text">98%</div>

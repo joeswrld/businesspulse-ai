@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Brain, Zap, FileText, BarChart3, Users, Shield, Globe, Download } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 const FeaturesSection = () => {
   const features = [
@@ -107,15 +108,15 @@ const FeaturesSection = () => {
         <div className="text-center mt-16">
           <div className="bg-background rounded-2xl p-8 shadow-soft border">
             <h3 className="text-2xl font-bold mb-4">
-              Ready to transform your business intelligence?
+              Ready to transform your customer feedback?
             </h3>
             <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
-              Join hundreds of enterprises already using NoteX to build data-driven strategies and make informed strategic decisions every day.
+              Join hundreds of businesses already using FeedbackFlow to understand their customers better and drive growth through actionable insights.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="inline-flex items-center justify-center gap-2 h-11 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 bg-gradient-primary text-primary-foreground hover:shadow-glow transform hover:scale-105 shadow-medium" >
-                Start Your Free Trial
-              </button>
+              <Button size="lg" asChild>
+                <Link to="/auth">Start Your Free Trial ✨</Link>
+              </Button>
             </div>
           </div>
         </div>

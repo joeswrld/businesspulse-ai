@@ -42,6 +42,7 @@ const Billing = lazy(() => import("./pages/Billing"));
 const FeedbackSimple = lazy(() => import("./pages/FeedbackSimple"));
 const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
 const TestPage = lazy(() => import("./pages/TestPage"));
+const Testimonials = lazy(() => import("./pages/Testimonials"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
 
@@ -64,6 +65,11 @@ const App = () => (
             <Route path="/auth" element={
               <Suspense fallback={<LoadingSpinner />}>
                 <AuthPage />
+              </Suspense>
+            } />
+            <Route path="/testimonials" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <Testimonials />
               </Suspense>
             } />
             
