@@ -487,11 +487,23 @@ export default function Dashboard() {
     
     if (!subscription) {
       console.log('🔍 No subscription, returning default');
+
+    // If no subscription, show Free Trial based on account creation
+    if (!subscription) {
+      const createdAt = user?.created_at ? new Date(user.created_at) : null;
+      let daysLeft = 0;
+      if (createdAt) {
+        const trialEnd = new Date(createdAt);
+        trialEnd.setDate(trialEnd.getDate() + 8);
+        const now = new Date();
+        daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+      }
+
       return {
         planName: 'Free Trial',
         planType: 'trial',
         isTrial: true,
-        daysLeft: 0,
+        daysLeft,
         upgradeText: 'Upgrade to Pro',
         upgradeLink: '/billing?plan=pro'
       };
@@ -509,6 +521,16 @@ export default function Dashboard() {
     const now = new Date();
     const daysLeft = Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
+    // With subscription, check if user is currently in trial
+    const isTrial = subscription.status === 'trialing';
+    let daysLeft = 0;
+    if (isTrial && subscription.trial_end) {
+      const trialEnd = new Date(subscription.trial_end);
+      const now = new Date();
+      daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    }
+
+
     let upgradeText = '';
     let upgradeLink = '';
 
@@ -516,6 +538,9 @@ export default function Dashboard() {
       upgradeText = 'Upgrade to Pro';
       upgradeLink = '/billing?plan=pro';
     } else if (planName === 'pro') {
+
+    } else if ((subscription.plan_name || '').toLowerCase() === 'pro') {
+
       upgradeText = 'Upgrade to Business';
       upgradeLink = '/billing?plan=business';
     } else {
@@ -540,8 +565,14 @@ export default function Dashboard() {
     return {
       planName: formattedPlanName,
       planType: planType,
+
+      planName: isTrial
+        ? 'Free Trial'
+        : (subscription.plan_name || 'Pro').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      planType: isTrial ? 'trial' : subscription.plan_type,
+
       isTrial,
-      daysLeft: Math.max(0, daysLeft),
+      daysLeft,
       upgradeText,
       upgradeLink
     };

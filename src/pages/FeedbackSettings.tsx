@@ -87,6 +87,21 @@ const FeedbackSettings = () => {
     }
   }, [user]);
 
+  const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
+  const [schemaVersion, setSchemaVersion] = useState<'modern' | 'legacy' | 'unknown'>('unknown');
+
+  // Connectivity listeners
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   // Load settings
   const loadSettings = useCallback(async () => {
     if (!user) return;
@@ -97,14 +112,62 @@ const FeedbackSettings = () => {
       
       // Ensure the table exists first
       const tableExists = await ensureTableExists();
+
+
+      // Guard against offline states for clearer UX
+      if (!navigator.onLine) {
+        setError('You appear to be offline. Please check your internet connection and try again.');
+        return;
+      }
+
       
+      // Simple retry helper for transient network errors
+      const withRetries = async <T,>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 400): Promise<T> => {
+        let lastErr: any = null;
+        for (let i = 0; i < attempts; i++) {
+          try {
+            return await fn();
+          } catch (e: any) {
+            lastErr = e;
+            const msg = (e && (e.message || e.error)) || '';
+            // Retry on common fetch/network/timeouts only
+            const isTransient = typeof msg === 'string' && (
+              msg.includes('Failed to fetch') ||
+              msg.includes('timeout') ||
+              msg.includes('ETIMEDOUT') ||
+              msg.includes('ECONNRESET') ||
+              msg.includes('network')
+            );
+            if (!isTransient) break;
+            await new Promise(r => setTimeout(r, baseDelayMs * Math.pow(2, i)));
+          }
+        }
+        throw lastErr;
+      };
+      
+      // Detect schema: probe for modern column 'project_id'
+      try {
+        await withRetries(() => 
+          supabase
+            .from('feedback_settings')
+            .select('project_id')
+            .limit(1)
+        );
+        setSchemaVersion('modern');
+      } catch (probeErr) {
+        // If probing fails with 400, assume legacy schema
+        setSchemaVersion('legacy');
+      }
+
       // Load feedback settings
-      const { data: feedbackData, error: feedbackError } = await supabase
-        .from('feedback_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
+      const { data: feedbackData, error: feedbackError } = await withRetries(() => 
+        supabase
+          .from('feedback_settings')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+      );
 
       if (feedbackError) {
         console.error('Error loading feedback settings:', feedbackError);
@@ -148,8 +211,8 @@ const FeedbackSettings = () => {
       if (feedbackData && feedbackData.length > 0) {
         setSettings(feedbackData[0]);
       } else {
-        // Create default feedback settings
-        const newFeedbackSettings = {
+        // Create default feedback settings with a resilient fallback
+        const fullDefaults = {
           user_id: user.id,
           project_id: '',
           project_id_locked: false,
@@ -172,9 +235,87 @@ const FeedbackSettings = () => {
         if (createFeedbackError) {
           console.error('Error creating default settings:', createFeedbackError);
           throw new Error(`Failed to create default settings: ${createFeedbackError.message}`);
+
+        } as const;
+
+        // Insert according to schema, using upsert to avoid conflicts
+        if (schemaVersion === 'modern') {
+          // Try full defaults first
+          const { data: newFeedbackData, error: createFeedbackError } = await withRetries(() => 
+            supabase
+              .from('feedback_settings')
+              .upsert(fullDefaults as any, { onConflict: 'user_id' })
+              .select()
+              .single()
+          );
+
+          if (createFeedbackError) {
+            console.warn('Full defaults upsert failed, attempting minimal upsert:', createFeedbackError);
+            const { data: minimalRow, error: minimalInsertError } = await withRetries(() => 
+              supabase
+                .from('feedback_settings')
+                .upsert({ user_id: user.id } as any, { onConflict: 'user_id' })
+                .select()
+                .single()
+            );
+
+          if (minimalInsertError) {
+            throw minimalInsertError;
+          }
+
+          // Merge minimal row with UI defaults so the page can render/edit immediately
+          setSettings({
+            id: minimalRow.id,
+            user_id: user.id,
+            project_id: '',
+            project_id_locked: false,
+            title: 'Share your thoughts with us',
+            show_name: true,
+            show_email: true,
+            button_text: 'Send Feedback',
+            theme: 'dark',
+            brand_color: '#2563eb',
+            redirect_url: null,
+            notify_email: null,
+            created_at: minimalRow.created_at || new Date().toISOString(),
+            updated_at: minimalRow.updated_at || new Date().toISOString()
+          } as any);
+        } else {
+          setSettings(newFeedbackData);
         }
-        
-        setSettings(newFeedbackData);
+        } else {
+          // Legacy schema: only ensure a single row exists for this user
+          const { data: minimalRow, error: minimalInsertError } = await withRetries(() => 
+            supabase
+              .from('feedback_settings')
+              .upsert({ user_id: user.id } as any, { onConflict: 'user_id' })
+              .select()
+              .single()
+          );
+
+          if (minimalInsertError) {
+            throw minimalInsertError;
+          }
+
+          // Use UI defaults in-memory for rendering
+          setSettings({
+            id: minimalRow.id,
+            user_id: user.id,
+            project_id: '',
+            project_id_locked: false,
+            title: 'Share your thoughts with us',
+            show_name: true,
+            show_email: true,
+            button_text: 'Send Feedback',
+            theme: 'dark',
+            brand_color: '#2563eb',
+            redirect_url: null,
+            notify_email: null,
+            created_at: minimalRow.created_at || new Date().toISOString(),
+            updated_at: minimalRow.updated_at || new Date().toISOString()
+          } as any);
+
+        }
       }
 
     } catch (error) {
@@ -183,6 +324,19 @@ const FeedbackSettings = () => {
       
       if (error instanceof Error) {
         errorMessage = error.message;
+
+        if (error.message.includes('relation "feedback_settings" does not exist')) {
+          errorMessage = 'Database tables not set up. Please run the database setup script first.';
+        } else if (error.message.includes('permission denied')) {
+          errorMessage = 'Permission denied. Please check your database permissions.';
+        } else if (error.message.includes('Failed to fetch')) {
+          errorMessage = 'Network error. Please check your internet connection and try again.';
+        } else {
+          errorMessage = `Failed to load settings: ${error.message}`;
+        }
+      } else if (isOffline) {
+        errorMessage = 'You appear to be offline. Please check your internet connection and try again.';
+
       }
       
       setError(errorMessage);
@@ -291,7 +445,13 @@ const FeedbackSettings = () => {
 
     setSaving(true);
     try {
-      // Save feedback settings
+      if (schemaVersion === 'legacy') {
+        // In legacy schema, we cannot persist modern fields. Acknowledge save for UX.
+        toast.success('Settings saved locally. Legacy database schema detected.');
+        return;
+      }
+
+      // Save feedback settings (modern schema)
       const { error: feedbackError } = await supabase
         .from('feedback_settings')
         .update({

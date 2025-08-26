@@ -35,6 +35,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [seededSettingsFor, setSeededSettingsFor] = useState<string | null>(null);
+
+
   useEffect(() => {
     let mounted = true;
 
@@ -45,6 +48,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       (event, session) => {
         console.log("🔐 Auth state changed:", event, session?.user?.email);
         
+
+      async (event, session) => {
+        console.log("Auth state changed:", event, session);
+
         if (mounted) {
           setSession(session);
           setUser(session?.user ?? null);
@@ -58,6 +65,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           } else if (event === 'TOKEN_REFRESHED') {
             console.log("🔄 Token refreshed");
           }
+        }
+
+        // On first sign-in for a user, ensure a feedback_settings row exists
+        try {
+          const currentUserId = session?.user?.id;
+          if (!currentUserId) return;
+          if (seededSettingsFor === currentUserId) return;
+
+          // Probe if row exists
+          const { data: existing } = await supabase
+            .from('feedback_settings')
+            .select('id')
+            .eq('user_id', currentUserId)
+            .limit(1);
+
+          if (!existing || existing.length === 0) {
+            // Create row idempotently
+            await supabase
+              .from('feedback_settings')
+              .upsert({ user_id: currentUserId } as any, { onConflict: 'user_id' });
+          }
+          setSeededSettingsFor(currentUserId);
+        } catch (e) {
+          console.warn('Non-fatal: could not seed feedback_settings on auth event:', e);
         }
       }
     );
