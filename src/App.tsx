@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
+
 // Pages
 import Index from "./pages/Index";
 import AuthPage from "./pages/AuthPage";

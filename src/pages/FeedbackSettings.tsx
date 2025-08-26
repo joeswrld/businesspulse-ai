@@ -13,7 +13,9 @@ import {
   Copy,
   Check,
   Save,
-  Lock
+  Lock,
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -46,6 +48,45 @@ const FeedbackSettings = () => {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [projectIdStatus, setProjectIdStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [setupAttempted, setSetupAttempted] = useState(false);
+
+  // Check if feedback_settings table exists and create it if needed
+  const ensureTableExists = useCallback(async () => {
+    if (!user) return false;
+
+    try {
+      // First, try to check if the table exists by attempting a simple query
+      const { data: testData, error: testError } = await supabase
+        .from('feedback_settings')
+        .select('id')
+        .limit(1);
+
+      // If we get a "relation does not exist" error, we need to create the table
+      if (testError && testError.message.includes('relation "feedback_settings" does not exist')) {
+        console.log('Feedback settings table does not exist, creating it...');
+        
+        // Call the setup function to create the table
+        const { error: setupError } = await supabase.rpc('create_feedback_settings_for_user', {
+          user_id_param: user.id
+        });
+
+        if (setupError) {
+          console.error('Error setting up feedback system:', setupError);
+          // If the RPC function doesn't exist, we'll handle it in the main load function
+          return false;
+        }
+
+        console.log('Feedback settings table created successfully');
+        return true;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error checking/creating table:', error);
+      return false;
+    }
+  }, [user]);
+
   const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
   const [schemaVersion, setSchemaVersion] = useState<'modern' | 'legacy' | 'unknown'>('unknown');
 
@@ -68,12 +109,17 @@ const FeedbackSettings = () => {
     try {
       setLoading(true);
       setError(null);
+      
+      // Ensure the table exists first
+      const tableExists = await ensureTableExists();
+
 
       // Guard against offline states for clearer UX
       if (!navigator.onLine) {
         setError('You appear to be offline. Please check your internet connection and try again.');
         return;
       }
+
       
       // Simple retry helper for transient network errors
       const withRetries = async <T,>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 400): Promise<T> => {
@@ -125,7 +171,41 @@ const FeedbackSettings = () => {
 
       if (feedbackError) {
         console.error('Error loading feedback settings:', feedbackError);
-        throw feedbackError;
+        
+        // Handle specific error cases
+        if (feedbackError.message.includes('relation "feedback_settings" does not exist')) {
+          if (!setupAttempted) {
+            setSetupAttempted(true);
+            // Try to create the table using a direct SQL approach
+            const { error: createError } = await supabase.rpc('create_feedback_settings_for_user', {
+              user_id_param: user.id
+            });
+            
+            if (createError) {
+              throw new Error('Database tables not set up. Please contact support to set up the feedback system.');
+            } else {
+              // Retry loading settings after table creation
+              const { data: retryData, error: retryError } = await supabase
+                .from('feedback_settings')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+              if (retryError) throw retryError;
+              if (retryData && retryData.length > 0) {
+                setSettings(retryData[0]);
+                return;
+              }
+            }
+          } else {
+            throw new Error('Database tables not set up. Please contact support to set up the feedback system.');
+          }
+        } else if (feedbackError.message.includes('permission denied')) {
+          throw new Error('Permission denied. Please check your database permissions or contact support.');
+        } else {
+          throw feedbackError;
+        }
       }
 
       if (feedbackData && feedbackData.length > 0) {
@@ -144,6 +224,18 @@ const FeedbackSettings = () => {
           brand_color: '#2563eb',
           redirect_url: null,
           notify_email: null
+        };
+        
+        const { data: newFeedbackData, error: createFeedbackError } = await supabase
+          .from('feedback_settings')
+          .insert(newFeedbackSettings)
+          .select()
+          .single();
+
+        if (createFeedbackError) {
+          console.error('Error creating default settings:', createFeedbackError);
+          throw new Error(`Failed to create default settings: ${createFeedbackError.message}`);
+
         } as const;
 
         // Insert according to schema, using upsert to avoid conflicts
@@ -222,6 +314,7 @@ const FeedbackSettings = () => {
             created_at: minimalRow.created_at || new Date().toISOString(),
             updated_at: minimalRow.updated_at || new Date().toISOString()
           } as any);
+
         }
       }
 
@@ -230,6 +323,8 @@ const FeedbackSettings = () => {
       let errorMessage = 'Failed to load settings. Please try again.';
       
       if (error instanceof Error) {
+        errorMessage = error.message;
+
         if (error.message.includes('relation "feedback_settings" does not exist')) {
           errorMessage = 'Database tables not set up. Please run the database setup script first.';
         } else if (error.message.includes('permission denied')) {
@@ -241,6 +336,7 @@ const FeedbackSettings = () => {
         }
       } else if (isOffline) {
         errorMessage = 'You appear to be offline. Please check your internet connection and try again.';
+
       }
       
       setError(errorMessage);
@@ -248,7 +344,7 @@ const FeedbackSettings = () => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, ensureTableExists, setupAttempted]);
 
   const checkProjectIdAvailability = useCallback(async (projectId: string) => {
     if (!user || !projectId || projectId.trim() === '' || projectId.length < 3) {
@@ -259,12 +355,12 @@ const FeedbackSettings = () => {
     setProjectIdStatus('checking');
 
     try {
-      // Check global uniqueness across all users
+      // Check global uniqueness across ALL users - if ANY user has this project_id, it's taken
       const { data: existingSettings, error: checkError } = await supabase
         .from('feedback_settings')
         .select('id, project_id, user_id')
         .eq('project_id', projectId.trim())
-        .neq('id', settings?.id || '');
+        .neq('user_id', user.id); // Exclude current user from the check
 
       if (checkError) {
         console.error('Error checking project ID availability:', checkError);
@@ -274,14 +370,18 @@ const FeedbackSettings = () => {
 
       if (existingSettings && existingSettings.length > 0) {
         setProjectIdStatus('taken');
+        console.log('Project ID taken by:', existingSettings);
+        console.log('Current user ID:', user.id);
+        console.log('Checking project ID:', projectId.trim());
       } else {
         setProjectIdStatus('available');
+        console.log('Project ID available for:', projectId.trim());
       }
     } catch (error) {
       console.error('Error checking project ID availability:', error);
       setProjectIdStatus('idle');
     }
-  }, [user, settings?.id]);
+  }, [user]);
 
   // Load settings on component mount
   useEffect(() => {
@@ -304,6 +404,7 @@ const FeedbackSettings = () => {
 
   const handleRetry = () => {
     setError(null);
+    setSetupAttempted(false);
     setLoading(true);
     loadSettings();
   };
@@ -329,7 +430,7 @@ const FeedbackSettings = () => {
         .from('feedback_settings')
         .select('id, project_id, user_id')
         .eq('project_id', settings.project_id.trim())
-        .neq('id', settings.id);
+        .neq('user_id', user.id); // Check against other users - if ANY user has this project_id, it's taken
 
       if (checkError) {
         toast.error('Failed to validate Project ID');
@@ -417,6 +518,7 @@ const FeedbackSettings = () => {
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
             <h2 className="text-xl font-semibold mb-2">Loading Settings...</h2>
             <p className="text-gray-600">Please wait while we fetch your configuration.</p>
           </div>
@@ -431,9 +533,18 @@ const FeedbackSettings = () => {
         <Card className="max-w-2xl mx-auto">
           <CardContent className="p-6">
             <div className="text-center">
+              <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
               <h2 className="text-xl font-semibold mb-4">Error Loading Settings</h2>
               <p className="text-gray-600 mb-6">{error}</p>
-              <Button onClick={handleRetry}>Try Again</Button>
+              <div className="space-y-2">
+                <Button onClick={handleRetry} className="w-full">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Try Again
+                </Button>
+                <p className="text-xs text-gray-500">
+                  If the problem persists, please contact support.
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -482,13 +593,56 @@ const FeedbackSettings = () => {
                 </p>
               )}
               {!settings?.project_id_locked && projectIdStatus === 'available' && (
-                <p className="text-sm text-green-600 mt-1">✓ Project ID available</p>
+                <p className="text-sm text-green-600 mt-1 flex items-center">
+                  <Check className="h-4 w-4 mr-1" />
+                  ✓ Project ID available - you can save to lock it
+                </p>
               )}
               {!settings?.project_id_locked && projectIdStatus === 'taken' && (
-                <p className="text-sm text-red-600 mt-1">✗ Project ID already taken by another user</p>
+                <p className="text-sm text-red-600 mt-1 flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  ✗ Project ID already taken by another user - please choose a different one
+                </p>
               )}
               {!settings?.project_id_locked && projectIdStatus === 'checking' && (
-                <p className="text-sm text-blue-600 mt-1">Checking availability...</p>
+                <p className="text-sm text-blue-600 mt-1 flex items-center">
+                  <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                  Checking availability...
+                </p>
+              )}
+              {!settings?.project_id_locked && projectIdStatus === 'idle' && settings?.project_id && settings.project_id.length >= 3 && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Type at least 3 characters to check availability
+                </p>
+              )}
+              
+              {/* Debug info - remove this in production */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
+                  <p><strong>Debug Info:</strong></p>
+                  <p>Current User ID: {user?.id}</p>
+                  <p>Project ID: {settings?.project_id}</p>
+                  <p>Status: {projectIdStatus}</p>
+                  <p>Locked: {settings?.project_id_locked ? 'Yes' : 'No'}</p>
+                  <Button 
+                    size="sm" 
+                    onClick={async () => {
+                      if (settings?.project_id) {
+                        const { data, error } = await supabase.rpc('test_project_id_uniqueness', {
+                          test_project_id: settings.project_id,
+                          current_user_id: user?.id
+                        });
+                        console.log('Test result:', { data, error });
+                        if (data && data.length > 0) {
+                          alert(`Test Result: ${data[0].message}`);
+                        }
+                      }
+                    }}
+                    className="mt-2"
+                  >
+                    Test Uniqueness
+                  </Button>
+                </div>
               )}
             </div>
           </CardContent>
@@ -647,7 +801,12 @@ const FeedbackSettings = () => {
         <div className="text-center">
           <Button
             onClick={handleSaveSettings}
-            disabled={saving || !settings?.project_id || (settings?.project_id && settings.project_id.trim().length < 3)}
+            disabled={
+              saving || 
+              !settings?.project_id || 
+              (settings?.project_id && settings.project_id.trim().length < 3) ||
+              (!settings?.project_id_locked && projectIdStatus === 'taken')
+            }
             className="px-8 py-3 text-lg"
           >
             {saving ? (
@@ -658,10 +817,15 @@ const FeedbackSettings = () => {
             ) : (
               <>
                 <Save className="h-5 w-5 mr-2" />
-                Update Settings
+                {settings?.project_id_locked ? 'Update Settings' : 'Save & Lock Project ID'}
               </>
             )}
           </Button>
+          {!settings?.project_id_locked && projectIdStatus === 'taken' && (
+            <p className="text-sm text-red-600 mt-2">
+              Cannot save: Project ID is already taken by another user
+            </p>
+          )}
         </div>
 
         {/* Embed Code */}
