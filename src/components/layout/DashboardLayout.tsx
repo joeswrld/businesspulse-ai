@@ -20,7 +20,9 @@ import {
   Crown,
   Star,
   Zap,
-  ChevronDown
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +30,7 @@ import { toast } from "sonner";
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [subscription, setSubscription] = useState<any>(null);
@@ -156,31 +159,46 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Sidebar */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-slate-50 to-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 shadow-xl max-h-screen",
+        "fixed inset-y-0 left-0 z-50 bg-gradient-to-b from-slate-50 to-white border-r border-slate-200 transform transition-all duration-300 ease-in-out lg:translate-x-0 shadow-xl max-h-screen",
+        sidebarCollapsed ? "w-16" : "w-72",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-white/50 backdrop-blur-sm">
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white/50 backdrop-blur-sm">
             <Link to="/dashboard" className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
-                <img src="/favicon.ico" alt="NoteX BI" className="h-6 w-6" />
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+                <img src="/favicon.ico" alt="FeedbackFlow" className="h-6 w-6" />
               </div>
-              <div>
-                <h1 className="text-lg font-bold text-slate-900">FeedbackFlow</h1>
-                <p className="text-xs text-slate-500">Turn feedback into growth ✨</p>
-              </div>
+              {!sidebarCollapsed && (
+                <div className="transition-opacity duration-300">
+                  <h1 className="text-lg font-bold text-slate-900">FeedbackFlow</h1>
+                  <p className="text-xs text-slate-500">Turn feedback into growth ✨</p>
+                </div>
+              )}
             </Link>
-            <button 
-              className="lg:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X className="h-5 w-5 text-slate-600" />
-            </button>
+            <div className="flex items-center space-x-2">
+              <button 
+                className="hidden lg:flex p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              >
+                {sidebarCollapsed ? (
+                  <ChevronRight className="h-4 w-4 text-slate-600" />
+                ) : (
+                  <ChevronLeft className="h-4 w-4 text-slate-600" />
+                )}
+              </button>
+              <button 
+                className="lg:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <X className="h-5 w-5 text-slate-600" />
+              </button>
+            </div>
           </div>
 
           {/* User Profile Section */}
-          {!loading && user && (
+          {!loading && user && !sidebarCollapsed && (
             <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
               <div className="flex items-center space-x-3 mb-4">
                 <Avatar className="h-12 w-12 border-2 border-white shadow-lg">
@@ -221,6 +239,18 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
             </div>
           )}
 
+          {/* Collapsed User Avatar */}
+          {!loading && user && sidebarCollapsed && (
+            <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <Avatar className="h-10 w-10 border-2 border-white shadow-lg mx-auto">
+                <AvatarImage src={profile?.avatar_url} />
+                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-semibold text-sm">
+                  {profile?.first_name?.[0] || user.email?.[0] || 'U'}
+                </AvatarFallback>
+              </Avatar>
+            </div>
+          )}
+
           {/* Navigation */}
           <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
             {navigation.map((item) => {
@@ -230,25 +260,34 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
               return (
                 <div key={item.name} className="relative">
                   {isComingSoon ? (
-                    <div className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 cursor-not-allowed opacity-60 hover:bg-slate-100/50 transition-colors">
+                    <div className={cn(
+                      "flex items-center space-x-3 rounded-lg text-sm font-medium text-slate-500 cursor-not-allowed opacity-60 hover:bg-slate-100/50 transition-colors",
+                      sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2.5"
+                    )}>
                       <div className="p-1 rounded-lg bg-slate-100">
                         <item.icon className="h-4 w-4" />
                       </div>
-                      <span className="flex-1">{item.name}</span>
-                      <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 font-medium">
-                        Soon
-                      </span>
+                      {!sidebarCollapsed && (
+                        <>
+                          <span className="flex-1">{item.name}</span>
+                          <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 font-medium">
+                            Soon
+                          </span>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <Link
                       to={item.href}
                       className={cn(
-                        "flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group",
+                        "flex items-center space-x-3 rounded-lg text-sm font-medium transition-all duration-200 group",
+                        sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2.5",
                         isActive
                           ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25"
                           : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
                       )}
                       onClick={() => setSidebarOpen(false)}
+                      title={sidebarCollapsed ? item.name : undefined}
                     >
                       <div className={cn(
                         "p-1 rounded-lg transition-colors",
@@ -261,9 +300,13 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                           isActive ? "text-white" : "text-slate-600"
                         )} />
                       </div>
-                      <span className="flex-1">{item.name}</span>
-                      {isActive && (
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                      {!sidebarCollapsed && (
+                        <>
+                          <span className="flex-1">{item.name}</span>
+                          {isActive && (
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                          )}
+                        </>
                       )}
                     </Link>
                   )}
@@ -277,22 +320,30 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
             <div className="space-y-1">
               <Link
                 to="/settings"
-                className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all duration-200 group"
+                className={cn(
+                  "flex items-center space-x-3 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all duration-200 group",
+                  sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2.5"
+                )}
+                title={sidebarCollapsed ? "Settings" : undefined}
               >
                 <div className="p-1 rounded-lg bg-slate-100 group-hover:bg-slate-200 transition-colors">
                   <Settings className="h-4 w-4 text-slate-600" />
                 </div>
-                <span className="flex-1">Settings</span>
+                {!sidebarCollapsed && <span className="flex-1">Settings</span>}
               </Link>
               
               <button
                 onClick={handleSignOut}
-                className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 group w-full"
+                className={cn(
+                  "flex items-center space-x-3 rounded-lg text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 group",
+                  sidebarCollapsed ? "px-2 py-2 justify-center w-full" : "px-3 py-2.5 w-full"
+                )}
+                title={sidebarCollapsed ? "Sign Out" : undefined}
               >
                 <div className="p-1 rounded-lg bg-red-100 group-hover:bg-red-200 transition-colors">
                   <LogOut className="h-4 w-4 text-red-600" />
                 </div>
-                <span className="flex-1">Sign Out</span>
+                {!sidebarCollapsed && <span className="flex-1">Sign Out</span>}
               </button>
             </div>
           </div>
@@ -300,7 +351,10 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-72 min-h-screen bg-background">
+      <div className={cn(
+        "min-h-screen bg-background transition-all duration-300",
+        sidebarCollapsed ? "lg:pl-16" : "lg:pl-72"
+      )}>
         {/* Mobile menu button */}
         <div className="lg:hidden p-4">
           <button
