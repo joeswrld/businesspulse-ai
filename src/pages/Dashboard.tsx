@@ -119,7 +119,7 @@ export default function Dashboard() {
   const [generatingInsight, setGeneratingInsight] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Load user's data
+  // Load user's data using optimized single query
   const loadDashboardData = useCallback(async () => {
     if (!user) return;
 
@@ -127,92 +127,51 @@ export default function Dashboard() {
       setLoading(true);
       console.log('Loading dashboard data for user:', user.id);
       
-      // Get user's project IDs from feedback_settings
-      let projectSettings = [];
-      try {
-        const { data, error: projectError } = await supabase
-          .from('feedback_settings')
-          .select('project_id')
-          .eq('user_id', user.id);
-
-        if (projectError) {
-          console.error('Error loading project settings:', projectError);
-          // Don't show error toast, just continue with empty data
-        } else {
-          projectSettings = data || [];
-        }
-      } catch (error) {
-        console.error('Exception loading project settings:', error);
-        // Continue with empty data
-      }
-
-      console.log('Project settings loaded:', projectSettings);
-      const projectIds = projectSettings?.map(setting => setting.project_id).filter(Boolean) || [];
-      console.log('Project IDs:', projectIds);
-
-      // Get latest 50 feedbacks for user's projects
-      let feedbacksData = [];
-      if (projectIds.length > 0) {
-        try {
-          const { data, error: feedbacksError } = await supabase
-            .from('feedbacks')
-            .select('*')
-            .in('project_id', projectIds)
-            .order('timestamp', { ascending: false })
-            .limit(50);
-
-          if (feedbacksError) {
-            console.error('Error loading feedbacks:', feedbacksError);
-            // Don't show error toast, just continue with empty data
-          } else {
-            feedbacksData = data || [];
-          }
-        } catch (error) {
-          console.error('Exception loading feedbacks:', error);
-          // Continue with empty data
-        }
-      } else {
-        console.log('No project IDs found, setting empty feedbacks');
-      }
-
-      console.log('Feedbacks loaded:', feedbacksData.length);
-      setFeedbacks(feedbacksData);
-
-      // Get user subscription
-      let subscriptionData = null;
-      try {
-        const { data, error: subscriptionError } = await supabase
-          .from('user_subscriptions')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-
-        if (subscriptionError && subscriptionError.code !== 'PGRST116') {
-          console.error('Error loading subscription:', subscriptionError);
-          // Don't show error toast, just continue with null subscription
-        } else {
-          subscriptionData = data;
-        }
-      } catch (error) {
-        console.error('Exception loading subscription:', error);
-        // Continue with null subscription
-      }
-
-      console.log('Subscription loaded:', subscriptionData);
-      console.log('Subscription properties:', {
-        plan_name: subscriptionData?.plan_name,
-        plan_type: subscriptionData?.plan_type,
-        subscription_type: subscriptionData?.subscription_type,
-        status: subscriptionData?.status,
-        trial_end: subscriptionData?.trial_end,
-        current_period_end: subscriptionData?.current_period_end
+      // Use optimized single query to get all data
+      const { data, error } = await supabase.rpc('get_dashboard_data', {
+        user_id_param: user.id,
+        limit_param: 50
       });
-      setSubscription(subscriptionData);
+
+      if (error) {
+        console.error('Error loading dashboard data:', error);
+        setError('Failed to load dashboard data');
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const result = data[0];
+        
+        // Parse feedbacks
+        const feedbacksData = result.feedbacks ? JSON.parse(result.feedbacks) : [];
+        console.log('Feedbacks loaded:', feedbacksData.length);
+        setFeedbacks(feedbacksData);
+
+        // Parse subscription
+        const subscriptionData = result.subscription && result.subscription !== 'null' 
+          ? JSON.parse(result.subscription) 
+          : null;
+        console.log('Subscription loaded:', subscriptionData);
+        setSubscription(subscriptionData);
+
+        // Log performance metrics
+        console.log('Dashboard data loaded in single query:', {
+          feedbacks: feedbacksData.length,
+          subscription: !!subscriptionData,
+          total_feedbacks: result.total_feedbacks,
+          positive_count: result.positive_count,
+          negative_count: result.negative_count,
+          neutral_count: result.neutral_count
+        });
+      } else {
+        console.log('No dashboard data returned');
+        setFeedbacks([]);
+        setSubscription(null);
+      }
 
     } catch (error) {
       console.error('Error in loadDashboardData:', error);
       setError(error instanceof Error ? error.message : 'An error occurred while loading dashboard data');
-      // Don't show error toast, just continue with empty data
     } finally {
       setLoading(false);
     }
@@ -221,11 +180,8 @@ export default function Dashboard() {
   // Load data on component mount
   useEffect(() => {
     if (user) {
-      // First check and setup database if needed
-      checkAndSetupDatabase(user.id).then(() => {
-        // Then load dashboard data
-        loadDashboardData();
-      });
+      // Load dashboard data directly (database setup is handled by auth context)
+      loadDashboardData();
     }
   }, [loadDashboardData, user]);
 
