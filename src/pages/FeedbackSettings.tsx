@@ -354,12 +354,11 @@ const FeedbackSettings = () => {
     setProjectIdStatus('checking');
 
     try {
-      // Check global uniqueness across ALL users - if ANY user has this project_id, it's taken
-      const { data: existingSettings, error: checkError } = await supabase
-        .from('feedback_settings')
-        .select('id, project_id, user_id')
-        .eq('project_id', projectId.trim())
-        .neq('user_id', user.id); // Exclude current user from the check
+      // Use the improved validation function
+      const { data: validationResult, error: checkError } = await supabase.rpc('validate_project_id', {
+        project_id_param: projectId.trim(),
+        current_user_id: user.id
+      });
 
       if (checkError) {
         console.error('Error checking project ID availability:', checkError);
@@ -367,14 +366,26 @@ const FeedbackSettings = () => {
         return;
       }
 
-      if (existingSettings && existingSettings.length > 0) {
-        setProjectIdStatus('taken');
-        console.log('Project ID taken by:', existingSettings);
-        console.log('Current user ID:', user.id);
-        console.log('Checking project ID:', projectId.trim());
+      if (validationResult && validationResult.length > 0) {
+        const result = validationResult[0];
+        
+        if (!result.is_valid) {
+          // Invalid format
+          setProjectIdStatus('idle');
+          console.log('Project ID format invalid:', result.error_message);
+        } else if (!result.is_available) {
+          // Taken by another user
+          setProjectIdStatus('taken');
+          console.log('Project ID taken by:', result.taken_by_user_id, result.taken_by_email);
+          console.log('Current user ID:', user.id);
+          console.log('Checking project ID:', projectId.trim());
+        } else {
+          // Available
+          setProjectIdStatus('available');
+          console.log('Project ID available for:', projectId.trim());
+        }
       } else {
-        setProjectIdStatus('available');
-        console.log('Project ID available for:', projectId.trim());
+        setProjectIdStatus('idle');
       }
     } catch (error) {
       console.error('Error checking project ID availability:', error);
@@ -425,20 +436,28 @@ const FeedbackSettings = () => {
     
     // Check if Project ID is available before saving
     if (!settings.project_id_locked) {
-      const { data: existingSettings, error: checkError } = await supabase
-        .from('feedback_settings')
-        .select('id, project_id, user_id')
-        .eq('project_id', settings.project_id.trim())
-        .neq('user_id', user.id); // Check against other users - if ANY user has this project_id, it's taken
+      const { data: validationResult, error: checkError } = await supabase.rpc('validate_project_id', {
+        project_id_param: settings.project_id.trim(),
+        current_user_id: user.id
+      });
 
       if (checkError) {
         toast.error('Failed to validate Project ID');
         return;
       }
 
-      if (existingSettings && existingSettings.length > 0) {
-        toast.error('Project ID is already taken by another user');
-        return;
+      if (validationResult && validationResult.length > 0) {
+        const result = validationResult[0];
+        
+        if (!result.is_valid) {
+          toast.error(result.error_message);
+          return;
+        }
+        
+        if (!result.is_available) {
+          toast.error('Project ID is already taken by another user');
+          return;
+        }
       }
     }
 
@@ -614,6 +633,12 @@ const FeedbackSettings = () => {
                   Type at least 3 characters to check availability
                 </p>
               )}
+              {!settings?.project_id_locked && settings?.project_id && settings.project_id.length >= 3 && !/^[a-zA-Z0-9_-]+$/.test(settings.project_id) && (
+                <p className="text-sm text-orange-600 mt-1 flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  ⚠ Project ID can only contain letters, numbers, hyphens, and underscores
+                </p>
+              )}
               
               {/* Debug info - remove this in production */}
               {process.env.NODE_ENV === 'development' && (
@@ -623,24 +648,41 @@ const FeedbackSettings = () => {
                   <p>Project ID: {settings?.project_id}</p>
                   <p>Status: {projectIdStatus}</p>
                   <p>Locked: {settings?.project_id_locked ? 'Yes' : 'No'}</p>
-                  <Button 
-                    size="sm" 
-                    onClick={async () => {
-                      if (settings?.project_id) {
-                        const { data, error } = await supabase.rpc('test_project_id_uniqueness', {
-                          test_project_id: settings.project_id,
-                          current_user_id: user?.id
-                        });
-                        console.log('Test result:', { data, error });
-                        if (data && data.length > 0) {
-                          alert(`Test Result: ${data[0].message}`);
+                  <div className="flex space-x-2 mt-2">
+                    <Button 
+                      size="sm" 
+                      onClick={async () => {
+                        if (settings?.project_id) {
+                          const { data, error } = await supabase.rpc('validate_project_id', {
+                            project_id_param: settings.project_id,
+                            current_user_id: user?.id
+                          });
+                          console.log('Validation result:', { data, error });
+                          if (data && data.length > 0) {
+                            const result = data[0];
+                            alert(`Validation Result:\nValid: ${result.is_valid}\nAvailable: ${result.is_available}\nMessage: ${result.error_message}`);
+                          }
                         }
-                      }
-                    }}
-                    className="mt-2"
-                  >
-                    Test Uniqueness
-                  </Button>
+                      }}
+                    >
+                      Test Validation
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      onClick={async () => {
+                        const { data, error } = await supabase.rpc('get_all_project_ids');
+                        console.log('All project IDs:', { data, error });
+                        if (data && data.length > 0) {
+                          const projectList = data.map((item: any) => `${item.project_id} (${item.user_email})`).join('\n');
+                          alert(`All Project IDs:\n${projectList}`);
+                        } else {
+                          alert('No project IDs found');
+                        }
+                      }}
+                    >
+                      Show All IDs
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
