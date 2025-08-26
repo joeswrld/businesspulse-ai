@@ -2,17 +2,14 @@ import { Zap, Mail, Phone, MapPin, Twitter, Linkedin, Github } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 
-
-
-
 const Footer = () => {
   const navigation = {
     product: [
-      { name: "Features", href: "#features" },
-      { name: "Pricing", href: "#pricing" },
-      { name: "Integrations", href: "/integrations" },
-      { name: "API", href: "/api" },
-      { name: "Security", href: "/privacy-policy" },
+      { name: "Dashboard", href: "/dashboard" },
+      { name: "Analytics", href: "/analytics" },
+      { name: "Insights", href: "/insights-simple" },
+      { name: "Feedback", href: "/feedback" },
+      { name: "Teams", href: "/teams" },
     ],
     company: [
       { name: "About", href: "/about" },
@@ -32,8 +29,6 @@ const Footer = () => {
       { name: "Privacy Policy", href: "/privacy-policy" },
       { name: "Terms of Service", href: "/terms-of-service" },
       { name: "Cookie Policy", href: "/cookie-policy" },
-      { name: "GDPR", href: "/privacy-policy" },
-      { name: "Data Processing", href: "/privacy-policy" },
     ],
   };
 
@@ -75,21 +70,12 @@ const Footer = () => {
                 <ul className="space-y-2">
                   {navigation.product.map((item) => (
                     <li key={item.name}>
-                      {item.href.startsWith('/') ? (
-                        <Link
-                          to={item.href}
-                          className="text-sm text-secondary-foreground/80 hover:text-white transition-colors"
-                        >
-                          {item.name}
-                        </Link>
-                      ) : (
-                        <a
-                          href={item.href}
-                          className="text-sm text-secondary-foreground/80 hover:text-white transition-colors"
-                        >
-                          {item.name}
-                        </a>
-                      )}
+                      <Link
+                        to={item.href}
+                        className="text-sm text-secondary-foreground/80 hover:text-white transition-colors"
+                      >
+                        {item.name}
+                      </Link>
                     </li>
                   ))}
                 </ul>
@@ -100,21 +86,12 @@ const Footer = () => {
                 <ul className="space-y-2">
                   {navigation.company.map((item) => (
                     <li key={item.name}>
-                      {item.href.startsWith('/') ? (
-                        <Link
-                          to={item.href}
-                          className="text-sm text-secondary-foreground/80 hover:text-white transition-colors"
-                        >
-                          {item.name}
-                        </Link>
-                      ) : (
-                        <a
-                          href={item.href}
-                          className="text-sm text-secondary-foreground/80 hover:text-white transition-colors"
-                        >
-                          {item.name}
-                        </a>
-                      )}
+                      <Link
+                        to={item.href}
+                        className="text-sm text-secondary-foreground/80 hover:text-white transition-colors"
+                      >
+                        {item.name}
+                      </Link>
                     </li>
                   ))}
                 </ul>
@@ -125,21 +102,12 @@ const Footer = () => {
                 <ul className="space-y-2">
                   {navigation.resources.map((item) => (
                     <li key={item.name}>
-                      {item.href.startsWith('/') ? (
-                        <Link
-                          to={item.href}
-                          className="text-sm text-secondary-foreground/80 hover:text-white transition-colors"
-                        >
-                          {item.name}
-                        </Link>
-                      ) : (
-                        <a
-                          href={item.href}
-                          className="text-sm text-secondary-foreground/80 hover:text-white transition-colors"
-                        >
-                          {item.name}
-                        </a>
-                      )}
+                      <Link
+                        to={item.href}
+                        className="text-sm text-secondary-foreground/80 hover:text-white transition-colors"
+                      >
+                        {item.name}
+                      </Link>
                     </li>
                   ))}
                 </ul>
@@ -150,21 +118,12 @@ const Footer = () => {
                 <ul className="space-y-2">
                   {navigation.legal.map((item) => (
                     <li key={item.name}>
-                      {item.href.startsWith('/') ? (
-                        <Link
-                          to={item.href}
-                          className="text-sm text-secondary-foreground/80 hover:text-white transition-colors"
-                        >
-                          {item.name}
-                        </Link>
-                      ) : (
-                        <a
-                          href={item.href}
-                          className="text-sm text-secondary-foreground/80 hover:text-white transition-colors"
-                        >
-                          {item.name}
-                        </a>
-                      )}
+                      <Link
+                        to={item.href}
+                        className="text-sm text-secondary-foreground/80 hover:text-white transition-colors"
+                      >
+                        {item.name}
+                      </Link>
                     </li>
                   ))}
                 </ul>

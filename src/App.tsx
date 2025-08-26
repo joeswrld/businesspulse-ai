@@ -24,14 +24,12 @@ const Index = lazy(() => import("./pages/Index"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const DataUpload = lazy(() => import("./pages/DataUpload"));
-const AIInsights = lazy(() => import("./pages/AIInsights"));
-const InsightsPage = lazy(() => import("./pages/InsightsPage"));
+
+
 const InsightsSimplePage = lazy(() => import("./pages/InsightsSimplePage"));
-const TestInsights = lazy(() => import("./pages/TestInsights"));
-const DemoInsights = lazy(() => import("./pages/DemoInsights"));
-const CompleteInsights = lazy(() => import("./pages/CompleteInsights"));
-const MockInsights = lazy(() => import("./pages/MockInsights"));
-const ActionableInsights = lazy(() => import("./pages/ActionableInsights"));
+
+
+
 const Reports = lazy(() => import("./pages/Reports"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -39,9 +37,9 @@ const Teams = lazy(() => import("./pages/Teams"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Feedback = lazy(() => import("./pages/Feedback"));
 const Billing = lazy(() => import("./pages/Billing"));
-const FeedbackSimple = lazy(() => import("./pages/FeedbackSimple"));
+
 const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
-const TestPage = lazy(() => import("./pages/TestPage"));
+
 const Testimonials = lazy(() => import("./pages/Testimonials"));
 const About = lazy(() => import("./pages/About"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -182,51 +180,7 @@ const App = () => (
                 </Suspense>
               </ProtectedRoute>
             } />
-            <Route path="/test-insights" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <TestInsights />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
-            } />
-            <Route path="/demo-insights" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <DemoInsights />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
-            } />
-            <Route path="/complete-insights" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <CompleteInsights />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
-            } />
-            <Route path="/mock-insights" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <MockInsights />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
-            } />
-            <Route path="/actionable-insights" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <ActionableInsights />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
-            } />
+
             <Route path="/reports" element={
               <ProtectedRoute>
                 <Suspense fallback={<LoadingSpinner />}>
@@ -281,15 +235,6 @@ const App = () => (
                 </Suspense>
               </ProtectedRoute>
             } />
-            <Route path="/feedback-simple" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <FeedbackSimple />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
-            } />
             <Route path="/feedback-settings" element={
               <ProtectedRoute>
                 <Suspense fallback={<LoadingSpinner />}>
@@ -299,17 +244,6 @@ const App = () => (
                 </Suspense>
               </ProtectedRoute>
             } />
-
-            <Route path="/test" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <TestPage />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
-            } />
-
             <Route path="/teams/invite/:token" element={
               <Suspense fallback={<LoadingSpinner />}>
                 <TeamInvitation />
