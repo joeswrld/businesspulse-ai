@@ -43,6 +43,10 @@ const FeedbackSimple = lazy(() => import("./pages/FeedbackSimple"));
 const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
 const TestPage = lazy(() => import("./pages/TestPage"));
 const Testimonials = lazy(() => import("./pages/Testimonials"));
+const About = lazy(() => import("./pages/About"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const HelpCenter = lazy(() => import("./pages/HelpCenter"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
 
@@ -70,6 +74,26 @@ const App = () => (
             <Route path="/testimonials" element={
               <Suspense fallback={<LoadingSpinner />}>
                 <Testimonials />
+              </Suspense>
+            } />
+            <Route path="/about" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <About />
+              </Suspense>
+            } />
+            <Route path="/privacy-policy" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <PrivacyPolicy />
+              </Suspense>
+            } />
+            <Route path="/terms-of-service" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <TermsOfService />
+              </Suspense>
+            } />
+            <Route path="/help" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <HelpCenter />
               </Suspense>
             } />
             
