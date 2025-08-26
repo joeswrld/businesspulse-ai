@@ -58,7 +58,9 @@ const Header = () => {
               // Show user profile and dashboard button when logged in
               <div className="flex items-center space-x-3">
                 <Button variant="ghost" size="sm" asChild>
-                  <Link to="/dashboard">Dashboard</Link>
+                  <Link to="/dashboard">
+                    {user.user_metadata?.full_name?.split(' ')[0] || user.user_metadata?.first_name || user.email?.split('@')[0] || 'Dashboard'}
+                  </Link>
                 </Button>
                 <div className="relative group">
                   <Button 
