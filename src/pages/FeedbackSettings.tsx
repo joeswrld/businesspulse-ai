@@ -346,19 +346,34 @@ const FeedbackSettings = () => {
   }, [user, ensureTableExists, setupAttempted]);
 
   const checkProjectIdAvailability = useCallback(async (projectId: string) => {
-    if (!user || !projectId || projectId.trim() === '' || projectId.length < 3) {
+    if (!user || !projectId || projectId.trim() === '') {
+      setProjectIdStatus('idle');
+      return;
+    }
+
+    // Check minimum length
+    if (projectId.trim().length < 3) {
+      setProjectIdStatus('idle');
+      return;
+    }
+
+    // Check for invalid characters
+    if (!/^[a-zA-Z0-9_-]+$/.test(projectId.trim())) {
       setProjectIdStatus('idle');
       return;
     }
 
     setProjectIdStatus('checking');
+    console.log('Checking availability for project ID:', projectId.trim());
 
     try {
-      // Use the improved validation function
-      const { data: validationResult, error: checkError } = await supabase.rpc('validate_project_id', {
-        project_id_param: projectId.trim(),
-        current_user_id: user.id
-      });
+      // Direct database query to check if project ID is taken by another user
+      const { data: existingSettings, error: checkError } = await supabase
+        .from('feedback_settings')
+        .select('id, user_id, project_id')
+        .eq('project_id', projectId.trim())
+        .neq('user_id', user.id) // Exclude current user
+        .limit(1);
 
       if (checkError) {
         console.error('Error checking project ID availability:', checkError);
@@ -366,26 +381,18 @@ const FeedbackSettings = () => {
         return;
       }
 
-      if (validationResult && validationResult.length > 0) {
-        const result = validationResult[0];
-        
-        if (!result.is_valid) {
-          // Invalid format
-          setProjectIdStatus('idle');
-          console.log('Project ID format invalid:', result.error_message);
-        } else if (!result.is_available) {
-          // Taken by another user
-          setProjectIdStatus('taken');
-          console.log('Project ID taken by:', result.taken_by_user_id, result.taken_by_email);
-          console.log('Current user ID:', user.id);
-          console.log('Checking project ID:', projectId.trim());
-        } else {
-          // Available
-          setProjectIdStatus('available');
-          console.log('Project ID available for:', projectId.trim());
-        }
+      console.log('Database check result:', existingSettings);
+
+      if (existingSettings && existingSettings.length > 0) {
+        // Project ID is taken by another user
+        setProjectIdStatus('taken');
+        console.log('Project ID taken by user:', existingSettings[0].user_id);
+        console.log('Current user ID:', user.id);
+        console.log('Project ID:', projectId.trim());
       } else {
-        setProjectIdStatus('idle');
+        // Project ID is available
+        setProjectIdStatus('available');
+        console.log('Project ID available for:', projectId.trim());
       }
     } catch (error) {
       console.error('Error checking project ID availability:', error);
@@ -436,28 +443,28 @@ const FeedbackSettings = () => {
     
     // Check if Project ID is available before saving
     if (!settings.project_id_locked) {
-      const { data: validationResult, error: checkError } = await supabase.rpc('validate_project_id', {
-        project_id_param: settings.project_id.trim(),
-        current_user_id: user.id
-      });
+      // Validate format
+      if (!/^[a-zA-Z0-9_-]+$/.test(settings.project_id.trim())) {
+        toast.error('Project ID can only contain letters, numbers, hyphens, and underscores');
+        return;
+      }
+
+      // Check if Project ID is taken by another user
+      const { data: existingSettings, error: checkError } = await supabase
+        .from('feedback_settings')
+        .select('id, user_id, project_id')
+        .eq('project_id', settings.project_id.trim())
+        .neq('user_id', user.id) // Exclude current user
+        .limit(1);
 
       if (checkError) {
         toast.error('Failed to validate Project ID');
         return;
       }
 
-      if (validationResult && validationResult.length > 0) {
-        const result = validationResult[0];
-        
-        if (!result.is_valid) {
-          toast.error(result.error_message);
-          return;
-        }
-        
-        if (!result.is_available) {
-          toast.error('Project ID is already taken by another user');
-          return;
-        }
+      if (existingSettings && existingSettings.length > 0) {
+        toast.error('Project ID is already taken by another user');
+        return;
       }
     }
 
@@ -630,7 +637,7 @@ const FeedbackSettings = () => {
               )}
               {!settings?.project_id_locked && projectIdStatus === 'idle' && settings?.project_id && settings.project_id.length >= 3 && (
                 <p className="text-sm text-gray-500 mt-1">
-                  Type at least 3 characters to check availability
+                  Click "Check Availability" to verify this Project ID
                 </p>
               )}
               {!settings?.project_id_locked && settings?.project_id && settings.project_id.length >= 3 && !/^[a-zA-Z0-9_-]+$/.test(settings.project_id) && (
@@ -638,6 +645,21 @@ const FeedbackSettings = () => {
                   <AlertCircle className="h-4 w-4 mr-1" />
                   ⚠ Project ID can only contain letters, numbers, hyphens, and underscores
                 </p>
+              )}
+              
+              {/* Manual check availability button */}
+              {!settings?.project_id_locked && settings?.project_id && settings.project_id.length >= 3 && /^[a-zA-Z0-9_-]+$/.test(settings.project_id) && projectIdStatus === 'idle' && (
+                <div className="mt-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => checkProjectIdAvailability(settings.project_id)}
+                    className="w-full"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Check Availability
+                  </Button>
+                </div>
               )}
               
               {/* Debug info - remove this in production */}
@@ -653,27 +675,34 @@ const FeedbackSettings = () => {
                       size="sm" 
                       onClick={async () => {
                         if (settings?.project_id) {
-                          const { data, error } = await supabase.rpc('validate_project_id', {
-                            project_id_param: settings.project_id,
-                            current_user_id: user?.id
-                          });
-                          console.log('Validation result:', { data, error });
+                          const { data, error } = await supabase
+                            .from('feedback_settings')
+                            .select('id, user_id, project_id')
+                            .eq('project_id', settings.project_id.trim())
+                            .neq('user_id', user?.id)
+                            .limit(1);
+                          console.log('Direct validation result:', { data, error });
                           if (data && data.length > 0) {
-                            const result = data[0];
-                            alert(`Validation Result:\nValid: ${result.is_valid}\nAvailable: ${result.is_available}\nMessage: ${result.error_message}`);
+                            alert(`Project ID is TAKEN by user: ${data[0].user_id}`);
+                          } else {
+                            alert('Project ID is AVAILABLE');
                           }
                         }
                       }}
                     >
-                      Test Validation
+                      Test Direct Query
                     </Button>
                     <Button 
                       size="sm" 
                       onClick={async () => {
-                        const { data, error } = await supabase.rpc('get_all_project_ids');
+                        const { data, error } = await supabase
+                          .from('feedback_settings')
+                          .select('project_id, user_id')
+                          .not('project_id', 'is', null)
+                          .neq('project_id', '');
                         console.log('All project IDs:', { data, error });
                         if (data && data.length > 0) {
-                          const projectList = data.map((item: any) => `${item.project_id} (${item.user_email})`).join('\n');
+                          const projectList = data.map((item: any) => `${item.project_id} (${item.user_id})`).join('\n');
                           alert(`All Project IDs:\n${projectList}`);
                         } else {
                           alert('No project IDs found');
@@ -846,7 +875,9 @@ const FeedbackSettings = () => {
               saving || 
               !settings?.project_id || 
               (settings?.project_id && settings.project_id.trim().length < 3) ||
-              (!settings?.project_id_locked && projectIdStatus === 'taken')
+              (!settings?.project_id_locked && projectIdStatus === 'taken') ||
+              (!settings?.project_id_locked && projectIdStatus === 'checking') ||
+              (!settings?.project_id_locked && projectIdStatus === 'idle' && settings?.project_id && settings.project_id.length >= 3)
             }
             className="px-8 py-3 text-lg"
           >
@@ -865,6 +896,21 @@ const FeedbackSettings = () => {
           {!settings?.project_id_locked && projectIdStatus === 'taken' && (
             <p className="text-sm text-red-600 mt-2">
               Cannot save: Project ID is already taken by another user
+            </p>
+          )}
+          {!settings?.project_id_locked && projectIdStatus === 'checking' && (
+            <p className="text-sm text-blue-600 mt-2">
+              Please wait while we check Project ID availability...
+            </p>
+          )}
+          {!settings?.project_id_locked && projectIdStatus === 'idle' && settings?.project_id && settings.project_id.length >= 3 && (
+            <p className="text-sm text-orange-600 mt-2">
+              Please check Project ID availability before saving
+            </p>
+          )}
+          {!settings?.project_id_locked && projectIdStatus === 'available' && (
+            <p className="text-sm text-green-600 mt-2">
+              ✓ Project ID is available and ready to save
             </p>
           )}
         </div>
