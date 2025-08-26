@@ -7,50 +7,50 @@ const FeaturesSection = () => {
   const features = [
     {
       icon: Brain,
-      title: "AI-Powered Analytics",
-      description: "Advanced AI processes your data pipelines and business metrics to generate predictive insights and strategic recommendations.",
+      title: "AI Sentiment Analysis",
+      description: "Advanced AI analyzes customer feedback in real-time to understand emotions, sentiment trends, and customer satisfaction levels.",
       badge: "Core Feature"
     },
     {
       icon: Zap,
-      title: "Real-time BI",
-      description: "Get instant business intelligence updates as soon as new data flows through your pipelines or systems change.",
+      title: "Real-time Feedback",
+      description: "Collect and analyze customer feedback instantly as it comes in, with live sentiment tracking and trend detection.",
       badge: "Live Updates"
     },
     {
       icon: FileText,
-      title: "Data Pipeline Integration",
-      description: "Connect to databases, APIs, cloud storage, or upload documents. We handle all your data sources seamlessly.",
-      badge: "Enterprise"
+      title: "Smart Widget Integration",
+      description: "Embed our feedback widget anywhere on your website or app. Customizable, lightweight, and designed for maximum response rates.",
+      badge: "Easy Setup"
     },
     {
       icon: BarChart3,
-      title: "Executive Dashboards",
-      description: "Interactive BI dashboards that automatically organize and visualize your key performance indicators and business metrics.",
+      title: "Insight Dashboards",
+      description: "Beautiful, interactive dashboards that visualize customer sentiment, feedback trends, and actionable insights at a glance.",
       badge: "Visual"
     },
     {
       icon: Users,
       title: "Team Collaboration",
-      description: "Share insights with your team, add annotations, and make data-driven strategic decisions together.",
+      description: "Share feedback insights with your team, add notes, and collaborate on improving customer experience together.",
       badge: "Teamwork"
     },
     {
       icon: Shield,
-      title: "Enterprise Security",
-      description: "Bank-level encryption, SOC2 compliance, and secure data handling for enterprise peace of mind.",
+      title: "Privacy & Security",
+      description: "GDPR compliant, bank-level encryption, and secure data handling to protect your customers' privacy and your business.",
       badge: "Secure"
     },
     {
       icon: Globe,
-      title: "Industry Templates",
-      description: "Pre-built BI templates and analytics models tailored for different industries and business verticals.",
-      badge: "Customized"
+      title: "Industry Insights",
+      description: "Benchmark your feedback against industry standards and get tailored recommendations for your specific business vertical.",
+      badge: "Smart"
     },
     {
       icon: Download,
-      title: "Executive Reports",
-      description: "Generate comprehensive PDF reports and export data in multiple formats for board presentations and strategic planning.",
+      title: "Actionable Reports",
+      description: "Generate comprehensive reports with actionable recommendations to improve customer satisfaction and drive business growth.",
       badge: "Professional"
     }
   ];
@@ -61,14 +61,14 @@ const FeaturesSection = () => {
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <Badge variant="outline" className="mb-4">
-            BI Platform Features
+            Feedback Analytics Features
           </Badge>
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Everything You Need for{" "}
-            <span className="gradient-text">Strategic Business Intelligence</span>
+            Everything You Need to{" "}
+            <span className="gradient-text">Master Customer Feedback</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            Our comprehensive BI platform powered by AI gives you all the tools to transform your data pipelines into strategic insights that drive enterprise growth.
+            Our AI-powered feedback platform gives you all the tools to collect, analyze, and act on customer feedback to boost satisfaction and drive business growth.
           </p>
         </div>
 

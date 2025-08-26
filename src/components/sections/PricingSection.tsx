@@ -10,19 +10,19 @@ const PricingSection = () => {
       name: "Free Trial",
       price: "₦0",
       period: "8 days",
-      description: "Perfect for testing our BI platform",
+      description: "Perfect for testing our feedback platform",
       icon: Zap,
       badge: "Start Here",
       badgeVariant: "default" as const,
       features: [
-        "AI Insights → up to 20 insights total",
-        "Data Sources → 1 source (CSV/Excel upload only)",
+        "Feedback Collection → up to 100 responses",
+        "AI Sentiment Analysis → Basic insights",
         "Team Members → 1 user (owner only)",
-        "AI Reports → 2 executive reports",
-        "Business Analytics → Basic metrics (static dashboards)",
-        "Upload business data (CSV/Excel, DOCX, TXT, PDF)",
-        "Generate simple insights (summaries, patterns)",
-        "Limited visualization (basic charts only)",
+        "Reports → 2 basic reports",
+        "Analytics → Basic sentiment dashboard",
+        "Widget Customization → Basic styling",
+        "Export Data → CSV format",
+        "Email Support → Basic support",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "hero" as const,
@@ -32,21 +32,21 @@ const PricingSection = () => {
       name: "Pro",
       price: "₦35,000",
       period: "/month",
-      description: "For SMBs and growing startups",
+      description: "For growing businesses and startups",
       icon: Star,
       badge: "Most Popular",
       badgeVariant: "default" as const,
       features: [
-        "AI Insights → up to 500 per month",
-        "Data Sources → 5 sources (CSV/Excel, Google Sheets, DOCX, TXT, PDF)",
+        "Feedback Collection → Unlimited responses",
+        "AI Sentiment Analysis → Advanced insights & trends",
         "Team Members → up to 5 users",
-        "AI Reports → 20 per month (executive summaries, trend detection)",
-        "Business Analytics → Real-time dashboards + export to PDF/CSV",
-        "Multi-source data sync (auto-refresh)",
-        "AI insights generator (trends, anomalies, opportunities)",
-        "Forecasting (short-term predictions)",
-        "Visual dashboards (charts, KPIs)",
-        "Data drill-down (filter/slice insights by category)",
+        "Reports → Unlimited reports with trends",
+        "Analytics → Advanced sentiment dashboard",
+        "Widget Customization → Full branding control",
+        "Export Data → CSV, PDF, Excel formats",
+        "Priority Support → Email & chat support",
+        "Custom Integrations → API access",
+        "Advanced Analytics → Trend detection & predictions",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "hero" as const,
@@ -61,17 +61,18 @@ const PricingSection = () => {
       badge: "Enterprise",
       badgeVariant: "secondary" as const,
       features: [
-        "AI Insights → Unlimited",
-        "Data Sources → Unlimited (databases, CRMs, ERPs, APIs)",
-        "Team Members → Unlimited (with role-based access)",
-        "AI Reports → Unlimited (weekly & on-demand reports)",
-        "Business Analytics → Enterprise-grade real-time + predictive analytics",
+        "Feedback Collection → Unlimited responses",
+        "AI Sentiment Analysis → Enterprise-grade insights",
+        "Team Members → Unlimited with role-based access",
+        "Reports → Unlimited with advanced analytics",
+        "Analytics → Enterprise sentiment dashboard",
         "Everything in Pro",
-        "White-label dashboards (brand it as your own)",
-        "Predictive forecasting (AI-powered trend projection)",
-        "Automated alerts (Teams, Email when KPIs shift)",
+        "White-label widgets (brand as your own)",
+        "Predictive analytics (AI-powered trend projection)",
+        "Automated alerts (Slack, Teams, Email)",
         "Dedicated support & SLA",
-        "Compliance (GDPR, SOC2)",
+        "Compliance (GDPR, SOC2, HIPAA)",
+        "Custom integrations & webhooks",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "premium" as const,
@@ -85,14 +86,14 @@ const PricingSection = () => {
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <Badge variant="outline" className="mb-4">
-            Transparent Pricing
+            Simple Pricing
           </Badge>
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Transform Your Business Data Into{" "}
-            <span className="gradient-text">Actionable Insights</span>
+            Turn Customer Feedback Into{" "}
+            <span className="gradient-text">Business Growth</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            Start with our 8-day free trial to experience AI-powered BI, then choose a plan that scales with your data intelligence needs. No hidden fees, cancel anytime.
+            Start with our 8-day free trial to experience AI-powered feedback analytics, then choose a plan that scales with your customer satisfaction goals. No hidden fees, cancel anytime.
           </p>
         </div>
 

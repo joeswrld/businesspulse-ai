@@ -118,16 +118,16 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   };
 
   const navigation = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Feedback", href: "/feedback", icon: MessageSquare }, 
-    { name: "AI Analytics", href: "/insights-simple", icon: Brain },
-    { name: "Executive Reports", href: "/reports", icon: FileText },
-    { name: "Business Intelligence", href: "/analytics", icon: BarChart3 },
-    { name: "Teams", href: "/teams", icon: Users, comingSoon: true },
-    { name: "Usage & Billing", href: "/billing", icon: CreditCard },
-    { name: "Feedback Settings", href: "/feedback-settings", icon: SlidersHorizontal },
-    { name: "Settings", href: "/settings", icon: Settings },
-    { name: "Profile", href: "/profile", icon: User },
+    { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Collect Feedback", href: "/feedback", icon: MessageSquare }, 
+    { name: "AI Insights", href: "/insights-simple", icon: Brain },
+    { name: "Reports & Analytics", href: "/reports", icon: FileText },
+    { name: "Business Metrics", href: "/analytics", icon: BarChart3 },
+    { name: "Team Collaboration", href: "/teams", icon: Users, comingSoon: true },
+    { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
+    { name: "Widget Settings", href: "/feedback-settings", icon: SlidersHorizontal },
+    { name: "Account Settings", href: "/settings", icon: Settings },
+    { name: "My Profile", href: "/profile", icon: User },
   ];
 
   const handleSignOut = async () => {
@@ -167,8 +167,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                 <img src="/favicon.ico" alt="NoteX BI" className="h-6 w-6" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-slate-900">NoteX BI</h1>
-                <p className="text-xs text-slate-500">Business Intelligence</p>
+                <h1 className="text-lg font-bold text-slate-900">FeedbackFlow</h1>
+                <p className="text-xs text-slate-500">Turn feedback into growth ✨</p>
               </div>
             </Link>
             <button 
@@ -215,7 +215,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                   to="/profile"
                   className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
                 >
-                  View Profile
+                  View Profile →
                 </Link>
               </div>
             </div>
