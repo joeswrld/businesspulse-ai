@@ -156,7 +156,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Sidebar */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-slate-50 to-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 shadow-xl",
+        "fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-slate-50 to-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 shadow-xl max-h-screen",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
@@ -222,7 +222,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           )}
 
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1">
+          <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
               const isComingSoon = item.comingSoon;
@@ -230,8 +230,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
               return (
                 <div key={item.name} className="relative">
                   {isComingSoon ? (
-                    <div className="flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-500 cursor-not-allowed opacity-60 hover:bg-slate-100/50 transition-colors">
-                      <div className="p-1.5 rounded-lg bg-slate-100">
+                    <div className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 cursor-not-allowed opacity-60 hover:bg-slate-100/50 transition-colors">
+                      <div className="p-1 rounded-lg bg-slate-100">
                         <item.icon className="h-4 w-4" />
                       </div>
                       <span className="flex-1">{item.name}</span>
@@ -243,7 +243,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                     <Link
                       to={item.href}
                       className={cn(
-                        "flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group",
+                        "flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group",
                         isActive
                           ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25"
                           : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
@@ -251,7 +251,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                       onClick={() => setSidebarOpen(false)}
                     >
                       <div className={cn(
-                        "p-1.5 rounded-lg transition-colors",
+                        "p-1 rounded-lg transition-colors",
                         isActive 
                           ? "bg-white/20" 
                           : "bg-slate-100 group-hover:bg-slate-200"
@@ -273,13 +273,13 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           </nav>
 
           {/* User Menu */}
-          <div className="p-4 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
-            <div className="space-y-2">
+          <div className="p-3 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
+            <div className="space-y-1">
               <Link
                 to="/settings"
-                className="flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all duration-200 group"
+                className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all duration-200 group"
               >
-                <div className="p-1.5 rounded-lg bg-slate-100 group-hover:bg-slate-200 transition-colors">
+                <div className="p-1 rounded-lg bg-slate-100 group-hover:bg-slate-200 transition-colors">
                   <Settings className="h-4 w-4 text-slate-600" />
                 </div>
                 <span className="flex-1">Settings</span>
@@ -287,9 +287,9 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
               
               <button
                 onClick={handleSignOut}
-                className="flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 group w-full"
+                className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 group w-full"
               >
-                <div className="p-1.5 rounded-lg bg-red-100 group-hover:bg-red-200 transition-colors">
+                <div className="p-1 rounded-lg bg-red-100 group-hover:bg-red-200 transition-colors">
                   <LogOut className="h-4 w-4 text-red-600" />
                 </div>
                 <span className="flex-1">Sign Out</span>
@@ -300,7 +300,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-72">
+      <div className="lg:pl-72 min-h-screen bg-background">
         {/* Mobile menu button */}
         <div className="lg:hidden p-4">
           <button
@@ -312,7 +312,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
         </div>
         
         {/* Page content */}
-        <main className="p-4 md:p-6">
+        <main className="p-4 md:p-6 w-full">
           {children}
         </main>
       </div>
