@@ -235,8 +235,7 @@ const FeedbackSettings = () => {
         if (createFeedbackError) {
           console.error('Error creating default settings:', createFeedbackError);
           throw new Error(`Failed to create default settings: ${createFeedbackError.message}`);
-
-        } as const;
+        }
 
         // Insert according to schema, using upsert to avoid conflicts
         if (schemaVersion === 'modern') {

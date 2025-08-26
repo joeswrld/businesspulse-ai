@@ -485,11 +485,9 @@ export default function Dashboard() {
   const getPlanInfo = () => {
     console.log('🔍 getPlanInfo called with subscription:', subscription);
     
-    if (!subscription) {
-      console.log('🔍 No subscription, returning default');
-
     // If no subscription, show Free Trial based on account creation
     if (!subscription) {
+      console.log('🔍 No subscription, returning default');
       const createdAt = user?.created_at ? new Date(user.created_at) : null;
       let daysLeft = 0;
       if (createdAt) {
@@ -516,13 +514,8 @@ export default function Dashboard() {
     
     console.log('🔍 Plan info extracted:', { planName, planType, trialEnd });
     
-    const isTrial = planName === 'free_trial' || planName === 'free';
-    const trialEndDate = trialEnd ? new Date(trialEnd) : new Date();
-    const now = new Date();
-    const daysLeft = Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-    // With subscription, check if user is currently in trial
-    const isTrial = subscription.status === 'trialing';
+    // Check if user is currently in trial
+    const isTrial = subscription.status === 'trialing' || planName === 'free_trial' || planName === 'free';
     let daysLeft = 0;
     if (isTrial && subscription.trial_end) {
       const trialEnd = new Date(subscription.trial_end);
@@ -563,14 +556,10 @@ export default function Dashboard() {
     });
 
     return {
-      planName: formattedPlanName,
-      planType: planType,
-
       planName: isTrial
         ? 'Free Trial'
-        : (subscription.plan_name || 'Pro').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      planType: isTrial ? 'trial' : subscription.plan_type,
-
+        : formattedPlanName,
+      planType: isTrial ? 'trial' : planType,
       isTrial,
       daysLeft,
       upgradeText,
