@@ -119,7 +119,7 @@ export default function Dashboard() {
   const [generatingInsight, setGeneratingInsight] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Load user's data using optimized single query
+  // Load user's data with fallback to individual queries
   const loadDashboardData = useCallback(async () => {
     if (!user) return;
 
@@ -127,47 +127,94 @@ export default function Dashboard() {
       setLoading(true);
       console.log('Loading dashboard data for user:', user.id);
       
-      // Use optimized single query to get all data
-      const { data, error } = await supabase.rpc('get_dashboard_data', {
-        user_id_param: user.id,
-        limit_param: 50
-      });
-
-      if (error) {
-        console.error('Error loading dashboard data:', error);
-        setError('Failed to load dashboard data');
-        return;
-      }
-
-      if (data && data.length > 0) {
-        const result = data[0];
-        
-        // Parse feedbacks
-        const feedbacksData = result.feedbacks ? JSON.parse(result.feedbacks) : [];
-        console.log('Feedbacks loaded:', feedbacksData.length);
-        setFeedbacks(feedbacksData);
-
-        // Parse subscription
-        const subscriptionData = result.subscription && result.subscription !== 'null' 
-          ? JSON.parse(result.subscription) 
-          : null;
-        console.log('Subscription loaded:', subscriptionData);
-        setSubscription(subscriptionData);
-
-        // Log performance metrics
-        console.log('Dashboard data loaded in single query:', {
-          feedbacks: feedbacksData.length,
-          subscription: !!subscriptionData,
-          total_feedbacks: result.total_feedbacks,
-          positive_count: result.positive_count,
-          negative_count: result.negative_count,
-          neutral_count: result.neutral_count
+      // Try optimized single query first
+      try {
+        const { data, error } = await supabase.rpc('get_dashboard_data', {
+          user_id_param: user.id,
+          limit_param: 50
         });
-      } else {
-        console.log('No dashboard data returned');
-        setFeedbacks([]);
-        setSubscription(null);
+
+        if (!error && data && data.length > 0) {
+          const result = data[0];
+          
+          // Parse feedbacks
+          const feedbacksData = result.feedbacks ? JSON.parse(result.feedbacks) : [];
+          console.log('Feedbacks loaded via RPC:', feedbacksData.length);
+          setFeedbacks(feedbacksData);
+
+          // Parse subscription
+          const subscriptionData = result.subscription && result.subscription !== 'null' 
+            ? JSON.parse(result.subscription) 
+            : null;
+          console.log('Subscription loaded via RPC:', subscriptionData);
+          setSubscription(subscriptionData);
+
+          console.log('Dashboard data loaded successfully via RPC');
+          return;
+        } else {
+          console.warn('RPC query failed or returned no data, falling back to individual queries:', error);
+        }
+      } catch (rpcError) {
+        console.warn('RPC function not available, falling back to individual queries:', rpcError);
       }
+
+      // Fallback: Load data using individual queries
+      console.log('Loading data using individual queries...');
+      
+      // Get user's project IDs
+      const { data: projectSettings, error: settingsError } = await supabase
+        .from('feedback_settings')
+        .select('project_id')
+        .eq('user_id', user.id)
+        .not('project_id', 'is', null)
+        .neq('project_id', '');
+
+      if (settingsError) {
+        console.error('Error loading project settings:', settingsError);
+        throw new Error('Failed to load project settings');
+      }
+
+      const projectIds = projectSettings?.map(s => s.project_id) || [];
+      console.log('Found project IDs:', projectIds);
+
+      // Get feedbacks for user's projects
+      let feedbacksData: Feedback[] = [];
+      if (projectIds.length > 0) {
+        const { data: feedbacks, error: feedbacksError } = await supabase
+          .from('feedbacks')
+          .select('*')
+          .in('project_id', projectIds)
+          .order('timestamp', { ascending: false })
+          .limit(50);
+
+        if (feedbacksError) {
+          console.error('Error loading feedbacks:', feedbacksError);
+          throw new Error('Failed to load feedbacks');
+        }
+
+        feedbacksData = feedbacks || [];
+        console.log('Feedbacks loaded via individual query:', feedbacksData.length);
+      }
+
+      // Get subscription data
+      const { data: subscriptionData, error: subscriptionError } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (subscriptionError && subscriptionError.code !== 'PGRST116') {
+        console.error('Error loading subscription:', subscriptionError);
+        // Don't throw error for subscription, it's optional
+      }
+
+      console.log('Subscription loaded via individual query:', subscriptionData);
+      
+      // Set the data
+      setFeedbacks(feedbacksData);
+      setSubscription(subscriptionData);
+
+      console.log('Dashboard data loaded successfully via individual queries');
 
     } catch (error) {
       console.error('Error in loadDashboardData:', error);
@@ -546,7 +593,13 @@ export default function Dashboard() {
           <div className="text-center">
             <RefreshCw className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Loading Dashboard...</h2>
-            <p className="text-gray-600">Please wait while we fetch your data.</p>
+            <p className="text-gray-600 mb-2">Please wait while we fetch your data.</p>
+            <div className="text-sm text-gray-500 space-y-1">
+              <p>• Loading project settings...</p>
+              <p>• Fetching feedback data...</p>
+              <p>• Retrieving subscription info...</p>
+              <p>• Calculating insights...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -560,7 +613,15 @@ export default function Dashboard() {
           <div className="text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Dashboard Error</h2>
-            <p className="text-gray-600 mb-4">There was an issue loading your dashboard data.</p>
+            <p className="text-gray-600 mb-4">
+              There was an issue loading your dashboard data. This might be due to:
+            </p>
+            <ul className="text-sm text-gray-500 mb-4 text-left max-w-md mx-auto">
+              <li>• Network connectivity issues</li>
+              <li>• Database connection problems</li>
+              <li>• Missing project settings</li>
+              <li>• Permission issues</li>
+            </ul>
             <div className="space-y-2">
               <Button onClick={() => {
                 setError(null);
