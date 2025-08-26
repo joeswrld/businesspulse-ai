@@ -26,16 +26,16 @@ const Header = () => {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 glass-effect border-b border-border/50">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
+      <div className="container mx-auto px-3 sm:px-4">
+        <div className="flex items-center justify-between h-14 sm:h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <img src="/favicon.ico" alt="NoteX" className="h-8 w-8" />
-            <span className="font-bold text-lg">NoteX</span>
+            <img src="/favicon.ico" alt="NoteX" className="h-6 w-6 sm:h-8 sm:w-8" />
+            <span className="font-bold text-base sm:text-lg">NoteX</span>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
+          <nav className="hidden lg:flex items-center space-x-6 xl:space-x-8">
             {navigation.map((item) => (
               <a
                 key={item.name}
@@ -48,7 +48,7 @@ const Header = () => {
           </nav>
 
           {/* CTA Buttons */}
-          <div className="hidden md:flex items-center space-x-3">
+          <div className="hidden lg:flex items-center space-x-3">
             {loading ? (
               // Show loading state
               <div className="flex items-center space-x-3">
@@ -123,7 +123,7 @@ const Header = () => {
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden p-2"
+            className="lg:hidden p-2"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
             {isMenuOpen ? (
@@ -136,12 +136,12 @@ const Header = () => {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <div className="md:hidden py-4 space-y-4 border-t border-border/50">
+          <div className="lg:hidden py-4 space-y-4 border-t border-border/50 bg-background/95 backdrop-blur-sm">
             {navigation.map((item) => (
               <a
                 key={item.name}
                 href={item.href}
-                className="block text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                className="block text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-4 py-2 rounded-lg hover:bg-muted/50"
                 onClick={() => setIsMenuOpen(false)}
               >
                 {item.name}
@@ -156,55 +156,59 @@ const Header = () => {
               ) : user ? (
                 // Show user profile and dashboard button when logged in
                 <>
-                  <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg mb-3">
-                    <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                  <div className="flex items-center space-x-3 p-4 bg-muted/30 rounded-lg mb-4 mx-4">
+                    <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
                       {user.user_metadata?.avatar_url ? (
                         <img 
                           src={user.user_metadata.avatar_url} 
                           alt="Profile" 
-                          className="w-10 h-10 rounded-full object-cover"
+                          className="w-12 h-12 rounded-full object-cover"
                         />
                       ) : (
-                        <User className="h-5 w-5 text-white" />
+                        <User className="h-6 w-6 text-white" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                      <p className="text-base font-semibold text-foreground truncate">
                         {user.user_metadata?.full_name?.split(' ')[0] || user.user_metadata?.first_name || user.email?.split('@')[0] || 'User'}
                       </p>
-                      <p className="text-xs text-gray-500 truncate">
+                      <p className="text-sm text-muted-foreground truncate">
                         {user.user_metadata?.full_name || user.email}
                       </p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>Dashboard</Link>
-                  </Button>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link to="/profile" onClick={() => setIsMenuOpen(false)}>Profile Settings</Link>
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => {
-                      handleLogout();
-                      setIsMenuOpen(false);
-                    }}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Sign Out
-                  </Button>
+                  <div className="px-4 space-y-3">
+                    <Button variant="ghost" size="sm" asChild className="w-full justify-start">
+                      <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>Dashboard</Link>
+                    </Button>
+                    <Button variant="ghost" size="sm" asChild className="w-full justify-start">
+                      <Link to="/profile" onClick={() => setIsMenuOpen(false)}>Profile Settings</Link>
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => {
+                        handleLogout();
+                        setIsMenuOpen(false);
+                      }}
+                      className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </Button>
+                  </div>
                 </>
               ) : (
                 // Show sign in and CTA buttons when not logged in
                 <>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link to="/auth" onClick={() => setIsMenuOpen(false)}>Sign In</Link>
-                  </Button>
-                  <Button variant="hero" size="sm" asChild>
-                    <Link to="/auth" onClick={() => setIsMenuOpen(false)}>Start Collecting Feedback ✨</Link>
-                  </Button>
+                  <div className="px-4 space-y-3">
+                    <Button variant="ghost" size="sm" asChild className="w-full justify-start">
+                      <Link to="/auth" onClick={() => setIsMenuOpen(false)}>Sign In</Link>
+                    </Button>
+                    <Button variant="hero" size="sm" asChild className="w-full justify-start">
+                      <Link to="/auth" onClick={() => setIsMenuOpen(false)}>Start Collecting Feedback ✨</Link>
+                    </Button>
+                  </div>
                 </>
               )}
             </div>
