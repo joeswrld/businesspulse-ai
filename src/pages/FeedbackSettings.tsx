@@ -211,8 +211,8 @@ const FeedbackSettings = () => {
       if (feedbackData && feedbackData.length > 0) {
         setSettings(feedbackData[0]);
       } else {
-        // Create default feedback settings with a resilient fallback
-        const fullDefaults = {
+        // Create default feedback settings
+        const defaultSettings = {
           user_id: user.id,
           project_id: '',
           project_id_locked: false,
@@ -225,95 +225,40 @@ const FeedbackSettings = () => {
           redirect_url: null,
           notify_email: null
         };
-        
-        const { data: newFeedbackData, error: createFeedbackError } = await supabase
-          .from('feedback_settings')
-          .insert(newFeedbackSettings)
-          .select()
-          .single();
 
-        if (createFeedbackError) {
-          console.error('Error creating default settings:', createFeedbackError);
-          throw new Error(`Failed to create default settings: ${createFeedbackError.message}`);
-        }
+        try {
+          // Try to create settings using upsert to avoid conflicts
+          const { data: newSettings, error: createError } = await supabase
+            .from('feedback_settings')
+            .upsert(defaultSettings, { onConflict: 'user_id' })
+            .select()
+            .single();
 
-        // Insert according to schema, using upsert to avoid conflicts
-        if (schemaVersion === 'modern') {
-          // Try full defaults first
-          const { data: newFeedbackData, error: createFeedbackError } = await withRetries(() => 
-            supabase
-              .from('feedback_settings')
-              .upsert(fullDefaults as any, { onConflict: 'user_id' })
-              .select()
-              .single()
-          );
-
-          if (createFeedbackError) {
-            console.warn('Full defaults upsert failed, attempting minimal upsert:', createFeedbackError);
-            const { data: minimalRow, error: minimalInsertError } = await withRetries(() => 
-              supabase
-                .from('feedback_settings')
-                .upsert({ user_id: user.id } as any, { onConflict: 'user_id' })
-                .select()
-                .single()
-            );
-
-          if (minimalInsertError) {
-            throw minimalInsertError;
+          if (createError) {
+            console.error('Error creating default settings:', createError);
+            throw new Error(`Failed to create default settings: ${createError.message}`);
           }
 
-          // Merge minimal row with UI defaults so the page can render/edit immediately
-          setSettings({
-            id: minimalRow.id,
-            user_id: user.id,
-            project_id: '',
-            project_id_locked: false,
-            title: 'Share your thoughts with us',
-            show_name: true,
-            show_email: true,
-            button_text: 'Send Feedback',
-            theme: 'dark',
-            brand_color: '#2563eb',
-            redirect_url: null,
-            notify_email: null,
-            created_at: minimalRow.created_at || new Date().toISOString(),
-            updated_at: minimalRow.updated_at || new Date().toISOString()
-          } as any);
-        } else {
-          setSettings(newFeedbackData);
-        }
-        } else {
-          // Legacy schema: only ensure a single row exists for this user
-          const { data: minimalRow, error: minimalInsertError } = await withRetries(() => 
-            supabase
-              .from('feedback_settings')
-              .upsert({ user_id: user.id } as any, { onConflict: 'user_id' })
-              .select()
-              .single()
-          );
-
-          if (minimalInsertError) {
-            throw minimalInsertError;
+          if (newSettings) {
+            setSettings(newSettings);
+          } else {
+            // Fallback: create in-memory settings if database insert fails
+            setSettings({
+              ...defaultSettings,
+              id: 'temp-' + Date.now(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            } as any);
           }
-
-          // Use UI defaults in-memory for rendering
+        } catch (error) {
+          console.error('Error in settings creation:', error);
+          // Fallback: create in-memory settings
           setSettings({
-            id: minimalRow.id,
-            user_id: user.id,
-            project_id: '',
-            project_id_locked: false,
-            title: 'Share your thoughts with us',
-            show_name: true,
-            show_email: true,
-            button_text: 'Send Feedback',
-            theme: 'dark',
-            brand_color: '#2563eb',
-            redirect_url: null,
-            notify_email: null,
-            created_at: minimalRow.created_at || new Date().toISOString(),
-            updated_at: minimalRow.updated_at || new Date().toISOString()
+            ...defaultSettings,
+            id: 'temp-' + Date.now(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           } as any);
-
         }
       }
 
