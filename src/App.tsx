@@ -27,10 +27,7 @@ const DataUpload = lazy(() => import("./pages/DataUpload"));
 const AIInsights = lazy(() => import("./pages/AIInsights"));
 const InsightsPage = lazy(() => import("./pages/InsightsPage"));
 const InsightsSimplePage = lazy(() => import("./pages/InsightsSimplePage"));
-const TestInsights = lazy(() => import("./pages/TestInsights"));
-const DemoInsights = lazy(() => import("./pages/DemoInsights"));
 const CompleteInsights = lazy(() => import("./pages/CompleteInsights"));
-const MockInsights = lazy(() => import("./pages/MockInsights"));
 const ActionableInsights = lazy(() => import("./pages/ActionableInsights"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Analytics = lazy(() => import("./pages/Analytics"));
@@ -41,7 +38,6 @@ const Feedback = lazy(() => import("./pages/Feedback"));
 const Billing = lazy(() => import("./pages/Billing"));
 const FeedbackSimple = lazy(() => import("./pages/FeedbackSimple"));
 const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
-const TestPage = lazy(() => import("./pages/TestPage"));
 const Testimonials = lazy(() => import("./pages/Testimonials"));
 const About = lazy(() => import("./pages/About"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -49,15 +45,6 @@ const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
 const Integrations = lazy(() => import("./pages/Integrations"));
 const API = lazy(() => import("./pages/API"));
-const Blog = lazy(() => import("./pages/Blog"));
-const Careers = lazy(() => import("./pages/Careers"));
-const Press = lazy(() => import("./pages/Press"));
-const Partners = lazy(() => import("./pages/Partners"));
-const Documentation = lazy(() => import("./pages/Documentation"));
-const Guides = lazy(() => import("./pages/Guides"));
-const Community = lazy(() => import("./pages/Community"));
-const Templates = lazy(() => import("./pages/Templates"));
-const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
 
@@ -117,51 +104,7 @@ const App = () => (
                 <API />
               </Suspense>
             } />
-            <Route path="/blog" element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <Blog />
-              </Suspense>
-            } />
-            <Route path="/careers" element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <Careers />
-              </Suspense>
-            } />
-            <Route path="/press" element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <Press />
-              </Suspense>
-            } />
-            <Route path="/partners" element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <Partners />
-              </Suspense>
-            } />
-            <Route path="/documentation" element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <Documentation />
-              </Suspense>
-            } />
-            <Route path="/guides" element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <Guides />
-              </Suspense>
-            } />
-            <Route path="/community" element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <Community />
-              </Suspense>
-            } />
-            <Route path="/templates" element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <Templates />
-              </Suspense>
-            } />
-            <Route path="/cookie-policy" element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <CookiePolicy />
-              </Suspense>
-            } />
+
             
             {/* Protected routes */}
             <Route path="/dashboard" element={
@@ -182,24 +125,7 @@ const App = () => (
                 </Suspense>
               </ProtectedRoute>
             } />
-            <Route path="/test-insights" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <TestInsights />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
-            } />
-            <Route path="/demo-insights" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <DemoInsights />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
-            } />
+
             <Route path="/complete-insights" element={
               <ProtectedRoute>
                 <Suspense fallback={<LoadingSpinner />}>
@@ -209,15 +135,7 @@ const App = () => (
                 </Suspense>
               </ProtectedRoute>
             } />
-            <Route path="/mock-insights" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <MockInsights />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
-            } />
+
             <Route path="/actionable-insights" element={
               <ProtectedRoute>
                 <Suspense fallback={<LoadingSpinner />}>
@@ -300,15 +218,7 @@ const App = () => (
               </ProtectedRoute>
             } />
 
-            <Route path="/test" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <TestPage />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
-            } />
+
 
             <Route path="/teams/invite/:token" element={
               <Suspense fallback={<LoadingSpinner />}>
