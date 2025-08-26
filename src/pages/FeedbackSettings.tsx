@@ -201,12 +201,12 @@ const FeedbackSettings = () => {
     setProjectIdStatus('checking');
 
     try {
-      // Check global uniqueness across all users
+      // Check global uniqueness across ALL users - if ANY user has this project_id, it's taken
       const { data: existingSettings, error: checkError } = await supabase
         .from('feedback_settings')
         .select('id, project_id, user_id')
         .eq('project_id', projectId.trim())
-        .neq('user_id', user.id); // Check against other users, not just other records
+        .neq('user_id', user.id); // Exclude current user from the check
 
       if (checkError) {
         console.error('Error checking project ID availability:', checkError);
@@ -217,8 +217,11 @@ const FeedbackSettings = () => {
       if (existingSettings && existingSettings.length > 0) {
         setProjectIdStatus('taken');
         console.log('Project ID taken by:', existingSettings);
+        console.log('Current user ID:', user.id);
+        console.log('Checking project ID:', projectId.trim());
       } else {
         setProjectIdStatus('available');
+        console.log('Project ID available for:', projectId.trim());
       }
     } catch (error) {
       console.error('Error checking project ID availability:', error);
@@ -273,7 +276,7 @@ const FeedbackSettings = () => {
         .from('feedback_settings')
         .select('id, project_id, user_id')
         .eq('project_id', settings.project_id.trim())
-        .neq('user_id', user.id); // Check against other users
+        .neq('user_id', user.id); // Check against other users - if ANY user has this project_id, it's taken
 
       if (checkError) {
         toast.error('Failed to validate Project ID');
@@ -451,6 +454,35 @@ const FeedbackSettings = () => {
                 <p className="text-sm text-gray-500 mt-1">
                   Type at least 3 characters to check availability
                 </p>
+              )}
+              
+              {/* Debug info - remove this in production */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
+                  <p><strong>Debug Info:</strong></p>
+                  <p>Current User ID: {user?.id}</p>
+                  <p>Project ID: {settings?.project_id}</p>
+                  <p>Status: {projectIdStatus}</p>
+                  <p>Locked: {settings?.project_id_locked ? 'Yes' : 'No'}</p>
+                  <Button 
+                    size="sm" 
+                    onClick={async () => {
+                      if (settings?.project_id) {
+                        const { data, error } = await supabase.rpc('test_project_id_uniqueness', {
+                          test_project_id: settings.project_id,
+                          current_user_id: user?.id
+                        });
+                        console.log('Test result:', { data, error });
+                        if (data && data.length > 0) {
+                          alert(`Test Result: ${data[0].message}`);
+                        }
+                      }
+                    }}
+                    className="mt-2"
+                  >
+                    Test Uniqueness
+                  </Button>
+                </div>
               )}
             </div>
           </CardContent>
