@@ -37,6 +37,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const [seededSettingsFor, setSeededSettingsFor] = useState<string | null>(null);
 
+  // Helper function to ensure feedback settings exist (non-blocking)
+  const ensureFeedbackSettings = async (userId: string) => {
+    try {
+      if (seededSettingsFor === userId) return;
+
+      // Probe if row exists
+      const { data: existing } = await supabase
+        .from('feedback_settings')
+        .select('id')
+        .eq('user_id', userId)
+        .limit(1);
+
+      if (!existing || existing.length === 0) {
+        // Create row idempotently
+        await supabase
+          .from('feedback_settings')
+          .upsert({ user_id: userId } as any, { onConflict: 'user_id' });
+      }
+      setSeededSettingsFor(userId);
+    } catch (e) {
+      console.warn('Non-fatal: could not seed feedback_settings:', e);
+    }
+  };
+
 
   useEffect(() => {
     let mounted = true;
@@ -45,12 +69,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log("🔐 Auth state changed:", event, session?.user?.email);
-        
-
       async (event, session) => {
-        console.log("Auth state changed:", event, session);
+        console.log("🔐 Auth state changed:", event, session?.user?.email);
 
         if (mounted) {
           setSession(session);
@@ -67,28 +87,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         }
 
-        // On first sign-in for a user, ensure a feedback_settings row exists
-        try {
-          const currentUserId = session?.user?.id;
-          if (!currentUserId) return;
-          if (seededSettingsFor === currentUserId) return;
-
-          // Probe if row exists
-          const { data: existing } = await supabase
-            .from('feedback_settings')
-            .select('id')
-            .eq('user_id', currentUserId)
-            .limit(1);
-
-          if (!existing || existing.length === 0) {
-            // Create row idempotently
-            await supabase
-              .from('feedback_settings')
-              .upsert({ user_id: currentUserId } as any, { onConflict: 'user_id' });
-          }
-          setSeededSettingsFor(currentUserId);
-        } catch (e) {
-          console.warn('Non-fatal: could not seed feedback_settings on auth event:', e);
+        // Defer feedback_settings creation to avoid blocking auth flow
+        if (session?.user?.id && !seededSettingsFor) {
+          // Defer this operation to avoid blocking the auth state change
+          setTimeout(() => {
+            ensureFeedbackSettings(session.user.id);
+          }, 1000);
         }
       }
     );

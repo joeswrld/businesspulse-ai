@@ -211,8 +211,8 @@ const FeedbackSettings = () => {
       if (feedbackData && feedbackData.length > 0) {
         setSettings(feedbackData[0]);
       } else {
-        // Create default feedback settings with a resilient fallback
-        const fullDefaults = {
+        // Create default feedback settings
+        const defaultSettings = {
           user_id: user.id,
           project_id: '',
           project_id_locked: false,
@@ -225,96 +225,40 @@ const FeedbackSettings = () => {
           redirect_url: null,
           notify_email: null
         };
-        
-        const { data: newFeedbackData, error: createFeedbackError } = await supabase
-          .from('feedback_settings')
-          .insert(newFeedbackSettings)
-          .select()
-          .single();
 
-        if (createFeedbackError) {
-          console.error('Error creating default settings:', createFeedbackError);
-          throw new Error(`Failed to create default settings: ${createFeedbackError.message}`);
+        try {
+          // Try to create settings using upsert to avoid conflicts
+          const { data: newSettings, error: createError } = await supabase
+            .from('feedback_settings')
+            .upsert(defaultSettings, { onConflict: 'user_id' })
+            .select()
+            .single();
 
-        } as const;
-
-        // Insert according to schema, using upsert to avoid conflicts
-        if (schemaVersion === 'modern') {
-          // Try full defaults first
-          const { data: newFeedbackData, error: createFeedbackError } = await withRetries(() => 
-            supabase
-              .from('feedback_settings')
-              .upsert(fullDefaults as any, { onConflict: 'user_id' })
-              .select()
-              .single()
-          );
-
-          if (createFeedbackError) {
-            console.warn('Full defaults upsert failed, attempting minimal upsert:', createFeedbackError);
-            const { data: minimalRow, error: minimalInsertError } = await withRetries(() => 
-              supabase
-                .from('feedback_settings')
-                .upsert({ user_id: user.id } as any, { onConflict: 'user_id' })
-                .select()
-                .single()
-            );
-
-          if (minimalInsertError) {
-            throw minimalInsertError;
+          if (createError) {
+            console.error('Error creating default settings:', createError);
+            throw new Error(`Failed to create default settings: ${createError.message}`);
           }
 
-          // Merge minimal row with UI defaults so the page can render/edit immediately
-          setSettings({
-            id: minimalRow.id,
-            user_id: user.id,
-            project_id: '',
-            project_id_locked: false,
-            title: 'Share your thoughts with us',
-            show_name: true,
-            show_email: true,
-            button_text: 'Send Feedback',
-            theme: 'dark',
-            brand_color: '#2563eb',
-            redirect_url: null,
-            notify_email: null,
-            created_at: minimalRow.created_at || new Date().toISOString(),
-            updated_at: minimalRow.updated_at || new Date().toISOString()
-          } as any);
-        } else {
-          setSettings(newFeedbackData);
-        }
-        } else {
-          // Legacy schema: only ensure a single row exists for this user
-          const { data: minimalRow, error: minimalInsertError } = await withRetries(() => 
-            supabase
-              .from('feedback_settings')
-              .upsert({ user_id: user.id } as any, { onConflict: 'user_id' })
-              .select()
-              .single()
-          );
-
-          if (minimalInsertError) {
-            throw minimalInsertError;
+          if (newSettings) {
+            setSettings(newSettings);
+          } else {
+            // Fallback: create in-memory settings if database insert fails
+            setSettings({
+              ...defaultSettings,
+              id: 'temp-' + Date.now(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            } as any);
           }
-
-          // Use UI defaults in-memory for rendering
+        } catch (error) {
+          console.error('Error in settings creation:', error);
+          // Fallback: create in-memory settings
           setSettings({
-            id: minimalRow.id,
-            user_id: user.id,
-            project_id: '',
-            project_id_locked: false,
-            title: 'Share your thoughts with us',
-            show_name: true,
-            show_email: true,
-            button_text: 'Send Feedback',
-            theme: 'dark',
-            brand_color: '#2563eb',
-            redirect_url: null,
-            notify_email: null,
-            created_at: minimalRow.created_at || new Date().toISOString(),
-            updated_at: minimalRow.updated_at || new Date().toISOString()
+            ...defaultSettings,
+            id: 'temp-' + Date.now(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           } as any);
-
         }
       }
 
@@ -347,20 +291,34 @@ const FeedbackSettings = () => {
   }, [user, ensureTableExists, setupAttempted]);
 
   const checkProjectIdAvailability = useCallback(async (projectId: string) => {
-    if (!user || !projectId || projectId.trim() === '' || projectId.length < 3) {
+    if (!user || !projectId || projectId.trim() === '') {
+      setProjectIdStatus('idle');
+      return;
+    }
+
+    // Check minimum length
+    if (projectId.trim().length < 3) {
+      setProjectIdStatus('idle');
+      return;
+    }
+
+    // Check for invalid characters
+    if (!/^[a-zA-Z0-9_-]+$/.test(projectId.trim())) {
       setProjectIdStatus('idle');
       return;
     }
 
     setProjectIdStatus('checking');
+    console.log('Checking availability for project ID:', projectId.trim());
 
     try {
-      // Check global uniqueness across ALL users - if ANY user has this project_id, it's taken
+      // Direct database query to check if project ID is taken by another user
       const { data: existingSettings, error: checkError } = await supabase
         .from('feedback_settings')
-        .select('id, project_id, user_id')
+        .select('id, user_id, project_id')
         .eq('project_id', projectId.trim())
-        .neq('user_id', user.id); // Exclude current user from the check
+        .neq('user_id', user.id) // Exclude current user
+        .limit(1);
 
       if (checkError) {
         console.error('Error checking project ID availability:', checkError);
@@ -368,12 +326,16 @@ const FeedbackSettings = () => {
         return;
       }
 
+      console.log('Database check result:', existingSettings);
+
       if (existingSettings && existingSettings.length > 0) {
+        // Project ID is taken by another user
         setProjectIdStatus('taken');
-        console.log('Project ID taken by:', existingSettings);
+        console.log('Project ID taken by user:', existingSettings[0].user_id);
         console.log('Current user ID:', user.id);
-        console.log('Checking project ID:', projectId.trim());
+        console.log('Project ID:', projectId.trim());
       } else {
+        // Project ID is available
         setProjectIdStatus('available');
         console.log('Project ID available for:', projectId.trim());
       }
@@ -410,7 +372,17 @@ const FeedbackSettings = () => {
   };
 
   const handleSaveSettings = async () => {
-    if (!user || !settings) return;
+    if (!user || !settings) {
+      console.error('Cannot save: user or settings not available', { user: !!user, settings: !!settings });
+      return;
+    }
+    
+    console.log('Starting save process:', { 
+      userId: user.id, 
+      settingsId: settings.id, 
+      projectId: settings.project_id,
+      projectIdLocked: settings.project_id_locked 
+    });
     
     // Validate that Project ID is provided
     if (!settings.project_id || settings.project_id.trim() === '') {
@@ -426,19 +398,47 @@ const FeedbackSettings = () => {
     
     // Check if Project ID is available before saving
     if (!settings.project_id_locked) {
-      const { data: existingSettings, error: checkError } = await supabase
-        .from('feedback_settings')
-        .select('id, project_id, user_id')
-        .eq('project_id', settings.project_id.trim())
-        .neq('user_id', user.id); // Check against other users - if ANY user has this project_id, it's taken
-
-      if (checkError) {
-        toast.error('Failed to validate Project ID');
+      // Validate format
+      if (!/^[a-zA-Z0-9_-]+$/.test(settings.project_id.trim())) {
+        toast.error('Project ID can only contain letters, numbers, hyphens, and underscores');
         return;
       }
 
-      if (existingSettings && existingSettings.length > 0) {
+      // If status is idle, check availability first
+      if (projectIdStatus === 'idle') {
+        setProjectIdStatus('checking');
+        try {
+          const { data: existingSettings, error: checkError } = await supabase
+            .from('feedback_settings')
+            .select('id, user_id, project_id')
+            .eq('project_id', settings.project_id.trim())
+            .neq('user_id', user.id) // Exclude current user
+            .limit(1);
+
+          if (checkError) {
+            toast.error('Failed to validate Project ID');
+            setProjectIdStatus('idle');
+            return;
+          }
+
+          if (existingSettings && existingSettings.length > 0) {
+            setProjectIdStatus('taken');
+            toast.error('Project ID is already taken by another user');
+            return;
+          } else {
+            setProjectIdStatus('available');
+          }
+        } catch (error) {
+          console.error('Error checking project ID availability:', error);
+          toast.error('Failed to validate Project ID');
+          setProjectIdStatus('idle');
+          return;
+        }
+      } else if (projectIdStatus === 'taken') {
         toast.error('Project ID is already taken by another user');
+        return;
+      } else if (projectIdStatus === 'checking') {
+        toast.error('Please wait while we check Project ID availability');
         return;
       }
     }
@@ -451,30 +451,152 @@ const FeedbackSettings = () => {
         return;
       }
 
-      // Save feedback settings (modern schema)
-      const { error: feedbackError } = await supabase
-        .from('feedback_settings')
-        .update({
-          title: settings.title,
-          show_name: settings.show_name,
-          show_email: settings.show_email,
-          button_text: settings.button_text,
-          redirect_url: settings.redirect_url,
-          theme: settings.theme,
-          brand_color: settings.brand_color,
-          project_id: settings.project_id,
-          project_id_locked: true, // Lock the project ID after first save
-          notify_email: settings.notify_email,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', settings.id);
+      // Check if we have a temporary ID (created when database insert failed)
+      const isTemporaryId = settings.id && settings.id.toString().startsWith('temp-');
+      console.log('Save operation:', { 
+        isTemporaryId, 
+        settingsId: settings.id, 
+        schemaVersion 
+      });
+      
+      if (isTemporaryId) {
+        // Try to create a new record since the previous insert failed
+        console.log('Attempting to create new settings record...');
+        
+        const { data: newSettings, error: insertError } = await supabase
+          .from('feedback_settings')
+          .insert({
+            user_id: user.id,
+            title: settings.title,
+            show_name: settings.show_name,
+            show_email: settings.show_email,
+            button_text: settings.button_text,
+            redirect_url: settings.redirect_url,
+            theme: settings.theme,
+            brand_color: settings.brand_color,
+            project_id: settings.project_id,
+            project_id_locked: true, // Lock the project ID after first save
+            notify_email: settings.notify_email,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
 
-      if (feedbackError) throw feedbackError;
+        if (insertError) {
+          console.error('Error creating settings:', insertError);
+          
+          // If there's a conflict, try to update existing record
+          if (insertError.code === '23505') { // Unique violation
+            console.log('Unique constraint violation, trying to update existing record...');
+            
+            const { data: existingSettings, error: updateError } = await supabase
+              .from('feedback_settings')
+              .update({
+                title: settings.title,
+                show_name: settings.show_name,
+                show_email: settings.show_email,
+                button_text: settings.button_text,
+                redirect_url: settings.redirect_url,
+                theme: settings.theme,
+                brand_color: settings.brand_color,
+                project_id: settings.project_id,
+                project_id_locked: true,
+                notify_email: settings.notify_email,
+                updated_at: new Date().toISOString()
+              })
+              .eq('user_id', user.id)
+              .select()
+              .single();
 
-      toast.success('Settings saved successfully!');
+            if (updateError) {
+              console.error('Error updating existing settings:', updateError);
+              throw new Error(`Failed to update settings: ${updateError.message}`);
+            }
+
+            setSettings(existingSettings);
+            toast.success('Settings saved successfully!');
+          } else {
+            throw new Error(`Failed to create settings: ${insertError.message}`);
+          }
+        } else {
+          // Update the settings state with the new record
+          setSettings(newSettings);
+          toast.success('Settings saved successfully!');
+        }
+      } else {
+        // Update existing record
+        console.log('Updating existing settings record...');
+        
+        const { data: updatedSettings, error: feedbackError } = await supabase
+          .from('feedback_settings')
+          .update({
+            title: settings.title,
+            show_name: settings.show_name,
+            show_email: settings.show_email,
+            button_text: settings.button_text,
+            redirect_url: settings.redirect_url,
+            theme: settings.theme,
+            brand_color: settings.brand_color,
+            project_id: settings.project_id,
+            project_id_locked: true, // Lock the project ID after first save
+            notify_email: settings.notify_email,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', settings.id)
+          .select()
+          .single();
+
+        if (feedbackError) {
+          console.error('Error updating settings:', feedbackError);
+          
+          // If the record doesn't exist, try to create it
+          if (feedbackError.code === 'PGRST116') { // Record not found
+            console.log('Record not found, trying to create new record...');
+            
+            const { data: newSettings, error: insertError } = await supabase
+              .from('feedback_settings')
+              .insert({
+                user_id: user.id,
+                title: settings.title,
+                show_name: settings.show_name,
+                show_email: settings.show_email,
+                button_text: settings.button_text,
+                redirect_url: settings.redirect_url,
+                theme: settings.theme,
+                brand_color: settings.brand_color,
+                project_id: settings.project_id,
+                project_id_locked: true,
+                notify_email: settings.notify_email,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .select()
+              .single();
+
+            if (insertError) {
+              console.error('Error creating settings after update failed:', insertError);
+              throw new Error(`Failed to create settings: ${insertError.message}`);
+            }
+
+            setSettings(newSettings);
+            toast.success('Settings saved successfully!');
+          } else {
+            throw new Error(`Failed to update settings: ${feedbackError.message}`);
+          }
+        } else {
+          // Update the settings state with the updated record
+          setSettings(updatedSettings);
+          toast.success('Settings saved successfully!');
+        }
+      }
     } catch (error) {
       console.error('Error saving settings:', error);
-      toast.error('Failed to save settings');
+      if (error instanceof Error) {
+        toast.error(`Failed to save settings: ${error.message}`);
+      } else {
+        toast.error('Failed to save settings');
+      }
     } finally {
       setSaving(false);
     }
@@ -612,8 +734,29 @@ const FeedbackSettings = () => {
               )}
               {!settings?.project_id_locked && projectIdStatus === 'idle' && settings?.project_id && settings.project_id.length >= 3 && (
                 <p className="text-sm text-gray-500 mt-1">
-                  Type at least 3 characters to check availability
+                  Click "Check Availability" to verify this Project ID
                 </p>
+              )}
+              {!settings?.project_id_locked && settings?.project_id && settings.project_id.length >= 3 && !/^[a-zA-Z0-9_-]+$/.test(settings.project_id) && (
+                <p className="text-sm text-orange-600 mt-1 flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  ⚠ Project ID can only contain letters, numbers, hyphens, and underscores
+                </p>
+              )}
+              
+              {/* Manual check availability button */}
+              {!settings?.project_id_locked && settings?.project_id && settings.project_id.length >= 3 && /^[a-zA-Z0-9_-]+$/.test(settings.project_id) && projectIdStatus === 'idle' && (
+                <div className="mt-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => checkProjectIdAvailability(settings.project_id)}
+                    className="w-full"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Check Availability
+                  </Button>
+                </div>
               )}
               
               {/* Debug info - remove this in production */}
@@ -624,24 +767,48 @@ const FeedbackSettings = () => {
                   <p>Project ID: {settings?.project_id}</p>
                   <p>Status: {projectIdStatus}</p>
                   <p>Locked: {settings?.project_id_locked ? 'Yes' : 'No'}</p>
-                  <Button 
-                    size="sm" 
-                    onClick={async () => {
-                      if (settings?.project_id) {
-                        const { data, error } = await supabase.rpc('test_project_id_uniqueness', {
-                          test_project_id: settings.project_id,
-                          current_user_id: user?.id
-                        });
-                        console.log('Test result:', { data, error });
-                        if (data && data.length > 0) {
-                          alert(`Test Result: ${data[0].message}`);
+                  <div className="flex space-x-2 mt-2">
+                    <Button 
+                      size="sm" 
+                      onClick={async () => {
+                        if (settings?.project_id) {
+                          const { data, error } = await supabase
+                            .from('feedback_settings')
+                            .select('id, user_id, project_id')
+                            .eq('project_id', settings.project_id.trim())
+                            .neq('user_id', user?.id)
+                            .limit(1);
+                          console.log('Direct validation result:', { data, error });
+                          if (data && data.length > 0) {
+                            alert(`Project ID is TAKEN by user: ${data[0].user_id}`);
+                          } else {
+                            alert('Project ID is AVAILABLE');
+                          }
                         }
-                      }
-                    }}
-                    className="mt-2"
-                  >
-                    Test Uniqueness
-                  </Button>
+                      }}
+                    >
+                      Test Direct Query
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      onClick={async () => {
+                        const { data, error } = await supabase
+                          .from('feedback_settings')
+                          .select('project_id, user_id')
+                          .not('project_id', 'is', null)
+                          .neq('project_id', '');
+                        console.log('All project IDs:', { data, error });
+                        if (data && data.length > 0) {
+                          const projectList = data.map((item: any) => `${item.project_id} (${item.user_id})`).join('\n');
+                          alert(`All Project IDs:\n${projectList}`);
+                        } else {
+                          alert('No project IDs found');
+                        }
+                      }}
+                    >
+                      Show All IDs
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -805,7 +972,8 @@ const FeedbackSettings = () => {
               saving || 
               !settings?.project_id || 
               (settings?.project_id && settings.project_id.trim().length < 3) ||
-              (!settings?.project_id_locked && projectIdStatus === 'taken')
+              (!settings?.project_id_locked && projectIdStatus === 'taken') ||
+              (!settings?.project_id_locked && projectIdStatus === 'checking')
             }
             className="px-8 py-3 text-lg"
           >
@@ -824,6 +992,21 @@ const FeedbackSettings = () => {
           {!settings?.project_id_locked && projectIdStatus === 'taken' && (
             <p className="text-sm text-red-600 mt-2">
               Cannot save: Project ID is already taken by another user
+            </p>
+          )}
+          {!settings?.project_id_locked && projectIdStatus === 'checking' && (
+            <p className="text-sm text-blue-600 mt-2">
+              Please wait while we check Project ID availability...
+            </p>
+          )}
+          {!settings?.project_id_locked && projectIdStatus === 'idle' && settings?.project_id && settings.project_id.length >= 3 && (
+            <p className="text-sm text-blue-600 mt-2">
+              Click "Save & Lock Project ID" to check availability and save
+            </p>
+          )}
+          {!settings?.project_id_locked && projectIdStatus === 'available' && (
+            <p className="text-sm text-green-600 mt-2">
+              ✓ Project ID is available and ready to save
             </p>
           )}
         </div>

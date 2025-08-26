@@ -18,26 +18,25 @@ const HeroSection = () => {
             {/* Announcement Badge */}
             <Badge variant="secondary" className="w-fit px-4 py-2 text-sm font-medium">
               <Zap className="h-4 w-4 mr-2" />
-              Enterprise Business Intelligence + AI Platform
+              AI-Powered Feedback Analytics Platform ✨
             </Badge>
 
             {/* Main Headline */}
             <div className="space-y-4">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
-                Transform Raw{" "}
-                <span className="gradient-text">Business Data</span> Into
-                Strategic Intelligence
+                Turn Customer{" "}
+                <span className="gradient-text">Feedback</span> Into
+                Business Growth
               </h1>
               <p className="text-lg text-muted-foreground leading-relaxed max-w-xl">
-                NoteX is a comprehensive BI platform that processes your data pipelines, documents, and business metrics to deliver AI-powered insights, predictive analytics, and executive reports that drive strategic decisions.
+                NoteX helps businesses collect, analyze, and act on customer feedback with AI-powered insights. Get real-time sentiment analysis, trend detection, and actionable recommendations to boost customer satisfaction and drive growth.
               </p>
             </div>
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4">
               <Button variant="hero" size="lg" className="w-full sm:w-auto" asChild>
-              <Link to="/auth">Start Free Trial <ArrowRight className="h-5 w-5 ml-2" /></Link>
-                
+                <Link to="/auth">Start Collecting Feedback ✨ <ArrowRight className="h-5 w-5 ml-2" /></Link>
               </Button>
             </div>
 
@@ -50,7 +49,7 @@ const HeroSection = () => {
                 <span className="text-sm text-muted-foreground ml-2">4.9/5 rating</span>
               </div>
               <div className="text-sm text-muted-foreground">
-                Trusted by 500+ businesses across US, Canada & Nigeria
+                Trusted by 500+ businesses to boost customer satisfaction 🚀
               </div>
             </div>
           </div>
@@ -60,7 +59,7 @@ const HeroSection = () => {
             <div className="relative rounded-2xl overflow-hidden shadow-large hero-glow">
               <img
                 src={heroImage}
-                alt="NoteX AI Business Intelligence Dashboard"
+                alt="NoteX AI Feedback Analytics Dashboard"
                 className="w-full h-auto object-cover"
               />
               
@@ -69,8 +68,8 @@ const HeroSection = () => {
                 <div className="flex items-center space-x-2">
                   <TrendingUp className="h-5 w-5 text-success" />
                   <div>
-                    <div className="text-xs font-medium">Data Pipeline</div>
-                    <div className="text-lg font-bold text-success">Active</div>
+                    <div className="text-xs font-medium">Sentiment Score</div>
+                    <div className="text-lg font-bold text-success">+87%</div>
                   </div>
                 </div>
               </div>
@@ -79,7 +78,7 @@ const HeroSection = () => {
                 <div className="flex items-center space-x-2">
                   <Brain className="h-5 w-5 text-primary" />
                   <div>
-                    <div className="text-xs font-medium">AI Analytics</div>
+                    <div className="text-xs font-medium">AI Insights</div>
                     <div className="text-lg font-bold text-primary">Live</div>
                   </div>
                 </div>
@@ -87,7 +86,7 @@ const HeroSection = () => {
               
               <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-medium">
                 <div className="text-xs font-medium text-center">
-                  Real-time BI Dashboard
+                  Real-time Feedback Analytics
                 </div>
               </div>
             </div>

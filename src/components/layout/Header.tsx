@@ -9,8 +9,8 @@ const Header = () => {
   const navigation = [
     { name: "Features", href: "#features" },
     { name: "Pricing", href: "#pricing" },
-    { name: "About", href: "/about" },
-    { name: "Testimonials", href: "/testimonials" },
+    { name: "How It Works", href: "#how-it-works" },
+    { name: "Success Stories", href: "/testimonials" },
   ];
 
   return (
@@ -19,7 +19,8 @@ const Header = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <img src="/favicon.ico" alt="NoteX BI" className="h-8 w-8" />
+            <img src="/favicon.ico" alt="NoteX" className="h-8 w-8" />
+            <span className="font-bold text-lg">NoteX</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -41,7 +42,7 @@ const Header = () => {
               <Link to="/auth">Sign In</Link>
             </Button>
             <Button variant="hero" size="sm" asChild>
-              <Link to="/auth">Start Free Trial</Link>
+              <Link to="/auth">Start Collecting Feedback ✨</Link>
             </Button>
           </div>
 
@@ -76,7 +77,7 @@ const Header = () => {
                 <Link to="/auth">Sign In</Link>
               </Button>
               <Button variant="hero" size="sm" asChild>
-                <Link to="/auth">Start Free Trial</Link>
+                <Link to="/auth">Start Collecting Feedback ✨</Link>
               </Button>
             </div>
           </div>

@@ -7,33 +7,59 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { lazy, Suspense } from "react";
 
+// Loading component
+const LoadingSpinner = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+      <p className="text-muted-foreground">Loading...</p>
+    </div>
+  </div>
+);
 
-// Pages
-import Index from "./pages/Index";
-import AuthPage from "./pages/AuthPage";
-import Dashboard from "./pages/Dashboard";
-import DataUpload from "./pages/DataUpload";
-import AIInsights from "./pages/AIInsights";
-import InsightsPage from "./pages/InsightsPage";
-import InsightsSimplePage from "./pages/InsightsSimplePage";
-import TestInsights from "./pages/TestInsights";
-import DemoInsights from "./pages/DemoInsights";
-import CompleteInsights from "./pages/CompleteInsights";
-import MockInsights from "./pages/MockInsights";
-import ActionableInsights from "./pages/ActionableInsights";
-import Reports from "./pages/Reports";
-import Analytics from "./pages/Analytics";
-import Settings from "./pages/Settings";
-import Teams from "./pages/Teams";
-import Profile from "./pages/Profile";
-import Feedback from "./pages/Feedback";
-import Billing from "./pages/Billing";
-import FeedbackSimple from "./pages/FeedbackSimple";
-import FeedbackSettings from "./pages/FeedbackSettings";
-import TestPage from "./pages/TestPage";
-import NotFound from "./pages/NotFound";
-import TeamInvitation from "./pages/TeamInvitation";
+// Lazy load pages
+const Index = lazy(() => import("./pages/Index"));
+const AuthPage = lazy(() => import("./pages/AuthPage"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const DataUpload = lazy(() => import("./pages/DataUpload"));
+const AIInsights = lazy(() => import("./pages/AIInsights"));
+const InsightsPage = lazy(() => import("./pages/InsightsPage"));
+const InsightsSimplePage = lazy(() => import("./pages/InsightsSimplePage"));
+const TestInsights = lazy(() => import("./pages/TestInsights"));
+const DemoInsights = lazy(() => import("./pages/DemoInsights"));
+const CompleteInsights = lazy(() => import("./pages/CompleteInsights"));
+const MockInsights = lazy(() => import("./pages/MockInsights"));
+const ActionableInsights = lazy(() => import("./pages/ActionableInsights"));
+const Reports = lazy(() => import("./pages/Reports"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Teams = lazy(() => import("./pages/Teams"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Feedback = lazy(() => import("./pages/Feedback"));
+const Billing = lazy(() => import("./pages/Billing"));
+const FeedbackSimple = lazy(() => import("./pages/FeedbackSimple"));
+const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
+const TestPage = lazy(() => import("./pages/TestPage"));
+const Testimonials = lazy(() => import("./pages/Testimonials"));
+const About = lazy(() => import("./pages/About"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const HelpCenter = lazy(() => import("./pages/HelpCenter"));
+const Integrations = lazy(() => import("./pages/Integrations"));
+const API = lazy(() => import("./pages/API"));
+const Blog = lazy(() => import("./pages/Blog"));
+const Careers = lazy(() => import("./pages/Careers"));
+const Press = lazy(() => import("./pages/Press"));
+const Partners = lazy(() => import("./pages/Partners"));
+const Documentation = lazy(() => import("./pages/Documentation"));
+const Guides = lazy(() => import("./pages/Guides"));
+const Community = lazy(() => import("./pages/Community"));
+const Templates = lazy(() => import("./pages/Templates"));
+const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
 
 const queryClient = new QueryClient();
 
@@ -46,136 +72,266 @@ const App = () => (
         <AuthProvider>
           <Routes>
             {/* Public routes */}
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <Index />
+              </Suspense>
+            } />
+            <Route path="/auth" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <AuthPage />
+              </Suspense>
+            } />
+            <Route path="/testimonials" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <Testimonials />
+              </Suspense>
+            } />
+            <Route path="/about" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <About />
+              </Suspense>
+            } />
+            <Route path="/privacy-policy" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <PrivacyPolicy />
+              </Suspense>
+            } />
+            <Route path="/terms-of-service" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <TermsOfService />
+              </Suspense>
+            } />
+            <Route path="/help" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <HelpCenter />
+              </Suspense>
+            } />
+            <Route path="/integrations" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <Integrations />
+              </Suspense>
+            } />
+            <Route path="/api" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <API />
+              </Suspense>
+            } />
+            <Route path="/blog" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <Blog />
+              </Suspense>
+            } />
+            <Route path="/careers" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <Careers />
+              </Suspense>
+            } />
+            <Route path="/press" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <Press />
+              </Suspense>
+            } />
+            <Route path="/partners" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <Partners />
+              </Suspense>
+            } />
+            <Route path="/documentation" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <Documentation />
+              </Suspense>
+            } />
+            <Route path="/guides" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <Guides />
+              </Suspense>
+            } />
+            <Route path="/community" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <Community />
+              </Suspense>
+            } />
+            <Route path="/templates" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <Templates />
+              </Suspense>
+            } />
+            <Route path="/cookie-policy" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <CookiePolicy />
+              </Suspense>
+            } />
             
             {/* Protected routes */}
             <Route path="/dashboard" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <Dashboard />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Dashboard />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             <Route path="/insights-simple" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <InsightsSimplePage />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <InsightsSimplePage />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             <Route path="/test-insights" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <TestInsights />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <TestInsights />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             <Route path="/demo-insights" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <DemoInsights />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <DemoInsights />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             <Route path="/complete-insights" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <CompleteInsights />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <CompleteInsights />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             <Route path="/mock-insights" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <MockInsights />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <MockInsights />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             <Route path="/actionable-insights" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <ActionableInsights />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <ActionableInsights />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             <Route path="/reports" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <Reports />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Reports />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             <Route path="/analytics" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <Analytics />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Analytics />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             <Route path="/settings" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <Settings />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Settings />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             <Route path="/teams" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <Teams />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Teams />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             <Route path="/billing" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <Billing />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Billing />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             <Route path="/feedback" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <Feedback />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Feedback />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             <Route path="/feedback-simple" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <FeedbackSimple />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <FeedbackSimple />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             <Route path="/feedback-settings" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <FeedbackSettings />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <FeedbackSettings />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
 
             <Route path="/test" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <TestPage />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <TestPage />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
 
-            <Route path="/teams/invite/:token" element={<TeamInvitation />} />
+            <Route path="/teams/invite/:token" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <TeamInvitation />
+              </Suspense>
+            } />
 
             <Route path="/profile" element={
               <ProtectedRoute>
-                <DashboardLayout>
-                  <Profile />
-                </DashboardLayout>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Profile />
+                  </DashboardLayout>
+                </Suspense>
               </ProtectedRoute>
             } />
             
             {/* Catch-all route */}
-            <Route path="*" element={<NotFound />} />
+            <Route path="*" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <NotFound />
+              </Suspense>
+            } />
           </Routes>
         </AuthProvider>
       </BrowserRouter>
