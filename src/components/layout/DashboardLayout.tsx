@@ -168,7 +168,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white/50 backdrop-blur-sm">
             <Link to="/dashboard" className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
-                <img src="/favicon.ico" alt="FeedbackFlow" className="h-6 w-6" />
+                <img src="/favicon.ico" alt="NoteX" className="h-6 w-6" />
               </div>
               {!sidebarCollapsed && (
                 <div className="transition-opacity duration-300">

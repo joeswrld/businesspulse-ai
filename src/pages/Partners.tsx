@@ -17,7 +17,7 @@ const Partners = () => {
   const partnerPrograms = [
     {
       title: "Technology Partners",
-      description: "Integrate FeedbackFlow with your platform and earn revenue sharing",
+      description: "Integrate NoteX with your platform and earn revenue sharing",
       benefits: [
         "Revenue sharing up to 30%",
         "Technical support and documentation",
@@ -28,7 +28,7 @@ const Partners = () => {
     },
     {
       title: "Agency Partners",
-      description: "Resell FeedbackFlow to your clients and earn commissions",
+      description: "Resell NoteX to your clients and earn commissions",
       benefits: [
         "Commission rates up to 25%",
         "White-label options available",
@@ -39,7 +39,7 @@ const Partners = () => {
     },
     {
       title: "Channel Partners",
-      description: "Distribute FeedbackFlow through your sales channels",
+      description: "Distribute NoteX through your sales channels",
       benefits: [
         "Volume-based pricing discounts",
         "Sales enablement resources",
@@ -55,7 +55,7 @@ const Partners = () => {
       name: "TechFlow Solutions",
       logo: "https://via.placeholder.com/120x60/2563EB/FFFFFF?text=TechFlow",
       category: "Technology Partner",
-      description: "Leading CRM platform integrating FeedbackFlow for enhanced customer insights"
+      description: "Leading CRM platform integrating NoteX for enhanced customer insights"
     },
     {
       name: "Digital Marketing Pro",
@@ -172,7 +172,7 @@ const Partners = () => {
           <div className="text-center max-w-3xl mx-auto mb-12">
             <h2 className="text-3xl font-bold mb-6">Our Partners</h2>
             <p className="text-lg text-muted-foreground">
-              Meet some of our trusted partners who are helping businesses succeed with FeedbackFlow.
+              Meet some of our trusted partners who are helping businesses succeed with NoteX.
             </p>
           </div>
           
@@ -271,7 +271,7 @@ const Partners = () => {
                   <div>
                     <h3 className="font-semibold mb-2">Grow</h3>
                     <p className="text-sm text-muted-foreground">
-                      Start earning revenue and growing your business with FeedbackFlow.
+                      Start earning revenue and growing your business with NoteX.
                     </p>
                   </div>
                 </div>

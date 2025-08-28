@@ -72,7 +72,7 @@ const HowItWorksSection = () => {
             Simple 4-Step Process
           </Badge>
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6">
-            How FeedbackFlow{" "}
+            How NoteX{" "}
             <span className="gradient-text">Works</span>
           </h2>
           <p className="text-base sm:text-lg text-muted-foreground">

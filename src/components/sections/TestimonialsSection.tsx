@@ -7,7 +7,7 @@ const TestimonialsSection = () => {
     {
       name: "Sarah Johnson",
       role: "CEO",
-      content: "FeedbackFlow transformed how we understand our customers. The AI sentiment analysis helped us identify pain points we never knew existed, leading to a 40% increase in customer satisfaction.",
+      content: "NoteX transformed how we understand our customers. The AI sentiment analysis helped us identify pain points we never knew existed, leading to a 40% increase in customer satisfaction.",
       rating: 5,
     },
     {

@@ -172,10 +172,10 @@ const PrivacyPolicy = () => {
             </p>
             <div className="space-y-2">
               <p className="text-sm">
-                <strong>Email:</strong> privacy@feedbackflow.com
+                <strong>Email:</strong> privacy@notex.com
               </p>
               <p className="text-sm">
-                <strong>Address:</strong> FeedbackFlow Inc., 123 Privacy Street, Security City, SC 12345
+                <strong>Address:</strong> NoteX Inc., 123 Privacy Street, Security City, SC 12345
               </p>
             </div>
           </div>
