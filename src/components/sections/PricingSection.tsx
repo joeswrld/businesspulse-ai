@@ -74,20 +74,12 @@ const PricingSection = () => {
         "Enterprise Analytics → Advanced sentiment & trend analysis",
         "Reports → Unlimited reports with advanced analytics",
         "Team Members → Unlimited with role-based access",
-        "Data Upload → Unlimited file processing",
         "Everything in Pro",
-        "White-label Widgets → Brand as your own",
         "Predictive Analytics → AI-powered trend projection",
         "Automated Alerts → Slack, Teams, Email, SMS",
         "Dedicated Support & SLA → 4-hour response time",
         "Compliance → GDPR, SOC2, HIPAA ready",
-        "Custom Integrations & Webhooks → Unlimited",
         "Data Retention → Unlimited",
-        "API Access → Unlimited",
-        "Advanced Security → SSO, 2FA, IP restrictions",
-        "Custom AI Models → Train on your data",
-        "Multi-language Support → 50+ languages",
-        "Advanced Segmentation → Customer cohorts & personas",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "premium" as const,
@@ -233,19 +225,19 @@ const PricingSection = () => {
                     <td className="py-3 px-4 font-medium">API Access</td>
                     <td className="text-center py-3 px-4">100/month</td>
                     <td className="text-center py-3 px-4">5,000/month</td>
-                    <td className="text-center py-3 px-4">Unlimited</td>
+                    <td className="text-center py-3 px-4">5,000/month</td>
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-medium">Data Upload</td>
                     <td className="text-center py-3 px-4">Basic</td>
                     <td className="text-center py-3 px-4">Advanced</td>
-                    <td className="text-center py-3 px-4">Unlimited</td>
+                    <td className="text-center py-3 px-4">Advanced</td>
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-medium">Widget Customization</td>
                     <td className="text-center py-3 px-4">Standard</td>
                     <td className="text-center py-3 px-4">Full Branding</td>
-                    <td className="text-center py-3 px-4">White-label</td>
+                    <td className="text-center py-3 px-4">Full Branding</td>
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-medium">Support</td>
