@@ -1,13 +1,52 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Zap, User, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
+interface UserProfile {
+  id: string;
+  user_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  avatar_url: string | null;
+  company_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const { user, loading } = useAuth();
+
+  // Load user profile data
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user) return;
+
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (profileError && profileError.code !== 'PGRST116') {
+          console.error('Error loading profile:', profileError);
+        }
+
+        if (profileData) {
+          setProfile(profileData);
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error);
+      }
+    };
+
+    loadProfile();
+  }, [user]);
 
   const handleLogout = async () => {
     try {
@@ -59,7 +98,7 @@ const Header = () => {
               <div className="flex items-center space-x-3">
                 <Button variant="ghost" size="sm" asChild>
                   <Link to="/dashboard">
-                    {user.user_metadata?.full_name?.split(' ')[0] || user.user_metadata?.first_name || user.email?.split('@')[0] || 'Dashboard'}
+                    {profile?.first_name || user.email?.split('@')[0] || 'Dashboard'}
                   </Link>
                 </Button>
                 <div className="relative group">
@@ -70,9 +109,9 @@ const Header = () => {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
-                      {user.user_metadata?.avatar_url ? (
+                      {profile?.avatar_url ? (
                         <img 
-                          src={user.user_metadata.avatar_url} 
+                          src={profile.avatar_url} 
                           alt="Profile" 
                           className="w-6 h-6 rounded-full object-cover"
                         />
@@ -81,7 +120,7 @@ const Header = () => {
                       )}
                     </div>
                     <span className="text-sm font-medium">
-                      {user.user_metadata?.full_name?.split(' ')[0] || user.user_metadata?.first_name || user.email?.split('@')[0] || 'User'}
+                      {profile?.first_name || user.email?.split('@')[0] || 'User'}
                     </span>
                   </Button>
                   
@@ -160,9 +199,9 @@ const Header = () => {
                 <>
                   <div className="flex items-center space-x-3 p-4 bg-muted/30 rounded-lg mb-4 mx-4">
                     <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
-                      {user.user_metadata?.avatar_url ? (
+                      {profile?.avatar_url ? (
                         <img 
-                          src={user.user_metadata.avatar_url} 
+                          src={profile.avatar_url} 
                           alt="Profile" 
                           className="w-12 h-12 rounded-full object-cover"
                         />
@@ -172,10 +211,10 @@ const Header = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-base font-semibold text-foreground truncate">
-                        {user.user_metadata?.full_name?.split(' ')[0] || user.user_metadata?.first_name || user.email?.split('@')[0] || 'User'}
+                        {profile?.first_name || user.email?.split('@')[0] || 'User'}
                       </p>
                       <p className="text-sm text-muted-foreground truncate">
-                        {user.user_metadata?.full_name || user.email}
+                        {profile?.first_name && profile?.last_name ? `${profile.first_name} ${profile.last_name}` : user.email}
                       </p>
                     </div>
                   </div>
