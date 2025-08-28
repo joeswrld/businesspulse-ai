@@ -16,15 +16,16 @@ const PricingSection = () => {
       badgeVariant: "default" as const,
       features: [
         "Feedback Collection → Up to 50 responses",
-        "AI Sentiment Analysis → Basic insights (3 themes)",
+        "AI Insights Generation → Up to 5 insights",
+        "Basic Analytics → Sentiment analysis dashboard",
+        "Reports → Up to 2 basic reports",
         "Team Members → 1 user (owner only)",
-        "Reports → 1 basic report",
-        "Analytics → Basic sentiment dashboard",
-        "Widget Customization → Standard colors only",
+        "Data Upload → Basic file processing",
+        "Widget Customization → Standard colors",
         "Export Data → CSV format",
         "Email Support → Community forum access",
         "Data Retention → 30 days",
-        "API Calls → 100 requests/month",
+        "API Access → 100 requests/month",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "hero" as const,
@@ -39,18 +40,19 @@ const PricingSection = () => {
       badge: "Most Popular",
       badgeVariant: "default" as const,
       features: [
-        "Feedback Collection → Up to 2,000 responses/month",
-        "AI Sentiment Analysis → Advanced insights (10 themes)",
-        "Team Members → Up to 10 users",
+        "Feedback Collection → Up to 300 responses/month",
+        "AI Insights Generation → Up to 50 insights/month",
+        "Advanced Analytics → Comprehensive sentiment dashboard",
         "Reports → Up to 20 reports/month",
-        "Analytics → Advanced sentiment dashboard",
+        "Team Members → Up to 5 users",
+        "Data Upload → Advanced file processing",
         "Widget Customization → Full branding control",
         "Export Data → CSV, PDF, Excel formats",
         "Priority Support → Email & chat support",
         "Custom Integrations → Basic API access",
-        "Advanced Analytics → Trend detection & predictions",
+        "Advanced Analytics → Trend detection",
         "Data Retention → 12 months",
-        "API Calls → 5,000 requests/month",
+        "API Access → 5,000 requests/month",
         "Automated Workflows → Basic automation",
         "Slack/Teams Integration → Basic notifications",
       ],
@@ -68,19 +70,20 @@ const PricingSection = () => {
       badgeVariant: "secondary" as const,
       features: [
         "Feedback Collection → Unlimited responses",
-        "AI Sentiment Analysis → Enterprise-grade insights (unlimited themes)",
-        "Team Members → Unlimited with role-based access",
+        "AI Insights Generation → Unlimited insights",
+        "Enterprise Analytics → Advanced sentiment & trend analysis",
         "Reports → Unlimited reports with advanced analytics",
-        "Analytics → Enterprise sentiment dashboard",
+        "Team Members → Unlimited with role-based access",
+        "Data Upload → Unlimited file processing",
         "Everything in Pro",
-        "White-label widgets → Brand as your own",
-        "Predictive analytics → AI-powered trend projection",
-        "Automated alerts → Slack, Teams, Email, SMS",
-        "Dedicated support & SLA → 4-hour response time",
+        "White-label Widgets → Brand as your own",
+        "Predictive Analytics → AI-powered trend projection",
+        "Automated Alerts → Slack, Teams, Email, SMS",
+        "Dedicated Support & SLA → 4-hour response time",
         "Compliance → GDPR, SOC2, HIPAA ready",
-        "Custom integrations & webhooks → Unlimited",
+        "Custom Integrations & Webhooks → Unlimited",
         "Data Retention → Unlimited",
-        "API Calls → Unlimited",
+        "API Access → Unlimited",
         "Advanced Security → SSO, 2FA, IP restrictions",
         "Custom AI Models → Train on your data",
         "Multi-language Support → 50+ languages",
@@ -105,7 +108,7 @@ const PricingSection = () => {
             <span className="gradient-text">Business Growth</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            Start with our 8-day free trial to experience AI-powered feedback analytics, then choose a plan that scales with your business needs. From startups to enterprises, we have the perfect plan for you.
+            Start with our 8-day free trial to experience AI-powered feedback insights, sentiment analysis, and comprehensive reporting. Choose a plan that scales with your business needs - from individual creators to enterprise teams.
           </p>
         </div>
 
@@ -199,24 +202,24 @@ const PricingSection = () => {
                   <tr>
                     <td className="py-3 px-4 font-medium">Feedback Responses</td>
                     <td className="text-center py-3 px-4">50</td>
-                    <td className="text-center py-3 px-4">2,000/month</td>
+                    <td className="text-center py-3 px-4">300/month</td>
                     <td className="text-center py-3 px-4">Unlimited</td>
                   </tr>
                   <tr>
-                    <td className="py-3 px-4 font-medium">AI Themes</td>
-                    <td className="text-center py-3 px-4">3</td>
-                    <td className="text-center py-3 px-4">10</td>
+                    <td className="py-3 px-4 font-medium">AI Insights</td>
+                    <td className="text-center py-3 px-4">5</td>
+                    <td className="text-center py-3 px-4">50/month</td>
                     <td className="text-center py-3 px-4">Unlimited</td>
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-medium">Team Members</td>
                     <td className="text-center py-3 px-4">1</td>
-                    <td className="text-center py-3 px-4">10</td>
+                    <td className="text-center py-3 px-4">5</td>
                     <td className="text-center py-3 px-4">Unlimited</td>
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-medium">Reports</td>
-                    <td className="text-center py-3 px-4">1</td>
+                    <td className="text-center py-3 px-4">2</td>
                     <td className="text-center py-3 px-4">20/month</td>
                     <td className="text-center py-3 px-4">Unlimited</td>
                   </tr>
@@ -227,10 +230,28 @@ const PricingSection = () => {
                     <td className="text-center py-3 px-4">Unlimited</td>
                   </tr>
                   <tr>
-                    <td className="py-3 px-4 font-medium">API Calls</td>
+                    <td className="py-3 px-4 font-medium">API Access</td>
                     <td className="text-center py-3 px-4">100/month</td>
                     <td className="text-center py-3 px-4">5,000/month</td>
                     <td className="text-center py-3 px-4">Unlimited</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-medium">Data Upload</td>
+                    <td className="text-center py-3 px-4">Basic</td>
+                    <td className="text-center py-3 px-4">Advanced</td>
+                    <td className="text-center py-3 px-4">Unlimited</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-medium">Widget Customization</td>
+                    <td className="text-center py-3 px-4">Standard</td>
+                    <td className="text-center py-3 px-4">Full Branding</td>
+                    <td className="text-center py-3 px-4">White-label</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-medium">Support</td>
+                    <td className="text-center py-3 px-4">Community</td>
+                    <td className="text-center py-3 px-4">Priority</td>
+                    <td className="text-center py-3 px-4">Dedicated SLA</td>
                   </tr>
                 </tbody>
               </table>
@@ -245,7 +266,7 @@ const PricingSection = () => {
               Ready to Get Started?
             </h3>
             <p className="text-muted-foreground mb-6">
-              Join hundreds of businesses already using NoteX to understand their customers better.
+              Join businesses already using NoteX to transform customer feedback into actionable insights and data-driven decisions.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button variant="hero" size="lg" asChild>
