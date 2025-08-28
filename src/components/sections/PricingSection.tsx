@@ -19,13 +19,10 @@ const PricingSection = () => {
         "AI Insights Generation → Up to 5 insights",
         "Basic Analytics → Sentiment analysis dashboard",
         "Reports → Up to 2 basic reports",
-        "Team Members → 1 user (owner only)",
-        "Data Upload → Basic file processing",
-        "Widget Customization → Standard colors",
+        "Team Members → Coming Soon",
         "Export Data → CSV format",
         "Email Support → Community forum access",
         "Data Retention → 30 days",
-        "API Access → 100 requests/month",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "hero" as const,
@@ -44,15 +41,11 @@ const PricingSection = () => {
         "AI Insights Generation → Up to 50 insights/month",
         "Advanced Analytics → Comprehensive sentiment dashboard",
         "Reports → Up to 20 reports/month",
-        "Team Members → Up to 5 users",
-        "Data Upload → Advanced file processing",
-        "Widget Customization → Full branding control",
+        "Team Members → Coming Soon",
         "Export Data → CSV, PDF, Excel formats",
         "Priority Support → Email & chat support",
-        "Custom Integrations → Basic API access",
         "Advanced Analytics → Trend detection",
         "Data Retention → 12 months",
-        "API Access → 5,000 requests/month",
         "Automated Workflows → Basic automation",
         "Slack/Teams Integration → Basic notifications",
       ],
@@ -73,7 +66,7 @@ const PricingSection = () => {
         "AI Insights Generation → Unlimited insights",
         "Enterprise Analytics → Advanced sentiment & trend analysis",
         "Reports → Unlimited reports with advanced analytics",
-        "Team Members → Unlimited with role-based access",
+        "Team Members → Coming Soon",
         "Everything in Pro",
         "Predictive Analytics → AI-powered trend projection",
         "Automated Alerts → Slack, Teams, Email, SMS",
@@ -205,9 +198,9 @@ const PricingSection = () => {
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-medium">Team Members</td>
-                    <td className="text-center py-3 px-4">1</td>
-                    <td className="text-center py-3 px-4">5</td>
-                    <td className="text-center py-3 px-4">Unlimited</td>
+                    <td className="text-center py-3 px-4">Coming Soon</td>
+                    <td className="text-center py-3 px-4">Coming Soon</td>
+                    <td className="text-center py-3 px-4">Coming Soon</td>
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-medium">Reports</td>
@@ -221,24 +214,8 @@ const PricingSection = () => {
                     <td className="text-center py-3 px-4">12 months</td>
                     <td className="text-center py-3 px-4">Unlimited</td>
                   </tr>
-                  <tr>
-                    <td className="py-3 px-4 font-medium">API Access</td>
-                    <td className="text-center py-3 px-4">100/month</td>
-                    <td className="text-center py-3 px-4">5,000/month</td>
-                    <td className="text-center py-3 px-4">5,000/month</td>
-                  </tr>
-                  <tr>
-                    <td className="py-3 px-4 font-medium">Data Upload</td>
-                    <td className="text-center py-3 px-4">Basic</td>
-                    <td className="text-center py-3 px-4">Advanced</td>
-                    <td className="text-center py-3 px-4">Advanced</td>
-                  </tr>
-                  <tr>
-                    <td className="py-3 px-4 font-medium">Widget Customization</td>
-                    <td className="text-center py-3 px-4">Standard</td>
-                    <td className="text-center py-3 px-4">Full Branding</td>
-                    <td className="text-center py-3 px-4">Full Branding</td>
-                  </tr>
+
+
                   <tr>
                     <td className="py-3 px-4 font-medium">Support</td>
                     <td className="text-center py-3 px-4">Community</td>
