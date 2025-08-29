@@ -589,16 +589,14 @@ const BillingPage: React.FC = () => {
                 planPrice={upgradePlan === 'pro' ? '₦35,000/mo' : '₦53,000/mo'}
                 onSuccess={async ({ reference, plan: paidPlan }) => {
                   try {
-                    // Store minimal subscription record (client-side stub). In production, verify via webhook.
+                    // Store minimal subscription record using existing columns only.
                     const { error } = await supabase.from('user_subscriptions').upsert({
                       user_id: user!.id,
-                      plan_name: paidPlan,
                       plan_id: paidPlan,
                       status: 'active',
                       current_period_start: new Date().toISOString(),
                       current_period_end: new Date(Date.now() + 30*24*60*60*1000).toISOString(),
-                      source: 'paystack',
-                      payment_reference: reference
+                      updated_at: new Date().toISOString()
                     } as any);
                     if (error) throw error;
                     toast.success('Subscription activated');
