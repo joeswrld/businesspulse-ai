@@ -33,6 +33,7 @@ import {
   Receipt,
   RefreshCw
 } from 'lucide-react';
+import PaystackPayment from '@/components/PaystackPayment';
 
 // Types
 interface UsageData {
@@ -71,6 +72,8 @@ interface Subscription {
 
 type PlanType = 'free' | 'pro' | 'business' | 'enterprise';
 
+type UpgradePlan = 'pro' | 'business' | null;
+
 const BillingPage: React.FC = () => {
   const { user } = useAuth();
   const {
@@ -93,6 +96,7 @@ const BillingPage: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [realtimeFeedbackCount, setRealtimeFeedbackCount] = useState<number | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [upgradePlan, setUpgradePlan] = useState<UpgradePlan>(null);
 
   // Load data on component mount and when user changes
   useEffect(() => {
@@ -571,6 +575,45 @@ const BillingPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {upgradePlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full">
+            <div className="p-4 border-b flex items-center justify-between">
+              <div className="font-semibold">Confirm Subscription</div>
+              <button className="text-sm text-muted-foreground hover:text-foreground" onClick={() => setUpgradePlan(null)}>Close</button>
+            </div>
+            <div className="p-4">
+              <PaystackPayment
+                plan={upgradePlan}
+                planName={upgradePlan === 'pro' ? 'Pro' : 'Business'}
+                planPrice={upgradePlan === 'pro' ? '₦35,000/mo' : '₦53,000/mo'}
+                onSuccess={async ({ reference, plan: paidPlan }) => {
+                  try {
+                    // Store minimal subscription record (client-side stub). In production, verify via webhook.
+                    const { error } = await supabase.from('user_subscriptions').upsert({
+                      user_id: user!.id,
+                      plan_name: paidPlan,
+                      plan_id: paidPlan,
+                      status: 'active',
+                      current_period_start: new Date().toISOString(),
+                      current_period_end: new Date(Date.now() + 30*24*60*60*1000).toISOString(),
+                      source: 'paystack',
+                      payment_reference: reference
+                    } as any);
+                    if (error) throw error;
+                    toast.success('Subscription activated');
+                    setUpgradePlan(null);
+                    await loadBillingData(true);
+                  } catch (e: any) {
+                    toast.error(e?.message || 'Failed to save subscription');
+                  }
+                }}
+                onCancel={() => setUpgradePlan(null)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -902,11 +945,11 @@ const BillingPage: React.FC = () => {
 
               {!subscription && trialDaysLeft === 0 && (
                 <div className="space-y-2">
-                  <Button className="w-full">
+                  <Button className="w-full" onClick={() => setUpgradePlan('pro')}>
                     <Crown className="h-4 w-4 mr-2" />
                     Upgrade to Pro
                   </Button>
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full" onClick={() => setUpgradePlan('business')}>
                     <Zap className="h-4 w-4 mr-2" />
                     Upgrade to Business
                   </Button>
@@ -914,7 +957,7 @@ const BillingPage: React.FC = () => {
               )}
 
               {subscription && subscription.status === 'active' && currentPlan.type === 'pro' && (
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full" onClick={() => setUpgradePlan('business')}>
                   <Zap className="h-4 w-4 mr-2" />
                   Upgrade to Business
                 </Button>
