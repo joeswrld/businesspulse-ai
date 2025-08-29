@@ -91,8 +91,11 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       };
     }
 
-    const planName = subscription.plan_name || 'Free Trial';
-    const isTrial = subscription.plan_type === 'trial';
+    const planId = (subscription as any)?.plan_id?.toLowerCase?.() || '';
+    const planType = planId.includes('business') ? 'business'
+      : (planId.includes('pro') || planId.includes('premium')) ? 'pro'
+      : (subscription as any).plan_type || 'free';
+    const isTrial = planType === 'trial' || (subscription as any).status === 'trialing';
     
     if (isTrial) {
       return {
@@ -103,7 +106,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       };
     }
 
-    if (subscription.plan_type === 'pro') {
+    if (planType === 'pro') {
       return {
         planName: 'Pro',
         planType: 'pro',
