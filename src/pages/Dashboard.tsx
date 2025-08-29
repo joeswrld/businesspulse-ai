@@ -538,12 +538,12 @@ export default function Dashboard() {
       };
     }
 
-    // Derive plan from available fields (plan_id preferred). Fallback to legacy fields.
+    // Derive plan from available fields (plan_name preferred). Fallback to legacy fields.
     const derivedPlan = (() => {
-      const pid = (subscription as any).plan_id?.toLowerCase?.() || '';
-      if (pid.includes('business')) return 'business';
-      if (pid.includes('pro') || pid.includes('premium')) return 'pro';
-      if (pid.includes('trial')) return 'trial';
+      const planName = (subscription as any).plan_name?.toLowerCase?.() || (subscription as any).plan_type?.toLowerCase?.() || '';
+      if (planName.includes('business')) return 'business';
+      if (planName.includes('pro') || planName.includes('premium')) return 'pro';
+      if (planName.includes('trial')) return 'trial';
       return (subscription as any).plan_type || 'free';
     })();
     const planType = derivedPlan;

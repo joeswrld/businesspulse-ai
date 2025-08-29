@@ -192,9 +192,9 @@ const Profile: React.FC = () => {
       };
     }
 
-    const planId = (subscription as any)?.plan_id?.toLowerCase?.() || '';
-    const planType = planId.includes('business') ? 'business'
-      : (planId.includes('pro') || planId.includes('premium')) ? 'pro'
+    const planName = (subscription as any)?.plan_name?.toLowerCase?.() || (subscription as any)?.plan_type?.toLowerCase?.() || '';
+    const planType = planName.includes('business') ? 'business'
+      : (planName.includes('pro') || planName.includes('premium')) ? 'pro'
       : (subscription as any).plan_type || 'free';
     const isTrial = planType === 'trial' || (subscription as any).status === 'trialing';
     

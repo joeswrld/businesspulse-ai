@@ -284,18 +284,18 @@ const BillingPage: React.FC = () => {
   // Get current plan
   const getCurrentPlan = (): { type: PlanType; label: string; color: string } => {
     if (subscription) {
-      // Check plan type based on plan_id or metadata
-      const planId = subscription.plan_id?.toLowerCase() || '';
+      // Check plan type based on plan_name or plan_type
+      const planName = subscription.plan_name?.toLowerCase() || subscription.plan_type?.toLowerCase() || '';
       
       // Determine plan type and status
       let planType: PlanType = 'pro';
       let statusLabel = '';
       
-      if (planId.includes('business')) {
+      if (planName.includes('business')) {
         planType = 'business';
-      } else if (planId.includes('enterprise')) {
+      } else if (planName.includes('enterprise')) {
         planType = 'enterprise';
-      } else if (planId.includes('pro') || planId.includes('premium')) {
+      } else if (planName.includes('pro') || planName.includes('premium')) {
         planType = 'pro';
       } else {
         planType = 'free';
@@ -589,15 +589,16 @@ const BillingPage: React.FC = () => {
                 planPrice={upgradePlan === 'pro' ? '₦35,000/mo' : '₦53,000/mo'}
                 onSuccess={async ({ reference, plan: paidPlan }) => {
                   try {
-                    // Store minimal subscription record using existing columns only.
+                    // Store subscription record using plan_name and plan_type columns
                     const { error } = await supabase.from('user_subscriptions').upsert({
                       user_id: user!.id,
-                      plan_id: paidPlan,
+                      plan_name: paidPlan,
+                      plan_type: paidPlan,
                       status: 'active',
                       current_period_start: new Date().toISOString(),
                       current_period_end: new Date(Date.now() + 30*24*60*60*1000).toISOString(),
                       updated_at: new Date().toISOString()
-                    } as any);
+                    });
                     if (error) throw error;
                     toast.success('Subscription activated');
                     setUpgradePlan(null);
