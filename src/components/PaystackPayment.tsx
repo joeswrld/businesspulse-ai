@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -44,6 +44,30 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paystackReady, setPaystackReady] = useState(false);
+  const [componentError, setComponentError] = useState<string | null>(null);
+
+  // Error boundary for the component
+  if (componentError) {
+    return (
+      <div className="p-6 text-center">
+        <Alert variant="destructive">
+          <XCircle className="h-4 w-4" />
+          <AlertDescription>
+            <p className="font-semibold mb-2">Component Error</p>
+            <p className="text-sm mb-4">{componentError}</p>
+            <Button 
+              onClick={() => window.location.reload()} 
+              size="sm" 
+              variant="outline"
+            >
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Reload Page
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   // Plan pricing in kobo (smallest currency unit)
   const planPricing = {
@@ -81,6 +105,9 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
       ]
     }
   };
+
+  // Safe access to plan details
+  const currentPlanDetails = planDetails[plan] || planDetails.pro;
 
   useEffect(() => {
     // Check if Paystack is already loaded
@@ -279,19 +306,19 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <span className="font-medium">Plan:</span>
-              <Badge variant="secondary">{planDetails[plan].name}</Badge>
+              <Badge variant="secondary">{currentPlanDetails.name}</Badge>
             </div>
             <div className="flex items-center justify-between mb-2">
               <span className="font-medium">Duration:</span>
-              <span className="text-sm text-gray-600">{planDetails[plan].duration}</span>
+              <span className="text-sm text-gray-600">{currentPlanDetails.duration}</span>
             </div>
             <div className="flex items-center justify-between mb-2">
               <span className="font-medium">Price:</span>
               <span className="text-lg font-bold">{formatPrice(amount)}/month</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="font-medium">Reference:</span>
-              <span className="text-sm text-gray-600 font-mono">{reference}</span>
+              <span className="font-medium">Features:</span>
+              <span className="text-sm text-gray-600">{currentPlanDetails.features.length} features</span>
             </div>
           </div>
 
@@ -299,7 +326,7 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
           <div className="space-y-2">
             <h4 className="font-medium">Plan Benefits:</h4>
             <ul className="text-sm text-gray-600 space-y-1">
-              {planDetails[plan].features.map((feature, index) => (
+              {currentPlanDetails.features.map((feature, index) => (
                 <li key={index}>• {feature}</li>
               ))}
             </ul>
