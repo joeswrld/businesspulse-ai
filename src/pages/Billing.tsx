@@ -11,7 +11,6 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import {
-  CreditCard,
   Download,
   Calendar,
   Users,
@@ -23,7 +22,6 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  ExternalLink,
   Loader2,
   Crown,
   Zap,
@@ -76,7 +74,6 @@ const BillingPage: React.FC = () => {
   
   // State
   const [cancelling, setCancelling] = useState(false);
-  const [updatingCard, setUpdatingCard] = useState(false);
   const [upgradePlanModal, setUpgradePlanModal] = useState<UpgradePlan>(null);
 
   // Handle subscription cancellation
@@ -94,24 +91,6 @@ const BillingPage: React.FC = () => {
       toast.error('Failed to cancel subscription: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setCancelling(false);
-    }
-  };
-
-  // Handle payment method update
-  const handleUpdateCard = async () => {
-    console.log('🔍 handleUpdateCard called');
-    console.log('billingProfile:', billingProfile);
-    console.log('isSubscriptionActive:', isSubscriptionActive);
-    
-    setUpdatingCard(true);
-    try {
-      await updatePaymentMethod();
-      console.log('✅ updatePaymentMethod completed successfully');
-    } catch (error) {
-      console.error('❌ updatePaymentMethod failed:', error);
-      toast.error('Failed to update payment method: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    } finally {
-      setUpdatingCard(false);
     }
   };
 
@@ -522,19 +501,11 @@ NoteX Team
         </Alert>
       )}
 
-      {isPaymentPastDue && !isInGracePeriod && (
+            {isPaymentPastDue && !isInGracePeriod && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            <strong>Payment Failed!</strong> Your payment method has failed. Update your payment method to avoid account suspension.
-            <div className="mt-3 flex gap-2">
-              <Button size="sm" onClick={handleUpdateCard}>
-                Update Payment Method
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleReactivateSubscription}>
-                Reactivate Subscription
-              </Button>
-            </div>
+            <strong>Payment Failed!</strong> Your payment method has failed. Please contact support to resolve this issue.
           </AlertDescription>
         </Alert>
       )}
@@ -543,12 +514,7 @@ NoteX Team
         <Alert>
           <Clock className="h-4 w-4" />
           <AlertDescription>
-            <strong>Payment Due!</strong> Your payment has failed, but you have {gracePeriodDaysLeft} days to update your payment method before your account is suspended.
-            <div className="mt-3">
-              <Button size="sm" onClick={handleUpdateCard}>
-                Update Payment Method
-              </Button>
-            </div>
+            <strong>Payment Due!</strong> Your payment has failed, but you have {gracePeriodDaysLeft} days to resolve this before your account is suspended. Please contact support.
           </AlertDescription>
         </Alert>
       )}
@@ -664,11 +630,6 @@ NoteX Team
               </>
             )}
             
-            {/* Show Update Payment Method button for all users */}
-            <Button variant="outline" onClick={handleUpdateCard} disabled={updatingCard}>
-              <CreditCard className="h-4 w-4 mr-2" />
-              {updatingCard ? 'Opening...' : 'Update Payment Method'}
-            </Button>
             
             {isSubscriptionActive && (
               <Button variant="outline" onClick={handleCancelSubscription} disabled={cancelling}>
@@ -768,30 +729,16 @@ NoteX Team
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {/* Download Receipt Button */}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => downloadReceipt(transaction)}
-                            disabled={transaction.status !== 'success'}
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Receipt
-                          </Button>
-                          
-                          {/* View in Paystack Button */}
-                          {transaction.paystack_reference && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => window.open(`https://dashboard.paystack.com/#/transactions/${transaction.paystack_reference}`, '_blank')}
-                            >
-                              <ExternalLink className="h-4 w-4 mr-2" />
-                              View
-                            </Button>
-                          )}
-                        </div>
+                        {/* Download Receipt Button */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => downloadReceipt(transaction)}
+                          disabled={transaction.status !== 'success'}
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Receipt
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );

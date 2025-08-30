@@ -77,7 +77,6 @@ export interface BillingSystemState {
   // Actions
   refreshData: () => Promise<void>;
   cancelSubscription: () => Promise<void>;
-  updatePaymentMethod: () => Promise<void>;
   upgradePlan: (plan: 'pro' | 'business') => Promise<void>;
   reactivateSubscription: () => Promise<void>;
 }
@@ -503,24 +502,6 @@ export function useBillingSystem(): BillingSystemState {
     }
   }, [billingProfile, refreshData]);
 
-  const updatePaymentMethod = useCallback(async () => {
-    try {
-      // For now, we'll provide a link to Paystack's dashboard
-      // In production, you should integrate with Paystack's customer management API
-      
-      // Since we might not have customer ID, we'll open the main Paystack dashboard
-      const paystackDashboardUrl = 'https://dashboard.paystack.com/';
-      
-      // Open the dashboard in a new tab
-      window.open(paystackDashboardUrl, '_blank');
-      toast.success('Paystack dashboard opened. You can manage your payment methods there.');
-      
-    } catch (err) {
-      console.error('Error updating payment method:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to update payment method');
-    }
-  }, []);
-
   const upgradePlan = useCallback(async (plan: 'pro' | 'business') => {
     // This will be handled by the PaystackPayment component
     return Promise.resolve();
@@ -592,7 +573,6 @@ export function useBillingSystem(): BillingSystemState {
     // Actions
     refreshData,
     cancelSubscription,
-    updatePaymentMethod,
     upgradePlan,
     reactivateSubscription
   };
