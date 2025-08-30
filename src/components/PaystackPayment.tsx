@@ -255,7 +255,7 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
       };
 
       const config: PaystackConfig = {
-        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || 'pk_test_...',
+        key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_...',
         email: userEmail,
         amount: amount,
         currency: 'NGN',
@@ -360,7 +360,7 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
                     Refresh Page
                   </Button>
                 </div>
-                {process.env.NODE_ENV === 'development' && (
+                {import.meta.env.DEV && (
                   <div className="mt-2 text-xs">
                     <p>Debug: paystackReady = {paystackReady.toString()}</p>
                     <p>Debug: window.PaystackPop = {window.PaystackPop ? 'exists' : 'missing'}</p>
