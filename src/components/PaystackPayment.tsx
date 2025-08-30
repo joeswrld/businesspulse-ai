@@ -200,7 +200,18 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
         toast.success(`🎉 Welcome to ${planName}! Your subscription has been activated.`);
         onSuccess({ reference: response.reference, plan });
       } else {
-        throw new Error(result.error || 'Failed to update subscription');
+        // Check if the error is retryable
+        if (result.retryable) {
+          setError(`${result.message} (Retryable - check your internet connection)`);
+          toast.error(result.message, {
+            action: {
+              label: 'Retry',
+              onClick: () => handlePaymentSuccess(response)
+            }
+          });
+        } else {
+          throw new Error(result.error || 'Failed to update subscription');
+        }
       }
     } catch (err) {
       console.error('Payment verification error:', err);
@@ -352,7 +363,30 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
               <XCircle className="h-4 w-4" />
               <AlertDescription>
                 {error}
-                <div className="mt-2">
+                <div className="mt-2 space-y-2">
+                  {/* Network Status */}
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className={`w-2 h-2 rounded-full ${navigator.onLine ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <span>{navigator.onLine ? 'Online' : 'Offline'}</span>
+                  </div>
+                  
+                  {/* Retry Button for Network Errors */}
+                  {error.includes('Retryable') && (
+                    <Button 
+                      onClick={() => {
+                        setError(null);
+                        handlePayment();
+                      }} 
+                      size="sm" 
+                      variant="outline"
+                      className="w-full"
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      Retry Payment Verification
+                    </Button>
+                  )}
+                  
+                  {/* General Retry */}
                   <Button 
                     onClick={retryPaystackLoad} 
                     size="sm" 
@@ -362,6 +396,7 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
                     <RefreshCw className="h-3 w-3 mr-1" />
                     Retry
                   </Button>
+                  
                   <Button 
                     onClick={() => window.location.reload()} 
                     size="sm" 

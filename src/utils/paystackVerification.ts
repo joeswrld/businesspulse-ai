@@ -18,6 +18,14 @@ export interface PaymentVerificationResult {
     paystack_transaction_id: string;
   };
   error?: string;
+  retryable?: boolean;
+}
+
+/**
+ * Check if the user has network connectivity
+ */
+function checkNetworkConnectivity(): boolean {
+  return navigator.onLine;
 }
 
 /**
@@ -31,15 +39,46 @@ export async function verifyPaystackPayment(
   try {
     console.log('Starting payment verification:', data);
 
+    // Check network connectivity first
+    if (!checkNetworkConnectivity()) {
+      return {
+        success: false,
+        message: 'No internet connection. Please check your network and try again.',
+        error: 'Network offline',
+        retryable: true
+      };
+    }
+
     // Get the current user from Supabase auth
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (authError || !user) {
+    if (authError) {
       console.error('Authentication error:', authError);
+      
+      // Check if it's a network-related auth error
+      if (authError.message.includes('Failed to fetch') || authError.message.includes('network')) {
+        return {
+          success: false,
+          message: 'Network connection issue. Please check your internet connection and try again.',
+          error: 'Network error during authentication',
+          retryable: true
+        };
+      }
+      
       return {
         success: false,
-        message: 'User not authenticated',
-        error: 'Authentication failed'
+        message: 'Authentication failed. Please log in again.',
+        error: 'Authentication failed',
+        retryable: false
+      };
+    }
+
+    if (!user) {
+      return {
+        success: false,
+        message: 'User not authenticated. Please log in and try again.',
+        error: 'User not found',
+        retryable: false
       };
     }
 
@@ -48,12 +87,39 @@ export async function verifyPaystackPayment(
       console.error('Email mismatch:', { userEmail: user.email, providedEmail: data.email });
       return {
         success: false,
-        message: 'Email verification failed',
-        error: 'Email does not match authenticated user'
+        message: 'Email verification failed. Please try again.',
+        error: 'Email does not match authenticated user',
+        retryable: false
       };
     }
 
     console.log('User authenticated:', user.id);
+
+    // Test database connectivity before proceeding
+    try {
+      const { error: testError } = await supabase
+        .from('billing_profiles')
+        .select('id')
+        .limit(1);
+      
+      if (testError) {
+        console.error('Database connectivity test failed:', testError);
+        return {
+          success: false,
+          message: 'Database connection failed. Please check your connection and try again.',
+          error: 'Database connectivity issue',
+          retryable: true
+        };
+      }
+    } catch (dbTestError) {
+      console.error('Database test error:', dbTestError);
+      return {
+        success: false,
+        message: 'Unable to connect to database. Please try again later.',
+        error: 'Database connection failed',
+        retryable: true
+      };
+    }
 
     // Create or update billing profile
     const { error: billingError } = await supabase
@@ -73,10 +139,22 @@ export async function verifyPaystackPayment(
 
     if (billingError) {
       console.error('Billing profile update error:', billingError);
+      
+      // Check if it's a network-related error
+      if (billingError.message.includes('Failed to fetch') || billingError.message.includes('network')) {
+        return {
+          success: false,
+          message: 'Network error while updating billing profile. Please try again.',
+          error: 'Network error during billing update',
+          retryable: true
+        };
+      }
+      
       return {
         success: false,
-        message: 'Failed to update billing profile',
-        error: billingError.message
+        message: 'Failed to update billing profile. Please try again.',
+        error: billingError.message,
+        retryable: true
       };
     }
 
@@ -97,10 +175,22 @@ export async function verifyPaystackPayment(
 
     if (transactionError) {
       console.error('Transaction record error:', transactionError);
+      
+      // Check if it's a network-related error
+      if (transactionError.message.includes('Failed to fetch') || transactionError.message.includes('network')) {
+        return {
+          success: false,
+          message: 'Network error while recording transaction. Please try again.',
+          error: 'Network error during transaction recording',
+          retryable: true
+        };
+      }
+      
       return {
         success: false,
-        message: 'Failed to record transaction',
-        error: transactionError.message
+        message: 'Failed to record transaction. Please try again.',
+        error: transactionError.message,
+        retryable: true
       };
     }
 
@@ -126,10 +216,22 @@ export async function verifyPaystackPayment(
 
     if (subscriptionError) {
       console.error('Subscription update error:', subscriptionError);
+      
+      // Check if it's a network-related error
+      if (subscriptionError.message.includes('Failed to fetch') || subscriptionError.message.includes('network')) {
+        return {
+          success: false,
+          message: 'Network error while updating subscription. Please try again.',
+          error: 'Network error during subscription update',
+          retryable: true
+        };
+      }
+      
       return {
         success: false,
-        message: 'Failed to update subscription',
-        error: subscriptionError.message
+        message: 'Failed to update subscription. Please try again.',
+        error: subscriptionError.message,
+        retryable: true
       };
     }
 
@@ -154,10 +256,30 @@ export async function verifyPaystackPayment(
   } catch (error) {
     console.error('Payment verification error:', error);
     
+    // Check if it's a network-related error
+    if (error instanceof Error) {
+      if (error.message.includes('Failed to fetch') || error.message.includes('network') || error.message.includes('ERR_TUNNEL_CONNECTION_FAILED') || error.message.includes('ERR_INTERNET_DISCONNECTED')) {
+        return {
+          success: false,
+          message: 'Network connection issue. Please check your internet connection and try again.',
+          error: 'Network error',
+          retryable: true
+        };
+      }
+      
+      return {
+        success: false,
+        message: 'Payment verification failed. Please try again.',
+        error: error.message,
+        retryable: true
+      };
+    }
+    
     return {
       success: false,
-      message: 'Internal server error',
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      message: 'An unexpected error occurred. Please try again.',
+      error: 'Unknown error',
+      retryable: true
     };
   }
 }
