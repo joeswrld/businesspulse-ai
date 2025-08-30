@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 // Types
 export interface BillingProfile {
   id: string;
-  plan: 'trial' | 'free' | 'pro' | 'business';
+  plan: 'trial' | 'pro' | 'business';
   trial_ends_at: string | null;
   next_billing_date: string | null;
   subscription_status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
@@ -61,7 +61,7 @@ export interface BillingSystemState {
   refreshing: boolean;
   
   // Computed values
-  currentPlan: 'trial' | 'free' | 'pro' | 'business';
+  currentPlan: 'trial' | 'pro' | 'business';
   trialDaysLeft: number;
   isTrialExpired: boolean;
   isSubscriptionActive: boolean;
@@ -94,16 +94,6 @@ const PLAN_LIMITS: Record<string, UsageLimits> = {
     support: ['Email'],
     retention: '8 days'
   },
-  free: {
-    feedback: 10,
-    analytics: 2,
-    reports: 1,
-    insights: 2,
-    teams: 1,
-    export: ['CSV'],
-    support: ['Email'],
-    retention: '30 days'
-  },
   pro: {
     feedback: 300,
     analytics: 100,
@@ -129,7 +119,6 @@ const PLAN_LIMITS: Record<string, UsageLimits> = {
 // Plan pricing (amounts in kobo - smallest currency unit for Paystack)
 const PLAN_PRICING = {
   trial: { price: 0, currency: 'NGN', period: '8 days' },
-  free: { price: 0, currency: 'NGN', period: 'forever' },
   pro: { price: 3500000, currency: 'NGN', period: '30 days' }, // ₦35,000 in kobo
   business: { price: 5300000, currency: 'NGN', period: '30 days' } // ₦53,000 in kobo
 };
@@ -616,11 +605,11 @@ export function useBillingSystem(): BillingSystemState {
 
 // Utility functions
 export function getPlanLimits(plan: string): UsageLimits {
-  return PLAN_LIMITS[plan] || PLAN_LIMITS.free;
+  return PLAN_LIMITS[plan] || PLAN_LIMITS.trial;
 }
 
 export function getPlanPricing(plan: string) {
-  return PLAN_PRICING[plan as keyof typeof PLAN_PRICING] || PLAN_PRICING.free;
+  return PLAN_PRICING[plan as keyof typeof PLAN_PRICING] || PLAN_PRICING.trial;
 }
 
 export function formatCurrency(amount: number, currency: string = 'NGN'): string {
@@ -641,7 +630,6 @@ export function formatDate(dateString: string): string {
 export function getPlanDisplayName(plan: string): string {
   const planNames: Record<string, string> = {
     trial: 'Free Trial',
-    free: 'Free Plan',
     pro: 'Pro Plan',
     business: 'Business Plan'
   };
@@ -651,7 +639,6 @@ export function getPlanDisplayName(plan: string): string {
 export function getPlanPrice(plan: string): string {
   const planPrices: Record<string, string> = {
     trial: 'Free',
-    free: 'Free',
     pro: '₦35,000/mo',
     business: '₦53,000/mo'
   };

@@ -421,26 +421,6 @@ const BillingPage: React.FC = () => {
               </>
             )}
             
-            {currentPlan === 'free' && (
-              <>
-                <Button onClick={() => setUpgradePlanModal('pro')} className="bg-green-600 hover:bg-green-700">
-                  <Zap className="h-4 w-4 mr-2" />
-                  Upgrade to Pro
-                </Button>
-                <Button onClick={() => setUpgradePlanModal('business')} variant="outline">
-                  <Crown className="h-4 w-4 mr-2" />
-                  Upgrade to Business
-                </Button>
-              </>
-            )}
-            
-            {currentPlan === 'pro' && (
-              <Button onClick={() => setUpgradePlanModal('business')} variant="outline">
-                <Crown className="h-4 w-4 mr-2" />
-                Upgrade to Business
-              </Button>
-            )}
-            
             {isSubscriptionActive && (
               <Button variant="outline" onClick={handleUpdateCard}>
                 <CreditCard className="h-4 w-4 mr-2" />
@@ -452,6 +432,13 @@ const BillingPage: React.FC = () => {
               <Button variant="outline" onClick={handleCancelSubscription} disabled={cancelling}>
                 {cancelling ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <X className="h-4 w-4 mr-2" />}
                 Cancel Subscription
+              </Button>
+            )}
+            
+            {currentPlan === 'pro' && (
+              <Button onClick={() => setUpgradePlanModal('business')} variant="outline">
+                <Crown className="h-4 w-4 mr-2" />
+                Upgrade to Business
               </Button>
             )}
             

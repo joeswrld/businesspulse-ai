@@ -23,7 +23,7 @@ import { UsageData, UsageLimits } from '@/hooks/useBillingSystem';
 interface UsageTrackerProps {
   usageData: UsageData;
   planLimits: UsageLimits;
-  currentPlan: 'trial' | 'free' | 'pro' | 'business';
+  currentPlan: 'trial' | 'pro' | 'business';
   onUpgrade: (plan: 'pro' | 'business') => void;
 }
 

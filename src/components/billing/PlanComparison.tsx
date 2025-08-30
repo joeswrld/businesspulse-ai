@@ -6,7 +6,7 @@ import { Check, X, Crown, Zap, Star } from 'lucide-react';
 import { getPlanLimits, getPlanPricing } from '@/hooks/useBillingSystem';
 
 interface PlanComparisonProps {
-  currentPlan: 'trial' | 'free' | 'pro' | 'business';
+  currentPlan: 'trial' | 'pro' | 'business';
   onUpgrade: (plan: 'pro' | 'business') => void;
   showUpgradeButtons?: boolean;
 }
@@ -38,32 +38,12 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
       comingSoon: false
     },
     {
-      id: 'free',
-      name: 'Free Plan',
-      description: 'Basic features for small teams',
-      price: 0,
-      currency: 'NGN',
-      period: 'month',
-      features: [
-        { name: 'Feedback Collection', limit: 10, unit: 'responses' },
-        { name: 'AI Insights', limit: 2, unit: 'insights' },
-        { name: 'Basic Analytics', limit: 2, unit: 'reports' },
-        { name: 'Reports', limit: 1, unit: 'report' },
-        { name: 'Team Members', limit: 1, unit: 'member' },
-        { name: 'Export Formats', limit: ['CSV'], unit: 'formats' },
-        { name: 'Support', limit: ['Email'], unit: 'channels' },
-        { name: 'Data Retention', limit: '30 days', unit: 'retention' }
-      ],
-      popular: false,
-      comingSoon: false
-    },
-    {
       id: 'pro',
       name: 'Pro Plan',
       description: 'Advanced features for growing businesses',
-      price: 35000,
+      price: 3500000, // ₦35,000 in kobo
       currency: 'NGN',
-      period: 'month',
+      period: '30 days',
       features: [
         { name: 'Feedback Collection', limit: 300, unit: 'responses' },
         { name: 'AI Insights', limit: 50, unit: 'insights' },
@@ -83,9 +63,9 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
       id: 'business',
       name: 'Business Plan',
       description: 'Enterprise features for large organizations',
-      price: 53000,
+      price: 5300000, // ₦53,000 in kobo
       currency: 'NGN',
-      period: 'month',
+      period: '30 days',
       features: [
         { name: 'Feedback Collection', limit: -1, unit: 'unlimited' },
         { name: 'AI Insights', limit: -1, unit: 'unlimited' },
@@ -107,10 +87,12 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
 
   const formatPrice = (price: number, currency: string) => {
     if (price === 0) return 'Free';
+    // Convert from kobo to naira
+    const amountInNaira = price / 100;
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: currency.toUpperCase(),
-    }).format(price / 100);
+    }).format(amountInNaira);
   };
 
   const getFeatureDisplay = (feature: any) => {
@@ -145,7 +127,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
       <div className="grid gap-6 lg:grid-cols-4">
         {plans.map((plan) => {
           const isCurrentPlan = plan.id === currentPlan;
-          const isUpgradeable = (currentPlan === 'trial' || currentPlan === 'free') && plan.id === 'pro';
+          const isUpgradeable = currentPlan === 'trial' && plan.id === 'pro';
           const isDowngradeable = currentPlan === 'business' && plan.id === 'pro';
           
           return (
@@ -226,7 +208,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
                       >
                         Downgrade to Pro
                       </Button>
-                    ) : plan.id === 'business' && (currentPlan === 'trial' || currentPlan === 'free') ? (
+                    ) : plan.id === 'business' && currentPlan === 'trial' ? (
                       <Button 
                         onClick={() => onUpgrade('business')} 
                         className="w-full bg-amber-600 hover:bg-amber-700"
@@ -274,7 +256,6 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
                 <tr className="border-b">
                   <th className="text-left py-3 px-4 font-medium">Feature</th>
                   <th className="text-center py-3 px-4 font-medium">Free Trial</th>
-                  <th className="text-center py-3 px-4 font-medium">Free Plan</th>
                   <th className="text-center py-3 px-4 font-medium">Pro Plan</th>
                   <th className="text-center py-3 px-4 font-medium">Business Plan</th>
                 </tr>
@@ -319,7 +300,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
           <div>
             <h4 className="font-semibold mb-2">What happens when my trial expires?</h4>
             <p className="text-sm text-muted-foreground">
-              You'll be moved to the Free plan with limited features. Upgrade to Pro or Business to continue using advanced features.
+              When your trial expires, you'll need to upgrade to Pro or Business to continue using advanced features. No automatic downgrade to a free plan.
             </p>
           </div>
           
