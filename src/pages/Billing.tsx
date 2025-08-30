@@ -39,7 +39,8 @@ import {
   ArrowRight,
   Check,
   X,
-  Infinity
+  Infinity,
+  Play
 } from 'lucide-react';
 import PaystackPayment from '@/components/PaystackPayment';
 import UsageTracker from '@/components/billing/UsageTracker';
@@ -245,22 +246,197 @@ const BillingPage: React.FC = () => {
           </p>
         </div>
         
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Welcome to NoteX! You're currently on a free trial. No billing information is available yet.
-            <br />
-            <br />
-            <strong>Your trial includes:</strong>
-            <ul className="list-disc list-inside mt-2 space-y-1">
-              <li>50 feedback submissions</li>
-              <li>5 analytics reports</li>
-              <li>2 detailed reports</li>
-              <li>5 AI insights</li>
-              <li>1 team</li>
-            </ul>
-          </AlertDescription>
-        </Alert>
+        <div className="space-y-8">
+          {/* Welcome Header */}
+          <div className="text-center space-y-4">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+              <Star className="h-8 w-8 text-white" />
+            </div>
+            <h1 className="text-4xl font-bold tracking-tight">Welcome to NoteX! 🎉</h1>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              You're starting your journey with a <strong>free 8-day trial</strong>. 
+              Explore all our features and see how NoteX can transform your feedback collection.
+            </p>
+          </div>
+
+          {/* Trial Benefits Card */}
+          <Card className="max-w-4xl mx-auto">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl flex items-center justify-center gap-2">
+                <Zap className="h-6 w-6 text-blue-600" />
+                Your Free Trial Benefits
+              </CardTitle>
+              <CardDescription className="text-lg">
+                Full access to NoteX features for 8 days - no credit card required!
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg text-green-700">✅ What's Included:</h3>
+                  <ul className="space-y-3">
+                    <li className="flex items-start gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium">50 Feedback Submissions</span>
+                        <p className="text-sm text-muted-foreground">Collect customer feedback and insights</p>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium">5 AI Insights</span>
+                        <p className="text-sm text-muted-foreground">AI-powered business intelligence</p>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium">5 Analytics Reports</span>
+                        <p className="text-sm text-muted-foreground">Data-driven insights and trends</p>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium">2 Detailed Reports</span>
+                        <p className="text-sm text-muted-foreground">Comprehensive business analysis</p>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium">1 Team Member</span>
+                        <p className="text-sm text-muted-foreground">Collaborate with your team</p>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+                
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg text-blue-700">🚀 After Trial:</h3>
+                  <div className="space-y-4">
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <h4 className="font-semibold text-blue-900 mb-2">Pro Plan - ₦35,000/month</h4>
+                      <ul className="text-sm text-blue-800 space-y-1">
+                        <li>• 300 feedback submissions (6x increase)</li>
+                        <li>• 50 AI insights (10x increase)</li>
+                        <li>• 100 analytics reports (20x increase)</li>
+                        <li>• PDF & Excel export</li>
+                        <li>• Email + Chat support</li>
+                      </ul>
+                    </div>
+                    
+                    <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                      <h4 className="font-semibold text-amber-900 mb-2">Business Plan - ₦53,000/month</h4>
+                      <ul className="text-sm text-amber-800 space-y-1">
+                        <li>• Unlimited usage across all features</li>
+                        <li>• Priority phone support</li>
+                        <li>• API access & custom integrations</li>
+                        <li>• Predictive analytics</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Action Cards */}
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            <Card className="text-center p-6">
+              <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <Play className="h-6 w-6 text-green-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Start Using NoteX</h3>
+              <p className="text-muted-foreground mb-4">
+                Begin collecting feedback and generating insights right away. Your trial is active now!
+              </p>
+              <Button className="w-full" onClick={() => window.location.href = '/dashboard'}>
+                Go to Dashboard
+              </Button>
+            </Card>
+
+            <Card className="text-center p-6">
+              <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                <Crown className="h-6 w-6 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Upgrade Early</h3>
+              <p className="text-muted-foreground mb-4">
+                Love what you see? Upgrade anytime during your trial to unlock unlimited features.
+              </p>
+              <div className="space-y-2">
+                <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => setUpgradePlanModal('pro')}>
+                  <Zap className="h-4 w-4 mr-2" />
+                  Upgrade to Pro
+                </Button>
+                <Button className="w-full bg-amber-600 hover:bg-amber-700" onClick={() => setUpgradePlanModal('business')}>
+                  <Crown className="h-4 w-4 mr-2" />
+                  Upgrade to Business
+                </Button>
+              </div>
+            </Card>
+          </div>
+
+          {/* Trial Status */}
+          <Card className="max-w-4xl mx-auto">
+            <CardHeader className="text-center">
+              <CardTitle className="text-lg">Trial Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center space-y-4">
+                <div className="mx-auto w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Clock className="h-12 w-12 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {trialDaysLeft} Days Remaining
+                  </p>
+                  <p className="text-muted-foreground">
+                    Your trial started today and will end on {new Date(Date.now() + (trialDaysLeft * 24 * 60 * 60 * 1000)).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex justify-center">
+                  <Progress value={((8 - trialDaysLeft) / 8) * 100} className="w-64 h-2" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {8 - trialDaysLeft} of 8 days used
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* FAQ Section */}
+          <Card className="max-w-4xl mx-auto">
+            <CardHeader>
+              <CardTitle className="text-center">Frequently Asked Questions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-semibold mb-2">What happens when my trial ends?</h4>
+                  <p className="text-sm text-muted-foreground">
+                    You'll need to upgrade to Pro or Business to continue using advanced features. No automatic charges - you decide when to upgrade.
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="font-semibold mb-2">Can I upgrade during my trial?</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Absolutely! You can upgrade anytime during your trial. Your billing cycle will start from the upgrade date.
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="font-semibold mb-2">Is my data safe?</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Yes! Your data is secure and will be preserved even after the trial ends. Upgrade anytime to continue accessing it.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
