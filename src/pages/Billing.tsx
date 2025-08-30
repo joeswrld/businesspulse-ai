@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useBillingSystem, getPlanLimits, formatCurrency, formatDate, getPlanDisplayName, getPlanPrice } from '@/hooks/useBillingSystem';
+import { useBillingSystem, getPlanLimits, formatCurrency, formatDate, getPlanDisplayName, getPlanPrice, getPlanPricing } from '@/hooks/useBillingSystem';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import {
   CreditCard,
@@ -30,7 +32,14 @@ import {
   DollarSign,
   Receipt,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Lock,
+  Unlock,
+  Star,
+  ArrowRight,
+  Check,
+  X,
+  Infinity
 } from 'lucide-react';
 import PaystackPayment from '@/components/PaystackPayment';
 
@@ -51,10 +60,15 @@ const BillingPage: React.FC = () => {
     isSubscriptionActive,
     isPaymentPastDue,
     nextBillingDate,
+    isInGracePeriod,
+    gracePeriodDaysLeft,
+    usagePercentages,
+    isLimitReached,
     refreshData,
     cancelSubscription,
     updatePaymentMethod,
-    upgradePlan
+    upgradePlan,
+    reactivateSubscription
   } = useBillingSystem();
   
   // State
@@ -82,6 +96,15 @@ const BillingPage: React.FC = () => {
     }
   };
 
+  // Handle subscription reactivation
+  const handleReactivateSubscription = async () => {
+    try {
+      await reactivateSubscription();
+    } catch (error) {
+      console.error('Failed to reactivate subscription:', error);
+    }
+  };
+
   // Get status icon and color
   const getStatusDisplay = (status: string) => {
     switch (status) {
@@ -106,6 +129,8 @@ const BillingPage: React.FC = () => {
       color = 'bg-blue-100 text-blue-800 border-blue-300';
       if (isTrialExpired) {
         statusLabel = ' - Expired';
+      } else {
+        statusLabel = ` - ${trialDaysLeft} days left`;
       }
     } else if (currentPlan === 'pro') {
       color = 'bg-green-100 text-green-800 border-green-300';
@@ -114,8 +139,13 @@ const BillingPage: React.FC = () => {
     }
 
     if (isPaymentPastDue) {
-      statusLabel = ' - Payment Due';
-      color = 'bg-red-100 text-red-800 border-red-300';
+      if (isInGracePeriod) {
+        statusLabel = ` - Payment Due (${gracePeriodDaysLeft} days grace)`;
+        color = 'bg-orange-100 text-orange-800 border-orange-300';
+      } else {
+        statusLabel = ' - Payment Failed';
+        color = 'bg-red-100 text-red-800 border-red-300';
+      }
     }
 
     return {
@@ -126,6 +156,7 @@ const BillingPage: React.FC = () => {
 
   // Get plan limits
   const planLimits = getPlanLimits(currentPlan);
+  const planPricing = getPlanPricing(currentPlan);
 
   // Check if user is authenticated
   if (!user) {
@@ -234,503 +265,276 @@ const BillingPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Payment Past Due Alert */}
-      {isPaymentPastDue && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Your payment has failed. Please update your payment method to continue using premium features.
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="ml-2"
-              onClick={handleUpdateCard}
-            >
-              Update Payment Method
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Trial Expired Alert */}
-      {isTrialExpired && (
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            Your free trial has expired. Upgrade to continue using all features.
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="ml-2"
-              onClick={() => setUpgradePlanModal('pro')}
-            >
-              Upgrade Now
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Upgrade Plan Modal */}
-      {upgradePlanModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full">
-            <div className="p-4 border-b flex items-center justify-between">
-              <div className="font-semibold">Upgrade Subscription</div>
-              <button 
-                className="text-sm text-muted-foreground hover:text-foreground" 
-                onClick={() => setUpgradePlanModal(null)}
-              >
-                Close
-              </button>
-            </div>
-            <div className="p-4">
-              <PaystackPayment
-                plan={upgradePlanModal}
-                planName={upgradePlanModal === 'pro' ? 'Pro' : 'Business'}
-                planPrice={getPlanPrice(upgradePlanModal)}
-                onSuccess={async ({ reference, plan: paidPlan }) => {
-                  try {
-                    toast.success('Subscription activated successfully!');
-                    setUpgradePlanModal(null);
-                    await refreshData();
-                  } catch (e: any) {
-                    toast.error(e?.message || 'Failed to activate subscription');
-                  }
-                }}
-                onCancel={() => setUpgradePlanModal(null)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Billing & Usage</h1>
-          <p className="text-muted-foreground">
-            Manage your subscription and view usage statistics
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={refreshData}
-          disabled={refreshing}
-          className="flex items-center space-x-2"
-        >
-          {refreshing ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-          <span>Refresh</span>
-        </Button>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Billing & Usage</h1>
+        <p className="text-muted-foreground">
+          Manage your subscription and view usage statistics
+        </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Current Usage Section */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <TrendingUp className="h-5 w-5" />
-              <span>Current Usage</span>
-            </CardTitle>
-            <CardDescription>
-              Track your feature usage across the platform
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {/* Feedback Usage */}
-              <div className={`flex items-center justify-between p-3 rounded-lg ${
-                (() => {
-                  const limitVal = planLimits.feedback;
-                  const current = usageData?.feedback_count || 0;
-                  const over = limitVal !== -1 && current >= limitVal;
-                  return over ? 'bg-red-50 border border-red-200' : 'bg-blue-50';
-                })()
-              }`}>
-                <div className="flex items-center space-x-2">
-                  <MessageSquare className={`h-5 w-5 ${
-                    (() => {
-                      const limitVal = planLimits.feedback;
-                      const current = usageData?.feedback_count || 0;
-                      const over = limitVal !== -1 && current >= limitVal;
-                      return over ? 'text-red-600' : 'text-blue-600';
-                    })()
-                  }`} />
-                  <div>
-                    <p className="text-sm font-medium">Feedback</p>
-                    <p className="text-xs text-muted-foreground">
-                      {currentPlan === 'trial' && '50 submissions / 8 days (Free Trial)'}
-                      {currentPlan === 'free' && '10 submissions / 30 days (Free Plan)'}
-                      {currentPlan === 'pro' && '300 submissions / 30 days (Pro Plan)'}
-                      {currentPlan === 'business' && 'Unlimited submissions (Business Plan)'}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className={`text-lg font-bold ${
-                    (() => {
-                      const limitVal = planLimits.feedback;
-                      const current = usageData?.feedback_count || 0;
-                      const over = limitVal !== -1 && current >= limitVal;
-                      return over ? 'text-red-600' : 'text-blue-600';
-                    })()
-                  }`}>
-                    {(() => {
-                      const limitVal = planLimits.feedback;
-                      const current = usageData?.feedback_count || 0;
-                      return limitVal === -1 ? current : Math.min(current, limitVal);
-                    })()}
-                  </span>
-                  <span className="text-xs text-muted-foreground block">
-                    {planLimits.feedback === -1 ? 'Unlimited' : `/${planLimits.feedback}`}
-                  </span>
-                  {(() => {
-                    const limitVal = planLimits.feedback;
-                    const current = usageData?.feedback_count || 0;
-                    const over = limitVal !== -1 && current >= limitVal;
-                    return over ? (<div className="text-xs text-red-600 mt-1">Limit Reached</div>) : null;
-                  })()}
-                </div>
-              </div>
-
-              {/* Analytics Usage */}
-              <div className={`flex items-center justify-between p-3 rounded-lg ${
-                (() => {
-                  const limitVal = planLimits.analytics;
-                  const current = usageData?.analytics_count || 0;
-                  const canUse = limitVal === -1 || current < limitVal;
-                  return canUse ? 'bg-green-50' : 'bg-red-50 border border-red-200';
-                })()
-              }`}>
-                <div className="flex items-center space-x-2">
-                  <BarChart3 className={`h-5 w-5 ${
-                    (() => {
-                      const limitVal = planLimits.analytics;
-                      const current = usageData?.analytics_count || 0;
-                      const canUse = limitVal === -1 || current < limitVal;
-                      return canUse ? 'text-green-600' : 'text-red-600';
-                    })()
-                  }`} />
-                  <div>
-                    <p className="text-sm font-medium">Analytics</p>
-                    <p className="text-xs text-muted-foreground">
-                      {(() => {
-                        const limitVal = planLimits.analytics;
-                        const current = usageData?.analytics_count || 0;
-                        return limitVal === -1 ? `${current} (Unlimited)` : `${current} / ${limitVal}`;
-                      })()} ({getPlanDisplayName(currentPlan)})
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className={`text-lg font-bold ${
-                    (() => {
-                      const limitVal = planLimits.analytics;
-                      const current = usageData?.analytics_count || 0;
-                      const canUse = limitVal === -1 || current < limitVal;
-                      return canUse ? 'text-green-600' : 'text-red-600';
-                    })()
-                  }`}>
-                    {usageData?.analytics_count || 0}
-                  </span>
-                  {(() => {
-                    const limitVal = planLimits.analytics;
-                    const current = usageData?.analytics_count || 0;
-                    const canUse = limitVal === -1 || current < limitVal;
-                    return !canUse ? (<div className="text-xs text-red-600 mt-1">Limit Reached</div>) : null;
-                  })()}
-                </div>
-              </div>
-
-              {/* Reports Usage */}
-              <div className={`flex items-center justify-between p-3 rounded-lg ${
-                (() => {
-                  const limitVal = planLimits.reports;
-                  const current = usageData?.reports_count || 0;
-                  const canUse = limitVal === -1 || current < limitVal;
-                  return canUse ? 'bg-purple-50' : 'bg-red-50 border border-red-200';
-                })()
-              }`}>
-                <div className="flex items-center space-x-2">
-                  <FileText className={`h-5 w-5 ${
-                    (() => {
-                      const limitVal = planLimits.reports;
-                      const current = usageData?.reports_count || 0;
-                      const canUse = limitVal === -1 || current < limitVal;
-                      return canUse ? 'text-purple-600' : 'text-red-600';
-                    })()
-                  }`} />
-                  <div>
-                    <p className="text-sm font-medium">Reports</p>
-                    <p className="text-xs text-muted-foreground">
-                      {(() => {
-                        const limitVal = planLimits.reports;
-                        const current = usageData?.reports_count || 0;
-                        return limitVal === -1 ? `${current} (Unlimited)` : `${current} / ${limitVal}`;
-                      })()} ({getPlanDisplayName(currentPlan)})
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className={`text-lg font-bold ${
-                    (() => {
-                      const limitVal = planLimits.reports;
-                      const current = usageData?.reports_count || 0;
-                      const canUse = limitVal === -1 || current < limitVal;
-                      return canUse ? 'text-purple-600' : 'text-red-600';
-                    })()
-                  }`}>
-                    {usageData?.reports_count || 0}
-                  </span>
-                  {(() => {
-                    const limitVal = planLimits.reports;
-                    const current = usageData?.reports_count || 0;
-                    const canUse = limitVal === -1 || current < limitVal;
-                    return !canUse ? (<div className="text-xs text-red-600 mt-1">Limit Reached</div>) : null;
-                  })()}
-                </div>
-              </div>
-
-              {/* Insights Usage */}
-              <div className={`flex items-center justify-between p-3 rounded-lg ${
-                (() => {
-                  const limitVal = planLimits.insights;
-                  const current = usageData?.insights_count || 0;
-                  const canUse = limitVal === -1 || current < limitVal;
-                  return canUse ? 'bg-orange-50' : 'bg-red-50 border border-red-200';
-                })()
-              }`}>
-                <div className="flex items-center space-x-2">
-                  <Brain className={`h-5 w-5 ${
-                    (() => {
-                      const limitVal = planLimits.insights;
-                      const current = usageData?.insights_count || 0;
-                      const canUse = limitVal === -1 || current < limitVal;
-                      return canUse ? 'text-orange-600' : 'text-red-600';
-                    })()
-                  }`} />
-                  <div>
-                    <p className="text-sm font-medium">Insights</p>
-                    <p className="text-xs text-muted-foreground">
-                      {(() => {
-                        const limitVal = planLimits.insights;
-                        const current = usageData?.insights_count || 0;
-                        return limitVal === -1 ? `${current} (Unlimited)` : `${current} / ${limitVal}`;
-                      })()} ({getPlanDisplayName(currentPlan)})
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className={`text-lg font-bold ${
-                    (() => {
-                      const limitVal = planLimits.insights;
-                      const current = usageData?.insights_count || 0;
-                      const canUse = limitVal === -1 || current < limitVal;
-                      return canUse ? 'text-orange-600' : 'text-red-600';
-                    })()
-                  }`}>
-                    {usageData?.insights_count || 0}
-                  </span>
-                  {(() => {
-                    const limitVal = planLimits.insights;
-                    const current = usageData?.insights_count || 0;
-                    const canUse = limitVal === -1 || current < limitVal;
-                    return !canUse ? (<div className="text-xs text-red-600 mt-1">Limit Reached</div>) : null;
-                  })()}
-                </div>
-              </div>
-
-              {/* Teams Usage */}
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg opacity-60">
-                <div className="flex items-center space-x-2">
-                  <Users className="h-5 w-5 text-gray-600" />
-                  <div>
-                    <p className="text-sm font-medium">Teams</p>
-                    <p className="text-xs text-muted-foreground">Coming Soon</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-lg font-bold text-gray-600">
-                    {usageData?.teams_count || 0}
-                  </span>
-                  <Badge variant="secondary" className="text-xs">
-                    Soon
-                  </Badge>
-                </div>
-              </div>
-              
-              {/* Usage Summary */}
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-blue-900">Current Plan: {getPlanDisplayName(currentPlan)}</h4>
-                    <p className="text-sm text-blue-700">
-                      {(() => {
-                        const limits = [planLimits.feedback, planLimits.analytics, planLimits.reports, planLimits.insights];
-                        const usages = [usageData?.feedback_count || 0, usageData?.analytics_count || 0, usageData?.reports_count || 0, usageData?.insights_count || 0];
-                        const hasReachedLimit = limits.some((limit, index) => limit !== -1 && usages[index] >= limit);
-                        return hasReachedLimit 
-                          ? 'Some features have reached their limits. Consider upgrading your plan.'
-                          : 'All features are within your plan limits.';
-                      })()}
-                    </p>
-                    <p className="text-xs text-blue-600 mt-1">
-                      Feedback Widget: {usageData?.feedback_count || 0} submissions in current period
-                      {planLimits.feedback !== -1 && ` (${Math.max(0, planLimits.feedback - (usageData?.feedback_count || 0))} remaining)`}
-                    </p>
-                  </div>
-                  {(() => {
-                    const limits = [planLimits.feedback, planLimits.analytics, planLimits.reports, planLimits.insights];
-                    const usages = [usageData?.feedback_count || 0, usageData?.analytics_count || 0, usageData?.reports_count || 0, usageData?.insights_count || 0];
-                    const hasReachedLimit = limits.some((limit, index) => limit !== -1 && usages[index] >= limit);
-                    return hasReachedLimit ? (
-                      <Button 
-                        size="sm" 
-                        className="bg-blue-600 hover:bg-blue-700"
-                        onClick={() => setUpgradePlanModal('pro')}
-                      >
-                        <Crown className="h-4 w-4 mr-2" />
-                        Upgrade Plan
-                      </Button>
-                    ) : null;
-                  })()}
-                </div>
-              </div>
+      {/* Critical Alerts */}
+      {isTrialExpired && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Trial Expired!</strong> Your free trial has ended. Upgrade to Pro or Business to continue using advanced features.
+            <div className="mt-3 flex gap-2">
+              <Button size="sm" onClick={() => setUpgradePlanModal('pro')}>
+                Upgrade to Pro
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setUpgradePlanModal('business')}>
+                Upgrade to Business
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </AlertDescription>
+        </Alert>
+      )}
 
-        {/* Current Plan Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <CreditCard className="h-5 w-5" />
-              <span>Current Plan</span>
-            </CardTitle>
-            <CardDescription>
-              Your subscription details and billing information
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Plan Status */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Plan</span>
+      {isPaymentPastDue && !isInGracePeriod && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Payment Failed!</strong> Your payment method has failed. Update your payment method to avoid account suspension.
+            <div className="mt-3 flex gap-2">
+              <Button size="sm" onClick={handleUpdateCard}>
+                Update Payment Method
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleReactivateSubscription}>
+                Reactivate Subscription
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {isPaymentPastDue && isInGracePeriod && (
+        <Alert>
+          <Clock className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Payment Due!</strong> Your payment has failed, but you have {gracePeriodDaysLeft} days to update your payment method before your account is suspended.
+            <div className="mt-3">
+              <Button size="sm" onClick={handleUpdateCard}>
+                Update Payment Method
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Current Plan Overview */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Crown className="h-5 w-5" />
+                Current Plan
+              </CardTitle>
+              <CardDescription>
+                Your current subscription and billing status
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
               <Badge className={getCurrentPlanDisplay().color}>
                 {getCurrentPlanDisplay().label}
               </Badge>
+              {refreshing && <Loader2 className="h-4 w-4 animate-spin" />}
             </div>
-
-            {/* Trial Info */}
-            {trialDaysLeft > 0 && (
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Trial Days Left</span>
-                  <span className="text-sm text-blue-600 font-medium">
-                    {trialDaysLeft} days
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Trial Ends</span>
-                  <span className="text-sm text-muted-foreground">
-                    {billingProfile?.trial_ends_at ? formatDate(billingProfile.trial_ends_at) : 'N/A'}
-                  </span>
-                </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <div className="text-2xl font-bold text-gray-900">
+                {planPricing.price === 0 ? 'Free' : formatCurrency(planPricing.price, planPricing.currency)}
+              </div>
+              <div className="text-sm text-gray-600">per {planPricing.period}</div>
+            </div>
+            
+            {currentPlan === 'trial' && !isTrialExpired && (
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-900">{trialDaysLeft}</div>
+                <div className="text-sm text-blue-600">trial days left</div>
               </div>
             )}
-
-            {/* Next Billing Date */}
+            
             {nextBillingDate && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Next Billing</span>
-                <span className="text-sm text-muted-foreground">
+              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                <div className="text-2xl font-bold text-gray-900">
                   {formatDate(nextBillingDate)}
-                </span>
+                </div>
+                <div className="text-sm text-gray-600">Next billing</div>
               </div>
             )}
+          </div>
 
-            {/* Action Buttons */}
-            <div className="space-y-2 pt-4">
-              {isSubscriptionActive && (
-                <Button
-                  variant="outline"
-                  onClick={handleCancelSubscription}
-                  disabled={cancelling}
-                  className="w-full"
-                >
-                  {cancelling ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <XCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Cancel Subscription
-                </Button>
-              )}
-
-              {billingProfile?.paystack_customer_id && (
-                <Button
-                  variant="outline"
-                  onClick={handleUpdateCard}
-                  disabled={updatingCard}
-                  className="w-full"
-                >
-                  {updatingCard ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <CreditCard className="h-4 w-4 mr-2" />
-                  )}
-                  Update Card
-                </Button>
-              )}
-
-              {!isSubscriptionActive && (isTrialExpired || currentPlan === 'free') && (
-                <div className="space-y-2">
-                  <Button className="w-full" onClick={() => setUpgradePlanModal('pro')}>
-                    <Crown className="h-4 w-4 mr-2" />
-                    Upgrade to Pro
-                  </Button>
-                  <Button variant="outline" className="w-full" onClick={() => setUpgradePlanModal('business')}>
-                    <Zap className="h-4 w-4 mr-2" />
-                    Upgrade to Business
-                  </Button>
+          {/* Plan Features */}
+          <div className="mt-6">
+            <h4 className="font-semibold mb-3">Plan Features</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-600" />
+                  <span>Export: {planLimits.export.join(', ')}</span>
                 </div>
-              )}
+                <div className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-600" />
+                  <span>Support: {planLimits.support.join(', ')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-600" />
+                  <span>Data Retention: {planLimits.retention}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-600" />
+                  <span>Teams: {planLimits.teams === -1 ? 'Unlimited' : planLimits.teams}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-600" />
+                  <span>Priority Support: {currentPlan === 'business' ? 'Yes' : 'No'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-600" />
+                  <span>API Access: {currentPlan === 'business' ? 'Yes' : 'No'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-              {isSubscriptionActive && currentPlan === 'pro' && (
-                <Button variant="outline" className="w-full" onClick={() => setUpgradePlanModal('business')}>
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-3 pt-4">
+            {currentPlan === 'trial' && !isTrialExpired && (
+              <>
+                <Button onClick={() => setUpgradePlanModal('pro')} className="bg-green-600 hover:bg-green-700">
                   <Zap className="h-4 w-4 mr-2" />
+                  Upgrade to Pro
+                </Button>
+                <Button onClick={() => setUpgradePlanModal('business')} variant="outline">
+                  <Crown className="h-4 w-4 mr-2" />
                   Upgrade to Business
                 </Button>
-              )}
+              </>
+            )}
+            
+            {currentPlan === 'free' && (
+              <>
+                <Button onClick={() => setUpgradePlanModal('pro')} className="bg-green-600 hover:bg-green-700">
+                  <Zap className="h-4 w-4 mr-2" />
+                  Upgrade to Pro
+                </Button>
+                <Button onClick={() => setUpgradePlanModal('business')} variant="outline">
+                  <Crown className="h-4 w-4 mr-2" />
+                  Upgrade to Business
+                </Button>
+              </>
+            )}
+            
+            {currentPlan === 'pro' && (
+              <Button onClick={() => setUpgradePlanModal('business')} variant="outline">
+                <Crown className="h-4 w-4 mr-2" />
+                Upgrade to Business
+              </Button>
+            )}
+            
+            {isSubscriptionActive && (
+              <Button variant="outline" onClick={handleUpdateCard}>
+                <CreditCard className="h-4 w-4 mr-2" />
+                Update Payment Method
+              </Button>
+            )}
+            
+            {isSubscriptionActive && (
+              <Button variant="outline" onClick={handleCancelSubscription} disabled={cancelling}>
+                {cancelling ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <X className="h-4 w-4 mr-2" />}
+                Cancel Subscription
+              </Button>
+            )}
+            
+            <Button variant="ghost" onClick={refreshData} disabled={refreshing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Usage Tracking */}
+      {usageData && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Usage & Limits
+            </CardTitle>
+            <CardDescription>
+              Track your current usage against plan limits
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {Object.entries(planLimits).map(([feature, limit]) => {
+                if (feature === 'export' || feature === 'support' || feature === 'retention') return null;
+                
+                const usage = usageData[`${feature}_count` as keyof UsageData] as number;
+                const percentage = usagePercentages[feature] || 0;
+                const reached = isLimitReached[feature];
+                const isUnlimited = limit === -1;
+                
+                return (
+                  <div key={feature} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium capitalize">{feature}</span>
+                        {reached && <XCircle className="h-4 w-4 text-red-600" />}
+                        {isUnlimited && <Infinity className="h-4 w-4 text-green-600" />}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {isUnlimited ? 'Unlimited' : `${usage}/${limit}`}
+                      </div>
+                    </div>
+                    
+                    {!isUnlimited && (
+                      <div className="space-y-1">
+                        <Progress 
+                          value={percentage} 
+                          className={`h-2 ${reached ? 'bg-red-100' : ''}`}
+                        />
+                        <div className="flex justify-between text-xs text-gray-500">
+                          <span>{usage} used</span>
+                          <span>{limit - usage} remaining</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {reached && (
+                      <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                        Limit reached! Upgrade to continue using this feature.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
-      </div>
+      )}
 
-      {/* Transaction History Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Receipt className="h-5 w-5" />
-            <span>Transaction History</span>
-          </CardTitle>
-          <CardDescription>
-            View your payment history and download invoices
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {transactions.length === 0 ? (
-            <div className="text-center py-8">
-              <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No transactions yet</h3>
-              <p className="text-muted-foreground">
-                Your transaction history will appear here once you make your first payment.
-              </p>
-            </div>
-          ) : (
+      {/* Transaction History */}
+      {transactions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5" />
+              Transaction History
+            </CardTitle>
+            <CardDescription>
+              Your payment and subscription history
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -738,52 +542,62 @@ const BillingPage: React.FC = () => {
                   <TableHead>Description</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {transactions.map((transaction) => {
                   const statusDisplay = getStatusDisplay(transaction.status);
-                  
                   return (
                     <TableRow key={transaction.id}>
-                      <TableCell className="font-medium">
-                        {formatDate(transaction.created_at)}
-                      </TableCell>
+                      <TableCell>{formatDate(transaction.created_at)}</TableCell>
+                      <TableCell>{transaction.description || 'Subscription Payment'}</TableCell>
+                      <TableCell>{formatCurrency(transaction.amount, transaction.currency)}</TableCell>
                       <TableCell>
-                        {transaction.description || 'Subscription Payment'}
-                      </TableCell>
-                      <TableCell>
-                        {formatCurrency(transaction.amount, transaction.currency)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <span className={statusDisplay.color}>
-                            {statusDisplay.icon}
-                          </span>
+                        <div className={`flex items-center gap-2 ${statusDisplay.color}`}>
+                          {statusDisplay.icon}
                           <span className="capitalize">{transaction.status}</span>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {transaction.paystack_reference && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(`https://dashboard.paystack.com/#/transactions/${transaction.paystack_reference}`, '_blank')}
-                          >
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            View
-                          </Button>
-                        )}
                       </TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Upgrade Plan Modal */}
+      {upgradePlanModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">
+              Upgrade to {upgradePlanModal === 'pro' ? 'Pro' : 'Business'}
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Choose your preferred plan and complete the upgrade.
+            </p>
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => setUpgradePlanModal(null)} 
+                variant="outline"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  setUpgradePlanModal(null);
+                  // Handle upgrade logic here
+                }}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
