@@ -1,4 +1,72 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { supabase } from '@/integrations/supabase/client';
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { subscriptionId } = req.body;
+
+    if (!subscriptionId) {
+      return res.status(400).json({ error: 'Subscription ID is required' });
+    }
+
+    // Get user from session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Call Paystack API to disable subscription
+    const paystackResponse = await fetch(`https://api.paystack.co/subscription/disable`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        code: subscriptionId,
+        token: 'disable_token' // This will disable the subscription
+      }),
+    });
+
+    if (!paystackResponse.ok) {
+      const errorData = await paystackResponse.json();
+      console.error('Paystack API error:', errorData);
+      return res.status(400).json({ error: 'Failed to cancel subscription with Paystack' });
+    }
+
+    const paystackData = await paystackResponse.json();
+
+    // Update billing profile in Supabase
+    const { error: updateError } = await supabase
+      .from('billing_profiles')
+      .update({
+        plan: 'free',
+        subscription_status: 'cancelled',
+        next_billing_date: null
+      })
+      .eq('paystack_subscription_id', subscriptionId)
+      .eq('id', session.user.id);
+
+    if (updateError) {
+      console.error('Error updating billing profile:', updateError);
+      return res.status(500).json({ error: 'Failed to update billing profile' });
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Subscription cancelled successfully',
+      data: paystackData 
+    });
+
+  } catch (error) {
+    console.error('Error cancelling subscription:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client

@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { useUsageEnforcement } from '@/hooks/useUsageEnforcement';
-import { formatUsageDisplay, PLAN_LIMITS, PLAN_NAMES } from '@/lib/usageEnforcement';
+import { useBillingSystem, getPlanLimits, formatCurrency, formatDate, getPlanDisplayName, getPlanPrice } from '@/hooks/useBillingSystem';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,425 +29,57 @@ import {
   TrendingUp,
   DollarSign,
   Receipt,
-  RefreshCw
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 import PaystackPayment from '@/components/PaystackPayment';
-
-// Types
-interface UsageData {
-  id: string;
-  user_id: string;
-  feedback_count: number;
-  analytics_count: number;
-  reports_count: number;
-  insights_count: number;
-  teams_count: number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface Transaction {
-  id: string;
-  amount: number;
-  currency: string;
-  status: 'success' | 'pending' | 'failed';
-  created_at: string;
-  invoice_url?: string;
-  description?: string;
-}
-
-interface Subscription {
-  id: string;
-  status: 'active' | 'trialing' | 'cancelled' | 'past_due';
-  current_period_start: string;
-  current_period_end: string;
-  trial_start?: string;
-  trial_end?: string;
-  plan_id: string;
-  paystack_subscription_code?: string;
-  paystack_token?: string;
-}
-
-type PlanType = 'free' | 'pro' | 'business' | 'enterprise';
 
 type UpgradePlan = 'pro' | 'business' | null;
 
 const BillingPage: React.FC = () => {
   const { user } = useAuth();
   const {
-    loading: usageLoading,
-    error: usageError,
-    usage: usageData,
-    subscription,
-    plan,
-    limits,
-    checks,
-    refreshUsage
-  } = useUsageEnforcement();
+    billingProfile,
+    transactions,
+    usageData,
+    loading,
+    error,
+    refreshing,
+    currentPlan,
+    trialDaysLeft,
+    isTrialExpired,
+    isSubscriptionActive,
+    isPaymentPastDue,
+    nextBillingDate,
+    refreshData,
+    cancelSubscription,
+    updatePaymentMethod,
+    upgradePlan
+  } = useBillingSystem();
   
   // State
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [updatingCard, setUpdatingCard] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [realtimeFeedbackCount, setRealtimeFeedbackCount] = useState<number | null>(null);
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const [upgradePlan, setUpgradePlan] = useState<UpgradePlan>(null);
+  const [upgradePlanModal, setUpgradePlanModal] = useState<UpgradePlan>(null);
 
-  // Load data on component mount and when user changes
-  useEffect(() => {
-    if (user) {
-      loadBillingData();
-    }
-  }, [user]);
-
-  // Set up real-time subscription for usage updates
-  useEffect(() => {
-    if (!user) return;
-
-    // Subscribe to usage_tracking changes
-    const usageChannel = supabase
-      .channel('usage-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'usage_tracking',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          console.log('Usage data changed:', payload);
-          // Refresh usage data when changes occur
-          loadBillingData(true);
-        }
-      )
-      .subscribe();
-
-    // Subscribe to transaction changes
-    const transactionChannel = supabase
-      .channel('transaction-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'transactions',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          console.log('Transaction data changed:', payload);
-          // Refresh transaction data when changes occur
-          loadBillingData(true);
-        }
-      )
-      .subscribe();
-
-    // Subscribe to subscription changes
-    const subscriptionChannel = supabase
-      .channel('subscription-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_subscriptions',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          console.log('Subscription data changed:', payload);
-          // Refresh subscription data when changes occur
-          loadBillingData(true);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(usageChannel);
-      supabase.removeChannel(transactionChannel);
-      supabase.removeChannel(subscriptionChannel);
-    };
-  }, [user]);
-
-  // Load project id and subscribe to feedback count in real-time
-  useEffect(() => {
-    if (!user) return;
-
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-
-    (async () => {
-      // fetch latest project_id from feedback_settings
-      const { data: settings } = await supabase
-        .from('feedback_settings')
-        .select('project_id')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      const pid = settings && settings.length > 0 ? settings[0].project_id : null;
-      setProjectId(pid);
-
-      if (!pid) return;
-
-      // compute initial count within window
-      const computeCount = async () => {
-        const now = new Date();
-        const planType = plan;
-        const windowDays = planType === 'free' ? 8 : (planType === 'pro' ? 30 : 30);
-        const fromDate = new Date(now);
-        fromDate.setDate(fromDate.getDate() - windowDays);
-
-        const { count } = await supabase
-          .from('feedbacks')
-          .select('id', { count: 'exact', head: true })
-          .eq('project_id', pid)
-          .gte('timestamp', fromDate.toISOString());
-
-        setRealtimeFeedbackCount(count || 0);
-      };
-
-      await computeCount();
-
-      channel = supabase
-        .channel(`feedbacks-${pid}-billing`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'feedbacks', filter: `project_id=eq.${pid}` },
-          () => {
-            computeCount();
-          }
-        )
-        .subscribe();
-    })();
-
-    return () => {
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, [user, plan]);
-
-  const loadBillingData = async (isRefresh = false) => {
-    if (!user) return;
-
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-    setError(null);
-
-    try {
-      // Refresh usage data using the hook
-      await refreshUsage();
-
-      // Load transactions from transactions table
-      const { data: transactionsData, error: transactionsError } = await supabase
-        .from('transactions')
-        .select('id, amount, currency, status, created_at, invoice_url, description')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (transactionsError) {
-        console.error('Error loading transactions:', transactionsError);
-        toast.error('Failed to load transaction history');
-      } else {
-        setTransactions(transactionsData || []);
-      }
-
-    } catch (err) {
-      console.error('Error loading billing data:', err);
-      setError('Failed to load billing information');
-      toast.error('Failed to load billing data');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  // Calculate trial days left
-  const getTrialDaysLeft = (): number => {
-    if (!user?.created_at) return 0;
-    
-    const trialEnd = new Date(user.created_at);
-    trialEnd.setDate(trialEnd.getDate() + 8); // 8-day trial
-    
-    const now = new Date();
-    const diffTime = trialEnd.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    return Math.max(0, diffDays);
-  };
-
-  // Get current plan
-  const getCurrentPlan = (): { type: PlanType; label: string; color: string } => {
-    if (subscription) {
-      // Check plan type based on plan_name or plan_type
-      const planName = subscription.plan_name?.toLowerCase() || subscription.plan_type?.toLowerCase() || '';
-      
-      // Determine plan type and status
-      let planType: PlanType = 'pro';
-      let statusLabel = '';
-      
-      if (planName.includes('business')) {
-        planType = 'business';
-      } else if (planName.includes('enterprise')) {
-        planType = 'enterprise';
-      } else if (planName.includes('pro') || planName.includes('premium')) {
-        planType = 'pro';
-      } else {
-        planType = 'free';
-      }
-      
-      // Add status to label
-      switch (subscription.status) {
-        case 'active':
-          statusLabel = '';
-          break;
-        case 'trialing':
-          statusLabel = ' Trial';
-          break;
-        case 'cancelled':
-          return { type: 'free', label: 'Free Plan', color: 'bg-gray-100 text-gray-800' };
-        case 'past_due':
-          statusLabel = ' - Payment Due';
-          break;
-        default:
-          return { type: 'free', label: 'Free Plan', color: 'bg-gray-100 text-gray-800' };
-      }
-      
-      // Return plan with appropriate color
-      switch (planType) {
-        case 'business':
-          return { 
-            type: 'business', 
-            label: `Business Plan${statusLabel}`, 
-            color: 'bg-amber-100 text-amber-800 border-amber-300' 
-          };
-        case 'enterprise':
-          return { 
-            type: 'enterprise', 
-            label: `Enterprise Plan${statusLabel}`, 
-            color: 'bg-purple-100 text-purple-800 border-purple-300' 
-          };
-        case 'pro':
-          return { 
-            type: 'pro', 
-            label: `Pro Plan${statusLabel}`, 
-            color: 'bg-green-100 text-green-800 border-green-300' 
-          };
-        default:
-          return { 
-            type: 'free', 
-            label: `Free Plan${statusLabel}`, 
-            color: 'bg-gray-100 text-gray-800 border-gray-300' 
-          };
-      }
-    }
-    
-    // Check if user is in trial period
-    const trialDaysLeft = getTrialDaysLeft();
-    if (trialDaysLeft > 0) {
-      return { type: 'free', label: 'Free Trial', color: 'bg-blue-100 text-blue-800 border-blue-300' };
-    }
-    
-    return { type: 'free', label: 'Free Plan', color: 'bg-gray-100 text-gray-800 border-gray-300' };
-  };
-
-  // Cancel subscription
+  // Handle subscription cancellation
   const handleCancelSubscription = async () => {
-    if (!subscription) return;
-
     setCancelling(true);
-    
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
-      }
-
-      const response = await fetch('/api/cancel-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ subscriptionId: subscription.id }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to cancel subscription');
-      }
-
-      toast.success('Subscription cancelled successfully');
-      await loadBillingData(true); // Refresh data
-      
-    } catch (err) {
-      console.error('Error cancelling subscription:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to cancel subscription');
+      await cancelSubscription();
     } finally {
       setCancelling(false);
     }
   };
 
-  // Update payment method
+  // Handle payment method update
   const handleUpdateCard = async () => {
-    if (!subscription) return;
-
     setUpdatingCard(true);
-    
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
-      }
-
-      const response = await fetch('/api/paystack/update-card', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to generate update link');
-      }
-
-      if (result.url) {
-        window.open(result.url, '_blank');
-        toast.success('Payment method update page opened');
-      } else {
-        throw new Error('No update URL received');
-      }
-      
-    } catch (err) {
-      console.error('Error updating card:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to update payment method');
+      await updatePaymentMethod();
     } finally {
       setUpdatingCard(false);
     }
-  };
-
-  // Format currency
-  const formatCurrency = (amount: number, currency: string): string => {
-    return new Intl.NumberFormat('en-NG', {
-      style: 'currency',
-      currency: currency.toUpperCase(),
-    }).format(amount / 100); // Convert from kobo to naira
-  };
-
-  // Format date
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
   };
 
   // Get status icon and color
@@ -466,47 +96,36 @@ const BillingPage: React.FC = () => {
     }
   };
 
-  // Download invoice
-  const handleDownloadInvoice = async (transactionId: string, invoiceUrl?: string) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
-      }
+  // Get current plan display info
+  const getCurrentPlanDisplay = () => {
+    const planName = getPlanDisplayName(currentPlan);
+    let color = 'bg-gray-100 text-gray-800 border-gray-300';
+    let statusLabel = '';
 
-      // Option 1: Use the API route to get the invoice URL
-      const response = await fetch(`/api/invoice/${transactionId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.error || 'Failed to get invoice');
+    if (currentPlan === 'trial') {
+      color = 'bg-blue-100 text-blue-800 border-blue-300';
+      if (isTrialExpired) {
+        statusLabel = ' - Expired';
       }
-
-      const result = await response.json();
-      
-      if (result.invoice_url) {
-        // Open the invoice URL in a new tab
-        window.open(result.invoice_url, '_blank');
-        toast.success('Invoice opened in new tab');
-      } else {
-        throw new Error('No invoice URL received');
-      }
-      
-    } catch (err) {
-      console.error('Error downloading invoice:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to download invoice');
+    } else if (currentPlan === 'pro') {
+      color = 'bg-green-100 text-green-800 border-green-300';
+    } else if (currentPlan === 'business') {
+      color = 'bg-amber-100 text-amber-800 border-amber-300';
     }
+
+    if (isPaymentPastDue) {
+      statusLabel = ' - Payment Due';
+      color = 'bg-red-100 text-red-800 border-red-300';
+    }
+
+    return {
+      label: `${planName}${statusLabel}`,
+      color
+    };
   };
 
-  // Refresh data
-  const handleRefresh = () => {
-    loadBillingData(true);
-  };
+  // Get plan limits
+  const planLimits = getPlanLimits(currentPlan);
 
   // Check if user is authenticated
   if (!user) {
@@ -575,44 +194,76 @@ const BillingPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {upgradePlan && (
+      {/* Payment Past Due Alert */}
+      {isPaymentPastDue && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Your payment has failed. Please update your payment method to continue using premium features.
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="ml-2"
+              onClick={handleUpdateCard}
+            >
+              Update Payment Method
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Trial Expired Alert */}
+      {isTrialExpired && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Your free trial has expired. Upgrade to continue using all features.
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="ml-2"
+              onClick={() => setUpgradePlanModal('pro')}
+            >
+              Upgrade Now
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Upgrade Plan Modal */}
+      {upgradePlanModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full">
             <div className="p-4 border-b flex items-center justify-between">
-              <div className="font-semibold">Confirm Subscription</div>
-              <button className="text-sm text-muted-foreground hover:text-foreground" onClick={() => setUpgradePlan(null)}>Close</button>
+              <div className="font-semibold">Upgrade Subscription</div>
+              <button 
+                className="text-sm text-muted-foreground hover:text-foreground" 
+                onClick={() => setUpgradePlanModal(null)}
+              >
+                Close
+              </button>
             </div>
             <div className="p-4">
               <PaystackPayment
-                plan={upgradePlan}
-                planName={upgradePlan === 'pro' ? 'Pro' : 'Business'}
-                planPrice={upgradePlan === 'pro' ? '₦35,000/mo' : '₦53,000/mo'}
+                plan={upgradePlanModal}
+                planName={upgradePlanModal === 'pro' ? 'Pro' : 'Business'}
+                planPrice={getPlanPrice(upgradePlanModal)}
                 onSuccess={async ({ reference, plan: paidPlan }) => {
                   try {
-                    // Store subscription record using plan_name and plan_type columns
-                    const { error } = await supabase.from('user_subscriptions').upsert({
-                      user_id: user!.id,
-                      plan_name: paidPlan,
-                      plan_type: paidPlan,
-                      status: 'active',
-                      current_period_start: new Date().toISOString(),
-                      current_period_end: new Date(Date.now() + 30*24*60*60*1000).toISOString(),
-                      updated_at: new Date().toISOString()
-                    });
-                    if (error) throw error;
-                    toast.success('Subscription activated');
-                    setUpgradePlan(null);
-                    await loadBillingData(true);
+                    toast.success('Subscription activated successfully!');
+                    setUpgradePlanModal(null);
+                    await refreshData();
                   } catch (e: any) {
-                    toast.error(e?.message || 'Failed to save subscription');
+                    toast.error(e?.message || 'Failed to activate subscription');
                   }
                 }}
-                onCancel={() => setUpgradePlan(null)}
+                onCancel={() => setUpgradePlanModal(null)}
               />
             </div>
           </div>
         </div>
       )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -624,7 +275,7 @@ const BillingPage: React.FC = () => {
         <Button
           variant="outline"
           size="sm"
-          onClick={handleRefresh}
+          onClick={refreshData}
           disabled={refreshing}
           className="flex items-center space-x-2"
         >
@@ -654,8 +305,8 @@ const BillingPage: React.FC = () => {
               {/* Feedback Usage */}
               <div className={`flex items-center justify-between p-3 rounded-lg ${
                 (() => {
-                  const limitVal = checks.feedback.limit;
-                  const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                  const limitVal = planLimits.feedback;
+                  const current = usageData?.feedback_count || 0;
                   const over = limitVal !== -1 && current >= limitVal;
                   return over ? 'bg-red-50 border border-red-200' : 'bg-blue-50';
                 })()
@@ -663,8 +314,8 @@ const BillingPage: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <MessageSquare className={`h-5 w-5 ${
                     (() => {
-                      const limitVal = checks.feedback.limit;
-                      const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                      const limitVal = planLimits.feedback;
+                      const current = usageData?.feedback_count || 0;
                       const over = limitVal !== -1 && current >= limitVal;
                       return over ? 'text-red-600' : 'text-blue-600';
                     })()
@@ -672,34 +323,34 @@ const BillingPage: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium">Feedback</p>
                     <p className="text-xs text-muted-foreground">
-                      {plan === 'free' && '50 submissions / 8 days (Free Trial)'}
-                      {plan === 'pro' && '300 submissions / 30 days (Pro Plan)'}
-                      {plan === 'business' && 'Unlimited submissions / 30 days (Business Plan)'}
-                      {plan === 'enterprise' && 'Unlimited submissions (Enterprise Plan)'}
+                      {currentPlan === 'trial' && '50 submissions / 8 days (Free Trial)'}
+                      {currentPlan === 'free' && '10 submissions / 30 days (Free Plan)'}
+                      {currentPlan === 'pro' && '300 submissions / 30 days (Pro Plan)'}
+                      {currentPlan === 'business' && 'Unlimited submissions (Business Plan)'}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className={`text-lg font-bold ${
                     (() => {
-                      const limitVal = checks.feedback.limit;
-                      const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                      const limitVal = planLimits.feedback;
+                      const current = usageData?.feedback_count || 0;
                       const over = limitVal !== -1 && current >= limitVal;
                       return over ? 'text-red-600' : 'text-blue-600';
                     })()
                   }`}>
                     {(() => {
-                      const limitVal = checks.feedback.limit;
-                      const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                      const limitVal = planLimits.feedback;
+                      const current = usageData?.feedback_count || 0;
                       return limitVal === -1 ? current : Math.min(current, limitVal);
                     })()}
                   </span>
                   <span className="text-xs text-muted-foreground block">
-                    {checks.feedback.limit === -1 ? 'Unlimited' : `/${checks.feedback.limit}`}
+                    {planLimits.feedback === -1 ? 'Unlimited' : `/${planLimits.feedback}`}
                   </span>
                   {(() => {
-                    const limitVal = checks.feedback.limit;
-                    const current = realtimeFeedbackCount ?? checks.feedback.currentUsage;
+                    const limitVal = planLimits.feedback;
+                    const current = usageData?.feedback_count || 0;
                     const over = limitVal !== -1 && current >= limitVal;
                     return over ? (<div className="text-xs text-red-600 mt-1">Limit Reached</div>) : null;
                   })()}
@@ -708,101 +359,152 @@ const BillingPage: React.FC = () => {
 
               {/* Analytics Usage */}
               <div className={`flex items-center justify-between p-3 rounded-lg ${
-                checks.analytics.canUse ? 'bg-green-50' : 'bg-red-50 border border-red-200'
+                (() => {
+                  const limitVal = planLimits.analytics;
+                  const current = usageData?.analytics_count || 0;
+                  const canUse = limitVal === -1 || current < limitVal;
+                  return canUse ? 'bg-green-50' : 'bg-red-50 border border-red-200';
+                })()
               }`}>
                 <div className="flex items-center space-x-2">
                   <BarChart3 className={`h-5 w-5 ${
-                    checks.analytics.canUse ? 'text-green-600' : 'text-red-600'
+                    (() => {
+                      const limitVal = planLimits.analytics;
+                      const current = usageData?.analytics_count || 0;
+                      const canUse = limitVal === -1 || current < limitVal;
+                      return canUse ? 'text-green-600' : 'text-red-600';
+                    })()
                   }`} />
                   <div>
                     <p className="text-sm font-medium">Analytics</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatUsageDisplay(
-                        checks.analytics.currentUsage,
-                        checks.analytics.limit,
-                        plan,
-                        'analytics'
-                      )}
+                      {(() => {
+                        const limitVal = planLimits.analytics;
+                        const current = usageData?.analytics_count || 0;
+                        return limitVal === -1 ? `${current} (Unlimited)` : `${current} / ${limitVal}`;
+                      })()} ({getPlanDisplayName(currentPlan)})
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className={`text-lg font-bold ${
-                    checks.analytics.canUse ? 'text-green-600' : 'text-red-600'
+                    (() => {
+                      const limitVal = planLimits.analytics;
+                      const current = usageData?.analytics_count || 0;
+                      const canUse = limitVal === -1 || current < limitVal;
+                      return canUse ? 'text-green-600' : 'text-red-600';
+                    })()
                   }`}>
-                    {checks.analytics.currentUsage}
+                    {usageData?.analytics_count || 0}
                   </span>
-                  {!checks.analytics.canUse && (
-                    <div className="text-xs text-red-600 mt-1">Limit Reached</div>
-                  )}
+                  {(() => {
+                    const limitVal = planLimits.analytics;
+                    const current = usageData?.analytics_count || 0;
+                    const canUse = limitVal === -1 || current < limitVal;
+                    return !canUse ? (<div className="text-xs text-red-600 mt-1">Limit Reached</div>) : null;
+                  })()}
                 </div>
               </div>
 
               {/* Reports Usage */}
               <div className={`flex items-center justify-between p-3 rounded-lg ${
-                checks.reports.canUse ? 'bg-purple-50' : 'bg-red-50 border border-red-200'
+                (() => {
+                  const limitVal = planLimits.reports;
+                  const current = usageData?.reports_count || 0;
+                  const canUse = limitVal === -1 || current < limitVal;
+                  return canUse ? 'bg-purple-50' : 'bg-red-50 border border-red-200';
+                })()
               }`}>
                 <div className="flex items-center space-x-2">
                   <FileText className={`h-5 w-5 ${
-                    checks.reports.canUse ? 'text-purple-600' : 'text-red-600'
+                    (() => {
+                      const limitVal = planLimits.reports;
+                      const current = usageData?.reports_count || 0;
+                      const canUse = limitVal === -1 || current < limitVal;
+                      return canUse ? 'text-purple-600' : 'text-red-600';
+                    })()
                   }`} />
                   <div>
                     <p className="text-sm font-medium">Reports</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatUsageDisplay(
-                        checks.reports.currentUsage,
-                        checks.reports.limit,
-                        plan,
-                        'reports'
-                      )}
+                      {(() => {
+                        const limitVal = planLimits.reports;
+                        const current = usageData?.reports_count || 0;
+                        return limitVal === -1 ? `${current} (Unlimited)` : `${current} / ${limitVal}`;
+                      })()} ({getPlanDisplayName(currentPlan)})
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className={`text-lg font-bold ${
-                    checks.reports.canUse ? 'text-purple-600' : 'text-red-600'
+                    (() => {
+                      const limitVal = planLimits.reports;
+                      const current = usageData?.reports_count || 0;
+                      const canUse = limitVal === -1 || current < limitVal;
+                      return canUse ? 'text-purple-600' : 'text-red-600';
+                    })()
                   }`}>
-                    {checks.reports.currentUsage}
+                    {usageData?.reports_count || 0}
                   </span>
-                  {!checks.reports.canUse && (
-                    <div className="text-xs text-red-600 mt-1">Limit Reached</div>
-                  )}
+                  {(() => {
+                    const limitVal = planLimits.reports;
+                    const current = usageData?.reports_count || 0;
+                    const canUse = limitVal === -1 || current < limitVal;
+                    return !canUse ? (<div className="text-xs text-red-600 mt-1">Limit Reached</div>) : null;
+                  })()}
                 </div>
               </div>
 
               {/* Insights Usage */}
               <div className={`flex items-center justify-between p-3 rounded-lg ${
-                checks.insights.canUse ? 'bg-orange-50' : 'bg-red-50 border border-red-200'
+                (() => {
+                  const limitVal = planLimits.insights;
+                  const current = usageData?.insights_count || 0;
+                  const canUse = limitVal === -1 || current < limitVal;
+                  return canUse ? 'bg-orange-50' : 'bg-red-50 border border-red-200';
+                })()
               }`}>
                 <div className="flex items-center space-x-2">
                   <Brain className={`h-5 w-5 ${
-                    checks.insights.canUse ? 'text-orange-600' : 'text-red-600'
+                    (() => {
+                      const limitVal = planLimits.insights;
+                      const current = usageData?.insights_count || 0;
+                      const canUse = limitVal === -1 || current < limitVal;
+                      return canUse ? 'text-orange-600' : 'text-red-600';
+                    })()
                   }`} />
                   <div>
                     <p className="text-sm font-medium">Insights</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatUsageDisplay(
-                        checks.insights.currentUsage,
-                        checks.insights.limit,
-                        plan,
-                        'insights'
-                      )}
+                      {(() => {
+                        const limitVal = planLimits.insights;
+                        const current = usageData?.insights_count || 0;
+                        return limitVal === -1 ? `${current} (Unlimited)` : `${current} / ${limitVal}`;
+                      })()} ({getPlanDisplayName(currentPlan)})
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className={`text-lg font-bold ${
-                    checks.insights.canUse ? 'text-orange-600' : 'text-red-600'
+                    (() => {
+                      const limitVal = planLimits.insights;
+                      const current = usageData?.insights_count || 0;
+                      const canUse = limitVal === -1 || current < limitVal;
+                      return canUse ? 'text-orange-600' : 'text-red-600';
+                    })()
                   }`}>
-                    {checks.insights.currentUsage}
+                    {usageData?.insights_count || 0}
                   </span>
-                  {!checks.insights.canUse && (
-                    <div className="text-xs text-red-600 mt-1">Limit Reached</div>
-                  )}
+                  {(() => {
+                    const limitVal = planLimits.insights;
+                    const current = usageData?.insights_count || 0;
+                    const canUse = limitVal === -1 || current < limitVal;
+                    return !canUse ? (<div className="text-xs text-red-600 mt-1">Limit Reached</div>) : null;
+                  })()}
                 </div>
               </div>
 
-              {/* Teams Usage (Coming Soon) */}
+              {/* Teams Usage */}
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg opacity-60">
                 <div className="flex items-center space-x-2">
                   <Users className="h-5 w-5 text-gray-600" />
@@ -825,26 +527,37 @@ const BillingPage: React.FC = () => {
               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-medium text-blue-900">Current Plan: {PLAN_NAMES[plan]}</h4>
+                    <h4 className="font-medium text-blue-900">Current Plan: {getPlanDisplayName(currentPlan)}</h4>
                     <p className="text-sm text-blue-700">
-                      {Object.values(checks).some(check => !check.canUse) 
-                        ? 'Some features have reached their limits. Consider upgrading your plan.'
-                        : 'All features are within your plan limits.'
-                      }
+                      {(() => {
+                        const limits = [planLimits.feedback, planLimits.analytics, planLimits.reports, planLimits.insights];
+                        const usages = [usageData?.feedback_count || 0, usageData?.analytics_count || 0, usageData?.reports_count || 0, usageData?.insights_count || 0];
+                        const hasReachedLimit = limits.some((limit, index) => limit !== -1 && usages[index] >= limit);
+                        return hasReachedLimit 
+                          ? 'Some features have reached their limits. Consider upgrading your plan.'
+                          : 'All features are within your plan limits.';
+                      })()}
                     </p>
-                    {checks.feedback && (
-                      <p className="text-xs text-blue-600 mt-1">
-                        Feedback Widget: {realtimeFeedbackCount ?? checks.feedback.currentUsage} submissions in current period
-                        {checks.feedback.limit !== -1 && ` (${Math.max(0, (checks.feedback.limit) - (realtimeFeedbackCount ?? checks.feedback.currentUsage))} remaining)`}
-                      </p>
-                    )}
+                    <p className="text-xs text-blue-600 mt-1">
+                      Feedback Widget: {usageData?.feedback_count || 0} submissions in current period
+                      {planLimits.feedback !== -1 && ` (${Math.max(0, planLimits.feedback - (usageData?.feedback_count || 0))} remaining)`}
+                    </p>
                   </div>
-                  {Object.values(checks).some(check => !check.canUse) && (
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                      <Crown className="h-4 w-4 mr-2" />
-                      Upgrade Plan
-                    </Button>
-                  )}
+                  {(() => {
+                    const limits = [planLimits.feedback, planLimits.analytics, planLimits.reports, planLimits.insights];
+                    const usages = [usageData?.feedback_count || 0, usageData?.analytics_count || 0, usageData?.reports_count || 0, usageData?.insights_count || 0];
+                    const hasReachedLimit = limits.some((limit, index) => limit !== -1 && usages[index] >= limit);
+                    return hasReachedLimit ? (
+                      <Button 
+                        size="sm" 
+                        className="bg-blue-600 hover:bg-blue-700"
+                        onClick={() => setUpgradePlanModal('pro')}
+                      >
+                        <Crown className="h-4 w-4 mr-2" />
+                        Upgrade Plan
+                      </Button>
+                    ) : null;
+                  })()}
                 </div>
               </div>
             </div>
@@ -866,8 +579,8 @@ const BillingPage: React.FC = () => {
             {/* Plan Status */}
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Plan</span>
-              <Badge className={currentPlan.color}>
-                {currentPlan.label}
+              <Badge className={getCurrentPlanDisplay().color}>
+                {getCurrentPlanDisplay().label}
               </Badge>
             </div>
 
@@ -883,34 +596,25 @@ const BillingPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Trial Ends</span>
                   <span className="text-sm text-muted-foreground">
-                    {(() => {
-                      if (!user?.created_at) return '';
-                      const trialEnd = new Date(user.created_at);
-                      trialEnd.setDate(trialEnd.getDate() + 8);
-                      return formatDate(trialEnd.toISOString());
-                    })()}
+                    {billingProfile?.trial_ends_at ? formatDate(billingProfile.trial_ends_at) : 'N/A'}
                   </span>
                 </div>
               </div>
             )}
 
-            {/* Subscription Period */}
-            {subscription && (
+            {/* Next Billing Date */}
+            {nextBillingDate && (
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">
-                  {subscription.status === 'trialing' ? 'Trial Ends' : 'Next Billing'}
-                </span>
+                <span className="text-sm font-medium">Next Billing</span>
                 <span className="text-sm text-muted-foreground">
-                  {subscription.status === 'trialing' && subscription.trial_end
-                    ? formatDate(subscription.trial_end)
-                    : formatDate(subscription.current_period_end)}
+                  {formatDate(nextBillingDate)}
                 </span>
               </div>
             )}
 
             {/* Action Buttons */}
             <div className="space-y-2 pt-4">
-              {subscription && subscription.status === 'active' && (
+              {isSubscriptionActive && (
                 <Button
                   variant="outline"
                   onClick={handleCancelSubscription}
@@ -926,7 +630,7 @@ const BillingPage: React.FC = () => {
                 </Button>
               )}
 
-              {subscription && (
+              {billingProfile?.paystack_customer_id && (
                 <Button
                   variant="outline"
                   onClick={handleUpdateCard}
@@ -942,30 +646,23 @@ const BillingPage: React.FC = () => {
                 </Button>
               )}
 
-              {!subscription && trialDaysLeft === 0 && (
+              {!isSubscriptionActive && (isTrialExpired || currentPlan === 'free') && (
                 <div className="space-y-2">
-                  <Button className="w-full" onClick={() => setUpgradePlan('pro')}>
+                  <Button className="w-full" onClick={() => setUpgradePlanModal('pro')}>
                     <Crown className="h-4 w-4 mr-2" />
                     Upgrade to Pro
                   </Button>
-                  <Button variant="outline" className="w-full" onClick={() => setUpgradePlan('business')}>
+                  <Button variant="outline" className="w-full" onClick={() => setUpgradePlanModal('business')}>
                     <Zap className="h-4 w-4 mr-2" />
                     Upgrade to Business
                   </Button>
                 </div>
               )}
 
-              {subscription && subscription.status === 'active' && currentPlan.type === 'pro' && (
-                <Button variant="outline" className="w-full" onClick={() => setUpgradePlan('business')}>
+              {isSubscriptionActive && currentPlan === 'pro' && (
+                <Button variant="outline" className="w-full" onClick={() => setUpgradePlanModal('business')}>
                   <Zap className="h-4 w-4 mr-2" />
                   Upgrade to Business
-                </Button>
-              )}
-
-              {subscription && subscription.status === 'active' && currentPlan.type === 'business' && (
-                <Button variant="outline" className="w-full">
-                  <Shield className="h-4 w-4 mr-2" />
-                  Upgrade to Enterprise
                 </Button>
               )}
             </div>
@@ -1027,18 +724,18 @@ const BillingPage: React.FC = () => {
                           <span className="capitalize">{transaction.status}</span>
                         </div>
                       </TableCell>
-                                             <TableCell className="text-right">
-                         {transaction.invoice_url && (
-                           <Button
-                             variant="ghost"
-                             size="sm"
-                             onClick={() => handleDownloadInvoice(transaction.id, transaction.invoice_url)}
-                           >
-                             <Download className="h-4 w-4 mr-2" />
-                             Invoice
-                           </Button>
-                         )}
-                       </TableCell>
+                      <TableCell className="text-right">
+                        {transaction.paystack_reference && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(`https://dashboard.paystack.com/#/transactions/${transaction.paystack_reference}`, '_blank')}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            View
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
