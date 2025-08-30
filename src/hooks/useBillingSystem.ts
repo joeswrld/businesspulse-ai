@@ -471,8 +471,7 @@ export function useBillingSystem(): BillingSystemState {
       const { error: updateError } = await supabase
         .from('billing_profiles')
         .update({
-          subscription_status: 'cancelled',
-          updated_at: new Date().toISOString()
+          subscription_status: 'cancelled'
         })
         .eq('id', billingProfile?.id);
 
