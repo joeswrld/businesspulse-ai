@@ -265,17 +265,46 @@ export function useBillingSystem(): BillingSystemState {
   const currentPlan = billingProfile?.plan || 'trial';
   
   const trialDaysLeft = useCallback(() => {
-    if (!billingProfile?.trial_ends_at) return 0;
-    const trialEnd = new Date(billingProfile.trial_ends_at);
-    const now = new Date();
-    const diffTime = trialEnd.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, diffDays);
+    if (!billingProfile?.trial_ends_at) return 8; // Default to 8 days for new users
+    try {
+      const trialEnd = new Date(billingProfile.trial_ends_at);
+      const now = new Date();
+      const diffTime = trialEnd.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return Math.max(0, diffDays);
+    } catch (error) {
+      console.warn('Error calculating trial days:', error);
+      return 8; // Fallback to 8 days
+    }
   }, [billingProfile]);
 
-  const isTrialExpired = trialDaysLeft() === 0 && currentPlan === 'trial';
-  const isSubscriptionActive = billingProfile?.subscription_status === 'active';
-  const isPaymentPastDue = billingProfile?.subscription_status === 'past_due';
+  const isTrialExpired = useCallback(() => {
+    try {
+      return trialDaysLeft() === 0 && currentPlan === 'trial';
+    } catch (error) {
+      console.warn('Error checking trial expiration:', error);
+      return false;
+    }
+  }, [trialDaysLeft, currentPlan]);
+
+  const isSubscriptionActive = useCallback(() => {
+    try {
+      return billingProfile?.subscription_status === 'active';
+    } catch (error) {
+      console.warn('Error checking subscription status:', error);
+      return false;
+    }
+  }, [billingProfile]);
+
+  const isPaymentPastDue = useCallback(() => {
+    try {
+      return billingProfile?.subscription_status === 'past_due';
+    } catch (error) {
+      console.warn('Error checking payment status:', error);
+      return false;
+    }
+  }, [billingProfile]);
+
   const nextBillingDate = billingProfile?.next_billing_date;
 
   // Actions
@@ -383,9 +412,9 @@ export function useBillingSystem(): BillingSystemState {
     // Computed values
     currentPlan,
     trialDaysLeft: trialDaysLeft(),
-    isTrialExpired,
-    isSubscriptionActive,
-    isPaymentPastDue,
+    isTrialExpired: isTrialExpired(),
+    isSubscriptionActive: isSubscriptionActive(),
+    isPaymentPastDue: isPaymentPastDue(),
     nextBillingDate,
     
     // Actions

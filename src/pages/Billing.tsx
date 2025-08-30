@@ -182,10 +182,53 @@ const BillingPage: React.FC = () => {
 
   if (error) {
     return (
-      <Alert variant="destructive">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Billing & Usage</h1>
+          <p className="text-muted-foreground">
+            Manage your subscription and view usage statistics
+          </p>
+        </div>
+        
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  // Check if we have any billing data
+  const hasBillingData = billingProfile || transactions.length > 0 || usageData;
+  
+  // If no billing data and no error, show a helpful message
+  if (!hasBillingData && !loading && !error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Billing & Usage</h1>
+          <p className="text-muted-foreground">
+            Manage your subscription and view usage statistics
+          </p>
+        </div>
+        
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Welcome to NoteX! You're currently on a free trial. No billing information is available yet.
+            <br />
+            <br />
+            <strong>Your trial includes:</strong>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>50 feedback submissions</li>
+              <li>5 analytics reports</li>
+              <li>2 detailed reports</li>
+              <li>5 AI insights</li>
+              <li>1 team</li>
+            </ul>
+          </AlertDescription>
+        </Alert>
+      </div>
     );
   }
 

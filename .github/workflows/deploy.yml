@@ -25,10 +25,42 @@ jobs:
     - name: Build application
       run: npm run build
     
+    - name: Check Vercel Secrets
+      run: |
+        if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+          echo "⚠️  VERCEL_TOKEN secret is not set. Skipping deployment."
+          echo "Please add VERCEL_TOKEN to your repository secrets."
+          exit 0
+        fi
+        if [ -z "${{ secrets.ORG_ID }}" ]; then
+          echo "⚠️  ORG_ID secret is not set. Skipping deployment."
+          echo "Please add ORG_ID to your repository secrets."
+          exit 0
+        fi
+        if [ -z "${{ secrets.PROJECT_ID }}" ]; then
+          echo "⚠️  PROJECT_ID secret is not set. Skipping deployment."
+          echo "Please add PROJECT_ID to your repository secrets."
+          exit 0
+        fi
+        echo "✅ All Vercel secrets are configured."
+    
     - name: Deploy to Vercel
+      if: secrets.VERCEL_TOKEN != '' && secrets.ORG_ID != '' && secrets.PROJECT_ID != ''
       uses: amondnet/vercel-action@v25
       with:
         vercel-token: ${{ secrets.VERCEL_TOKEN }}
         vercel-org-id: ${{ secrets.ORG_ID }}
         vercel-project-id: ${{ secrets.PROJECT_ID }}
         vercel-args: '--prod'
+    
+    - name: Deployment Skipped
+      if: secrets.VERCEL_TOKEN == '' || secrets.ORG_ID == '' || secrets.PROJECT_ID == ''
+      run: |
+        echo "🚫 Deployment skipped due to missing Vercel secrets."
+        echo "To enable deployment, add the following secrets to your repository:"
+        echo "- VERCEL_TOKEN: Your Vercel API token"
+        echo "- ORG_ID: Your Vercel organization ID"
+        echo "- PROJECT_ID: Your Vercel project ID"
+        echo ""
+        echo "You can find these in your Vercel dashboard under Settings > General > Project ID"
+        echo "and Account > Tokens for the VERCEL_TOKEN."
