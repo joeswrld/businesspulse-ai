@@ -149,6 +149,21 @@ export function useBillingSystem(): BillingSystemState {
     setError(null);
 
     try {
+      // First, try to create billing profile using the database function
+      // This avoids permission issues with auth.users triggers
+      try {
+        const { data: profileResult, error: profileCreateError } = await supabase
+          .rpc('create_user_billing_profile', { user_uuid: user.id });
+
+        if (profileCreateError) {
+          console.warn('Failed to create billing profile via function:', profileCreateError);
+        } else if (profileResult) {
+          console.log('Billing profile creation result:', profileResult);
+        }
+      } catch (error) {
+        console.warn('Billing profile creation function not available, using fallback');
+      }
+
       // Load billing profile
       let profileData = null;
       try {

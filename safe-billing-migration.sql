@@ -1,6 +1,8 @@
 -- Safe migration to handle existing tables
 -- This script checks if tables exist before creating them
 -- Updated for NoteX: Free Trial (8 days), Pro (30 days), Business (30 days)
+-- NOTE: Triggers on auth.users are removed to prevent permission errors
+-- Billing profiles are now created via function calls instead of automatic triggers
 
 -- Function to safely create tables
 CREATE OR REPLACE FUNCTION create_billing_tables_safely()
@@ -205,20 +207,7 @@ BEGIN
 END $$;
 
 -- Create functions safely
-CREATE OR REPLACE FUNCTION create_billing_profile()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO billing_profiles (id, plan, trial_ends_at, subscription_status)
-  VALUES (
-    NEW.id,
-    'trial',
-    NOW() + INTERVAL '8 days',
-    'trial'
-  );
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
+-- Create functions safely
 CREATE OR REPLACE FUNCTION handle_trial_expiration()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -234,15 +223,10 @@ $$ LANGUAGE plpgsql;
 -- Create triggers safely
 DO $$
 BEGIN
-  -- billing profile trigger
-  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trigger_create_billing_profile') THEN
-    CREATE TRIGGER trigger_create_billing_profile
-      AFTER INSERT ON auth.users
-      FOR EACH ROW
-      EXECUTE FUNCTION create_billing_profile();
-  END IF;
-
-  -- trial expiration trigger
+  -- NOTE: Triggers on auth.users are removed to prevent permission errors
+  -- Billing profiles are now created via function calls instead of triggers
+  
+  -- trial expiration trigger (only on billing_profiles table)
   IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trigger_handle_trial_expiration') THEN
     CREATE TRIGGER trigger_handle_trial_expiration
       BEFORE UPDATE ON billing_profiles
