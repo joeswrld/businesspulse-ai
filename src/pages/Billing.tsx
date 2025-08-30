@@ -81,9 +81,17 @@ const BillingPage: React.FC = () => {
 
   // Handle subscription cancellation
   const handleCancelSubscription = async () => {
+    console.log('🔍 handleCancelSubscription called');
+    console.log('billingProfile:', billingProfile);
+    console.log('isSubscriptionActive:', isSubscriptionActive);
+    
     setCancelling(true);
     try {
       await cancelSubscription();
+      console.log('✅ cancelSubscription completed successfully');
+    } catch (error) {
+      console.error('❌ cancelSubscription failed:', error);
+      toast.error('Failed to cancel subscription: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setCancelling(false);
     }
@@ -91,9 +99,17 @@ const BillingPage: React.FC = () => {
 
   // Handle payment method update
   const handleUpdateCard = async () => {
+    console.log('🔍 handleUpdateCard called');
+    console.log('billingProfile:', billingProfile);
+    console.log('isSubscriptionActive:', isSubscriptionActive);
+    
     setUpdatingCard(true);
     try {
       await updatePaymentMethod();
+      console.log('✅ updatePaymentMethod completed successfully');
+    } catch (error) {
+      console.error('❌ updatePaymentMethod failed:', error);
+      toast.error('Failed to update payment method: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setUpdatingCard(false);
     }
@@ -619,6 +635,20 @@ NoteX Team
             </div>
           </div>
 
+          {/* Debug Information (Development Only) */}
+          {import.meta.env.DEV && (
+            <div className="mt-4 p-4 bg-gray-100 rounded-lg text-xs">
+              <h4 className="font-semibold mb-2">Debug Info:</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div>Current Plan: {currentPlan}</div>
+                <div>Is Subscription Active: {isSubscriptionActive.toString()}</div>
+                <div>Billing Profile ID: {billingProfile?.id || 'None'}</div>
+                <div>Subscription Status: {billingProfile?.subscription_status || 'None'}</div>
+                <div>Transactions Count: {transactions.length}</div>
+              </div>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-3 pt-4">
             {currentPlan === 'trial' && !isTrialExpired && (
@@ -634,12 +664,11 @@ NoteX Team
               </>
             )}
             
-            {isSubscriptionActive && (
-              <Button variant="outline" onClick={handleUpdateCard}>
-                <CreditCard className="h-4 w-4 mr-2" />
-                Update Payment Method
-              </Button>
-            )}
+            {/* Show Update Payment Method button for all users */}
+            <Button variant="outline" onClick={handleUpdateCard} disabled={updatingCard}>
+              <CreditCard className="h-4 w-4 mr-2" />
+              {updatingCard ? 'Opening...' : 'Update Payment Method'}
+            </Button>
             
             {isSubscriptionActive && (
               <Button variant="outline" onClick={handleCancelSubscription} disabled={cancelling}>

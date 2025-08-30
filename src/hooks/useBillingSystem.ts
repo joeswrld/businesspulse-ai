@@ -462,11 +462,6 @@ export function useBillingSystem(): BillingSystemState {
   }, [loadBillingData]);
 
   const cancelSubscription = useCallback(async () => {
-    if (!billingProfile?.paystack_subscription_id) {
-      toast.error('No active subscription to cancel');
-      return;
-    }
-
     try {
       // For now, we'll update the local database since we don't have Edge Functions
       // In production, you should integrate with Paystack's subscription management API
@@ -478,7 +473,7 @@ export function useBillingSystem(): BillingSystemState {
           subscription_status: 'cancelled',
           updated_at: new Date().toISOString()
         })
-        .eq('id', billingProfile.id);
+        .eq('id', billingProfile?.id);
 
       if (updateError) {
         throw new Error(updateError.message);
@@ -493,7 +488,7 @@ export function useBillingSystem(): BillingSystemState {
           canceled_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
-        .eq('user_id', billingProfile.id);
+        .eq('user_id', billingProfile?.id);
 
       if (subscriptionError) {
         throw new Error(subscriptionError.message);
@@ -509,27 +504,22 @@ export function useBillingSystem(): BillingSystemState {
   }, [billingProfile, refreshData]);
 
   const updatePaymentMethod = useCallback(async () => {
-    if (!billingProfile?.paystack_customer_id) {
-      toast.error('No payment method to update');
-      return;
-    }
-
     try {
-      // For now, we'll provide a link to Paystack's customer portal
+      // For now, we'll provide a link to Paystack's dashboard
       // In production, you should integrate with Paystack's customer management API
       
-      // Create a Paystack customer portal URL
-      const customerPortalUrl = `https://dashboard.paystack.com/#/customers/${billingProfile.paystack_customer_id}`;
+      // Since we might not have customer ID, we'll open the main Paystack dashboard
+      const paystackDashboardUrl = 'https://dashboard.paystack.com/';
       
-      // Open the customer portal in a new tab
-      window.open(customerPortalUrl, '_blank');
-      toast.success('Payment method update page opened. You can manage your payment methods there.');
+      // Open the dashboard in a new tab
+      window.open(paystackDashboardUrl, '_blank');
+      toast.success('Paystack dashboard opened. You can manage your payment methods there.');
       
     } catch (err) {
       console.error('Error updating payment method:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to update payment method');
     }
-  }, [billingProfile]);
+  }, []);
 
   const upgradePlan = useCallback(async (plan: 'pro' | 'business') => {
     // This will be handled by the PaystackPayment component
