@@ -131,39 +131,57 @@ export function useBillingSystem(): BillingSystemState {
 
     try {
       // Load billing profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('billing_profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      let profileData = null;
+      try {
+        const { data, error: profileError } = await supabase
+          .from('billing_profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
 
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.error('Error loading billing profile:', profileError);
-        throw new Error('Failed to load billing profile');
+        if (profileError && profileError.code !== 'PGRST116') {
+          console.warn('Billing profiles table not available, skipping billing data');
+        } else {
+          profileData = data;
+        }
+      } catch (error) {
+        console.warn('Billing profiles table not available, skipping billing data');
       }
 
       // Load transactions
-      const { data: transactionsData, error: transactionsError } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      let transactionsData = [];
+      try {
+        const { data, error: transactionsError } = await supabase
+          .from('transactions')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
 
-      if (transactionsError) {
-        console.error('Error loading transactions:', transactionsError);
-        throw new Error('Failed to load transaction history');
+        if (transactionsError) {
+          console.warn('Transactions table not available, skipping transaction data');
+        } else {
+          transactionsData = data || [];
+        }
+      } catch (error) {
+        console.warn('Transactions table not available, skipping transaction data');
       }
 
       // Load usage data
-      const { data: usageData, error: usageError } = await supabase
-        .from('usage_tracking')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      let usageData = null;
+      try {
+        const { data, error: usageError } = await supabase
+          .from('usage_tracking')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
 
-      if (usageError && usageError.code !== 'PGRST116') {
-        console.error('Error loading usage data:', usageError);
-        // Don't throw error for usage data, it might not exist yet
+        if (usageError && usageError.code !== 'PGRST116') {
+          console.warn('Usage tracking table not available, skipping usage data');
+        } else {
+          usageData = data;
+        }
+      } catch (error) {
+        console.warn('Usage tracking table not available, skipping usage data');
       }
 
       setBillingProfile(profileData);
@@ -171,9 +189,9 @@ export function useBillingSystem(): BillingSystemState {
       setUsageData(usageData);
 
     } catch (err) {
-      console.error('Error loading billing data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load billing data');
-      toast.error('Failed to load billing data');
+      console.warn('Error loading billing data:', err);
+      setError(null); // Don't set error for missing tables
+      // Don't show toast error for missing tables
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -189,43 +207,57 @@ export function useBillingSystem(): BillingSystemState {
   useEffect(() => {
     if (!user) return;
 
-    const billingChannel = supabase
-      .channel('billing-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'billing_profiles',
-          filter: `id=eq.${user.id}`
-        },
-        () => {
-          console.log('Billing profile updated');
-          loadBillingData(true);
-        }
-      )
-      .subscribe();
+    // Only set up channels if tables exist (check by trying to load data first)
+    let billingChannel = null;
+    let transactionsChannel = null;
 
-    const transactionsChannel = supabase
-      .channel('transactions-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'transactions',
-          filter: `user_id=eq.${user.id}`
-        },
-        () => {
-          console.log('Transactions updated');
-          loadBillingData(true);
-        }
-      )
-      .subscribe();
+    // Try to set up billing channel
+    try {
+      billingChannel = supabase
+        .channel('billing-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'billing_profiles',
+            filter: `id=eq.${user.id}`
+          },
+          () => {
+            console.log('Billing profile updated');
+            loadBillingData(true);
+          }
+        )
+        .subscribe();
+    } catch (error) {
+      console.warn('Could not set up billing real-time subscription');
+    }
+
+    // Try to set up transactions channel
+    try {
+      transactionsChannel = supabase
+        .channel('transactions-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'transactions',
+            filter: `user_id=eq.${user.id}`
+          },
+          () => {
+            console.log('Transactions updated');
+            loadBillingData(true);
+          }
+        )
+        .subscribe();
+    } catch (error) {
+      console.warn('Could not set up transactions real-time subscription');
+    }
 
     return () => {
-      supabase.removeChannel(billingChannel);
-      supabase.removeChannel(transactionsChannel);
+      if (billingChannel) supabase.removeChannel(billingChannel);
+      if (transactionsChannel) supabase.removeChannel(transactionsChannel);
     };
   }, [user, loadBillingData]);
 

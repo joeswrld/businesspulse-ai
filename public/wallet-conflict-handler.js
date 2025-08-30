@@ -26,7 +26,7 @@
 
       return true;
     } catch (error) {
-      console.warn('NoteX: Failed to set window.ethereum:', error.message);
+      // Don't log this as an error since it's expected behavior
       return false;
     }
   }
@@ -42,7 +42,7 @@
           enumerable: true
         });
       } catch (error) {
-        console.warn('NoteX: Failed to restore original ethereum:', error.message);
+        // Silently handle restoration errors
       }
     }
   }
@@ -65,8 +65,8 @@
     if (!shouldFilter) {
       originalConsoleError.apply(console, args);
     } else {
-      // Log as warning instead of error for wallet conflicts
-      console.warn('NoteX: Wallet extension conflict detected and handled gracefully');
+      // Log as info instead of error for wallet conflicts
+      console.info('NoteX: Wallet extension conflict handled gracefully');
     }
   };
 
