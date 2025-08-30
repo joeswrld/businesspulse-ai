@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CreditCard, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PaystackPaymentProps {
   plan: 'pro' | 'business';
@@ -39,8 +40,10 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
   onSuccess,
   onCancel
 }) => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [paystackReady, setPaystackReady] = useState(false);
 
   // Plan pricing in kobo (smallest currency unit)
   const planPricing = {
@@ -96,12 +99,23 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
   }, []);
 
   const handlePayment = async () => {
+    if (!paystackReady) {
+      setError('Paystack payment system is still loading. Please wait a moment and try again.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      // Get user email from auth context or localStorage
-      const userEmail = localStorage.getItem('userEmail') || 'user@example.com';
+      // Get user email from auth context
+      const userEmail = user?.email || 'user@example.com';
+      
+      if (!userEmail || userEmail === 'user@example.com') {
+        setError('Please log in to proceed with payment');
+        setLoading(false);
+        return;
+      }
 
       const config: PaystackConfig = {
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || 'pk_test_...',
@@ -224,17 +238,31 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
             </Alert>
           )}
 
+          {!paystackReady && !error && (
+            <Alert>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <AlertDescription>
+                Loading payment system... Please wait a moment before proceeding.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Action Buttons */}
           <div className="flex gap-3">
             <Button
               onClick={handlePayment}
-              disabled={loading}
+              disabled={loading || !paystackReady}
               className="flex-1 bg-green-600 hover:bg-green-700"
             >
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Processing...
+                </>
+              ) : !paystackReady ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Loading Payment System...
                 </>
               ) : (
                 <>
