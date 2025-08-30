@@ -45,6 +45,9 @@ export interface UsageData {
   reports_count: number;
   insights_count: number;
   teams_count: number;
+  detailed_reports_count: number;
+  team_members_count: number;
+  export_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -78,7 +81,6 @@ export interface BillingSystemState {
   refreshData: () => Promise<void>;
   cancelSubscription: () => Promise<void>;
   upgradePlan: (plan: 'pro' | 'business') => Promise<void>;
-  reactivateSubscription: () => Promise<void>;
 }
 
 // Plan limits configuration - Real-world SaaS limits
@@ -505,45 +507,7 @@ export function useBillingSystem(): BillingSystemState {
   const upgradePlan = useCallback(async (plan: 'pro' | 'business') => {
     // This will be handled by the PaystackPayment component
     return Promise.resolve();
-  }, []);
-
-  const reactivateSubscription = useCallback(async () => {
-    if (!billingProfile?.paystack_subscription_id) {
-      toast.error('No subscription to reactivate');
-      return;
-    }
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
-      }
-
-      const response = await fetch('/api/reactivate-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ 
-          subscriptionId: billingProfile.paystack_subscription_id 
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to reactivate subscription');
-      }
-
-      toast.success('Subscription reactivated successfully');
-      await refreshData();
-      
-    } catch (err) {
-      console.error('Error reactivating subscription:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to reactivate subscription');
-    }
-  }, [billingProfile, refreshData]);
+    }, []);
 
   return {
     // Data
@@ -573,8 +537,7 @@ export function useBillingSystem(): BillingSystemState {
     // Actions
     refreshData,
     cancelSubscription,
-    upgradePlan,
-    reactivateSubscription
+    upgradePlan
   };
 }
 

@@ -67,9 +67,7 @@ const BillingPage: React.FC = () => {
     isLimitReached,
     refreshData,
     cancelSubscription,
-    updatePaymentMethod,
-    upgradePlan,
-    reactivateSubscription
+    upgradePlan
   } = useBillingSystem();
   
   // State
@@ -78,28 +76,14 @@ const BillingPage: React.FC = () => {
 
   // Handle subscription cancellation
   const handleCancelSubscription = async () => {
-    console.log('🔍 handleCancelSubscription called');
-    console.log('billingProfile:', billingProfile);
-    console.log('isSubscriptionActive:', isSubscriptionActive);
-    
     setCancelling(true);
     try {
       await cancelSubscription();
-      console.log('✅ cancelSubscription completed successfully');
     } catch (error) {
-      console.error('❌ cancelSubscription failed:', error);
+      console.error('Failed to cancel subscription:', error);
       toast.error('Failed to cancel subscription: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setCancelling(false);
-    }
-  };
-
-  // Handle subscription reactivation
-  const handleReactivateSubscription = async () => {
-    try {
-      await reactivateSubscription();
-    } catch (error) {
-      console.error('Failed to reactivate subscription:', error);
     }
   };
 
@@ -601,19 +585,200 @@ NoteX Team
             </div>
           </div>
 
-          {/* Debug Information (Development Only) */}
-          {import.meta.env.DEV && (
-            <div className="mt-4 p-4 bg-gray-100 rounded-lg text-xs">
-              <h4 className="font-semibold mb-2">Debug Info:</h4>
-              <div className="grid grid-cols-2 gap-2">
-                <div>Current Plan: {currentPlan}</div>
-                <div>Is Subscription Active: {isSubscriptionActive.toString()}</div>
-                <div>Billing Profile ID: {billingProfile?.id || 'None'}</div>
-                <div>Subscription Status: {billingProfile?.subscription_status || 'None'}</div>
-                <div>Transactions Count: {transactions.length}</div>
+          {/* Usage Overview */}
+          <div className="mt-6">
+            <h4 className="font-semibold mb-4 flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-blue-600" />
+              Usage Overview
+            </h4>
+            <p className="text-sm text-muted-foreground mb-4">
+              Track your current usage against your business plan limits
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Feedback Collection */}
+              <div className="p-4 border rounded-lg bg-gradient-to-br from-green-50 to-green-100">
+                <div className="flex items-center gap-3 mb-3">
+                  <MessageSquare className="h-5 w-5 text-green-600" />
+                  <div>
+                    <h5 className="font-medium text-green-800">Feedback Collection</h5>
+                    <span className="text-xs text-green-600 bg-green-200 px-2 py-1 rounded-full">Good</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-green-700">Usage</span>
+                    <span className="text-sm font-medium text-green-800">
+                      {usageData?.feedback_count || 0} responses
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-green-700">Limit</span>
+                    <span className="text-sm font-medium text-green-800">
+                      {currentPlan === 'trial' ? '50 responses' : 
+                       currentPlan === 'pro' ? '300 responses' : 'Unlimited usage'}
+                    </span>
+                  </div>
+                  {currentPlan !== 'business' && (
+                    <Progress 
+                      value={Math.min(100, ((usageData?.feedback_count || 0) / (currentPlan === 'trial' ? 50 : 300)) * 100)} 
+                      className="h-2"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* AI Insights */}
+              <div className="p-4 border rounded-lg bg-gradient-to-br from-blue-50 to-blue-100">
+                <div className="flex items-center gap-3 mb-3">
+                  <Brain className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <h5 className="font-medium text-blue-800">AI Insights</h5>
+                    <span className="text-xs text-blue-600 bg-blue-200 px-2 py-1 rounded-full">Good</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-blue-700">Usage</span>
+                    <span className="text-sm font-medium text-blue-800">
+                      {usageData?.insights_count || 0} insights
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-blue-700">Limit</span>
+                    <span className="text-sm font-medium text-blue-800">
+                      {currentPlan === 'trial' ? '5 insights' : 
+                       currentPlan === 'pro' ? '50 insights' : 'Unlimited usage'}
+                    </span>
+                  </div>
+                  {currentPlan !== 'business' && (
+                    <Progress 
+                      value={Math.min(100, ((usageData?.insights_count || 0) / (currentPlan === 'trial' ? 5 : 50)) * 100)} 
+                      className="h-2"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Analytics Reports */}
+              <div className="p-4 border rounded-lg bg-gradient-to-br from-purple-50 to-purple-100">
+                <div className="flex items-center gap-3 mb-3">
+                  <BarChart3 className="h-5 w-5 text-purple-600" />
+                  <div>
+                    <h5 className="font-medium text-purple-800">Analytics Reports</h5>
+                    <span className="text-xs text-purple-600 bg-purple-200 px-2 py-1 rounded-full">Good</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-purple-700">Usage</span>
+                    <span className="text-sm font-medium text-purple-800">
+                      {usageData?.reports_count || 0} reports
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-purple-700">Limit</span>
+                    <span className="text-sm font-medium text-purple-800">
+                      {currentPlan === 'trial' ? '2 reports' : 
+                       currentPlan === 'pro' ? '20 reports' : 'Unlimited usage'}
+                    </span>
+                  </div>
+                  {currentPlan !== 'business' && (
+                    <Progress 
+                      value={Math.min(100, ((usageData?.reports_count || 0) / (currentPlan === 'trial' ? 2 : 20)) * 100)} 
+                      className="h-2"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Detailed Reports */}
+              <div className="p-4 border rounded-lg bg-gradient-to-br from-orange-50 to-orange-100">
+                <div className="flex items-center gap-3 mb-3">
+                  <FileText className="h-5 w-5 text-orange-600" />
+                  <div>
+                    <h5 className="font-medium text-orange-800">Detailed Reports</h5>
+                    <span className="text-xs text-orange-600 bg-orange-200 px-2 py-1 rounded-full">Good</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-orange-700">Usage</span>
+                    <span className="text-sm font-medium text-orange-800">
+                      {usageData?.detailed_reports_count || 0} reports
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-orange-700">Limit</span>
+                    <span className="text-sm font-medium text-orange-800">
+                      {currentPlan === 'trial' ? '1 report' : 
+                       currentPlan === 'pro' ? '10 reports' : 'Unlimited usage'}
+                    </span>
+                  </div>
+                  {currentPlan !== 'business' && (
+                    <Progress 
+                      value={Math.min(100, ((usageData?.detailed_reports_count || 0) / (currentPlan === 'trial' ? 1 : 10)) * 100)} 
+                      className="h-2"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Team Members */}
+              <div className="p-4 border rounded-lg bg-gradient-to-br from-gray-50 to-gray-100">
+                <div className="flex items-center gap-3 mb-3">
+                  <Users className="h-5 w-5 text-gray-600" />
+                  <div>
+                    <h5 className="font-medium text-gray-800">Team Members</h5>
+                    <span className="text-xs text-gray-600 bg-gray-200 px-2 py-1 rounded-full">Coming Soon</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-700">Usage</span>
+                    <span className="text-sm font-medium text-gray-800">
+                      {usageData?.team_members_count || 0} members
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-700">Limit</span>
+                    <span className="text-sm font-medium text-gray-800">
+                      {currentPlan === 'trial' ? '1 member' : 
+                       currentPlan === 'pro' ? '5 members' : 'Unlimited members'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 italic">Feature coming soon</div>
+                </div>
+              </div>
+
+              {/* Export Data */}
+              <div className="p-4 border rounded-lg bg-gradient-to-br from-indigo-50 to-indigo-100">
+                <div className="flex items-center gap-3 mb-3">
+                  <Download className="h-5 w-5 text-indigo-600" />
+                  <div>
+                    <h5 className="font-medium text-indigo-800">Export Data</h5>
+                    <span className="text-xs text-indigo-600 bg-indigo-200 px-2 py-1 rounded-full">Good</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-indigo-700">Usage</span>
+                    <span className="text-sm font-medium text-indigo-800">
+                      {usageData?.export_count || 0} exports
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-indigo-700">Limit</span>
+                    <span className="text-sm font-medium text-indigo-800">
+                      {currentPlan === 'trial' ? 'CSV only' : 
+                       currentPlan === 'pro' ? 'CSV, PDF, Excel' : 'All formats'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-indigo-500">Data export capabilities</div>
+                </div>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-3 pt-4">
