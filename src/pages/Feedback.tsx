@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,12 +17,25 @@ import {
   Eye,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Tag,
+  Plus,
+  RefreshCw,
+  Settings,
+  ExternalLink,
+  Calendar,
+  User,
+  Mail,
+  MoreHorizontal,
+  Edit3,
+  Trash2,
+  Archive,
+  MessageCircle,
+  Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { componentPerformance } from "@/utils/performanceTest";
 
 interface Feedback {
   id: string;
@@ -32,1008 +45,702 @@ interface Feedback {
   message: string;
   timestamp: string;
   status: 'new' | 'reviewed' | 'resolved';
+  tags?: string[];
+  sentiment?: 'positive' | 'negative' | 'neutral';
+}
+
+interface FeedbackTag {
+  id: string;
+  feedback_id: string;
+  tag: string;
+  created_at: string;
 }
 
 const Feedback = () => {
-  console.log('Feedback component rendering...');
-  
   const { user } = useAuth();
-  console.log('User from AuthContext:', user);
   
+  // State management
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'new' | 'reviewed' | 'resolved'>('all');
+  const [sentimentFilter, setSentimentFilter] = useState<'all' | 'positive' | 'negative' | 'neutral'>('all');
+  const [dateFilter, setDateFilter] = useState<'7d' | '30d' | 'all'>('all');
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [settingsConfigured, setSettingsConfigured] = useState<boolean | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedFeedbacks, setSelectedFeedbacks] = useState<Set<string>>(new Set());
-  const [bulkUpdating, setBulkUpdating] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState<string | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
+  const [showTagInput, setShowTagInput] = useState<string | null>(null);
+  const [newTag, setNewTag] = useState('');
 
-  // Performance tracking
-  const renderTimer = componentPerformance.trackRender('Feedback');
-
-  const loadProjectId = useCallback(async () => {
-    if (!user) {
-      console.log('No user, skipping loadProjectId');
-      setIsInitializing(false);
-      return;
-    }
-
-    console.log('Starting loadProjectId for user:', user.id);
-    setError(null);
+  // Load project ID and feedbacks
+  const loadProjectAndFeedbacks = useCallback(async () => {
+    if (!user) return;
 
     try {
-      console.log('Loading project ID for user:', user.id);
+      setLoading(true);
       
-      // Simple direct query without complex caching
-      const { data, error } = await supabase
+      // Get user's project ID
+      const { data: projectSettings, error: projectError } = await supabase
         .from('feedback_settings')
-        .select('project_id, project_id_locked')
+        .select('project_id')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1);
 
-      if (error) {
-        console.error('Error loading project ID:', error);
-        throw error;
+      if (projectError) {
+        console.error('Error loading project settings:', projectError);
+        toast.error('Failed to load project configuration');
+        return;
       }
 
-      console.log('Query result:', { data, error });
-
-      if (data && Array.isArray(data) && data.length > 0) {
-        const projectId = data[0].project_id;
-        console.log('Project ID loaded:', projectId);
-        
-
-        
-        // Check if project_id is empty or null
-        if (!projectId || projectId.trim() === '') {
-          console.log('Project ID is empty, showing setup message');
-          setSettingsConfigured(false);
-          setIsInitializing(false);
-          return;
-        }
-        
-        setProjectId(projectId);
-        setSettingsConfigured(true);
-        setIsInitializing(false);
-        console.log('Project ID set successfully:', projectId);
-        
-        // Debug: Check if there are any existing feedbacks for this project
-        const { data: existingFeedbacks, error: feedbackError } = await supabase
-          .from('feedbacks')
-          .select('*')
-          .eq('project_id', projectId)
-          .order('timestamp', { ascending: false });
-        
-        console.log('Existing feedbacks for project:', projectId, ':', existingFeedbacks?.length || 0, existingFeedbacks);
-        if (feedbackError) {
-          console.error('Error checking existing feedbacks:', feedbackError);
-        }
-        
-        // Debug: Check ALL feedbacks in the database to see what's there
-        const { data: allFeedbacks, error: allFeedbacksError } = await supabase
-          .from('feedbacks')
-          .select('*')
-          .order('timestamp', { ascending: false })
-          .limit(10);
-        
-        console.log('ALL feedbacks in database (latest 10):', allFeedbacks?.length || 0, allFeedbacks);
-        if (allFeedbacksError) {
-          console.error('Error checking all feedbacks:', allFeedbacksError);
-        }
-      } else {
-        console.log('No settings found, showing setup message');
-        setSettingsConfigured(false);
-        setIsInitializing(false);
+      if (!projectSettings || projectSettings.length === 0) {
+        setProjectId(null);
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error loading project ID:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setError(`Failed to load project configuration: ${errorMessage}`);
-      toast.error(`Failed to load project configuration: ${errorMessage}`);
-      setIsInitializing(false);
-    }
-  }, [user]);
 
-  const loadFeedbacks = useCallback(async () => {
-    if (!projectId) {
-      console.log('No projectId, skipping loadFeedbacks');
-      return;
-    }
+      const projectId = projectSettings[0].project_id;
+      if (!projectId || projectId.trim() === '') {
+        setProjectId(null);
+        setLoading(false);
+        return;
+      }
 
-    console.log('Starting loadFeedbacks for project:', projectId);
-    setError(null);
+      setProjectId(projectId);
 
-    try {
-      console.log('Loading feedbacks for project:', projectId);
-      
-      // Simple direct query
-      const { data, error } = await supabase
+      // Load feedbacks for the project
+      const { data: feedbacksData, error: feedbacksError } = await supabase
         .from('feedbacks')
         .select('*')
         .eq('project_id', projectId)
-        .order('timestamp', { ascending: false })
-        .limit(50);
+        .order('timestamp', { ascending: false });
 
-      if (error) {
-        console.error('Error in loadFeedbacks query:', error);
-        throw error;
+      if (feedbacksError) {
+        console.error('Error loading feedbacks:', feedbacksError);
+        toast.error('Failed to load feedbacks');
+        return;
       }
-      
-      console.log('Feedbacks loaded:', data?.length || 0);
-      setFeedbacks(data || []);
+
+      // Load tags for each feedback
+      const feedbacksWithTags = await Promise.all(
+        (feedbacksData || []).map(async (feedback) => {
+          const { data: tagsData } = await supabase
+            .from('feedback_tags')
+            .select('tag')
+            .eq('feedback_id', feedback.id);
+          
+          return {
+            ...feedback,
+            tags: tagsData?.map(t => t.tag) || [],
+            sentiment: analyzeSentiment(feedback.message)
+          };
+        })
+      );
+
+      setFeedbacks(feedbacksWithTags);
+      setLoading(false);
+
     } catch (error) {
-      console.error('Error loading feedbacks:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setError(`Failed to load feedbacks: ${errorMessage}`);
-      toast.error(`Failed to load feedbacks: ${errorMessage}`);
+      console.error('Error in loadProjectAndFeedbacks:', error);
+      toast.error('Failed to load data');
+      setLoading(false);
     }
-  }, [projectId]);
+  }, [user]);
 
-  const setupRealtimeSubscription = useCallback(() => {
-    if (!projectId) {
-      console.log('No projectId for real-time subscription');
-      return;
-    }
+  // Load data on mount
+  useEffect(() => {
+    loadProjectAndFeedbacks();
+  }, [loadProjectAndFeedbacks]);
 
-    console.log('Setting up real-time subscription for project:', projectId);
-    console.log('Current feedbacks count:', feedbacks.length);
+  // Setup real-time subscription
+  useEffect(() => {
+    if (!projectId) return;
 
-    const channelName = `feedbacks-${projectId}`;
-    const subscription = supabase
-      .channel(channelName)
+    setRealtimeStatus('connecting');
+    
+    const channel = supabase
+      .channel(`feedbacks-${projectId}`)
       .on('postgres_changes', {
-        event: 'INSERT',
+        event: '*',
         schema: 'public',
         table: 'feedbacks',
         filter: `project_id=eq.${projectId}`
-      }, (payload) => {
-        console.log('Real-time INSERT event received:', payload);
-        console.log('Current project ID:', projectId);
-        console.log('Payload project ID:', payload.new?.project_id);
-        console.log('Current feedbacks count:', feedbacks.length);
+      }, async (payload) => {
+        console.log('Real-time event received:', payload);
         
-        const newFeedback = payload.new as Feedback;
-        
-        // Add the new feedback to the top of the list
-        setFeedbacks(prev => {
-          // Check if feedback already exists to avoid duplicates
-          const exists = prev.some(f => f.id === newFeedback.id);
-          if (exists) {
-            console.log('Feedback already exists in list, skipping duplicate');
-            return prev;
-          }
-          console.log('Adding new feedback to list');
-          return [newFeedback, ...prev];
-        });
-        
-        toast.success('New feedback received!', {
-          description: `From: ${newFeedback.name || 'Anonymous'}`,
-        });
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'feedbacks',
-        filter: `project_id=eq.${projectId}`
-      }, (payload) => {
-        console.log('Feedback updated via real-time:', payload.new);
-        const updatedFeedback = payload.new as Feedback;
-        setFeedbacks(prev => 
-          prev.map(feedback => 
-            feedback.id === updatedFeedback.id ? updatedFeedback : feedback
-          )
-        );
-      })
-      .on('postgres_changes', {
-        event: 'DELETE',
-        schema: 'public',
-        table: 'feedbacks',
-        filter: `project_id=eq.${projectId}`
-      }, (payload) => {
-        console.log('Feedback deleted via real-time:', payload.old);
-        const deletedFeedback = payload.old as Feedback;
-        setFeedbacks(prev => 
-          prev.filter(feedback => feedback.id !== deletedFeedback.id)
-        );
+        if (payload.eventType === 'INSERT') {
+          const newFeedback = payload.new as Feedback;
+          const feedbackWithTags = {
+            ...newFeedback,
+            tags: [],
+            sentiment: analyzeSentiment(newFeedback.message)
+          };
+          setFeedbacks(prev => [feedbackWithTags, ...prev]);
+          toast.success('New feedback received!');
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedFeedback = payload.new as Feedback;
+          setFeedbacks(prev => prev.map(f => 
+            f.id === updatedFeedback.id ? { ...f, ...updatedFeedback } : f
+          ));
+        } else if (payload.eventType === 'DELETE') {
+          const deletedFeedback = payload.old as Feedback;
+          setFeedbacks(prev => prev.filter(f => f.id !== deletedFeedback.id));
+        }
       })
       .subscribe((status) => {
-        console.log('Real-time subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('Successfully subscribed to feedback updates for project:', projectId);
-          setRealtimeStatus('connected');
-          toast.success('Real-time updates enabled', {
-            description: 'New feedback will appear automatically',
-          });
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('Real-time subscription error');
-          setRealtimeStatus('error');
-          toast.error('Real-time connection failed. Please refresh the page.');
-        } else if (status === 'TIMED_OUT') {
-          console.error('Real-time subscription timed out');
-          setRealtimeStatus('error');
-          toast.error('Real-time connection timed out. Please refresh the page.');
-        } else if (status === 'CLOSED') {
-          console.log('Real-time subscription closed');
-          setRealtimeStatus('disconnected');
-        } else if (status === 'PENDING') {
-          setRealtimeStatus('connecting');
-        }
+        setRealtimeStatus(status === 'SUBSCRIBED' ? 'connected' : 'disconnected');
       });
 
     return () => {
-      console.log('Cleaning up real-time subscription for project:', projectId);
-      supabase.removeChannel(subscription);
+      supabase.removeChannel(channel);
     };
-  }, [projectId, feedbacks.length]);
+  }, [projectId]);
 
-  // Load project ID and feedbacks on component mount
-  useEffect(() => {
-    console.log('Feedback useEffect triggered - user:', user?.id, 'isInitializing:', isInitializing, 'settingsConfigured:', settingsConfigured);
-    if (user) {
-      loadProjectId();
-    }
-  }, [user, loadProjectId]);
+  // Analyze sentiment from message content
+  const analyzeSentiment = (message: string): 'positive' | 'negative' | 'neutral' => {
+    const positiveWords = [
+      'great', 'good', 'excellent', 'amazing', 'wonderful', 'fantastic', 'love', 'like', 'happy', 'satisfied',
+      'perfect', 'awesome', 'outstanding', 'brilliant', 'superb', 'terrific', 'pleased', 'impressed', 'smooth',
+      'fast', 'easy', 'intuitive', 'beautiful', 'clean', 'modern', 'helpful', 'supportive', 'responsive'
+    ];
+    
+    const negativeWords = [
+      'bad', 'terrible', 'awful', 'horrible', 'hate', 'dislike', 'angry', 'frustrated', 'annoyed', 'disappointed',
+      'broken', 'slow', 'difficult', 'confusing', 'ugly', 'cluttered', 'buggy', 'crash', 'error', 'fail',
+      'useless', 'waste', 'problem', 'issue', 'complaint', 'unhappy', 'dissatisfied', 'poor', 'weak'
+    ];
 
-  useEffect(() => {
-    if (projectId) {
-      loadFeedbacks();
-      const cleanup = setupRealtimeSubscription();
-      
-      // Cleanup subscription on unmount or projectId change
-      return () => {
-        if (cleanup) cleanup();
-      };
-    }
-  }, [projectId, loadFeedbacks, setupRealtimeSubscription]);
+    const messageLower = message.toLowerCase();
+    const positiveCount = positiveWords.filter(word => messageLower.includes(word)).length;
+    const negativeCount = negativeWords.filter(word => messageLower.includes(word)).length;
 
-  const updateFeedbackStatus = async (feedbackId: string, status: 'new' | 'reviewed' | 'resolved') => {
+    if (positiveCount > negativeCount) return 'positive';
+    if (negativeCount > positiveCount) return 'negative';
+    return 'neutral';
+  };
+
+  // Filter feedbacks based on all filters
+  const filteredFeedbacks = useMemo(() => {
+    return feedbacks.filter(feedback => {
+      // Search filter
+      const matchesSearch = searchTerm === '' || 
+        feedback.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        feedback.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        feedback.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      if (!matchesSearch) return false;
+
+      // Status filter
+      if (statusFilter !== 'all' && feedback.status !== statusFilter) return false;
+
+      // Sentiment filter
+      if (sentimentFilter !== 'all' && feedback.sentiment !== sentimentFilter) return false;
+
+      // Date filter
+      if (dateFilter !== 'all') {
+        const feedbackDate = new Date(feedback.timestamp);
+        const now = new Date();
+        const diffTime = Math.abs(now.getTime() - feedbackDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (dateFilter === '7d' && diffDays > 7) return false;
+        if (dateFilter === '30d' && diffDays > 30) return false;
+      }
+
+      return true;
+    });
+  }, [feedbacks, searchTerm, statusFilter, sentimentFilter, dateFilter]);
+
+  // Update feedback status
+  const updateFeedbackStatus = async (feedbackId: string, newStatus: 'new' | 'reviewed' | 'resolved') => {
+    setUpdating(feedbackId);
+    
     try {
-      console.log('Updating feedback status:', { feedbackId, status });
-      
       const { error } = await supabase
         .from('feedbacks')
-        .update({ status })
+        .update({ status: newStatus })
         .eq('id', feedbackId);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      // Update local state immediately for better UX
-      setFeedbacks(prev => 
-        prev.map(feedback => 
-          feedback.id === feedbackId 
-            ? { ...feedback, status }
-            : feedback
-        )
-      );
+      setFeedbacks(prev => prev.map(f => 
+        f.id === feedbackId ? { ...f, status: newStatus } : f
+      ));
 
-      toast.success(`Feedback marked as ${status}`);
+      toast.success(`Feedback marked as ${newStatus}`);
     } catch (error) {
       console.error('Error updating feedback status:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Failed to update feedback status: ${errorMessage}`);
-      
-      // Revert the local state change on error
-      setFeedbacks(prev => 
-        prev.map(feedback => 
-          feedback.id === feedbackId 
-            ? { ...feedback, status: feedback.status } // Keep original status
-            : feedback
-        )
-      );
-    }
-  };
-
-  const bulkUpdateFeedbackStatus = async (status: 'new' | 'reviewed' | 'resolved') => {
-    if (selectedFeedbacks.size === 0) {
-      toast.error('Please select feedbacks to update');
-      return;
-    }
-
-    setBulkUpdating(true);
-    try {
-      console.log('Bulk updating feedback status:', { 
-        feedbackIds: Array.from(selectedFeedbacks), 
-        status 
-      });
-      
-      const { error } = await supabase
-        .from('feedbacks')
-        .update({ status })
-        .in('id', Array.from(selectedFeedbacks));
-
-      if (error) throw error;
-
-      // Update local state immediately for better UX
-      setFeedbacks(prev => 
-        prev.map(feedback => 
-          selectedFeedbacks.has(feedback.id)
-            ? { ...feedback, status }
-            : feedback
-        )
-      );
-
-      // Clear selection
-      setSelectedFeedbacks(new Set());
-
-      toast.success(`${selectedFeedbacks.size} feedback(s) marked as ${status}`);
-    } catch (error) {
-      console.error('Error bulk updating feedback status:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Failed to update feedback status: ${errorMessage}`);
+      toast.error('Failed to update feedback status');
     } finally {
-      setBulkUpdating(false);
+      setUpdating(null);
     }
   };
 
-  const toggleFeedbackSelection = (feedbackId: string) => {
-    setSelectedFeedbacks(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(feedbackId)) {
-        newSet.delete(feedbackId);
-      } else {
-        newSet.add(feedbackId);
+  // Add tag to feedback
+  const addTagToFeedback = async (feedbackId: string, tag: string) => {
+    if (!tag.trim()) return;
+
+    try {
+      // Insert tag into feedback_tags table
+      const { error } = await supabase
+        .from('feedback_tags')
+        .insert({
+          feedback_id: feedbackId,
+          tag: tag.trim().toLowerCase()
+        });
+
+      if (error) {
+        throw error;
       }
-      return newSet;
+
+      // Update local state
+      setFeedbacks(prev => prev.map(f => 
+        f.id === feedbackId 
+          ? { ...f, tags: [...(f.tags || []), tag.trim().toLowerCase()] }
+          : f
+      ));
+
+      setNewTag('');
+      setShowTagInput(null);
+      toast.success('Tag added successfully');
+    } catch (error) {
+      console.error('Error adding tag:', error);
+      toast.error('Failed to add tag');
+    }
+  };
+
+  // Remove tag from feedback
+  const removeTagFromFeedback = async (feedbackId: string, tagToRemove: string) => {
+    try {
+      const { error } = await supabase
+        .from('feedback_tags')
+        .delete()
+        .eq('feedback_id', feedbackId)
+        .eq('tag', tagToRemove);
+
+      if (error) {
+        throw error;
+      }
+
+      setFeedbacks(prev => prev.map(f => 
+        f.id === feedbackId 
+          ? { ...f, tags: (f.tags || []).filter(tag => tag !== tagToRemove) }
+          : f
+      ));
+
+      toast.success('Tag removed successfully');
+    } catch (error) {
+      console.error('Error removing tag:', error);
+      toast.error('Failed to remove tag');
+    }
+  };
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
-  const selectAllFeedbacks = () => {
-    const allIds = filteredFeedbacks.map(f => f.id);
-    setSelectedFeedbacks(new Set(allIds));
-  };
-
-  const clearSelection = () => {
-    setSelectedFeedbacks(new Set());
-  };
-
-  const exportToTXT = () => {
-    const content = feedbacks.map(feedback => 
-      `Feedback ID: ${feedback.id}
-From: ${feedback.name || 'Anonymous'}
-Email: ${feedback.email || 'Not provided'}
-Message: ${feedback.message}
-Status: ${feedback.status}
-Timestamp: ${new Date(feedback.timestamp).toLocaleString()}
----`
-    ).join('\n\n');
-
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `feedbacks-${new Date().toISOString().split('T')[0]}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success('Feedbacks exported successfully!');
-  };
-
-  const getStatusBadge = (status: string) => {
+  // Get status badge variant
+  const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'new':
-        return <Badge variant="default" className="bg-blue-100 text-blue-800"><AlertCircle className="h-3 w-3 mr-1" />New</Badge>;
+        return 'secondary';
       case 'reviewed':
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800"><Eye className="h-3 w-3 mr-1" />Reviewed</Badge>;
+        return 'default';
       case 'resolved':
-        return <Badge variant="outline" className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Resolved</Badge>;
+        return 'outline';
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return 'secondary';
     }
   };
 
+  // Get sentiment badge variant
+  const getSentimentBadgeVariant = (sentiment: string) => {
+    switch (sentiment) {
+      case 'positive':
+        return 'default';
+      case 'negative':
+        return 'destructive';
+      default:
+        return 'secondary';
+    }
+  };
+
+  // Get status icon
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'new':
-        return <AlertCircle className="h-4 w-4 text-blue-600" />;
+        return <AlertCircle className="h-4 w-4" />;
       case 'reviewed':
-        return <Eye className="h-4 w-4 text-yellow-600" />;
+        return <Eye className="h-4 w-4" />;
       case 'resolved':
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
+        return <CheckCircle className="h-4 w-4" />;
       default:
-        return <AlertCircle className="h-4 w-4 text-gray-600" />;
+        return <AlertCircle className="h-4 w-4" />;
     }
   };
 
-  // Filter feedbacks based on search and status
-  const filteredFeedbacks = feedbacks.filter(feedback => {
-    const matchesSearch = 
-      feedback.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      feedback.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      feedback.message.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || feedback.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
-
-
-
-  if (error) {
+  if (!user) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center max-w-md">
-            <div className="p-4 bg-red-100 rounded-full w-16 h-16 mx-auto mb-6 flex items-center justify-center">
-              <AlertCircle className="h-8 w-8 text-red-600" />
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <MessageSquare className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+              <p className="text-gray-600">Please log in to access your feedback.</p>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Error Loading Feedback</h2>
-            <p className="text-gray-600 mb-6">{error}</p>
-            <div className="space-y-3">
-              <Button 
-                onClick={() => {
-                  setError(null);
-                  loadProjectId();
-                }}
-                className="w-full"
-              >
-                Try Again
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={() => window.location.href = '/feedback-settings'}
-                className="w-full"
-              >
-                Go to Settings
-              </Button>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  // Show configuration message if settings are not configured
-  if (settingsConfigured === false) {
+  if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center max-w-md">
-            <div className="p-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full w-16 h-16 mx-auto mb-6 flex items-center justify-center">
-              <MessageSquare className="h-8 w-8 text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Setup Required</h2>
-            <p className="text-gray-600 mb-6">
-              You need to configure your feedback settings before you can view feedback.
-            </p>
-            <Button 
-              onClick={() => window.location.href = '/feedback-settings'}
-              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-            >
-              Configure Feedback Settings
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show loading state while initializing
-  if (isInitializing || settingsConfigured === null) {
-    return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto p-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600 mb-4">Initializing...</p>
-            <p className="text-sm text-gray-500 mb-4">
-              User: {user?.id ? 'Logged in' : 'Not logged in'} | 
-              Settings: {settingsConfigured === null ? 'Loading' : settingsConfigured ? 'Configured' : 'Not configured'} |
-              Project ID: {projectId || 'None'}
-            </p>
-            <div className="space-y-2">
-              <Button 
-                onClick={() => {
-                  console.log('Debug: Force loading project ID');
-                  loadProjectId();
-                }}
-                variant="outline"
-                size="sm"
-              >
-                Debug: Retry Load
-              </Button>
-              {projectId && (
-                <>
-                  <Button 
-                    onClick={() => {
-                      console.log('Debug: Force loading feedbacks for project:', projectId);
-                      loadFeedbacks();
-                    }}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Debug: Load Feedbacks
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      console.log('Debug: Check all feedbacks in database');
-                      const checkAllFeedbacks = async () => {
-                        const { data, error } = await supabase
-                          .from('feedbacks')
-                          .select('*')
-                          .order('timestamp', { ascending: false })
-                          .limit(20);
-                        console.log('All feedbacks in database:', data);
-                        if (error) console.error('Error:', error);
-                      };
-                      checkAllFeedbacks();
-                    }}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Debug: Check All Feedbacks
-                  </Button>
-                </>
-              )}
-            </div>
+            <RefreshCw className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Loading Feedback...</h2>
+            <p className="text-gray-600">Please wait while we fetch your data.</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // End render timer
-  renderTimer.end();
-
-  console.log('About to render Feedback component - states:', {
-    user: !!user,
-    isInitializing,
-    settingsConfigured,
-    error,
-    projectId,
-    feedbacksCount: feedbacks.length
-  });
-
-  // Fallback - show main content even if there are issues
-  return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="text-center mb-8">
-        <div className="flex items-center justify-center mb-6">
-          <div className="p-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl mr-6 shadow-lg">
-            <MessageSquare className="h-10 w-10 text-white" />
-          </div>
-          <div className="text-left">
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2">
-              Feedback Management
-            </h1>
-            <div className="flex items-center gap-3">
-              <Badge 
-                variant="outline" 
-                className={`px-3 py-1 ${
-                  realtimeStatus === 'connected' 
-                    ? 'bg-green-50 text-green-700 border-green-200' 
-                    : realtimeStatus === 'connecting'
-                    ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                    : realtimeStatus === 'error'
-                    ? 'bg-red-50 text-red-700 border-red-200'
-                    : 'bg-gray-50 text-gray-700 border-gray-200'
-                }`}
-              >
-                <div className={`w-2 h-2 rounded-full mr-2 ${
-                  realtimeStatus === 'connected' 
-                    ? 'bg-green-500 animate-pulse' 
-                    : realtimeStatus === 'connecting'
-                    ? 'bg-yellow-500 animate-spin'
-                    : realtimeStatus === 'error'
-                    ? 'bg-red-500'
-                    : 'bg-gray-500'
-                }`}></div>
-                {realtimeStatus === 'connected' && 'Live & Real-time'}
-                {realtimeStatus === 'connecting' && 'Connecting...'}
-                {realtimeStatus === 'error' && 'Connection Error'}
-                {realtimeStatus === 'disconnected' && 'Disconnected'}
-              </Badge>
-              {isInitializing && (
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-spin"></div>
-                  Loading...
-                </Badge>
-              )}
-              <span className="text-sm text-gray-500 font-medium">
-                Powered by NoteX
-              </span>
+  if (!projectId) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card className="max-w-2xl mx-auto text-center">
+          <CardContent className="p-12">
+            <div className="mb-6">
+              <MessageSquare className="h-24 w-24 text-blue-500 mx-auto mb-6" />
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">No Feedback Widget Configured</h1>
+              <p className="text-lg text-gray-600 mb-8">
+                You need to set up a feedback widget to start collecting feedback from your users.
+              </p>
             </div>
-          </div>
-        </div>
-        <div className="max-w-3xl mx-auto">
-          <p className="text-xl text-gray-600 leading-relaxed mb-4">
-            View and manage all feedback from your website visitors in real-time. 
-            Stay connected with your audience and respond to their needs instantly.
-          </p>
-          <div className="flex items-center justify-center gap-6 text-sm text-gray-500">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span>Real-time updates</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span>Bulk actions</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-              <span>Smart filtering</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header Actions */}
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-              Real-time Active
-            </Badge>
-            <span className="text-sm text-gray-500">
-              New feedback will appear automatically
-            </span>
-          </div>
-          <Button 
-            onClick={() => {
-              setIsRefreshing(true);
-              loadFeedbacks().finally(() => setIsRefreshing(false));
-            }}
-            variant="outline"
-            size="sm"
-            disabled={isRefreshing}
-          >
-            {isRefreshing ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                Refreshing...
-              </>
-            ) : (
-              <>
-                <Zap className="h-4 w-4 mr-2" />
-                Refresh
-              </>
-            )}
-          </Button>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Feedback</p>
-                  <p className="text-2xl font-bold text-gray-900">{feedbacks.length}</p>
-                </div>
-                <MessageSquare className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">New</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {feedbacks.filter(f => f.status === 'new').length}
-                  </p>
-                </div>
-                <AlertCircle className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Reviewed</p>
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {feedbacks.filter(f => f.status === 'reviewed').length}
-                  </p>
-                </div>
-                <Eye className="h-8 w-8 text-yellow-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Resolved</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {feedbacks.filter(f => f.status === 'resolved').length}
-                  </p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Controls */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-              <div className="flex flex-col md:flex-row gap-4 flex-1">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    placeholder="Search feedbacks..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full md:w-48">
-                    <Filter className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="new">New</SelectItem>
-                    <SelectItem value="reviewed">Reviewed</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            
+            <div className="space-y-4">
+              <Button size="lg" asChild>
+                <a href="/feedback-settings">
+                  <Settings className="h-5 w-5 mr-2" />
+                  Configure Feedback Widget
+                </a>
+              </Button>
               
-              <div className="flex gap-2">
-                <Button 
-                  onClick={() => {
-                    setIsRefreshing(true);
-                    loadFeedbacks().finally(() => setIsRefreshing(false));
-                  }}
-                  variant="outline"
-                  disabled={isRefreshing}
-                >
-                  <Zap className="h-4 w-4 mr-2" />
-                  Refresh
-                </Button>
-                {realtimeStatus === 'error' && (
-                  <Button 
-                    onClick={() => {
-                      setRealtimeStatus('connecting');
-                      const cleanup = setupRealtimeSubscription();
-                      if (cleanup) {
-                        setTimeout(() => {
-                          if (realtimeStatus === 'connecting') {
-                            setRealtimeStatus('error');
-                            toast.error('Failed to reconnect. Please refresh the page.');
-                          }
-                        }, 5000);
-                      }
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="text-red-600 border-red-200 hover:bg-red-50"
-                  >
-                    <Zap className="h-4 w-4 mr-2" />
-                    Reconnect
-                  </Button>
-                )}
-                <Button onClick={exportToTXT} variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export TXT
-                </Button>
+              <div className="text-sm text-gray-500">
+                <p>Once configured, feedback will appear here in real-time</p>
               </div>
             </div>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
 
-        {/* Bulk Actions */}
-        {filteredFeedbacks.length > 0 && (
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedFeedbacks.size === filteredFeedbacks.length && filteredFeedbacks.length > 0}
-                      onChange={selectedFeedbacks.size === filteredFeedbacks.length ? clearSelection : selectAllFeedbacks}
-                      className="rounded border-gray-300"
-                    />
-                    <span className="text-sm text-gray-600">
-                      {selectedFeedbacks.size === 0 
-                        ? 'Select all' 
-                        : `${selectedFeedbacks.size} of ${filteredFeedbacks.length} selected`
-                      }
-                    </span>
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Feedback Management</h1>
+          <p className="text-gray-600 mt-2">
+            Manage and respond to user feedback in real-time
+          </p>
+          <div className="flex items-center space-x-2 mt-2">
+            <div className="flex items-center space-x-1 text-sm text-gray-500">
+              <div className={`w-2 h-2 rounded-full ${
+                realtimeStatus === 'connected' ? 'bg-green-500' : 
+                realtimeStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+              }`}></div>
+              <span className="capitalize">{realtimeStatus}</span>
+            </div>
+            <span className="text-gray-400">•</span>
+            <span className="text-sm text-gray-500">
+              {feedbacks.length} feedback entries
+            </span>
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            onClick={loadProjectAndFeedbacks}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button asChild>
+            <a href="/feedback-settings">
+              <Settings className="h-4 w-4 mr-2" />
+              Widget Settings
+            </a>
+          </Button>
+        </div>
+      </div>
+
+      {/* Filters Bar */}
+      <Card className="rounded-xl shadow-lg border-2 border-blue-100 bg-blue-50">
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Search */}
+            <div className="lg:col-span-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search feedback by message, name, or email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-white"
+                />
+              </div>
+            </div>
+
+            {/* Status Filter */}
+            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="reviewed">Reviewed</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Sentiment Filter */}
+            <Select value={sentimentFilter} onValueChange={(value: any) => setSentimentFilter(value)}>
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="Sentiment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sentiments</SelectItem>
+                <SelectItem value="positive">Positive</SelectItem>
+                <SelectItem value="neutral">Neutral</SelectItem>
+                <SelectItem value="negative">Negative</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Date Filter */}
+            <Select value={dateFilter} onValueChange={(value: any) => setDateFilter(value)}>
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="Date Range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 Days</SelectItem>
+                <SelectItem value="30d">Last 30 Days</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Results Summary */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-gray-600">
+          Showing {filteredFeedbacks.length} of {feedbacks.length} feedback entries
+        </div>
+        <div className="text-sm text-gray-500">
+          {filteredFeedbacks.length > 0 && (
+            <span>Last updated: {new Date().toLocaleTimeString()}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Feedback Grid */}
+      {filteredFeedbacks.length > 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {filteredFeedbacks.map((feedback) => (
+            <Card key={feedback.id} className="rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Badge variant={getStatusBadgeVariant(feedback.status)}>
+                      {getStatusIcon(feedback.status)}
+                      <span className="ml-1 capitalize">{feedback.status}</span>
+                    </Badge>
+                    <Badge variant={getSentimentBadgeVariant(feedback.sentiment || 'neutral')}>
+                      {feedback.sentiment || 'neutral'}
+                    </Badge>
                   </div>
-                  
-                  {selectedFeedbacks.size > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-500">Bulk actions:</span>
-                      <Button
-                        onClick={() => bulkUpdateFeedbackStatus('reviewed')}
-                        disabled={bulkUpdating}
-                        size="sm"
-                        variant="outline"
-                        className="text-yellow-700 border-yellow-200 hover:bg-yellow-50"
-                      >
-                        {bulkUpdating ? (
-                          <>
-                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-yellow-600 mr-1"></div>
-                            Updating...
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="h-3 w-3 mr-1" />
-                            Mark Reviewed
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        onClick={() => bulkUpdateFeedbackStatus('resolved')}
-                        disabled={bulkUpdating}
-                        size="sm"
-                        variant="outline"
-                        className="text-green-700 border-green-200 hover:bg-green-50"
-                      >
-                        {bulkUpdating ? (
-                          <>
-                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-1"></div>
-                            Updating...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Mark Resolved
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        onClick={clearSelection}
-                        size="sm"
-                        variant="ghost"
-                        className="text-gray-500"
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex items-center space-x-1 text-sm text-gray-500">
+                    <Clock className="h-4 w-4" />
+                    <span>{formatDate(feedback.timestamp)}</span>
+                  </div>
                 </div>
-                
-                {selectedFeedbacks.size > 0 && (
-                  <div className="text-sm text-gray-500">
-                    {selectedFeedbacks.size} feedback{selectedFeedbacks.size !== 1 ? 's' : ''} selected
+              </CardHeader>
+              
+              <CardContent className="space-y-4">
+                {/* User Info */}
+                {(feedback.name || feedback.email) && (
+                  <div className="flex items-center space-x-3 text-sm text-gray-600">
+                    {feedback.name && (
+                      <div className="flex items-center space-x-1">
+                        <User className="h-4 w-4" />
+                        <span>{feedback.name}</span>
+                      </div>
+                    )}
+                    {feedback.email && (
+                      <div className="flex items-center space-x-1">
+                        <Mail className="h-4 w-4" />
+                        <span>{feedback.email}</span>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Feedback List */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>All Feedback</CardTitle>
-                <CardDescription>
-                  {filteredFeedbacks.length} feedback{filteredFeedbacks.length !== 1 ? 's' : ''} found
-                  {feedbacks.length > 0 && (
-                    <span className={`ml-2 ${
-                      realtimeStatus === 'connected' 
-                        ? 'text-green-600' 
-                        : realtimeStatus === 'connecting'
-                        ? 'text-yellow-600'
-                        : realtimeStatus === 'error'
-                        ? 'text-red-600'
-                        : 'text-gray-600'
-                    }`}>
-                      • {realtimeStatus === 'connected' && 'Real-time updates enabled'}
-                      • {realtimeStatus === 'connecting' && 'Connecting to real-time...'}
-                      • {realtimeStatus === 'error' && 'Real-time connection failed'}
-                      • {realtimeStatus === 'disconnected' && 'Real-time disconnected'}
-                    </span>
-                  )}
-                </CardDescription>
-              </div>
-              {isRefreshing && (
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                  Refreshing...
+                {/* Message */}
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-gray-800 leading-relaxed">{feedback.message}</p>
                 </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {filteredFeedbacks.length === 0 ? (
-              <div className="text-center py-12">
-                <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No feedback found</h3>
-                <p className="text-gray-600 mb-4">
-                  {feedbacks.length === 0 
-                    ? "No feedback has been submitted yet. Add the widget to your website to start collecting feedback."
-                    : "No feedback matches your current search and filter criteria."
-                  }
-                </p>
-                {feedbacks.length === 0 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
-                    <h4 className="font-semibold text-blue-900 mb-2">Getting Started:</h4>
-                    <ol className="text-sm text-blue-800 space-y-1 text-left">
-                      <li>1. Go to <strong>Feedback Settings</strong> to configure your widget</li>
-                      <li>2. Copy the embed code and add it to your website</li>
-                      <li>3. The feedback widget will appear on your website</li>
-                      <li>4. All feedback will be collected here in real-time</li>
-                    </ol>
-                    <Button 
-                      onClick={() => window.location.href = '/feedback-settings'}
-                      className="mt-3 w-full"
-                      variant="outline"
+
+                {/* Tags */}
+                <div className="flex items-center space-x-2">
+                  <Tag className="h-4 w-4 text-gray-400" />
+                  <div className="flex flex-wrap gap-1">
+                    {feedback.tags?.map((tag, index) => (
+                      <Badge 
+                        key={index} 
+                        variant="outline" 
+                        className="text-xs cursor-pointer hover:bg-red-50"
+                        onClick={() => removeTagFromFeedback(feedback.id, tag)}
+                      >
+                        {tag}
+                        <XCircle className="h-3 w-3 ml-1" />
+                      </Badge>
+                    ))}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700"
+                      onClick={() => setShowTagInput(feedback.id)}
                     >
-                      Configure Widget
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Tag
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Tag Input */}
+                {showTagInput === feedback.id && (
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      placeholder="Enter tag name..."
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      className="text-sm"
+                      onKeyPress={(e) => e.key === 'Enter' && addTagToFeedback(feedback.id, newTag)}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => addTagToFeedback(feedback.id, newTag)}
+                      disabled={!newTag.trim()}
+                    >
+                      Add
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowTagInput(null);
+                        setNewTag('');
+                      }}
+                    >
+                      Cancel
                     </Button>
                   </div>
                 )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredFeedbacks.map((feedback) => (
-                  <div key={feedback.id} className={`border rounded-lg p-6 transition-colors ${
-                    selectedFeedbacks.has(feedback.id) 
-                      ? 'bg-blue-50 border-blue-200' 
-                      : 'hover:bg-gray-50'
-                  }`}>
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedFeedbacks.has(feedback.id)}
-                          onChange={() => toggleFeedbackSelection(feedback.id)}
-                          className="rounded border-gray-300 mt-1"
-                        />
-                        {getStatusIcon(feedback.status)}
-                        <div>
-                          <h3 className="font-semibold text-gray-900">
-                            {feedback.name || 'Anonymous'}
-                          </h3>
-                          {feedback.email && (
-                            <p className="text-sm text-gray-600">{feedback.email}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {getStatusBadge(feedback.status)}
-                        <Select 
-                          value={feedback.status} 
-                          onValueChange={(value: 'new' | 'reviewed' | 'resolved') => 
-                            updateFeedbackStatus(feedback.id, value)
-                          }
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="new">New</SelectItem>
-                            <SelectItem value="reviewed">Reviewed</SelectItem>
-                            <SelectItem value="resolved">Resolved</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <div className="flex items-center space-x-2">
+                    {feedback.status !== 'resolved' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateFeedbackStatus(feedback.id, 'resolved')}
+                        disabled={updating === feedback.id}
+                      >
+                        {updating === feedback.id ? (
+                          <RefreshCw className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <CheckCircle className="h-3 w-3" />
+                        )}
+                        <span className="ml-1">Mark Resolved</span>
+                      </Button>
+                    )}
                     
-                    <div className="mb-4">
-                      <p className="text-gray-700 whitespace-pre-wrap">{feedback.message}</p>
-                    </div>
-                    
-                    <div className="flex items-center justify-between text-sm text-gray-500">
-                      <span>ID: {feedback.id}</span>
-                      <span>{new Date(feedback.timestamp).toLocaleString()}</span>
-                    </div>
+                    {feedback.status === 'new' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateFeedbackStatus(feedback.id, 'reviewed')}
+                        disabled={updating === feedback.id}
+                      >
+                        <Eye className="h-3 w-3 mr-1" />
+                        Mark Reviewed
+                      </Button>
+                    )}
                   </div>
-                ))}
+                  
+                  <div className="text-xs text-gray-400">
+                    ID: {feedback.id.slice(0, 8)}...
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        /* Empty State */
+        <Card className="rounded-xl shadow-lg text-center py-16">
+          <CardContent>
+            <div className="mb-6">
+              <MessageSquare className="h-24 w-24 text-blue-500 mx-auto mb-6" />
+              <h3 className="text-2xl font-semibold text-gray-900 mb-4">
+                {searchTerm || statusFilter !== 'all' || sentimentFilter !== 'all' || dateFilter !== 'all' 
+                  ? 'No feedback matches your filters' 
+                  : 'No feedback yet'}
+              </h3>
+              <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                {searchTerm || statusFilter !== 'all' || sentimentFilter !== 'all' || dateFilter !== 'all'
+                  ? 'Try adjusting your search criteria or filters to see more results.'
+                  : 'Start collecting feedback by embedding the widget on your website or app.'
+                }
+              </p>
+            </div>
+            
+            {!searchTerm && statusFilter === 'all' && sentimentFilter === 'all' && dateFilter === 'all' && (
+              <div className="space-y-4">
+                <Button size="lg" asChild>
+                  <a href="/feedback-settings">
+                    <Settings className="h-5 w-5 mr-2" />
+                    Configure Feedback Widget
+                  </a>
+                </Button>
+                
+                <div className="text-sm text-gray-500">
+                  <p>Once configured, feedback will appear here in real-time</p>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
-      </div>
+      )}
     </div>
   );
 };

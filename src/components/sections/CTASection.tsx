@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, CheckCircle, Clock, Shield } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const CTASection = () => {
   const benefits = [
@@ -35,12 +36,12 @@ const CTASection = () => {
 
             {/* Headline */}
             <h2 className="text-3xl md:text-5xl font-bold leading-tight">
-              Ready to Transform Your Business Intelligence with AI-Powered Analytics?
+              Ready to Transform Your Customer Feedback with AI-Powered Insights?
             </h2>
 
             {/* Subheadline */}
             <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
-              Join hundreds of successful enterprises using NoteX BI to build data-driven strategies. Start your free trial today and see the difference AI-powered BI can make.
+              Join hundreds of successful businesses using NoteX to understand their customers better. Start your free trial today and see the difference AI-powered feedback analytics can make.
             </p>
 
             {/* Benefits */}
@@ -58,10 +59,12 @@ const CTASection = () => {
               <Button 
                 size="xl" 
                 className="bg-white text-primary hover:bg-white/90 shadow-large font-semibold"
-              
-                >
-                Start Your 8-Day Free Trial
-                <ArrowRight className="h-5 w-5 ml-2" />
+                asChild
+              >
+                <Link to="/auth">
+                  Start Your 8-Day Free Trial
+                  <ArrowRight className="h-5 w-5 ml-2" />
+                </Link>
               </Button>
               
             </div>
@@ -83,7 +86,7 @@ const CTASection = () => {
             {/* Urgency */}
             <div className="pt-4">
               <p className="text-sm text-white/70">
-                🔥🔥🔥 Over 50 enterprises deployed this week
+                🔥🔥🔥 Over 50 businesses started collecting feedback this week
               </p>
             </div>
           </div>

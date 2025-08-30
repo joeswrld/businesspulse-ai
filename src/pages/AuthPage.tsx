@@ -28,23 +28,40 @@ const AuthPage = () => {
     setLoading(true);
 
     try {
+      console.log("🔐 Attempting authentication...");
+      
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
+        console.log("🔐 Signing in with email:", formData.email);
+        
+        const { data, error } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         });
 
-        if (error) throw error;
+        console.log("🔐 Sign in result:", { data, error });
 
+        if (error) {
+          console.error("❌ Sign in error:", error);
+          throw error;
+        }
+
+        console.log("✅ Sign in successful:", data.user?.email);
+        
         toast({
           title: "Welcome back!",
           description: "You've been successfully signed in.",
         });
-        navigate("/dashboard");
+        
+        // Add a small delay to ensure the auth state is updated
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 100);
       } else {
+        console.log("🔐 Creating account for email:", formData.email);
+        
         const redirectUrl = `${window.location.origin}/`;
         
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
           options: {
@@ -57,7 +74,14 @@ const AuthPage = () => {
           }
         });
 
-        if (error) throw error;
+        console.log("🔐 Sign up result:", { data, error });
+
+        if (error) {
+          console.error("❌ Sign up error:", error);
+          throw error;
+        }
+
+        console.log("✅ Sign up successful:", data.user?.email);
 
         toast({
           title: "Account created!",
@@ -65,6 +89,7 @@ const AuthPage = () => {
         });
       }
     } catch (error: any) {
+      console.error("❌ Authentication error:", error);
       toast({
         title: "Error",
         description: error.message || "An error occurred during authentication.",

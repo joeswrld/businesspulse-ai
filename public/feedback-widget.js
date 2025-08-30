@@ -149,6 +149,8 @@
       ></textarea>
     </div>
 
+    <div id="notex-quota" style="margin: 8px 0 12px 0; color: #374151; font-size: 12px; display: none;"></div>
+
     <div style="display: flex; gap: 12px; justify-content: flex-end;">
       <button 
         type="button" 
@@ -252,6 +254,39 @@
   function openModal() {
     modalOverlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    // Fetch remaining quota on open
+    const quotaEl = document.getElementById('notex-quota');
+    const submitButton = document.getElementById('notex-submit-button');
+    const projectIdField = form.querySelector('input[name="project_id"]');
+    const pid = projectIdField ? projectIdField.value : null;
+    if (!pid) return;
+
+    quotaEl.style.display = 'none';
+    quotaEl.textContent = '';
+    submitButton.disabled = false;
+    submitButton.style.opacity = '1';
+
+    const usageCheckUrl = 'https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/check-usage';
+    fetch(usageCheckUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: pid, feature: 'feedback' })
+    })
+      .then(r => r.json().catch(() => ({})))
+      .then(result => {
+        if (!result || result.success !== true) return;
+        quotaEl.style.display = 'block';
+        if (result.isUnlimited || result.limit === -1) {
+          quotaEl.textContent = 'Quota: Unlimited';
+        } else {
+          quotaEl.textContent = `Quota: ${Math.max(0, result.remaining)} remaining`;
+          if (result.remaining <= 0) {
+            submitButton.disabled = true;
+            submitButton.style.opacity = '0.6';
+          }
+        }
+      })
+      .catch(() => {});
   }
 
   function closeModal() {
@@ -309,6 +344,48 @@
         email: formData.get('email'),
         message: formData.get('message')
       });
+
+      // First check usage limits before submitting
+      const usageCheckUrl = 'https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/check-usage';
+      console.log('NoteX Feedback Widget: Checking usage limits...');
+      
+      const usageResponse = await fetch(usageCheckUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: formData.get('project_id'),
+          feature: 'feedback'
+        })
+      });
+
+      let usageResult = null;
+      if (usageResponse.ok) {
+        usageResult = await usageResponse.json();
+      } else {
+        console.warn('NoteX Feedback Widget: Usage check failed, proceeding optimistically');
+      }
+      console.log('NoteX Feedback Widget: Usage check result', usageResult);
+
+      if (usageResult && usageResult.success === true && usageResult.canUse === false) {
+        // Show limit reached message
+        errorMessage.innerHTML = `
+          <div style="text-align: center;">
+            <div style="font-weight: 600; margin-bottom: 8px; color: #dc2626;">
+              ⚠️ Limit reached — contact admin
+            </div>
+            <div style="font-size: 13px; color: #991b1b; margin-bottom: 12px;">
+              You have reached your feedback submission limit.
+            </div>
+            <div style="font-size: 12px; color: #7c2d12; background: #fef3c7; padding: 8px; border-radius: 4px; border: 1px solid #f59e0b;">
+              Please contact the admin to increase your limit or upgrade your plan.
+            </div>
+          </div>
+        `;
+        errorMessage.style.display = 'block';
+        return;
+      }
 
       // Use the correct Supabase URL
       const apiUrl = 'https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/feedback-api';

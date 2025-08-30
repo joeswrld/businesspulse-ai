@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   LayoutDashboard, 
   FileText, 
@@ -14,7 +16,13 @@ import {
   CreditCard,
   Users,
   MessageSquare,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Crown,
+  Star,
+  Zap,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,21 +30,107 @@ import { toast } from "sonner";
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [subscription, setSubscription] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
 
 
+  // Load user data
+  const loadUserData = async () => {
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        setUser(currentUser);
+        
+        // Load profile
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .single();
+        
+        if (profileData) {
+          setProfile(profileData);
+        }
+        
+        // Load subscription
+        const { data: subscriptionData } = await supabase
+          .from('user_subscriptions')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .single();
+        
+        if (subscriptionData) {
+          setSubscription(subscriptionData);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load data on mount
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  // Get plan info for badge
+  const getPlanInfo = () => {
+    if (!subscription) {
+      return {
+        planName: 'Free Trial',
+        planType: 'trial',
+        planColor: 'bg-orange-100 text-orange-800 border-orange-200',
+        planIcon: <Star className="h-3 w-3" />
+      };
+    }
+
+    const planName = subscription.plan_name || 'Free Trial';
+    const isTrial = subscription.plan_type === 'trial';
+    
+    if (isTrial) {
+      return {
+        planName,
+        planType: 'trial',
+        planColor: 'bg-orange-100 text-orange-800 border-orange-200',
+        planIcon: <Star className="h-3 w-3" />
+      };
+    }
+
+    if (subscription.plan_type === 'pro') {
+      return {
+        planName: 'Pro',
+        planType: 'pro',
+        planColor: 'bg-blue-100 text-blue-800 border-blue-200',
+        planIcon: <Zap className="h-3 w-3" />
+      };
+    }
+
+    return {
+      planName: 'Business',
+      planType: 'business',
+      planColor: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      planIcon: <Crown className="h-3 w-3" />
+    };
+  };
+
   const navigation = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Feedback", href: "/feedback", icon: MessageSquare }, 
-    { name: "AI Analytics", href: "/insights-simple", icon: Brain },
-    { name: "Executive Reports", href: "/reports", icon: FileText },
-    { name: "Business Intelligence", href: "/analytics", icon: BarChart3 },
-    { name: "Teams", href: "/teams", icon: Users, comingSoon: true },
-    { name: "Usage & Billing", href: "/billing", icon: CreditCard },
-    { name: "Feedback Settings", href: "/feedback-settings", icon: SlidersHorizontal },
-    { name: "Settings", href: "/settings", icon: Settings },
-    { name: "Profile", href: "/profile", icon: User },
+    { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Collect Feedback", href: "/feedback", icon: MessageSquare }, 
+    { name: "AI Insights", href: "/insights-simple", icon: Brain },
+    { name: "Reports & Analytics", href: "/reports", icon: FileText },
+    { name: "Business Metrics", href: "/analytics", icon: BarChart3 },
+    { name: "Team Collaboration", href: "/teams", icon: Users, comingSoon: true },
+    { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
+    { name: "Widget Settings", href: "/feedback-settings", icon: SlidersHorizontal },
+    { name: "Account Settings", href: "/settings", icon: Settings },
+    { name: "My Profile", href: "/profile", icon: User },
   ];
 
   const handleSignOut = async () => {
@@ -65,25 +159,100 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Sidebar */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform duration-300 ease-in-out lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 bg-gradient-to-b from-slate-50 to-white border-r border-slate-200 transform transition-all duration-300 ease-in-out lg:translate-x-0 shadow-xl max-h-screen",
+        sidebarCollapsed ? "w-16" : "w-72",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between p-4 border-b border-border">
-            <Link to="/dashboard" className="flex items-center space-x-2">
-              <img src="/favicon.ico" alt="NoteX BI" className="h-8 w-8" />
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white/50 backdrop-blur-sm">
+            <Link to="/dashboard" className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+                <img src="/favicon.ico" alt="FeedbackFlow" className="h-6 w-6" />
+              </div>
+              {!sidebarCollapsed && (
+                <div className="transition-opacity duration-300">
+                               <h1 className="text-lg font-bold text-slate-900">NoteX</h1>
+             <p className="text-xs text-slate-500">Turn feedback into growth ✨</p>
+                </div>
+              )}
             </Link>
-            <button 
-              className="lg:hidden p-1"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X className="h-5 w-5" />
-            </button>
+            <div className="flex items-center space-x-2">
+              <button 
+                className="hidden lg:flex p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              >
+                {sidebarCollapsed ? (
+                  <ChevronRight className="h-4 w-4 text-slate-600" />
+                ) : (
+                  <ChevronLeft className="h-4 w-4 text-slate-600" />
+                )}
+              </button>
+              <button 
+                className="lg:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <X className="h-5 w-5 text-slate-600" />
+              </button>
+            </div>
           </div>
 
+          {/* User Profile Section */}
+          {!loading && user && !sidebarCollapsed && (
+            <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <div className="flex items-center space-x-3 mb-4">
+                <Avatar className="h-12 w-12 border-2 border-white shadow-lg">
+                  <AvatarImage src={profile?.avatar_url} />
+                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-semibold">
+                    {profile?.first_name?.[0] || user.email?.[0] || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-slate-900 truncate">
+                    {profile?.first_name && profile?.last_name 
+                      ? `${profile.first_name} ${profile.last_name}`
+                      : user.email?.split('@')[0] || 'User'
+                    }
+                  </h3>
+                  <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                </div>
+              </div>
+              
+              {/* Plan Badge */}
+              <div className="flex items-center justify-between">
+                <Badge 
+                  variant="outline" 
+                  className={`px-3 py-1 text-xs font-medium border ${getPlanInfo().planColor}`}
+                >
+                  <div className="flex items-center space-x-1">
+                    {getPlanInfo().planIcon}
+                    <span>{getPlanInfo().planName}</span>
+                  </div>
+                </Badge>
+                <Link 
+                  to="/profile"
+                  className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                >
+                  View Profile →
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Collapsed User Avatar */}
+          {!loading && user && sidebarCollapsed && (
+            <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <Avatar className="h-10 w-10 border-2 border-white shadow-lg mx-auto">
+                <AvatarImage src={profile?.avatar_url} />
+                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-semibold text-sm">
+                  {profile?.first_name?.[0] || user.email?.[0] || 'U'}
+                </AvatarFallback>
+              </Avatar>
+            </div>
+          )}
+
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-2">
+          <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
               const isComingSoon = item.comingSoon;
@@ -91,26 +260,54 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
               return (
                 <div key={item.name} className="relative">
                   {isComingSoon ? (
-                    <div className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground cursor-not-allowed opacity-60">
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.name}</span>
-                      <span className="ml-auto text-xs bg-muted px-2 py-1 rounded-full text-muted-foreground">
-                        Coming Soon
-                      </span>
+                    <div className={cn(
+                      "flex items-center space-x-3 rounded-lg text-sm font-medium text-slate-500 cursor-not-allowed opacity-60 hover:bg-slate-100/50 transition-colors",
+                      sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2.5"
+                    )}>
+                      <div className="p-1 rounded-lg bg-slate-100">
+                        <item.icon className="h-4 w-4" />
+                      </div>
+                      {!sidebarCollapsed && (
+                        <>
+                          <span className="flex-1">{item.name}</span>
+                          <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600 font-medium">
+                            Soon
+                          </span>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <Link
                       to={item.href}
                       className={cn(
-                        "flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                        "flex items-center space-x-3 rounded-lg text-sm font-medium transition-all duration-200 group",
+                        sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2.5",
                         isActive
-                          ? "bg-primary text-primary-foreground shadow-soft"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                          ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
                       )}
                       onClick={() => setSidebarOpen(false)}
+                      title={sidebarCollapsed ? item.name : undefined}
                     >
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.name}</span>
+                      <div className={cn(
+                        "p-1 rounded-lg transition-colors",
+                        isActive 
+                          ? "bg-white/20" 
+                          : "bg-slate-100 group-hover:bg-slate-200"
+                      )}>
+                        <item.icon className={cn(
+                          "h-4 w-4",
+                          isActive ? "text-white" : "text-slate-600"
+                        )} />
+                      </div>
+                      {!sidebarCollapsed && (
+                        <>
+                          <span className="flex-1">{item.name}</span>
+                          {isActive && (
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                          )}
+                        </>
+                      )}
                     </Link>
                   )}
                 </div>
@@ -119,43 +316,57 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           </nav>
 
           {/* User Menu */}
-          <div className="p-4 border-t border-border space-y-2">
-            <button
-              onClick={handleSignOut}
-              className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors w-full"
-            >
-              <LogOut className="h-5 w-5" />
-              <span>Sign Out</span>
-            </button>
+          <div className="p-3 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
+            <div className="space-y-1">
+              <Link
+                to="/settings"
+                className={cn(
+                  "flex items-center space-x-3 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all duration-200 group",
+                  sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2.5"
+                )}
+                title={sidebarCollapsed ? "Settings" : undefined}
+              >
+                <div className="p-1 rounded-lg bg-slate-100 group-hover:bg-slate-200 transition-colors">
+                  <Settings className="h-4 w-4 text-slate-600" />
+                </div>
+                {!sidebarCollapsed && <span className="flex-1">Settings</span>}
+              </Link>
+              
+              <button
+                onClick={handleSignOut}
+                className={cn(
+                  "flex items-center space-x-3 rounded-lg text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 group",
+                  sidebarCollapsed ? "px-2 py-2 justify-center w-full" : "px-3 py-2.5 w-full"
+                )}
+                title={sidebarCollapsed ? "Sign Out" : undefined}
+              >
+                <div className="p-1 rounded-lg bg-red-100 group-hover:bg-red-200 transition-colors">
+                  <LogOut className="h-4 w-4 text-red-600" />
+                </div>
+                {!sidebarCollapsed && <span className="flex-1">Sign Out</span>}
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-64">
-        {/* Top bar */}
-        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
-          <div className="flex items-center justify-between px-4 py-3">
-            <button
-              className="lg:hidden p-2 -ml-2"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-            
-            <div className="flex-1" />
-            
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span>System Online</span>
-              </div>
-            </div>
-          </div>
-        </header>
-
+      <div className={cn(
+        "min-h-screen bg-background transition-all duration-300",
+        sidebarCollapsed ? "lg:pl-16" : "lg:pl-72"
+      )}>
+        {/* Mobile menu button */}
+        <div className="lg:hidden p-4">
+          <button
+            className="p-2 -ml-2 hover:bg-slate-100 rounded-lg transition-colors"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu className="h-5 w-5 text-slate-600" />
+          </button>
+        </div>
+        
         {/* Page content */}
-        <main className="p-4 md:p-6">
+        <main className="p-4 md:p-6 w-full">
           {children}
         </main>
       </div>
