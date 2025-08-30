@@ -108,6 +108,43 @@ const BillingPage: React.FC = () => {
     }
   };
 
+  // Download transaction receipt
+  const downloadReceipt = (transaction: any) => {
+    try {
+      // Create receipt content
+      const receiptContent = `
+NoteX - Transaction Receipt
+
+Date: ${formatDate(transaction.created_at)}
+Description: ${transaction.description || 'Subscription Payment'}
+Amount: ${formatCurrency(transaction.amount, transaction.currency)}
+Status: ${transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+Reference: ${transaction.paystack_reference || 'N/A'}
+Transaction ID: ${transaction.id}
+
+Thank you for your payment!
+
+NoteX Team
+      `.trim();
+
+      // Create blob and download
+      const blob = new Blob([receiptContent], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `receipt-${transaction.id}-${formatDate(transaction.created_at).replace(/\//g, '-')}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Receipt downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading receipt:', error);
+      toast.error('Failed to download receipt');
+    }
+  };
+
   // Get status icon and color
   const getStatusDisplay = (status: string) => {
     switch (status) {
@@ -670,7 +707,7 @@ const BillingPage: React.FC = () => {
                   <TableHead>Description</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">Receipt</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -702,16 +739,30 @@ const BillingPage: React.FC = () => {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        {transaction.paystack_reference && (
+                        <div className="flex items-center justify-end gap-2">
+                          {/* Download Receipt Button */}
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.open(`https://dashboard.paystack.com/#/transactions/${transaction.paystack_reference}`, '_blank')}
+                            onClick={() => downloadReceipt(transaction)}
+                            disabled={transaction.status !== 'success'}
                           >
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            View
+                            <Download className="h-4 w-4 mr-2" />
+                            Receipt
                           </Button>
-                        )}
+                          
+                          {/* View in Paystack Button */}
+                          {transaction.paystack_reference && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(`https://dashboard.paystack.com/#/transactions/${transaction.paystack_reference}`, '_blank')}
+                            >
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              View
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

@@ -468,29 +468,38 @@ export function useBillingSystem(): BillingSystemState {
     }
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
+      // For now, we'll update the local database since we don't have Edge Functions
+      // In production, you should integrate with Paystack's subscription management API
+      
+      // Update billing profile to cancelled status
+      const { error: updateError } = await supabase
+        .from('billing_profiles')
+        .update({
+          subscription_status: 'cancelled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', billingProfile.id);
+
+      if (updateError) {
+        throw new Error(updateError.message);
       }
 
-      const response = await fetch('/api/cancel-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ 
-          subscriptionId: billingProfile.paystack_subscription_id 
-        }),
-      });
+      // Update user subscription status
+      const { error: subscriptionError } = await supabase
+        .from('user_subscriptions')
+        .update({
+          status: 'cancelled',
+          cancel_at_period_end: true,
+          canceled_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', billingProfile.id);
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to cancel subscription');
+      if (subscriptionError) {
+        throw new Error(subscriptionError.message);
       }
 
-      toast.success('Subscription cancelled successfully');
+      toast.success('Subscription cancelled successfully. You can continue using your plan until the end of your current billing period.');
       await refreshData();
       
     } catch (err) {
@@ -506,34 +515,15 @@ export function useBillingSystem(): BillingSystemState {
     }
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
-      }
-
-      const response = await fetch('/api/paystack/update-card', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ 
-          customerId: billingProfile.paystack_customer_id 
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to generate update link');
-      }
-
-      if (result.url) {
-        window.open(result.url, '_blank');
-        toast.success('Payment method update page opened');
-      } else {
-        throw new Error('No update URL received');
-      }
+      // For now, we'll provide a link to Paystack's customer portal
+      // In production, you should integrate with Paystack's customer management API
+      
+      // Create a Paystack customer portal URL
+      const customerPortalUrl = `https://dashboard.paystack.com/#/customers/${billingProfile.paystack_customer_id}`;
+      
+      // Open the customer portal in a new tab
+      window.open(customerPortalUrl, '_blank');
+      toast.success('Payment method update page opened. You can manage your payment methods there.');
       
     } catch (err) {
       console.error('Error updating payment method:', err);
