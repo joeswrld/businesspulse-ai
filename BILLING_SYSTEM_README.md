@@ -1,130 +1,53 @@
-# NoteX Billing System
+# Production-Ready Billing System
 
-A comprehensive billing and usage tracking system for NoteX, built with React, Supabase, and Paystack integration.
+This is a complete, production-ready billing system for your SaaS built with Next.js, Supabase, and Paystack.
 
 ## 🏗️ Architecture Overview
 
-The billing system consists of:
+The billing system follows a webhook-driven architecture where:
+- **Frontend** only reads from Supabase (source of truth)
+- **Paystack webhooks** update Supabase tables
+- **Reconciliation job** runs daily to fix any mismatches
+- **8-day free trial** is automatically managed
 
-1. **Frontend**: React components with TypeScript
-2. **Backend**: Supabase database with PostgreSQL
-3. **Payment Processing**: Paystack integration
-4. **API Endpoints**: Next.js API routes
-5. **Usage Tracking**: Real-time usage monitoring
+## 📊 Database Schema
 
-## 📁 File Structure
+### Tables Created
 
-```
-src/
-├── pages/
-│   ├── Billing.tsx                    # Main billing page component
-│   └── api/
-│       ├── cancel-subscription.ts     # Cancel subscription API
-│       └── paystack/
-│           └── update-card.ts         # Update payment method API
-├── hooks/
-│   └── useUsageTracking.ts            # Usage tracking hook
-└── components/
-    └── examples/
-        └── UsageTrackingExample.tsx   # Usage examples
+1. **`user_subscriptions`** - Tracks subscription state and billing periods
+2. **`transactions`** - Records all payment transactions for audit
+3. **`users`** - Enhanced with trial management and billing fields
 
-Database/
-├── create_usage_tracking_table.sql    # Usage tracking table
-├── create_increment_usage_function.sql # Usage increment function
-└── create_transactions_table.sql      # Transactions table
-```
+### Key Fields
 
-## 🚀 Features
+- `trial_end` - 8-day free trial end date
+- `subscription_status` - Current subscription state
+- `authorization_code` - Paystack reusable payment code
+- `plan_code` - Links to Paystack plan codes
 
-### ✅ **Current Usage Tracking**
-- Real-time usage counters for all features
-- Visual usage cards with icons and colors
-- Teams feature marked as "Coming Soon"
+## 🔧 API Endpoints
 
-### ✅ **Subscription Management**
-- Plan status display (Free Trial, Pro, Cancelled)
-- Trial days calculation (8-day trial period)
-- Subscription cancellation
-- Payment method updates
+### Supabase Edge Functions
 
-### ✅ **Transaction History**
-- Complete payment history
-- Invoice downloads
-- Status tracking (Success, Pending, Failed)
-- Currency formatting (NGN support)
+1. **`/paystack-webhook`** - Handles Paystack webhook events
+2. **`/cancel-subscription`** - Cancels active subscriptions
+3. **`/update-card`** - Updates payment method
+4. **`/reconcile-subscriptions`** - Daily reconciliation job
 
-### ✅ **Professional UI**
-- Clean, minimal design with Tailwind CSS
-- Loading skeletons and error states
-- Responsive grid layout
-- Lovable UI components integration
+### Webhook Events Handled
 
-## 🗄️ Database Schema
+- `charge.success` → Marks subscription active, records transaction
+- `invoice.payment_failed` → Marks subscription as past_due
+- `subscription.not_renewed` → Marks subscription as canceled
+- `subscription.disabled` → Marks subscription as canceled
 
-### Usage Tracking Table
-```sql
-CREATE TABLE usage_tracking (
-    id UUID PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id),
-    feedback_count INTEGER DEFAULT 0,
-    analytics_count INTEGER DEFAULT 0,
-    reports_count INTEGER DEFAULT 0,
-    insights_count INTEGER DEFAULT 0,
-    teams_count INTEGER DEFAULT 0,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
-);
-```
+## 🚀 Setup Instructions
 
-### Subscription Plans
-The system supports multiple subscription tiers:
-- **Free Plan**: Basic features with limitations
-- **Pro Plan**: Advanced features for individuals
-- **Business Plan**: Team features and advanced analytics
-- **Enterprise Plan**: Custom solutions for large organizations
-
-### Transactions Table
-```sql
-CREATE TABLE transactions (
-    id UUID PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id),
-    paystack_transaction_id VARCHAR(255) UNIQUE,
-    amount INTEGER, -- Amount in kobo
-    currency VARCHAR(3) DEFAULT 'NGN',
-    status VARCHAR(20) CHECK (status IN ('success', 'pending', 'failed')),
-    description TEXT,
-    invoice_url TEXT,
-    metadata JSONB,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
-);
-```
-
-## 🔧 Setup Instructions
-
-### 1. Database Setup
-
-Run the SQL migrations in order:
+### 1. Environment Variables
 
 ```bash
-# 1. Create usage tracking table
-psql -d your_database -f create_usage_tracking_table.sql
-
-# 2. Create increment usage function
-psql -d your_database -f create_increment_usage_function.sql
-
-# 3. Create transactions table
-psql -d your_database -f create_transactions_table.sql
-```
-
-### 2. Environment Variables
-
-Add these to your `.env.local`:
-
-```env
 # Supabase
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_URL=your_supabase_url
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 # Paystack
@@ -132,255 +55,162 @@ PAYSTACK_SECRET_KEY=your_paystack_secret_key
 PAYSTACK_PUBLIC_KEY=your_paystack_public_key
 ```
 
-### 3. Supabase Edge Function
-
-Deploy the usage tracking function:
+### 2. Database Migration
 
 ```bash
-supabase functions deploy usage
+# Apply the billing system migration
+supabase db push
+
+# Or run manually
+psql -h your_host -U your_user -d your_db -f supabase/migrations/20250120000000_create_billing_system.sql
 ```
 
-## 📊 Usage Tracking
+### 3. Deploy Edge Functions
 
-### Basic Usage
-```tsx
-import { useUsageTracking } from '@/hooks/useUsageTracking';
+```bash
+# Deploy all functions
+supabase functions deploy
 
-function MyComponent() {
-  const { trackUsage, loading, error, success } = useUsageTracking();
-
-  const handleAction = async () => {
-    await trackUsage("feedback");
-  };
-
-  return (
-    <button onClick={handleAction} disabled={loading}>
-      {loading ? 'Tracking...' : 'Submit Feedback'}
-    </button>
-  );
-}
+# Or deploy individually
+supabase functions deploy paystack-webhook
+supabase functions deploy cancel-subscription
+supabase functions deploy update-card
+supabase functions deploy reconcile-subscriptions
 ```
 
-### Available Actions
-- `"feedback"` - Track feedback submissions
-- `"analytics"` - Track analytics queries
-- `"reports"` - Track report generation
-- `"insights"` - Track insights access
-- `"teams"` - Track team interactions (placeholder)
+### 4. Paystack Configuration
 
-## 💳 Payment Integration
+1. Set webhook URL: `https://your-project.supabase.co/functions/v1/paystack-webhook`
+2. Configure webhook events:
+   - `charge.success`
+   - `invoice.payment_failed`
+   - `subscription.not_renewed`
+   - `subscription.disabled`
 
-### Cancel Subscription
-```tsx
-const handleCancel = async () => {
-  const response = await fetch('/api/cancel-subscription', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ subscriptionId: subscription.id }),
-  });
-};
-```
+## 📱 Frontend Components
 
-### Update Payment Method
-```tsx
-const handleUpdateCard = async () => {
-  const response = await fetch('/api/paystack/update-card', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  
-  const { url } = await response.json();
-  window.open(url, '_blank');
-};
-```
+### BillingPage Component
 
-## 🎨 UI Components
+A complete billing page that shows:
+- Current subscription status
+- Trial countdown
+- Plan selection
+- Transaction history
+- Payment processing
 
-### Usage Cards
-Each usage metric is displayed in a colored card:
-- **Feedback**: Blue theme
-- **Analytics**: Green theme
-- **Reports**: Purple theme
-- **Insights**: Orange theme
-- **Teams**: Gray theme (Coming Soon)
+### useBilling Hook
 
-### Plan Status Badges
-- **Free Trial**: Blue badge with trial days
-- **Pro Plan**: Green badge
-- **Business Plan**: Gold/Amber badge
-- **Enterprise Plan**: Purple badge
-- **Cancelled**: Gray badge
-- **Payment Due**: Yellow badge
+Custom hook providing:
+- Billing data management
+- Subscription actions
+- Trial status checking
+- Real-time updates
 
-### Transaction Table
-- Date formatting
-- Currency formatting (NGN)
-- Status icons and colors
-- Invoice download buttons
+## 🔄 Real-time Updates
 
-## 🔒 Security Features
-
-### Row Level Security (RLS)
-All tables have RLS policies ensuring users can only access their own data:
-
-```sql
--- Users can only view their own transactions
-CREATE POLICY "Users can view their own transactions" ON transactions
-    FOR SELECT USING (user_id = auth.uid());
-```
-
-### Authentication
-- JWT-based authentication with Supabase
-- Automatic token validation in API routes
-- Secure session management
-
-### Input Validation
-- TypeScript interfaces for all data structures
-- Server-side validation in API endpoints
-- SQL injection prevention with parameterized queries
-
-## 📱 Responsive Design
-
-The billing page is fully responsive:
-
-- **Mobile**: Single column layout
-- **Tablet**: Two column grid
-- **Desktop**: Three column grid with usage cards spanning 2 columns
+The system uses Supabase Realtime to:
+- Update billing page instantly when webhooks arrive
+- Show real-time subscription status changes
+- Display transaction updates immediately
 
 ## 🧪 Testing
 
-### Component Testing
-```tsx
-import { render, screen, fireEvent } from '@testing-library/react';
-import BillingPage from '@/pages/Billing';
+### Test Webhook Locally
 
-test('displays usage data correctly', () => {
-  render(<BillingPage />);
-  expect(screen.getByText('Current Usage')).toBeInTheDocument();
-});
+```bash
+# Use ngrok to expose local function
+ngrok http 54321
+
+# Update Paystack webhook URL to ngrok URL
+# Test with Paystack webhook tester
 ```
 
-### Hook Testing
-```tsx
-import { renderHook, act } from '@testing-library/react-hooks';
-import { useUsageTracking } from '@/hooks/useUsageTracking';
+### Test Subscription Flow
 
-test('tracks usage successfully', async () => {
-  const { result } = renderHook(() => useUsageTracking());
-  
-  await act(async () => {
-    await result.current.trackUsage('feedback');
-  });
-  
-  expect(result.current.success).toBe(true);
-});
+1. Create test user
+2. Initiate subscription
+3. Complete payment
+4. Verify webhook updates
+5. Check database state
+
+## 🚨 Production Considerations
+
+### Security
+
+- Webhook signature verification
+- Environment variable protection
+- Service role key security
+- CORS configuration
+
+### Monitoring
+
+- Webhook delivery monitoring
+- Failed payment alerts
+- Subscription status tracking
+- Transaction reconciliation
+
+### Backup
+
+- Daily database backups
+- Webhook event logging
+- Transaction audit trail
+- Plan change history
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+1. **Webhook not receiving events**
+   - Check Paystack webhook URL
+   - Verify signature verification
+   - Check function logs
+
+2. **Subscription status mismatch**
+   - Run reconciliation job
+   - Check webhook delivery
+   - Verify Paystack plan codes
+
+3. **Trial not working**
+   - Check database triggers
+   - Verify user creation flow
+   - Check trial_end column
+
+### Debug Commands
+
+```bash
+# Check function logs
+supabase functions logs paystack-webhook
+
+# Check database state
+supabase db reset
+
+# Test webhook manually
+curl -X POST https://your-project.supabase.co/functions/v1/paystack-webhook \
+  -H "Content-Type: application/json" \
+  -d '{"test": "data"}'
 ```
 
-## 🚨 Error Handling
+## 📈 Scaling Considerations
 
-### Frontend Errors
-- Loading states with skeletons
-- Error alerts with descriptive messages
-- Graceful fallbacks for missing data
+- **Webhook processing**: Handle high volume with queue system
+- **Database performance**: Index on frequently queried fields
+- **Real-time updates**: Consider connection limits
+- **Reconciliation**: Schedule during low-traffic periods
 
-### Backend Errors
-- Comprehensive error logging
-- User-friendly error messages
-- Proper HTTP status codes
+## 🔗 Integration Points
 
-### Network Errors
-- Retry mechanisms for failed requests
-- Offline state handling
-- Connection error notifications
+- **User registration** → Sets trial_end automatically
+- **Payment success** → Updates subscription status
+- **Trial expiration** → Blocks access automatically
+- **Subscription changes** → Updates user permissions
 
-## 📈 Performance Optimizations
+## 📚 Additional Resources
 
-### Database
-- Indexed queries for fast lookups
-- Efficient joins and filters
-- Connection pooling
+- [Paystack Webhook Documentation](https://paystack.com/docs/payments/webhooks)
+- [Supabase Edge Functions](https://supabase.com/docs/guides/functions)
+- [Supabase Realtime](https://supabase.com/docs/guides/realtime)
+- [Database Triggers](https://supabase.com/docs/guides/database/triggers)
 
-### Frontend
-- React.memo for expensive components
-- useCallback for stable references
-- Lazy loading for large datasets
+---
 
-### Caching
-- Supabase real-time subscriptions
-- Client-side state management
-- Optimistic updates
-
-## 🔄 State Management
-
-### Local State
-- Component-level state for UI interactions
-- Loading and error states
-- Form data management
-
-### Global State
-- User authentication state
-- Subscription status
-- Usage data caching
-
-## 📊 Analytics & Monitoring
-
-### Usage Analytics
-- Real-time usage tracking
-- Feature adoption metrics
-- User behavior insights
-
-### Error Monitoring
-- Console error logging
-- API error tracking
-- Performance monitoring
-
-## 🔮 Future Enhancements
-
-### Planned Features
-- [ ] Usage limits and quotas
-- [ ] Advanced billing analytics
-- [ ] Multi-currency support
-- [ ] Automated invoicing
-- [ ] Subscription upgrades/downgrades
-- [ ] Team billing management
-
-### Technical Improvements
-- [ ] Webhook integration for real-time updates
-- [ ] Advanced caching strategies
-- [ ] Performance optimizations
-- [ ] Enhanced error handling
-- [ ] Comprehensive testing suite
-
-## 🤝 Contributing
-
-### Development Workflow
-1. Create feature branch
-2. Implement changes
-3. Add tests
-4. Update documentation
-5. Submit pull request
-
-### Code Standards
-- TypeScript for type safety
-- ESLint for code quality
-- Prettier for formatting
-- Conventional commits
-
-## 📞 Support
-
-For questions or issues:
-
-1. Check the documentation
-2. Review existing issues
-3. Create a new issue with details
-4. Contact the development team
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+This billing system is production-ready and follows industry best practices for SaaS billing management.
