@@ -114,19 +114,43 @@ serve(async (req) => {
 
 async function handleSubscriptionCreate(supabase: any, data: any) {
   try {
-    const { error } = await supabase
-      .from('users')
-      .update({
-        subscription_status: data.status,
-        subscription_id: data.subscription_code,
-        plan_start_date: new Date().toISOString(),
-        next_payment_date: data.next_payment_date,
-        updated_at: new Date().toISOString()
-      })
-      .eq('email', data.customer.email)
+    // Get user_id from metadata or customer email
+    const userId = data.metadata?.user_id || await getUserIdFromEmail(supabase, data.customer.email)
+    
+    if (!userId) {
+      console.error('Could not find user for subscription create')
+      return
+    }
 
-    if (error) {
-      console.error('Error updating subscription create:', error)
+    // Update billing profile
+    const { error: billingError } = await supabase
+      .from('billing_profiles')
+      .update({
+        plan: data.plan?.name?.toLowerCase() || 'pro',
+        subscription_status: 'active',
+        next_billing_date: data.next_payment_date,
+        paystack_customer_id: data.customer.customer_code,
+        paystack_subscription_id: data.subscription_code
+      })
+      .eq('id', userId)
+
+    if (billingError) {
+      console.error('Error updating billing profile:', billingError)
+    }
+
+    // Create transaction record
+    const { error: transactionError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: userId,
+        amount: data.amount,
+        status: 'success',
+        description: `Subscription to ${data.plan?.name || 'Pro Plan'}`,
+        paystack_reference: data.reference
+      })
+
+    if (transactionError) {
+      console.error('Error creating transaction:', transactionError)
     }
   } catch (error) {
     console.error('Error handling subscription create:', error)
@@ -135,17 +159,30 @@ async function handleSubscriptionCreate(supabase: any, data: any) {
 
 async function handleSubscriptionDisable(supabase: any, data: any) {
   try {
-    const { error } = await supabase
-      .from('users')
-      .update({
-        subscription_status: 'cancelled',
-        plan: 'free',
-        updated_at: new Date().toISOString()
-      })
-      .eq('subscription_id', data.subscription_code)
+    // Find user by subscription ID
+    const { data: billingProfile, error: findError } = await supabase
+      .from('billing_profiles')
+      .select('id')
+      .eq('paystack_subscription_id', data.subscription_code)
+      .single()
 
-    if (error) {
-      console.error('Error updating subscription disable:', error)
+    if (findError || !billingProfile) {
+      console.error('Could not find billing profile for subscription disable')
+      return
+    }
+
+    // Update billing profile
+    const { error: updateError } = await supabase
+      .from('billing_profiles')
+      .update({
+        plan: 'free',
+        subscription_status: 'cancelled',
+        next_billing_date: null
+      })
+      .eq('id', billingProfile.id)
+
+    if (updateError) {
+      console.error('Error updating billing profile for disable:', updateError)
     }
   } catch (error) {
     console.error('Error handling subscription disable:', error)
@@ -154,17 +191,44 @@ async function handleSubscriptionDisable(supabase: any, data: any) {
 
 async function handleChargeSuccess(supabase: any, data: any) {
   try {
-    const { error } = await supabase
-      .from('users')
+    // Find user by subscription ID
+    const { data: billingProfile, error: findError } = await supabase
+      .from('billing_profiles')
+      .select('id')
+      .eq('paystack_subscription_id', data.subscription)
+      .single()
+
+    if (findError || !billingProfile) {
+      console.error('Could not find billing profile for charge success')
+      return
+    }
+
+    // Update billing profile
+    const { error: updateError } = await supabase
+      .from('billing_profiles')
       .update({
         subscription_status: 'active',
-        last_payment_date: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        next_billing_date: new Date(Date.now() + 30*24*60*60*1000).toISOString()
       })
-      .eq('subscription_id', data.subscription)
+      .eq('id', billingProfile.id)
 
-    if (error) {
-      console.error('Error updating charge success:', error)
+    if (updateError) {
+      console.error('Error updating billing profile for charge success:', updateError)
+    }
+
+    // Create transaction record
+    const { error: transactionError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: billingProfile.id,
+        amount: data.amount,
+        status: 'success',
+        description: 'Subscription renewal',
+        paystack_reference: data.reference
+      })
+
+    if (transactionError) {
+      console.error('Error creating transaction for charge success:', transactionError)
     }
   } catch (error) {
     console.error('Error handling charge success:', error)
@@ -173,16 +237,43 @@ async function handleChargeSuccess(supabase: any, data: any) {
 
 async function handleChargeFailed(supabase: any, data: any) {
   try {
-    const { error } = await supabase
-      .from('users')
-      .update({
-        subscription_status: 'past_due',
-        updated_at: new Date().toISOString()
-      })
-      .eq('subscription_id', data.subscription)
+    // Find user by subscription ID
+    const { data: billingProfile, error: findError } = await supabase
+      .from('billing_profiles')
+      .select('id')
+      .eq('paystack_subscription_id', data.subscription)
+      .single()
 
-    if (error) {
-      console.error('Error updating charge failed:', error)
+    if (findError || !billingProfile) {
+      console.error('Could not find billing profile for charge failed')
+      return
+    }
+
+    // Update billing profile
+    const { error: updateError } = await supabase
+      .from('billing_profiles')
+      .update({
+        subscription_status: 'past_due'
+      })
+      .eq('id', billingProfile.id)
+
+    if (updateError) {
+      console.error('Error updating billing profile for charge failed:', updateError)
+    }
+
+    // Create failed transaction record
+    const { error: transactionError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: billingProfile.id,
+        amount: data.amount,
+        status: 'failed',
+        description: 'Payment failed',
+        paystack_reference: data.reference
+      })
+
+    if (transactionError) {
+      console.error('Error creating transaction for charge failed:', transactionError)
     }
   } catch (error) {
     console.error('Error handling charge failed:', error)
@@ -191,16 +282,43 @@ async function handleChargeFailed(supabase: any, data: any) {
 
 async function handlePaymentFailed(supabase: any, data: any) {
   try {
-    const { error } = await supabase
-      .from('users')
-      .update({
-        subscription_status: 'past_due',
-        updated_at: new Date().toISOString()
-      })
-      .eq('subscription_id', data.subscription)
+    // Find user by subscription ID
+    const { data: billingProfile, error: findError } = await supabase
+      .from('billing_profiles')
+      .select('id')
+      .eq('paystack_subscription_id', data.subscription)
+      .single()
 
-    if (error) {
-      console.error('Error updating payment failed:', error)
+    if (findError || !billingProfile) {
+      console.error('Could not find billing profile for payment failed')
+      return
+    }
+
+    // Update billing profile
+    const { error: updateError } = await supabase
+      .from('billing_profiles')
+      .update({
+        subscription_status: 'past_due'
+      })
+      .eq('id', billingProfile.id)
+
+    if (updateError) {
+      console.error('Error updating billing profile for payment failed:', updateError)
+    }
+
+    // Create failed transaction record
+    const { error: transactionError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: billingProfile.id,
+        amount: data.amount,
+        status: 'failed',
+        description: 'Payment failed',
+        paystack_reference: data.reference
+      })
+
+    if (transactionError) {
+      console.error('Error creating transaction for payment failed:', transactionError)
     }
   } catch (error) {
     console.error('Error handling payment failed:', error)
@@ -209,20 +327,66 @@ async function handlePaymentFailed(supabase: any, data: any) {
 
 async function handlePaymentSuccess(supabase: any, data: any) {
   try {
-    const { error } = await supabase
-      .from('users')
+    // Find user by subscription ID
+    const { data: billingProfile, error: findError } = await supabase
+      .from('billing_profiles')
+      .select('id')
+      .eq('paystack_subscription_id', data.subscription)
+      .single()
+
+    if (findError || !billingProfile) {
+      console.error('Could not find billing profile for payment success')
+      return
+    }
+
+    // Update billing profile
+    const { error: updateError } = await supabase
+      .from('billing_profiles')
       .update({
         subscription_status: 'active',
-        last_payment_date: new Date().toISOString(),
-        next_payment_date: data.next_payment_date,
-        updated_at: new Date().toISOString()
+        next_billing_date: data.next_payment_date
       })
-      .eq('subscription_id', data.subscription)
+      .eq('id', billingProfile.id)
 
-    if (error) {
-      console.error('Error updating payment success:', error)
+    if (updateError) {
+      console.error('Error updating billing profile for payment success:', updateError)
+    }
+
+    // Create transaction record
+    const { error: transactionError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: billingProfile.id,
+        amount: data.amount,
+        status: 'success',
+        description: 'Payment successful',
+        paystack_reference: data.reference
+      })
+
+    if (transactionError) {
+      console.error('Error creating transaction for payment success:', transactionError)
     }
   } catch (error) {
     console.error('Error handling payment success:', error)
+  }
+}
+
+async function getUserIdFromEmail(supabase: any, email: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single()
+
+    if (error) {
+      console.error('Error finding user by email:', error)
+      return null
+    }
+
+    return data?.id || null
+  } catch (error) {
+    console.error('Error in getUserIdFromEmail:', error)
+    return null
   }
 }
