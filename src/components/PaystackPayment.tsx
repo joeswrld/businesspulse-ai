@@ -83,19 +83,41 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
   };
 
   useEffect(() => {
-    // Load Paystack script if not already loaded
-    if (!window.PaystackPop) {
-      const script = document.createElement('script');
-      script.src = 'https://js.paystack.co/v1/inline.js';
-      script.async = true;
-      script.onload = () => {
-        console.log('Paystack script loaded');
-      };
-      script.onerror = () => {
-        setError('Failed to load Paystack payment system');
-      };
-      document.head.appendChild(script);
+    // Check if Paystack is already loaded
+    if (window.PaystackPop && typeof window.PaystackPop.setup === 'function') {
+      setPaystackReady(true);
+      return;
     }
+
+    // Load Paystack script if not already loaded
+    const script = document.createElement('script');
+    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.async = true;
+    script.onload = () => {
+      console.log('Paystack script loaded successfully');
+      // Add a delay to ensure the script is fully initialized
+      setTimeout(() => {
+        if (window.PaystackPop && typeof window.PaystackPop.setup === 'function') {
+          setPaystackReady(true);
+          console.log('Paystack is now ready');
+        } else {
+          console.error('Paystack script loaded but not properly initialized');
+          setError('Paystack script loaded but not properly initialized');
+        }
+      }, 500);
+    };
+    script.onerror = () => {
+      console.error('Failed to load Paystack script');
+      setError('Failed to load Paystack payment system');
+    };
+    document.head.appendChild(script);
+
+    // Cleanup function
+    return () => {
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
   }, []);
 
   const handlePayment = async () => {
@@ -234,7 +256,16 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
           {error && (
             <Alert variant="destructive">
               <XCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>
+                {error}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="mt-2 text-xs">
+                    <p>Debug: paystackReady = {paystackReady.toString()}</p>
+                    <p>Debug: window.PaystackPop = {window.PaystackPop ? 'exists' : 'missing'}</p>
+                    <p>Debug: setup function = {window.PaystackPop?.setup ? 'exists' : 'missing'}</p>
+                  </div>
+                )}
+              </AlertDescription>
             </Alert>
           )}
 
@@ -245,6 +276,18 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
                 Loading payment system... Please wait a moment before proceeding.
               </AlertDescription>
             </Alert>
+          )}
+
+          {!paystackReady && !error && (
+            <div className="text-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+              <p className="text-sm text-muted-foreground">
+                Initializing payment system...
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                This may take a few seconds on first load
+              </p>
+            </div>
           )}
 
           {/* Action Buttons */}
@@ -262,7 +305,7 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
               ) : !paystackReady ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Loading Payment System...
+                  Initializing...
                 </>
               ) : (
                 <>

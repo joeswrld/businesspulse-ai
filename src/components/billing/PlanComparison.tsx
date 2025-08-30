@@ -124,7 +124,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-3 max-w-6xl mx-auto">
         {plans.map((plan) => {
           const isCurrentPlan = plan.id === currentPlan;
           const isUpgradeable = currentPlan === 'trial' && plan.id === 'pro';
