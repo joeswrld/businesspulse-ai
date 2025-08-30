@@ -42,6 +42,8 @@ import {
   Infinity
 } from 'lucide-react';
 import PaystackPayment from '@/components/PaystackPayment';
+import UsageTracker from '@/components/billing/UsageTracker';
+import PlanComparison from '@/components/billing/PlanComparison';
 
 type UpgradePlan = 'pro' | 'business' | null;
 
@@ -463,64 +465,19 @@ const BillingPage: React.FC = () => {
 
       {/* Usage Tracking */}
       {usageData && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Usage & Limits
-            </CardTitle>
-            <CardDescription>
-              Track your current usage against plan limits
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {Object.entries(planLimits).map(([feature, limit]) => {
-                if (feature === 'export' || feature === 'support' || feature === 'retention') return null;
-                
-                const usage = usageData[`${feature}_count` as keyof UsageData] as number;
-                const percentage = usagePercentages[feature] || 0;
-                const reached = isLimitReached[feature];
-                const isUnlimited = limit === -1;
-                
-                return (
-                  <div key={feature} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium capitalize">{feature}</span>
-                        {reached && <XCircle className="h-4 w-4 text-red-600" />}
-                        {isUnlimited && <Infinity className="h-4 w-4 text-green-600" />}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {isUnlimited ? 'Unlimited' : `${usage}/${limit}`}
-                      </div>
-                    </div>
-                    
-                    {!isUnlimited && (
-                      <div className="space-y-1">
-                        <Progress 
-                          value={percentage} 
-                          className={`h-2 ${reached ? 'bg-red-100' : ''}`}
-                        />
-                        <div className="flex justify-between text-xs text-gray-500">
-                          <span>{usage} used</span>
-                          <span>{limit - usage} remaining</span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {reached && (
-                      <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
-                        Limit reached! Upgrade to continue using this feature.
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        <UsageTracker 
+          usageData={usageData}
+          planLimits={planLimits}
+          currentPlan={currentPlan}
+          onUpgrade={(plan) => setUpgradePlanModal(plan)}
+        />
       )}
+
+      {/* Plan Comparison */}
+      <PlanComparison 
+        currentPlan={currentPlan}
+        onUpgrade={(plan) => setUpgradePlanModal(plan)}
+      />
 
       {/* Transaction History */}
       <Card>
