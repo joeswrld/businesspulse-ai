@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, CreditCard, CheckCircle, XCircle, ExternalLink, RefreshCw, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PaystackPaymentProps {
   plan: 'pro' | 'business';
@@ -186,27 +187,26 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
     try {
       console.log('Processing successful payment:', response);
       
-      // Call your API to update the user's subscription
-      const updateResponse = await fetch('/api/paystack/verify-payment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      // Call Supabase Edge Function to verify payment and update subscription
+      const { data: result, error } = await supabase.functions.invoke('verify-payment', {
+        body: {
           reference: response.reference,
           plan: plan,
           amount: amount,
           email: user?.email || 'user@example.com'
-        }),
+        }
       });
 
-      const updateData = await updateResponse.json();
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Failed to verify payment');
+      }
 
-      if (updateResponse.ok) {
+      if (result && result.success) {
         toast.success(`🎉 Welcome to ${planName}! Your subscription has been activated.`);
         onSuccess({ reference: response.reference, plan });
       } else {
-        throw new Error(updateData.error || 'Failed to update subscription');
+        throw new Error(result?.error || 'Failed to update subscription');
       }
     } catch (err) {
       console.error('Payment verification error:', err);
