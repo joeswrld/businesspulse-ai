@@ -78,10 +78,11 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
   const amount = planPricing[plan];
   const reference = `notex_${plan}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-  // Plan details
+  // Plan details with actual Paystack plan codes
   const planDetails = {
     pro: {
       name: 'Pro Plan',
+      planCode: 'PLN_4z2wpgmw41w2k7r',
       duration: '30 days',
       features: [
         '300 feedback submissions (6x increase)',
@@ -94,6 +95,7 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
     },
     business: {
       name: 'Business Plan',
+      planCode: 'PLN_esryg99ztsy9xc8',
       duration: '30 days',
       features: [
         'Unlimited usage across all features',
@@ -258,6 +260,7 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
         amount: amount,
         currency: 'NGN',
         reference: reference,
+        plan: currentPlanDetails.planCode, // Use actual plan code for subscription
         callback: paymentCallback,
         onClose: () => {
           setLoading(false);

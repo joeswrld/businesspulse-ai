@@ -20,6 +20,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
     {
       id: 'trial',
       name: 'Free Trial',
+      planCode: null,
       description: 'Perfect for trying out NoteX',
       price: 0,
       currency: 'NGN',
@@ -40,6 +41,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
     {
       id: 'pro',
       name: 'Pro Plan',
+      planCode: 'PLN_4z2wpgmw41w2k7r',
       description: 'Advanced features for growing businesses',
       price: 3500000, // ₦35,000 in kobo
       currency: 'NGN',
@@ -62,6 +64,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
     {
       id: 'business',
       name: 'Business Plan',
+      planCode: 'PLN_esryg99ztsy9xc8',
       description: 'Enterprise features for large organizations',
       price: 5300000, // ₦53,000 in kobo
       currency: 'NGN',

@@ -61,7 +61,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
         subscription_status: 'active',
         paystack_customer_id: transaction.customer?.customer_code || null,
-        paystack_subscription_id: null, // Will be set when subscription is created
+        paystack_subscription_id: transaction.subscription?.subscription_code || null, // Get subscription code if available
         created_at: new Date().toISOString()
       }, {
         onConflict: 'id'
@@ -95,7 +95,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .from('user_subscriptions')
       .upsert({
         user_id: user.user.id,
-        plan_code: plan,
+        plan_code: plan === 'pro' ? 'PLN_4z2wpgmw41w2k7r' : 'PLN_esryg99ztsy9xc8', // Use actual Paystack plan codes
         plan_name: plan === 'pro' ? 'Pro Plan' : 'Business Plan',
         status: 'active',
         current_period_start: new Date().toISOString(),
