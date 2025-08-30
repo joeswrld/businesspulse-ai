@@ -6,10 +6,10 @@ import { toast } from 'sonner';
 // Types
 export interface BillingProfile {
   id: string;
-  plan: 'trial' | 'free' | 'pro' | 'business';
+  plan: 'trial' | 'pro' | 'business';
   trial_ends_at: string | null;
   next_billing_date: string | null;
-  subscription_status: string | null;
+  subscription_status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
   paystack_customer_id: string | null;
   paystack_subscription_id: string | null;
   created_at: string;
@@ -32,6 +32,9 @@ export interface UsageLimits {
   reports: number;
   insights: number;
   teams: number;
+  export: string[];
+  support: string[];
+  retention: string;
 }
 
 export interface UsageData {
@@ -42,6 +45,9 @@ export interface UsageData {
   reports_count: number;
   insights_count: number;
   teams_count: number;
+  detailed_reports_count: number;
+  team_members_count: number;
+  export_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -58,50 +64,64 @@ export interface BillingSystemState {
   refreshing: boolean;
   
   // Computed values
-  currentPlan: 'trial' | 'free' | 'pro' | 'business';
+  currentPlan: 'trial' | 'pro' | 'business';
   trialDaysLeft: number;
   isTrialExpired: boolean;
   isSubscriptionActive: boolean;
   isPaymentPastDue: boolean;
   nextBillingDate: string | null;
+  isInGracePeriod: boolean;
+  gracePeriodDaysLeft: number;
+  
+  // Usage tracking
+  usagePercentages: Record<string, number>;
+  isLimitReached: Record<string, boolean>;
   
   // Actions
   refreshData: () => Promise<void>;
   cancelSubscription: () => Promise<void>;
-  updatePaymentMethod: () => Promise<void>;
   upgradePlan: (plan: 'pro' | 'business') => Promise<void>;
 }
 
-// Plan limits configuration
+// Plan limits configuration - Real-world SaaS limits
 const PLAN_LIMITS: Record<string, UsageLimits> = {
   trial: {
     feedback: 50,
     analytics: 5,
     reports: 2,
     insights: 5,
-    teams: 1
-  },
-  free: {
-    feedback: 10,
-    analytics: 2,
-    reports: 1,
-    insights: 2,
-    teams: 1
+    teams: 1,
+    export: ['CSV'],
+    support: ['Email'],
+    retention: '8 days'
   },
   pro: {
     feedback: 300,
     analytics: 100,
     reports: 20,
     insights: 50,
-    teams: 5
+    teams: 5,
+    export: ['CSV', 'PDF', 'Excel'],
+    support: ['Email', 'Chat'],
+    retention: '12 months'
   },
   business: {
     feedback: -1, // unlimited
     analytics: -1,
     reports: -1,
     insights: -1,
-    teams: -1
+    teams: -1,
+    export: ['CSV', 'PDF', 'Excel', 'API'],
+    support: ['Email', 'Chat', 'Phone', 'Priority'],
+    retention: 'Unlimited'
   }
+};
+
+// Plan pricing (amounts in kobo - smallest currency unit for Paystack)
+const PLAN_PRICING = {
+  trial: { price: 0, currency: 'NGN', period: '8 days' },
+  pro: { price: 3500000, currency: 'NGN', period: '30 days' }, // ₦35,000 in kobo
+  business: { price: 5300000, currency: 'NGN', period: '30 days' } // ₦53,000 in kobo
 };
 
 export function useBillingSystem(): BillingSystemState {
@@ -130,6 +150,21 @@ export function useBillingSystem(): BillingSystemState {
     setError(null);
 
     try {
+      // First, try to create billing profile using the database function
+      // This avoids permission issues with auth.users triggers
+      try {
+        const { data: profileResult, error: profileCreateError } = await supabase
+          .rpc('create_user_billing_profile', { user_uuid: user.id });
+
+        if (profileCreateError) {
+          console.warn('Failed to create billing profile via function:', profileCreateError);
+        } else if (profileResult) {
+          console.log('Billing profile creation result:', profileResult);
+        }
+      } catch (error) {
+        console.warn('Billing profile creation function not available, using fallback');
+      }
+
       // Load billing profile
       let profileData = null;
       try {
@@ -140,12 +175,33 @@ export function useBillingSystem(): BillingSystemState {
           .single();
 
         if (profileError && profileError.code !== 'PGRST116') {
-          console.warn('Billing profiles table not available, skipping billing data');
+          console.warn('Billing profiles table not available, creating default profile');
+          // Create default trial profile for new users
+          profileData = {
+            id: user.id,
+            plan: 'trial',
+            trial_ends_at: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
+            next_billing_date: null,
+            subscription_status: 'trial',
+            paystack_customer_id: null,
+            paystack_subscription_id: null,
+            created_at: new Date().toISOString()
+          };
         } else {
           profileData = data;
         }
       } catch (error) {
-        console.warn('Billing profiles table not available, skipping billing data');
+        console.warn('Creating default trial profile for new user');
+        profileData = {
+          id: user.id,
+          plan: 'trial',
+          trial_ends_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+          next_billing_date: null,
+          subscription_status: 'trial',
+          paystack_customer_id: null,
+          paystack_subscription_id: null,
+          created_at: new Date().toISOString()
+        };
       }
 
       // Load transactions
@@ -176,12 +232,34 @@ export function useBillingSystem(): BillingSystemState {
           .single();
 
         if (usageError && usageError.code !== 'PGRST116') {
-          console.warn('Usage tracking table not available, skipping usage data');
+          console.warn('Usage tracking table not available, creating default usage data');
+          usageData = {
+            id: user.id,
+            user_id: user.id,
+            feedback_count: 0,
+            analytics_count: 0,
+            reports_count: 0,
+            insights_count: 0,
+            teams_count: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
         } else {
           usageData = data;
         }
       } catch (error) {
-        console.warn('Usage tracking table not available, skipping usage data');
+        console.warn('Creating default usage data for new user');
+        usageData = {
+          id: user.id,
+          user_id: user.id,
+          feedback_count: 0,
+          analytics_count: 0,
+          reports_count: 0,
+          insights_count: 0,
+          teams_count: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
       }
 
       setBillingProfile(profileData);
@@ -191,7 +269,6 @@ export function useBillingSystem(): BillingSystemState {
     } catch (err) {
       console.warn('Error loading billing data:', err);
       setError(null); // Don't set error for missing tables
-      // Don't show toast error for missing tables
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -207,11 +284,9 @@ export function useBillingSystem(): BillingSystemState {
   useEffect(() => {
     if (!user) return;
 
-    // Only set up channels if tables exist (check by trying to load data first)
     let billingChannel = null;
     let transactionsChannel = null;
 
-    // Try to set up billing channel
     try {
       billingChannel = supabase
         .channel('billing-updates')
@@ -233,7 +308,6 @@ export function useBillingSystem(): BillingSystemState {
       console.warn('Could not set up billing real-time subscription');
     }
 
-    // Try to set up transactions channel
     try {
       transactionsChannel = supabase
         .channel('transactions-updates')
@@ -261,22 +335,127 @@ export function useBillingSystem(): BillingSystemState {
     };
   }, [user, loadBillingData]);
 
-  // Computed values
+  // Computed values with real-world logic
   const currentPlan = billingProfile?.plan || 'trial';
   
   const trialDaysLeft = useCallback(() => {
-    if (!billingProfile?.trial_ends_at) return 0;
-    const trialEnd = new Date(billingProfile.trial_ends_at);
-    const now = new Date();
-    const diffTime = trialEnd.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, diffDays);
+    if (!billingProfile?.trial_ends_at) return 8;
+    try {
+      const trialEnd = new Date(billingProfile.trial_ends_at);
+      const now = new Date();
+      const diffTime = trialEnd.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return Math.max(0, diffDays);
+    } catch (error) {
+      console.warn('Error calculating trial days:', error);
+      return 8;
+    }
   }, [billingProfile]);
 
-  const isTrialExpired = trialDaysLeft() === 0 && currentPlan === 'trial';
-  const isSubscriptionActive = billingProfile?.subscription_status === 'active';
-  const isPaymentPastDue = billingProfile?.subscription_status === 'past_due';
+  const isTrialExpired = useCallback(() => {
+    try {
+      return trialDaysLeft() === 0 && currentPlan === 'trial';
+    } catch (error) {
+      console.warn('Error checking trial expiration:', error);
+      return false;
+    }
+  }, [trialDaysLeft, currentPlan]);
+
+  const isSubscriptionActive = useCallback(() => {
+    try {
+      return billingProfile?.subscription_status === 'active';
+    } catch (error) {
+      console.warn('Error checking subscription status:', error);
+      return false;
+    }
+  }, [billingProfile]);
+
+  const isPaymentPastDue = useCallback(() => {
+    try {
+      return billingProfile?.subscription_status === 'past_due';
+    } catch (error) {
+      console.warn('Error checking payment status:', error);
+      return false;
+    }
+  }, [billingProfile]);
+
   const nextBillingDate = billingProfile?.next_billing_date;
+
+  // Grace period logic (3 days after failed payment)
+  const isInGracePeriod = useCallback(() => {
+    if (!isPaymentPastDue()) return false;
+    if (!billingProfile?.next_billing_date) return false;
+    
+    try {
+      const nextBilling = new Date(billingProfile.next_billing_date);
+      const now = new Date();
+      const gracePeriodEnd = new Date(nextBilling.getTime() + 3 * 24 * 60 * 60 * 1000);
+      return now < gracePeriodEnd;
+    } catch (error) {
+      return false;
+    }
+  }, [isPaymentPastDue, billingProfile]);
+
+  const gracePeriodDaysLeft = useCallback(() => {
+    if (!isInGracePeriod()) return 0;
+    if (!billingProfile?.next_billing_date) return 0;
+    
+    try {
+      const nextBilling = new Date(billingProfile.next_billing_date);
+      const now = new Date();
+      const gracePeriodEnd = new Date(nextBilling.getTime() + 3 * 24 * 60 * 60 * 1000);
+      const diffTime = gracePeriodEnd.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return Math.max(0, diffDays);
+    } catch (error) {
+      return 0;
+    }
+  }, [isInGracePeriod, billingProfile]);
+
+  // Usage tracking and limits
+  const usagePercentages = useCallback(() => {
+    if (!usageData) return {};
+    
+    const currentLimits = PLAN_LIMITS[currentPlan];
+    const percentages: Record<string, number> = {};
+    
+    Object.keys(currentLimits).forEach(key => {
+      if (key === 'export' || key === 'support' || key === 'retention') return;
+      
+      const limit = currentLimits[key as keyof UsageLimits] as number;
+      const usage = usageData[`${key}_count` as keyof UsageData] as number;
+      
+      if (limit === -1) {
+        percentages[key] = 0; // Unlimited
+      } else {
+        percentages[key] = Math.min(100, (usage / limit) * 100);
+      }
+    });
+    
+    return percentages;
+  }, [usageData, currentPlan]);
+
+  const isLimitReached = useCallback(() => {
+    if (!usageData) return {};
+    
+    const currentLimits = PLAN_LIMITS[currentPlan];
+    const reached: Record<string, boolean> = {};
+    
+    Object.keys(currentLimits).forEach(key => {
+      if (key === 'export' || key === 'support' || key === 'retention') return;
+      
+      const limit = currentLimits[key as keyof UsageLimits] as number;
+      const usage = usageData[`${key}_count` as keyof UsageData] as number;
+      
+      if (limit === -1) {
+        reached[key] = false; // Unlimited
+      } else {
+        reached[key] = usage >= limit;
+      }
+    });
+    
+    return reached;
+  }, [usageData, currentPlan]);
 
   // Actions
   const refreshData = useCallback(async () => {
@@ -284,35 +463,39 @@ export function useBillingSystem(): BillingSystemState {
   }, [loadBillingData]);
 
   const cancelSubscription = useCallback(async () => {
-    if (!billingProfile?.paystack_subscription_id) {
-      toast.error('No active subscription to cancel');
-      return;
-    }
-
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
+      // For now, we'll update the local database since we don't have Edge Functions
+      // In production, you should integrate with Paystack's subscription management API
+      
+      // Update billing profile to cancelled status
+      const { error: updateError } = await supabase
+        .from('billing_profiles')
+        .update({
+          subscription_status: 'cancelled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', billingProfile?.id);
+
+      if (updateError) {
+        throw new Error(updateError.message);
       }
 
-      const response = await fetch('/api/cancel-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ 
-          subscriptionId: billingProfile.paystack_subscription_id 
-        }),
-      });
+      // Update user subscription status
+      const { error: subscriptionError } = await supabase
+        .from('user_subscriptions')
+        .update({
+          status: 'cancelled',
+          cancel_at_period_end: true,
+          canceled_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', billingProfile?.id);
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to cancel subscription');
+      if (subscriptionError) {
+        throw new Error(subscriptionError.message);
       }
 
-      toast.success('Subscription cancelled successfully');
+      toast.success('Subscription cancelled successfully. You can continue using your plan until the end of your current billing period.');
       await refreshData();
       
     } catch (err) {
@@ -321,53 +504,10 @@ export function useBillingSystem(): BillingSystemState {
     }
   }, [billingProfile, refreshData]);
 
-  const updatePaymentMethod = useCallback(async () => {
-    if (!billingProfile?.paystack_customer_id) {
-      toast.error('No payment method to update');
-      return;
-    }
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
-      }
-
-      const response = await fetch('/api/paystack/update-card', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ 
-          customerId: billingProfile.paystack_customer_id 
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to generate update link');
-      }
-
-      if (result.url) {
-        window.open(result.url, '_blank');
-        toast.success('Payment method update page opened');
-      } else {
-        throw new Error('No update URL received');
-      }
-      
-    } catch (err) {
-      console.error('Error updating payment method:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to update payment method');
-    }
-  }, [billingProfile]);
-
   const upgradePlan = useCallback(async (plan: 'pro' | 'business') => {
     // This will be handled by the PaystackPayment component
-    // Just return a promise that resolves immediately
     return Promise.resolve();
-  }, []);
+    }, []);
 
   return {
     // Data
@@ -383,22 +523,31 @@ export function useBillingSystem(): BillingSystemState {
     // Computed values
     currentPlan,
     trialDaysLeft: trialDaysLeft(),
-    isTrialExpired,
-    isSubscriptionActive,
-    isPaymentPastDue,
+    isTrialExpired: isTrialExpired(),
+    isSubscriptionActive: isSubscriptionActive(),
+    isPaymentPastDue: isPaymentPastDue(),
     nextBillingDate,
+    isInGracePeriod: isInGracePeriod(),
+    gracePeriodDaysLeft: gracePeriodDaysLeft(),
+    
+    // Usage tracking
+    usagePercentages: usagePercentages(),
+    isLimitReached: isLimitReached(),
     
     // Actions
     refreshData,
     cancelSubscription,
-    updatePaymentMethod,
     upgradePlan
   };
 }
 
 // Utility functions
 export function getPlanLimits(plan: string): UsageLimits {
-  return PLAN_LIMITS[plan] || PLAN_LIMITS.free;
+  return PLAN_LIMITS[plan] || PLAN_LIMITS.trial;
+}
+
+export function getPlanPricing(plan: string) {
+  return PLAN_PRICING[plan as keyof typeof PLAN_PRICING] || PLAN_PRICING.trial;
 }
 
 export function formatCurrency(amount: number, currency: string = 'NGN'): string {
@@ -419,7 +568,6 @@ export function formatDate(dateString: string): string {
 export function getPlanDisplayName(plan: string): string {
   const planNames: Record<string, string> = {
     trial: 'Free Trial',
-    free: 'Free Plan',
     pro: 'Pro Plan',
     business: 'Business Plan'
   };
@@ -429,7 +577,6 @@ export function getPlanDisplayName(plan: string): string {
 export function getPlanPrice(plan: string): string {
   const planPrices: Record<string, string> = {
     trial: 'Free',
-    free: 'Free',
     pro: '₦35,000/mo',
     business: '₦53,000/mo'
   };
