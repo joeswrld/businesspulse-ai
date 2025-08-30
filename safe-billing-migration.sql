@@ -1,5 +1,6 @@
 -- Safe migration to handle existing tables
 -- This script checks if tables exist before creating them
+-- Updated for NoteX: Free Trial (8 days), Pro (30 days), Business (30 days)
 
 -- Function to safely create tables
 CREATE OR REPLACE FUNCTION create_billing_tables_safely()
@@ -12,7 +13,7 @@ BEGIN
       plan TEXT CHECK (plan IN ('trial','free','pro','business')) DEFAULT 'trial',
       trial_ends_at TIMESTAMP WITH TIME ZONE,
       next_billing_date TIMESTAMP WITH TIME ZONE,
-      subscription_status TEXT,
+      subscription_status TEXT CHECK (subscription_status IN ('trial','active','past_due','cancelled','expired')) DEFAULT 'trial',
       paystack_customer_id TEXT,
       paystack_subscription_id TEXT,
       created_at TIMESTAMP DEFAULT NOW()
@@ -50,9 +51,9 @@ BEGIN
     CREATE TABLE transactions (
       id BIGSERIAL PRIMARY KEY,
       user_id UUID REFERENCES auth.users ON DELETE CASCADE,
-      amount INT,
+      amount INTEGER NOT NULL,
       currency TEXT DEFAULT 'NGN',
-      status TEXT CHECK (status IN ('success','failed','pending')),
+      status TEXT CHECK (status IN ('success','failed','pending')) DEFAULT 'pending',
       description TEXT,
       paystack_reference TEXT UNIQUE,
       created_at TIMESTAMP DEFAULT NOW()
@@ -268,7 +269,7 @@ INSERT INTO user_subscriptions (user_id, plan_code, plan_name, status)
 SELECT 
   u.id,
   'trial',
-  'Trial Plan',
+  'Free Trial (8 days)',
   'active'
 FROM auth.users u
 WHERE NOT EXISTS (
@@ -296,9 +297,9 @@ COMMENT ON TABLE billing_profiles IS 'User billing profiles with plan, trial, an
 COMMENT ON TABLE user_subscriptions IS 'User subscription state and billing periods';
 COMMENT ON TABLE transactions IS 'Payment transaction history for users';
 COMMENT ON TABLE usage_tracking IS 'User feature usage tracking';
-COMMENT ON COLUMN billing_profiles.plan IS 'Current plan: trial, free, pro, business';
+COMMENT ON COLUMN billing_profiles.plan IS 'Current plan: trial (8 days), free, pro (30 days), business (30 days)';
 COMMENT ON COLUMN billing_profiles.trial_ends_at IS 'End date of 8-day free trial';
-COMMENT ON COLUMN billing_profiles.next_billing_date IS 'Next billing date for active subscriptions';
+COMMENT ON COLUMN billing_profiles.next_billing_date IS 'Next billing date for active subscriptions (30 days for pro/business)';
 COMMENT ON COLUMN billing_profiles.subscription_status IS 'Subscription status: trial, active, past_due, cancelled, expired';
 COMMENT ON COLUMN transactions.amount IS 'Transaction amount in kobo (smallest currency unit)';
 COMMENT ON COLUMN transactions.paystack_reference IS 'Unique Paystack transaction reference';

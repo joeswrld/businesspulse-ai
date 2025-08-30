@@ -51,6 +51,34 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
   const amount = planPricing[plan];
   const reference = `notex_${plan}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+  // Plan details
+  const planDetails = {
+    pro: {
+      name: 'Pro Plan',
+      duration: '30 days',
+      features: [
+        '300 feedback submissions (6x increase)',
+        '50 AI insights (10x increase)',
+        '100 analytics reports (20x increase)',
+        'PDF & Excel export formats',
+        'Email + Chat support',
+        '12 months data retention'
+      ]
+    },
+    business: {
+      name: 'Business Plan',
+      duration: '30 days',
+      features: [
+        'Unlimited usage across all features',
+        'Priority phone support',
+        'API access for integrations',
+        'Predictive analytics',
+        'Custom integrations',
+        'Unlimited data retention'
+      ]
+    }
+  };
+
   useEffect(() => {
     // Load Paystack script if not already loaded
     if (!window.PaystackPop) {
@@ -162,7 +190,11 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <span className="font-medium">Plan:</span>
-              <Badge variant="secondary">{planName}</Badge>
+              <Badge variant="secondary">{planDetails[plan].name}</Badge>
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-medium">Duration:</span>
+              <span className="text-sm text-gray-600">{planDetails[plan].duration}</span>
             </div>
             <div className="flex items-center justify-between mb-2">
               <span className="font-medium">Price:</span>
@@ -178,26 +210,9 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
           <div className="space-y-2">
             <h4 className="font-medium">Plan Benefits:</h4>
             <ul className="text-sm text-gray-600 space-y-1">
-              {plan === 'pro' && (
-                <>
-                  <li>• 300 feedback submissions (6x increase)</li>
-                  <li>• 50 AI insights (10x increase)</li>
-                  <li>• 100 analytics reports (20x increase)</li>
-                  <li>• PDF & Excel export formats</li>
-                  <li>• Email + Chat support</li>
-                  <li>• 12 months data retention</li>
-                </>
-              )}
-              {plan === 'business' && (
-                <>
-                  <li>• Unlimited usage across all features</li>
-                  <li>• Priority phone support</li>
-                  <li>• API access for integrations</li>
-                  <li>• Predictive analytics</li>
-                  <li>• Custom integrations</li>
-                  <li>• Unlimited data retention</li>
-                </>
-              )}
+              {planDetails[plan].features.map((feature, index) => (
+                <li key={index}>• {feature}</li>
+              ))}
             </ul>
           </div>
 
