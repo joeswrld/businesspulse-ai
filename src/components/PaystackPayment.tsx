@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CreditCard, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
+import { Loader2, CreditCard, CheckCircle, XCircle, ExternalLink, RefreshCw, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -120,6 +120,74 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
     };
   }, []);
 
+  // Retry mechanism for Paystack loading
+  const retryPaystackLoad = useCallback(() => {
+    console.log('Retrying Paystack load...');
+    setError(null);
+    setPaystackReady(false);
+    
+    // Force reload the script
+    const existingScript = document.querySelector('script[src*="paystack.co"]');
+    if (existingScript) {
+      existingScript.remove();
+    }
+    
+    const script = document.createElement('script');
+    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.async = true;
+    script.onload = () => {
+      console.log('Paystack script reloaded successfully');
+      setTimeout(() => {
+        if (window.PaystackPop && typeof window.PaystackPop.setup === 'function') {
+          console.log('Paystack is now ready after retry');
+          setPaystackReady(true);
+        } else {
+          console.error('Paystack still not ready after retry');
+          setError('Failed to initialize Paystack after retry. Please refresh the page.');
+        }
+      }, 1500);
+    };
+    script.onerror = () => {
+      console.error('Failed to reload Paystack script');
+      setError('Failed to load Paystack payment system. Please check your internet connection.');
+    };
+    document.head.appendChild(script);
+  }, []);
+  const handlePaymentSuccess = async (response: any) => {
+    try {
+      console.log('Processing successful payment:', response);
+      
+      // Call your API to update the user's subscription
+      const updateResponse = await fetch('/api/paystack/verify-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reference: response.reference,
+          plan: plan,
+          amount: amount,
+          email: user?.email || 'user@example.com'
+        }),
+      });
+
+      const updateData = await updateResponse.json();
+
+      if (updateResponse.ok) {
+        toast.success(`🎉 Welcome to ${planName}! Your subscription has been activated.`);
+        onSuccess({ reference: response.reference, plan });
+      } else {
+        throw new Error(updateData.error || 'Failed to update subscription');
+      }
+    } catch (err) {
+      console.error('Payment verification error:', err);
+      setError(err instanceof Error ? err.message : 'Payment verification failed');
+      toast.error('Payment verification failed. Please contact support.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePayment = async () => {
     if (!paystackReady) {
       setError('Paystack payment system is still loading. Please wait a moment and try again.');
@@ -139,61 +207,46 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
         return;
       }
 
+      // Ensure Paystack is properly loaded and ready
+      if (!window.PaystackPop || typeof window.PaystackPop.setup !== 'function') {
+        throw new Error('Paystack payment system not properly initialized. Please refresh and try again.');
+      }
+
+      // Create a simpler callback function to avoid async issues
+      const paymentCallback = (response: any) => {
+        console.log('Paystack response received:', response);
+        
+        if (response.status === 'success') {
+          // Handle success asynchronously
+          handlePaymentSuccess(response);
+        } else {
+          setError('Payment was not successful');
+          setLoading(false);
+        }
+      };
+
       const config: PaystackConfig = {
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || 'pk_test_...',
         email: userEmail,
         amount: amount,
         currency: 'NGN',
         reference: reference,
-        callback: async (response: any) => {
-          try {
-            console.log('Paystack response:', response);
-            
-            if (response.status === 'success') {
-              // Call your API to update the user's subscription
-              const updateResponse = await fetch('/api/paystack/verify-payment', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  reference: response.reference,
-                  plan: plan,
-                  amount: amount,
-                  email: userEmail
-                }),
-              });
-
-              const updateData = await updateResponse.json();
-
-              if (updateResponse.ok) {
-                toast.success(`🎉 Welcome to ${planName}! Your subscription has been activated.`);
-                onSuccess({ reference: response.reference, plan });
-              } else {
-                throw new Error(updateData.error || 'Failed to update subscription');
-              }
-            } else {
-              throw new Error('Payment was not successful');
-            }
-          } catch (err) {
-            console.error('Payment verification error:', err);
-            setError(err instanceof Error ? err.message : 'Payment verification failed');
-            toast.error('Payment verification failed. Please contact support.');
-          } finally {
-            setLoading(false);
-          }
-        },
+        callback: paymentCallback,
         onClose: () => {
           setLoading(false);
           toast.info('Payment cancelled');
         }
       };
 
-      if (window.PaystackPop) {
+      console.log('Setting up Paystack with config:', config);
+      
+      try {
         const handler = window.PaystackPop.setup(config);
+        console.log('Paystack handler created:', handler);
         handler.openIframe();
-      } else {
-        throw new Error('Paystack payment system not loaded');
+      } catch (setupError) {
+        console.error('Paystack setup error:', setupError);
+        throw new Error(`Failed to setup payment: ${setupError.message}`);
       }
     } catch (err) {
       console.error('Payment setup error:', err);
@@ -258,6 +311,25 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
               <XCircle className="h-4 w-4" />
               <AlertDescription>
                 {error}
+                <div className="mt-2">
+                  <Button 
+                    onClick={retryPaystackLoad} 
+                    size="sm" 
+                    variant="outline"
+                    className="mr-2"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Retry
+                  </Button>
+                  <Button 
+                    onClick={() => window.location.reload()} 
+                    size="sm" 
+                    variant="outline"
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Refresh Page
+                  </Button>
+                </div>
                 {process.env.NODE_ENV === 'development' && (
                   <div className="mt-2 text-xs">
                     <p>Debug: paystackReady = {paystackReady.toString()}</p>
