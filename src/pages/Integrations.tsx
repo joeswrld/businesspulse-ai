@@ -182,7 +182,7 @@ const Integrations = () => {
         },
         {
           name: "Zapier",
-          description: "Connect FeedbackFlow with 5000+ apps via Zapier",
+          description: "Connect NoteX with 5000+ apps via Zapier",
           status: "Available",
           popular: true,
           logo: "https://via.placeholder.com/60x60/FF4A00/FFFFFF?text=ZP"

@@ -17,21 +17,21 @@ const Press = () => {
   const pressReleases = [
     {
       id: 1,
-      title: "FeedbackFlow Raises $10M Series A to Scale AI-Powered Feedback Analytics",
+      title: "NoteX Raises $10M Series A to Scale AI-Powered Feedback Analytics",
       date: "January 15, 2024",
       excerpt: "Funding will accelerate product development and expand global reach for customer feedback analytics platform.",
       category: "Funding"
     },
     {
       id: 2,
-      title: "FeedbackFlow Launches Advanced Sentiment Analysis with 95% Accuracy",
+      title: "NoteX Launches Advanced Sentiment Analysis with 95% Accuracy",
       date: "January 10, 2024",
       excerpt: "New AI-powered sentiment analysis feature helps businesses understand customer emotions with unprecedented accuracy.",
       category: "Product Launch"
     },
     {
       id: 3,
-      title: "FeedbackFlow Reaches 500+ Active Business Customers",
+      title: "NoteX Reaches 500+ Active Business Customers",
       date: "January 5, 2024",
       excerpt: "Milestone achievement demonstrates growing demand for AI-powered customer feedback analytics.",
       category: "Company News"
@@ -44,7 +44,7 @@ const Press = () => {
       title: "How AI is Revolutionizing Customer Feedback Analysis",
       publication: "TechCrunch",
       date: "January 12, 2024",
-      excerpt: "FeedbackFlow's innovative approach to customer feedback analytics is changing how businesses understand their customers.",
+      excerpt: "NoteX's innovative approach to customer feedback analytics is changing how businesses understand their customers.",
       link: "#"
     },
     {
@@ -52,15 +52,15 @@ const Press = () => {
       title: "The Future of Customer Experience: AI-Powered Insights",
       publication: "Forbes",
       date: "January 8, 2024",
-      excerpt: "FeedbackFlow CEO Sarah Johnson discusses the future of customer experience and AI-powered analytics.",
+      excerpt: "NoteX CEO Sarah Johnson discusses the future of customer experience and AI-powered analytics.",
       link: "#"
     },
     {
       id: 3,
-      title: "Startup Spotlight: FeedbackFlow's Mission to Democratize Customer Insights",
+      title: "Startup Spotlight: NoteX's Mission to Democratize Customer Insights",
       publication: "VentureBeat",
       date: "January 3, 2024",
-      excerpt: "A deep dive into FeedbackFlow's mission and how they're making customer feedback analytics accessible to all businesses.",
+      excerpt: "A deep dive into NoteX's mission and how they're making customer feedback analytics accessible to all businesses.",
       link: "#"
     }
   ];

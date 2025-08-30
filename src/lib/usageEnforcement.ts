@@ -110,11 +110,11 @@ export const PLAN_PRICING: Record<PlanType, string> = {
 export function getUserPlan(subscription: Subscription | null): PlanType {
   if (!subscription) return 'free';
   
-  const planId = subscription.plan_id?.toLowerCase() || '';
+  const planName = subscription.plan_name?.toLowerCase() || subscription.plan_type?.toLowerCase() || '';
   
-  if (planId.includes('enterprise')) return 'enterprise';
-  if (planId.includes('business')) return 'business';
-  if (planId.includes('pro') || planId.includes('premium')) return 'pro';
+  if (planName.includes('enterprise')) return 'enterprise';
+  if (planName.includes('business')) return 'business';
+  if (planName.includes('pro') || planName.includes('premium')) return 'pro';
   
   return 'free';
 }

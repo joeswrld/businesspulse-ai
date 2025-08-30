@@ -18,7 +18,7 @@ const TermsOfService = () => {
     {
       title: "Acceptance of Terms",
       content: [
-        "By accessing and using FeedbackFlow, you accept and agree to be bound by the terms and provision of this agreement.",
+        "By accessing and using NoteX, you accept and agree to be bound by the terms and provision of this agreement.",
         "If you do not agree to abide by the above, please do not use this service.",
         "These terms apply to all users of the site, including without limitation users who are browsers, vendors, customers, merchants, and/or contributors of content."
       ]
@@ -26,18 +26,18 @@ const TermsOfService = () => {
     {
       title: "Use License",
       content: [
-        "Permission is granted to temporarily download one copy of FeedbackFlow for personal, non-commercial transitory viewing only.",
+        "Permission is granted to temporarily download one copy of NoteX for personal, non-commercial transitory viewing only.",
         "This is the grant of a license, not a transfer of title, and under this license you may not:",
         "• Modify or copy the materials",
         "• Use the materials for any commercial purpose or for any public display",
-        "• Attempt to reverse engineer any software contained in FeedbackFlow",
+        "• Attempt to reverse engineer any software contained in NoteX",
         "• Remove any copyright or other proprietary notations from the materials"
       ]
     },
     {
       title: "Service Description",
       content: [
-        "FeedbackFlow provides AI-powered feedback analytics services including:",
+        "NoteX provides AI-powered feedback analytics services including:",
         "• Customer feedback collection and analysis",
         "• Sentiment analysis and trend detection",
         "• Interactive dashboards and reporting",
@@ -79,7 +79,7 @@ const TermsOfService = () => {
     {
       title: "Intellectual Property",
       content: [
-        "The service and its original content, features, and functionality are owned by FeedbackFlow and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.",
+        "The service and its original content, features, and functionality are owned by NoteX and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.",
         "You retain ownership of any content you submit to the service",
         "You grant us a license to use, store, and process your content to provide our services",
         "We may use anonymized, aggregated data for research and improvement purposes"
@@ -88,7 +88,7 @@ const TermsOfService = () => {
     {
       title: "Limitation of Liability",
       content: [
-        "In no event shall FeedbackFlow, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential, or punitive damages",
+        "In no event shall NoteX, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential, or punitive damages",
         "Our total liability to you for any claims arising from the use of our service shall not exceed the amount you paid us in the 12 months preceding the claim",
         "Some jurisdictions do not allow the exclusion or limitation of liability for consequential or incidental damages"
       ]
@@ -145,7 +145,7 @@ const TermsOfService = () => {
               <span className="gradient-text">Service</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-4">
-              These terms govern your use of FeedbackFlow and outline the rights and responsibilities 
+              These terms govern your use of NoteX and outline the rights and responsibilities 
               of both you and our platform.
             </p>
             <p className="text-sm text-muted-foreground">
@@ -194,7 +194,7 @@ const TermsOfService = () => {
               <div>
                 <h3 className="text-lg font-semibold text-yellow-800 mb-2">Important Notice</h3>
                 <p className="text-yellow-700 mb-4">
-                  By using FeedbackFlow, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service. 
+                  By using NoteX, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service. 
                   If you do not agree with any part of these terms, you should not use our service.
                 </p>
                 <p className="text-sm text-yellow-600">
@@ -212,10 +212,10 @@ const TermsOfService = () => {
             </p>
             <div className="space-y-2">
               <p className="text-sm">
-                <strong>Email:</strong> legal@feedbackflow.com
+                <strong>Email:</strong> legal@notex.com
               </p>
               <p className="text-sm">
-                <strong>Address:</strong> FeedbackFlow Inc., 123 Legal Street, Compliance City, CC 12345
+                <strong>Address:</strong> NoteX Inc., 123 Legal Street, Compliance City, CC 12345
               </p>
             </div>
           </div>
@@ -227,7 +227,7 @@ const TermsOfService = () => {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            By using FeedbackFlow, you agree to these terms. Start your free trial today and 
+            By using NoteX, you agree to these terms. Start your free trial today and 
             experience the power of AI-powered feedback analytics.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

@@ -538,15 +538,22 @@ export default function Dashboard() {
       };
     }
 
-    // Safely get subscription properties with defaults
-    const planName = subscription.plan_name || subscription.subscription_type || 'free';
-    const planType = subscription.plan_type || 'free';
+    // Derive plan from available fields (plan_name preferred). Fallback to legacy fields.
+    const derivedPlan = (() => {
+      const planName = (subscription as any).plan_name?.toLowerCase?.() || (subscription as any).plan_type?.toLowerCase?.() || '';
+      if (planName.includes('business')) return 'business';
+      if (planName.includes('pro') || planName.includes('premium')) return 'pro';
+      if (planName.includes('trial')) return 'trial';
+      return (subscription as any).plan_type || 'free';
+    })();
+    const planType = derivedPlan;
+    const planName = derivedPlan;
     const trialEnd = subscription.trial_end || subscription.current_period_end;
     
     console.log('🔍 Plan info extracted:', { planName, planType, trialEnd });
     
     // Check if user is currently in trial
-    const isTrial = subscription.status === 'trialing' || planName === 'free_trial' || planName === 'free';
+    const isTrial = subscription.status === 'trialing' || planName === 'free_trial' || planName === 'free' || planName === 'trial';
     let daysLeft = 0;
     if (isTrial && subscription.trial_end) {
       const trialEnd = new Date(subscription.trial_end);
@@ -562,8 +569,6 @@ export default function Dashboard() {
       upgradeText = 'Upgrade to Pro';
       upgradeLink = '/billing?plan=pro';
     } else if (planName === 'pro') {
-
-    } else if ((subscription.plan_name || '').toLowerCase() === 'pro') {
 
       upgradeText = 'Upgrade to Business';
       upgradeLink = '/billing?plan=business';

@@ -4,16 +4,16 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command, mode }) => ({
   plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  server: {
+  server: command === 'serve' ? {
     proxy: {
-      // Proxy API calls to Supabase Edge Functions
+      // Proxy API calls to Supabase Edge Functions (development only)
       '/api/process-upload': {
         target: 'https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/process-upload',
         changeOrigin: true,
@@ -39,5 +39,5 @@ export default defineConfig({
         },
       },
     },
-  },
-});
+  } : undefined,
+}));

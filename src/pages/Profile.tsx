@@ -192,8 +192,11 @@ const Profile: React.FC = () => {
       };
     }
 
-    const planName = subscription.plan_name || 'Free Trial';
-    const isTrial = subscription.plan_type === 'trial';
+    const planName = (subscription as any)?.plan_name?.toLowerCase?.() || (subscription as any)?.plan_type?.toLowerCase?.() || '';
+    const planType = planName.includes('business') ? 'business'
+      : (planName.includes('pro') || planName.includes('premium')) ? 'pro'
+      : (subscription as any).plan_type || 'free';
+    const isTrial = planType === 'trial' || (subscription as any).status === 'trialing';
     
     if (isTrial && subscription.trial_end) {
       const trialEnd = new Date(subscription.trial_end);
@@ -201,7 +204,7 @@ const Profile: React.FC = () => {
       const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       
       return {
-        planName,
+        planName: 'Free Trial',
         planType: 'trial',
         isTrial: true,
         daysLeft: Math.max(0, daysLeft),
@@ -212,7 +215,7 @@ const Profile: React.FC = () => {
       };
     }
 
-    if (subscription.plan_type === 'pro') {
+    if (planType === 'pro') {
       return {
         planName: 'Pro',
         planType: 'pro',

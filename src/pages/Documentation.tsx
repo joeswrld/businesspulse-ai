@@ -69,7 +69,7 @@ const Documentation = () => {
               <span className="gradient-text">Documentation</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-8">
-              Complete guides, tutorials, and API reference for integrating FeedbackFlow into your applications.
+              Complete guides, tutorials, and API reference for integrating NoteX into your applications.
             </p>
           </div>
         </div>

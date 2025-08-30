@@ -15,7 +15,7 @@ const Testimonials = () => {
       role: "CEO",
       company: "TechFlow Solutions",
       industry: "SaaS",
-      content: "FeedbackFlow transformed how we understand our customers. The AI sentiment analysis helped us identify pain points we never knew existed, leading to a 40% increase in customer satisfaction.",
+      content: "NoteX transformed how we understand our customers. The AI sentiment analysis helped us identify pain points we never knew existed, leading to a 40% increase in customer satisfaction.",
       rating: 5,
       image: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
     },
