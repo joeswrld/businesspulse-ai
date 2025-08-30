@@ -189,9 +189,6 @@ const BillingPage: React.FC = () => {
     );
   }
 
-  const currentPlan = getCurrentPlan();
-  const trialDaysLeft = getTrialDaysLeft();
-
   return (
     <div className="space-y-6">
       {/* Payment Past Due Alert */}
