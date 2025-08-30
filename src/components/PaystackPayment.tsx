@@ -260,7 +260,8 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
         amount: amount,
         currency: 'NGN',
         reference: reference,
-        plan: currentPlanDetails.planCode, // Use actual plan code for subscription
+        // Note: plan parameter is not supported in inline checkout
+        // We'll handle subscription creation after successful payment
         callback: paymentCallback,
         onClose: () => {
           setLoading(false);
@@ -268,7 +269,23 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
         }
       };
 
-      console.log('Setting up Paystack with config:', config);
+      // Validate configuration before sending to Paystack
+      if (!import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY === 'pk_test_...') {
+        throw new Error('Paystack public key not configured. Please check your environment variables.');
+      }
+
+      if (!userEmail || userEmail === 'user@example.com') {
+        throw new Error('Valid user email is required for payment.');
+      }
+
+      if (!amount || amount <= 0) {
+        throw new Error('Invalid payment amount.');
+      }
+
+      console.log('Setting up Paystack with config:', {
+        ...config,
+        key: config.key.substring(0, 20) + '...' // Log partial key for security
+      });
       
       try {
         const handler = window.PaystackPop.setup(config);
