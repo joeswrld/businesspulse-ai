@@ -42,10 +42,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Billing profile not found' });
     }
 
-    // Cancel subscription with Paystack
+    // Reactivate subscription with Paystack
     if (billingProfile.paystack_subscription_id) {
       try {
-        const paystackResponse = await fetch(`https://api.paystack.co/subscription/disable`, {
+        const paystackResponse = await fetch(`https://api.paystack.co/subscription/enable`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
@@ -58,10 +58,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
 
         if (!paystackResponse.ok) {
-          console.error('Paystack subscription cancellation failed');
+          console.error('Paystack subscription reactivation failed');
         }
       } catch (error) {
-        console.error('Error cancelling Paystack subscription:', error);
+        console.error('Error reactivating Paystack subscription:', error);
       }
     }
 
@@ -69,8 +69,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { error: updateError } = await supabase
       .from('billing_profiles')
       .update({
-        subscription_status: 'cancelled',
-        next_billing_date: null
+        subscription_status: 'active',
+        next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
       })
       .eq('id', user.id);
 
@@ -83,9 +83,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { error: subscriptionError } = await supabase
       .from('user_subscriptions')
       .update({
-        status: 'cancelled',
-        cancel_at_period_end: true,
-        canceled_at: new Date().toISOString(),
+        status: 'active',
+        cancel_at_period_end: false,
+        canceled_at: null,
+        current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq('user_id', user.id);
@@ -95,20 +96,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'Failed to update subscription' });
     }
 
-    // Log cancellation
-    console.log(`User ${user.id} cancelled their subscription`);
+    // Log reactivation
+    console.log(`User ${user.id} reactivated their subscription`);
 
     return res.status(200).json({
       success: true,
-      message: 'Subscription cancelled successfully',
+      message: 'Subscription reactivated successfully',
       data: {
         user_id: user.id,
-        cancelled_at: new Date().toISOString()
+        reactivated_at: new Date().toISOString()
       }
     });
 
   } catch (error) {
-    console.error('Subscription cancellation error:', error);
+    console.error('Subscription reactivation error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

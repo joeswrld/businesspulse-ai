@@ -523,18 +523,26 @@ const BillingPage: React.FC = () => {
       )}
 
       {/* Transaction History */}
-      {transactions.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Receipt className="h-5 w-5" />
-              Transaction History
-            </CardTitle>
-            <CardDescription>
-              Your payment and subscription history
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Receipt className="h-5 w-5" />
+            Transaction History
+          </CardTitle>
+          <CardDescription>
+            Your payment and subscription history
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {transactions.length === 0 ? (
+            <div className="text-center py-8">
+              <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No transactions yet</h3>
+              <p className="text-muted-foreground">
+                Your transaction history will appear here once you make your first payment.
+              </p>
+            </div>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -542,6 +550,7 @@ const BillingPage: React.FC = () => {
                   <TableHead>Description</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -549,52 +558,69 @@ const BillingPage: React.FC = () => {
                   const statusDisplay = getStatusDisplay(transaction.status);
                   return (
                     <TableRow key={transaction.id}>
-                      <TableCell>{formatDate(transaction.created_at)}</TableCell>
-                      <TableCell>{transaction.description || 'Subscription Payment'}</TableCell>
-                      <TableCell>{formatCurrency(transaction.amount, transaction.currency)}</TableCell>
+                      <TableCell className="font-medium">
+                        {formatDate(transaction.created_at)}
+                      </TableCell>
                       <TableCell>
-                        <div className={`flex items-center gap-2 ${statusDisplay.color}`}>
+                        {transaction.description || 'Subscription Payment'}
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-medium">
+                          {formatCurrency(transaction.amount, transaction.currency)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
                           {statusDisplay.icon}
-                          <span className="capitalize">{transaction.status}</span>
+                          <Badge 
+                            variant={transaction.status === 'success' ? 'default' : 
+                                   transaction.status === 'pending' ? 'secondary' : 'destructive'}
+                            className="text-xs"
+                          >
+                            {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                          </Badge>
                         </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {transaction.paystack_reference && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(`https://dashboard.paystack.com/#/transactions/${transaction.paystack_reference}`, '_blank')}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            View
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {/* Upgrade Plan Modal */}
       {upgradePlanModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">
-              Upgrade to {upgradePlanModal === 'pro' ? 'Pro' : 'Business'}
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Choose your preferred plan and complete the upgrade.
-            </p>
-            <div className="flex gap-3">
-              <Button 
-                onClick={() => setUpgradePlanModal(null)} 
-                variant="outline"
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={() => {
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <PaystackPayment
+              plan={upgradePlanModal}
+              planName={upgradePlanModal === 'pro' ? 'Pro' : 'Business'}
+              planPrice={getPlanPrice(upgradePlanModal)}
+              onSuccess={async ({ reference, plan: paidPlan }) => {
+                try {
+                  toast.success(`🎉 Welcome to ${upgradePlanModal === 'pro' ? 'Pro' : 'Business'}! Your subscription has been activated.`);
                   setUpgradePlanModal(null);
-                  // Handle upgrade logic here
-                }}
-                className="flex-1 bg-green-600 hover:bg-green-700"
-              >
-                Continue
-              </Button>
-            </div>
+                  await refreshData();
+                } catch (e: any) {
+                  toast.error(e?.message || 'Failed to activate subscription');
+                }
+              }}
+              onCancel={() => setUpgradePlanModal(null)}
+            />
           </div>
         </div>
       )}
