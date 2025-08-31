@@ -73,6 +73,7 @@ const BillingPage: React.FC = () => {
   // State
   const [cancelling, setCancelling] = useState(false);
   const [upgradePlanModal, setUpgradePlanModal] = useState<UpgradePlan>(null);
+  const [showConfigError, setShowConfigError] = useState(false);
 
   // Handle subscription cancellation
   const handleCancelSubscription = async () => {
@@ -85,6 +86,19 @@ const BillingPage: React.FC = () => {
     } finally {
       setCancelling(false);
     }
+  };
+
+  // Check if Paystack is properly configured before opening upgrade modal
+  const handleUpgradeClick = (plan: UpgradePlan) => {
+    const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+    
+    if (!paystackKey || paystackKey === 'pk_test_...' || paystackKey.includes('your_actual_paystack')) {
+      setShowConfigError(true);
+      toast.error('Paystack payment system not configured. Please check your environment variables.');
+      return;
+    }
+    
+    setUpgradePlanModal(plan);
   };
 
   // Download transaction receipt
@@ -385,11 +399,11 @@ NoteX Team
                 Love what you see? Upgrade anytime during your trial to unlock unlimited features.
               </p>
               <div className="space-y-2">
-                <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => setUpgradePlanModal('pro')}>
+                <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => handleUpgradeClick('pro')}>
                   <Zap className="h-4 w-4 mr-2" />
                   Upgrade to Pro
                 </Button>
-                <Button className="w-full bg-amber-600 hover:bg-amber-700" onClick={() => setUpgradePlanModal('business')}>
+                <Button className="w-full bg-amber-600 hover:bg-amber-700" onClick={() => handleUpgradeClick('business')}>
                   <Crown className="h-4 w-4 mr-2" />
                   Upgrade to Business
                 </Button>
@@ -470,6 +484,45 @@ NoteX Team
         </p>
       </div>
 
+      {/* Paystack Configuration Error Alert */}
+      {showConfigError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Payment System Not Configured!</strong> The Paystack payment system is not properly configured.
+            <div className="mt-3 space-y-2">
+              <p className="text-sm">
+                To fix this issue, you need to configure your Paystack public key in the environment variables.
+              </p>
+              <div className="text-sm space-y-1">
+                <p><strong>Steps to fix:</strong></p>
+                <ol className="list-decimal list-inside space-y-1 ml-2">
+                  <li>Get your Paystack key from <a href="https://dashboard.paystack.com/settings/developers" target="_blank" rel="noopener noreferrer" className="underline">Paystack Dashboard</a></li>
+                  <li>Update the <code className="bg-red-100 px-1 rounded">VITE_PAYSTACK_PUBLIC_KEY</code> in your <code className="bg-red-100 px-1 rounded">.env.local</code> file</li>
+                  <li>Restart your development server</li>
+                </ol>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => setShowConfigError(false)}
+                >
+                  Dismiss
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => window.open('PAYSTACK_KEY_FIX.md', '_blank')}
+                >
+                  View Fix Guide
+                </Button>
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Fallback Upgrade Section for Trial Users (when billing data might not be loaded) */}
       {(!billingProfile || billingProfile?.plan === 'trial') && !loading && (
         <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
@@ -531,10 +584,10 @@ NoteX Team
           <AlertDescription>
             <strong>Trial Expired!</strong> Your free trial has ended. Upgrade to Pro or Business to continue using advanced features.
             <div className="mt-3 flex gap-2">
-              <Button size="sm" onClick={() => setUpgradePlanModal('pro')}>
+              <Button size="sm" onClick={() => handleUpgradeClick('pro')}>
                 Upgrade to Pro
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setUpgradePlanModal('business')}>
+              <Button size="sm" variant="outline" onClick={() => handleUpgradeClick('business')}>
                 Upgrade to Business
               </Button>
             </div>
@@ -841,11 +894,11 @@ NoteX Team
           <div className="flex flex-wrap gap-3 pt-4">
             {currentPlan === 'trial' && !isTrialExpired && (
               <>
-                <Button onClick={() => setUpgradePlanModal('pro')} className="bg-green-600 hover:bg-green-700">
+                <Button onClick={() => handleUpgradeClick('pro')} className="bg-green-600 hover:bg-green-700">
                   <Zap className="h-4 w-4 mr-2" />
                   Upgrade to Pro
                 </Button>
-                <Button onClick={() => setUpgradePlanModal('business')} variant="outline">
+                <Button onClick={() => handleUpgradeClick('business')} variant="outline">
                   <Crown className="h-4 w-4 mr-2" />
                   Upgrade to Business
                 </Button>
@@ -861,7 +914,7 @@ NoteX Team
             )}
             
             {currentPlan === 'pro' && (
-              <Button onClick={() => setUpgradePlanModal('business')} variant="outline">
+              <Button onClick={() => handleUpgradeClick('business')} variant="outline">
                 <Crown className="h-4 w-4 mr-2" />
                 Upgrade to Business
               </Button>
@@ -977,14 +1030,14 @@ NoteX Team
           usageData={usageData}
           planLimits={planLimits}
           currentPlan={currentPlan}
-          onUpgrade={(plan) => setUpgradePlanModal(plan)}
+          onUpgrade={(plan) => handleUpgradeClick(plan)}
         />
       )}
 
       {/* Plan Comparison */}
       <PlanComparison 
         currentPlan={currentPlan}
-        onUpgrade={(plan) => setUpgradePlanModal(plan)}
+        onUpgrade={(plan) => handleUpgradeClick(plan)}
       />
 
       {/* Transaction History */}
