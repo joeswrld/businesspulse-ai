@@ -111,7 +111,6 @@ SELECT
     'Free',
     'active'
 FROM users u
-WHERE u.plan = 'free' OR u.plan IS NULL
 ON CONFLICT (user_id) DO NOTHING;
 
 -- Update existing users to have trial_end if not set

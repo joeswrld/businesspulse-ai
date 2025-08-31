@@ -120,8 +120,6 @@ INSERT INTO billing_profiles (id, plan, trial_ends_at, subscription_status)
 SELECT 
   u.id,
   CASE 
-    WHEN u.plan = 'pro' THEN 'pro'
-    WHEN u.plan = 'business' THEN 'business'
     WHEN u.created_at > NOW() - INTERVAL '8 days' THEN 'trial'
     ELSE 'free'
   END,
@@ -130,7 +128,6 @@ SELECT
     ELSE NULL
   END,
   CASE 
-    WHEN u.subscription_status = 'active' THEN 'active'
     WHEN u.created_at > NOW() - INTERVAL '8 days' THEN 'trial'
     ELSE 'expired'
   END
