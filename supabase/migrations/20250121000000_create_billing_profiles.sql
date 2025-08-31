@@ -36,26 +36,42 @@ ALTER TABLE billing_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for billing_profiles
-CREATE POLICY "users can read own billing profile"
-  ON billing_profiles FOR SELECT
-  USING (auth.uid() = id);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'billing_profiles' AND policyname = 'users can read own billing profile') THEN
+    CREATE POLICY "users can read own billing profile"
+      ON billing_profiles FOR SELECT
+      USING (auth.uid() = id);
+  END IF;
 
-CREATE POLICY "users can update own billing profile"
-  ON billing_profiles FOR UPDATE
-  USING (auth.uid() = id);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'billing_profiles' AND policyname = 'users can update own billing profile') THEN
+    CREATE POLICY "users can update own billing profile"
+      ON billing_profiles FOR UPDATE
+      USING (auth.uid() = id);
+  END IF;
 
-CREATE POLICY "users can insert own billing profile"
-  ON billing_profiles FOR INSERT
-  WITH CHECK (auth.uid() = id);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'billing_profiles' AND policyname = 'users can insert own billing profile') THEN
+    CREATE POLICY "users can insert own billing profile"
+      ON billing_profiles FOR INSERT
+      WITH CHECK (auth.uid() = id);
+  END IF;
+END $$;
 
 -- RLS Policies for transactions
-CREATE POLICY "users can read own transactions"
-  ON transactions FOR SELECT
-  USING (auth.uid() = user_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'transactions' AND policyname = 'users can read own transactions') THEN
+    CREATE POLICY "users can read own transactions"
+      ON transactions FOR SELECT
+      USING (auth.uid() = user_id);
+  END IF;
 
-CREATE POLICY "users can insert own transactions"
-  ON transactions FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'transactions' AND policyname = 'users can insert own transactions') THEN
+    CREATE POLICY "users can insert own transactions"
+      ON transactions FOR INSERT
+      WITH CHECK (auth.uid() = user_id);
+  END IF;
+END $$;
 
 -- Function to create billing profile for new users
 CREATE OR REPLACE FUNCTION create_billing_profile()
