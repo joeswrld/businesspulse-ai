@@ -251,8 +251,11 @@ NoteX Team
   // Check if we have any billing data
   const hasBillingData = billingProfile || transactions.length > 0 || usageData;
   
-  // If no billing data and no error, show a helpful message
-  if (!hasBillingData && !loading && !error) {
+  // Check if user is in trial (either no billing data or explicitly trial status)
+  const isInTrial = !hasBillingData || (billingProfile?.plan === 'trial' && billingProfile?.subscription_status === 'trial');
+  
+  // If no billing data and no error, or if user is in trial, show onboarding
+  if (isInTrial && !loading && !error) {
     return (
       <div className="space-y-6">
         <div>
@@ -466,6 +469,60 @@ NoteX Team
           Manage your subscription and view usage statistics
         </p>
       </div>
+
+      {/* Fallback Upgrade Section for Trial Users (when billing data might not be loaded) */}
+      {(!billingProfile || billingProfile?.plan === 'trial') && !loading && (
+        <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
+              <Crown className="h-8 w-8 text-white" />
+            </div>
+            <CardTitle className="text-2xl text-blue-900">Welcome to NoteX! 🎉</CardTitle>
+            <CardDescription className="text-lg text-blue-700">
+              You're starting your journey with a free 8-day trial. Upgrade anytime to unlock unlimited features!
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+              <div className="text-center p-6 bg-white rounded-lg border border-blue-200 shadow-sm">
+                <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <Zap className="h-6 w-6 text-green-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2 text-green-800">Pro Plan</h3>
+                <p className="text-2xl font-bold text-green-700 mb-2">₦35,000/month</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Perfect for growing businesses
+                </p>
+                <Button 
+                  className="w-full bg-green-600 hover:bg-green-700" 
+                  onClick={() => setUpgradePlanModal('pro')}
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  Upgrade to Pro
+                </Button>
+              </div>
+              
+              <div className="text-center p-6 bg-white rounded-lg border border-amber-200 shadow-sm">
+                <div className="mx-auto w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+                  <Crown className="h-6 w-6 text-amber-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2 text-amber-800">Business Plan</h3>
+                <p className="text-2xl font-bold text-amber-700 mb-2">₦53,000/month</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  For enterprise teams
+                </p>
+                <Button 
+                  className="w-full bg-amber-600 hover:bg-amber-700" 
+                  onClick={() => setUpgradePlanModal('business')}
+                >
+                  <Crown className="h-4 w-4 mr-2" />
+                  Upgrade to Business
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Critical Alerts */}
       {isTrialExpired && (
@@ -817,6 +874,102 @@ NoteX Team
           </div>
         </CardContent>
       </Card>
+
+      {/* Upgrade Early Section for Trial Users */}
+      {currentPlan === 'trial' && !isTrialExpired && (
+        <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
+              <Crown className="h-8 w-8 text-white" />
+            </div>
+            <CardTitle className="text-2xl text-blue-900">Upgrade Early & Unlock Unlimited Features! 🚀</CardTitle>
+            <CardDescription className="text-lg text-blue-700">
+              Love what you see? Upgrade anytime during your trial to unlock unlimited features and never worry about limits again.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+              <div className="text-center p-6 bg-white rounded-lg border border-blue-200 shadow-sm">
+                <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <Zap className="h-6 w-6 text-green-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2 text-green-800">Pro Plan</h3>
+                <p className="text-2xl font-bold text-green-700 mb-2">₦35,000/month</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Perfect for growing businesses
+                </p>
+                <ul className="text-sm text-left space-y-2 mb-4">
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-green-600" />
+                    <span>300 feedback submissions (6x increase)</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-green-600" />
+                    <span>50 AI insights (10x increase)</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-green-600" />
+                    <span>100 analytics reports (20x increase)</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-green-600" />
+                    <span>PDF & Excel export</span>
+                  </li>
+                </ul>
+                <Button 
+                  className="w-full bg-green-600 hover:bg-green-700" 
+                  onClick={() => setUpgradePlanModal('pro')}
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  Upgrade to Pro
+                </Button>
+              </div>
+              
+              <div className="text-center p-6 bg-white rounded-lg border border-amber-200 shadow-sm">
+                <div className="mx-auto w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+                  <Crown className="h-6 w-6 text-amber-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2 text-amber-800">Business Plan</h3>
+                <p className="text-2xl font-bold text-amber-700 mb-2">₦53,000/month</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  For enterprise teams
+                </p>
+                <ul className="text-left space-y-2 mb-4">
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-amber-600" />
+                    <span>Unlimited usage across all features</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-amber-600" />
+                    <span>Priority phone support</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-amber-600" />
+                    <span>API access & custom integrations</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-amber-600" />
+                    <span>Predictive analytics</span>
+                  </li>
+                </ul>
+                <Button 
+                  className="w-full bg-amber-600 hover:bg-amber-700" 
+                  onClick={() => setUpgradePlanModal('business')}
+                >
+                  <Crown className="h-4 w-4 mr-2" />
+                  Upgrade to Business
+                </Button>
+              </div>
+            </div>
+            
+            <div className="text-center mt-6">
+              <p className="text-sm text-blue-600">
+                💡 <strong>Pro tip:</strong> Upgrade now and your billing cycle starts from today!
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Usage Tracking */}
       {usageData && (
