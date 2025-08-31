@@ -275,8 +275,8 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
       };
 
       // Validate configuration before sending to Paystack
-      if (!import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY === 'pk_test_...') {
-        throw new Error('Paystack public key not configured. Please check your environment variables.');
+      if (!import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY === 'pk_test_...' || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY.includes('your_actual_paystack')) {
+        throw new Error('Paystack public key not configured. Please add your actual Paystack key to the .env.local file. See PAYSTACK_KEY_FIX.md for instructions.');
       }
 
       if (!userEmail || userEmail === 'user@example.com') {
@@ -363,6 +363,25 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
               <XCircle className="h-4 w-4" />
               <AlertDescription>
                 {error}
+                
+                {/* Special handling for Paystack key configuration errors */}
+                {error.includes('Paystack public key not configured') && (
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <h4 className="font-semibold text-red-800 mb-2">🔑 Configuration Required</h4>
+                    <p className="text-sm text-red-700 mb-3">
+                      To fix this issue, you need to configure your Paystack public key:
+                    </p>
+                    <ol className="text-sm text-red-700 space-y-1 mb-3">
+                      <li>1. Get your Paystack key from <a href="https://dashboard.paystack.com/settings/developers" target="_blank" rel="noopener noreferrer" className="underline">Paystack Dashboard</a></li>
+                      <li>2. Update the <code className="bg-red-100 px-1 rounded">VITE_PAYSTACK_PUBLIC_KEY</code> in your <code className="bg-red-100 px-1 rounded">.env.local</code> file</li>
+                      <li>3. Restart your development server</li>
+                    </ol>
+                    <div className="text-xs text-red-600">
+                      <strong>Current key:</strong> {import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'Not set'}
+                    </div>
+                  </div>
+                )}
+                
                 <div className="mt-2 space-y-2">
                   {/* Network Status */}
                   <div className="flex items-center gap-2 text-sm">
@@ -411,6 +430,7 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
                     <p>Debug: paystackReady = {paystackReady.toString()}</p>
                     <p>Debug: window.PaystackPop = {window.PaystackPop ? 'exists' : 'missing'}</p>
                     <p>Debug: setup function = {window.PaystackPop?.setup ? 'exists' : 'missing'}</p>
+                    <p>Debug: Paystack Key = {import.meta.env.VITE_PAYSTACK_PUBLIC_KEY ? 'Set' : 'Not set'}</p>
                   </div>
                 )}
               </AlertDescription>
