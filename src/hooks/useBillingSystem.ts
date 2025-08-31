@@ -195,7 +195,22 @@ export function useBillingSystem(): BillingSystemState {
         profileData = {
           id: user.id,
           plan: 'trial',
-          trial_ends_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+          trial_ends_at: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
+          next_billing_date: null,
+          subscription_status: 'trial',
+          paystack_customer_id: null,
+          paystack_subscription_id: null,
+          created_at: new Date().toISOString()
+        };
+      }
+
+      // Ensure we always have a profile for new users
+      if (!profileData) {
+        console.log('No billing profile found, creating default trial profile');
+        profileData = {
+          id: user.id,
+          plan: 'trial',
+          trial_ends_at: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
           next_billing_date: null,
           subscription_status: 'trial',
           paystack_customer_id: null,
@@ -241,6 +256,9 @@ export function useBillingSystem(): BillingSystemState {
             reports_count: 0,
             insights_count: 0,
             teams_count: 0,
+            detailed_reports_count: 0,
+            team_members_count: 0,
+            export_count: 0,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
@@ -257,6 +275,28 @@ export function useBillingSystem(): BillingSystemState {
           reports_count: 0,
           insights_count: 0,
           teams_count: 0,
+          detailed_reports_count: 0,
+          team_members_count: 0,
+          export_count: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      }
+
+      // Ensure we always have usage data for new users
+      if (!usageData) {
+        console.log('No usage data found, creating default usage data');
+        usageData = {
+          id: user.id,
+          user_id: user.id,
+          feedback_count: 0,
+          analytics_count: 0,
+          reports_count: 0,
+          insights_count: 0,
+          teams_count: 0,
+          detailed_reports_count: 0,
+          team_members_count: 0,
+          export_count: 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -265,6 +305,14 @@ export function useBillingSystem(): BillingSystemState {
       setBillingProfile(profileData);
       setTransactions(transactionsData || []);
       setUsageData(usageData);
+
+      // Debug logging
+      console.log('Billing data loaded:', {
+        profile: profileData,
+        transactions: transactionsData?.length || 0,
+        usage: usageData,
+        hasBillingData: !!(profileData || (transactionsData && transactionsData.length > 0) || usageData)
+      });
 
     } catch (err) {
       console.warn('Error loading billing data:', err);
