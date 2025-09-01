@@ -122,7 +122,7 @@ const Profile: React.FC = () => {
       }
 
       if (subscriptionData) {
-        setSubscription(subscriptionData);
+        setSubscription(subscriptionData as any);
       }
 
       // Fetch activity stats

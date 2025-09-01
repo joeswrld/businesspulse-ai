@@ -134,7 +134,7 @@ const InsightsSimplePage: React.FC = () => {
         return;
       }
 
-      setFeedbacks(feedbacksData || []);
+      setFeedbacks((feedbacksData || []) as any);
     } catch (error) {
       console.error('Error in loadFeedbacks:', error);
       setError('Failed to load feedbacks');
