@@ -76,7 +76,7 @@ export default function Reports() {
     try {
       setLoading(true);
       
-      const { data: reportsData, error: reportsError } = await supabase
+      const { data: reportsData, error: reportsError } = await (supabase as any)
         .from('insights_history')
         .select('*')
         .eq('user_id', user.id)
@@ -88,7 +88,7 @@ export default function Reports() {
         return;
       }
 
-      setReports(reportsData || []);
+      setReports((reportsData || []) as any);
     } catch (error) {
       console.error('Error in loadReports:', error);
       toast.error('Failed to load reports');

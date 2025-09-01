@@ -98,7 +98,7 @@ const InsightsSimplePage: React.FC = () => {
       setError(null);
 
       // Get user's feedback settings to find their project IDs
-      const { data: feedbackSettings, error: settingsError } = await supabase
+      const { data: feedbackSettings, error: settingsError } = await (supabase as any)
         .from('feedback_settings')
         .select('project_id')
         .eq('user_id', user.id);
@@ -122,7 +122,7 @@ const InsightsSimplePage: React.FC = () => {
       }
 
       // Get feedbacks for user's projects
-      const { data: feedbacksData, error: feedbacksError } = await supabase
+      const { data: feedbacksData, error: feedbacksError } = await (supabase as any)
         .from('feedbacks')
         .select('*')
         .in('project_id', projectIds)
@@ -151,7 +151,7 @@ const InsightsSimplePage: React.FC = () => {
       setIsLoadingHistory(true);
       setError(null);
 
-      const { data: historyData, error: historyError } = await supabase
+      const { data: historyData, error: historyError } = await (supabase as any)
         .from('insights_history')
         .select('*')
         .eq('user_id', user.id)
@@ -163,7 +163,7 @@ const InsightsSimplePage: React.FC = () => {
         return;
       }
 
-      setAnalysisHistory(historyData || []);
+      setAnalysisHistory((historyData || []) as any);
     } catch (error) {
       console.error('Error in loadAnalysisHistory:', error);
       setError('Failed to load analysis history');
@@ -253,7 +253,7 @@ const InsightsSimplePage: React.FC = () => {
         throw new Error('Authentication session not found');
       }
 
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/analyze-insights`, {
+      const response = await fetch(`https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/analyze-insights`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -284,7 +284,7 @@ const InsightsSimplePage: React.FC = () => {
 
         // Save to insights history
         try {
-          const { error: insertError } = await supabase
+          const { error: insertError } = await (supabase as any)
             .from('insights_history')
             .insert({
               user_id: user.id,

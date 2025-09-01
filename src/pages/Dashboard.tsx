@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { checkAndSetupDatabase } from '@/utils/databaseCheck';
+// import { checkAndSetupDatabase } from '@/utils/databaseCheck';
 import { 
   BarChart3, 
   Users, 
