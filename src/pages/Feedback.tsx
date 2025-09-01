@@ -80,7 +80,7 @@ const Feedback = () => {
       setLoading(true);
       
       // Get user's project ID
-      const { data: projectSettings, error: projectError } = await supabase
+      const { data: projectSettings, error: projectError } = await (supabase as any)
         .from('feedback_settings')
         .select('project_id')
         .eq('user_id', user.id)
@@ -99,7 +99,7 @@ const Feedback = () => {
         return;
       }
 
-      const projectId = projectSettings[0].project_id;
+      const projectId = (projectSettings as any)?.[0]?.project_id;
       if (!projectId || projectId.trim() === '') {
         setProjectId(null);
         setLoading(false);
@@ -109,7 +109,7 @@ const Feedback = () => {
       setProjectId(projectId);
 
       // Load feedbacks for the project
-      const { data: feedbacksData, error: feedbacksError } = await supabase
+      const { data: feedbacksData, error: feedbacksError } = await (supabase as any)
         .from('feedbacks')
         .select('*')
         .eq('project_id', projectId)
@@ -123,21 +123,21 @@ const Feedback = () => {
 
       // Load tags for each feedback
       const feedbacksWithTags = await Promise.all(
-        (feedbacksData || []).map(async (feedback) => {
-          const { data: tagsData } = await supabase
+        (feedbacksData || []).map(async (feedback: any) => {
+          const { data: tagsData } = await (supabase as any)
             .from('feedback_tags')
             .select('tag')
             .eq('feedback_id', feedback.id);
           
           return {
             ...feedback,
-            tags: tagsData?.map(t => t.tag) || [],
+            tags: (tagsData as any)?.map((t: any) => t.tag) || [],
             sentiment: analyzeSentiment(feedback.message)
           };
         })
       );
 
-      setFeedbacks(feedbacksWithTags);
+      setFeedbacks(feedbacksWithTags as any);
       setLoading(false);
 
     } catch (error) {
@@ -256,7 +256,7 @@ const Feedback = () => {
     setUpdating(feedbackId);
     
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('feedbacks')
         .update({ status: newStatus })
         .eq('id', feedbackId);
@@ -284,7 +284,7 @@ const Feedback = () => {
 
     try {
       // Insert tag into feedback_tags table
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('feedback_tags')
         .insert({
           feedback_id: feedbackId,
@@ -314,7 +314,7 @@ const Feedback = () => {
   // Remove tag from feedback
   const removeTagFromFeedback = async (feedbackId: string, tagToRemove: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('feedback_tags')
         .delete()
         .eq('feedback_id', feedbackId)

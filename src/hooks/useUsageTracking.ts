@@ -88,8 +88,8 @@ export function useUsageTracking(): UseUsageTrackingReturn {
     setLoading(true);
 
     try {
-      // Get the Supabase URL from the client
-      const supabaseUrl = supabase.supabaseUrl;
+      // Get the Supabase URL from the client  
+      const supabaseUrl = (supabase as any).supabaseUrl;
       
       // Make the API call to the usage tracking function
       const response = await fetch(`${supabaseUrl}/functions/v1/usage`, {

@@ -36,8 +36,8 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
     const dashboardLoad = performance.now() - startTime;
 
     // Estimate bundle size (this would be more accurate in production)
-    const bundleSize = performance.memory ? 
-      Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) : 
+    const bundleSize = (performance as any).memory ? 
+      Math.round((performance as any).memory.usedJSHeapSize / 1024 / 1024) : 
       Math.round(Math.random() * 50 + 100);
 
     // Estimate network latency

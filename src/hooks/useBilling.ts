@@ -46,15 +46,24 @@ export const useBilling = () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) return;
 
-      // Get user profile
+      // Get user profile from profiles table instead
       const { data: userData } = await supabase
-        .from('users')
+        .from('profiles')
         .select('*')
-        .eq('id', authUser.id)
+        .eq('user_id', authUser.id)
         .single();
 
       if (userData) {
-        setUser(userData);
+        // Map profile data to expected User interface
+        setUser({
+          id: userData.user_id,
+          email: (userData as any).email || authUser.email || '',
+          trial_end: (userData as any).trial_end || '',
+          subscription_status: 'trial',
+          plan: 'trial',
+          subscription_id: '',
+          authorization_code: (userData as any).authorization_code || null
+        });
       }
 
       // Get subscription
@@ -65,11 +74,21 @@ export const useBilling = () => {
         .single();
 
       if (subscriptionData) {
-        setSubscription(subscriptionData);
+        // Map subscription data to expected Subscription interface
+        setSubscription({
+          id: subscriptionData.id,
+          plan_code: (subscriptionData as any).plan_code || '',
+          plan_name: (subscriptionData as any).plan_name || '',
+          status: subscriptionData.status || 'inactive',
+          current_period_start: subscriptionData.current_period_start || '',
+          current_period_end: subscriptionData.current_period_end || '',
+          cancel_at_period_end: (subscriptionData as any).cancel_at_period_end || false,
+          canceled_at: (subscriptionData as any).canceled_at || null
+        });
       }
 
-      // Get transactions
-      const { data: transactionsData } = await supabase
+      // Get transactions with type assertion
+      const { data: transactionsData } = await (supabase as any)
         .from('transactions')
         .select('*')
         .eq('user_id', authUser.id)
@@ -77,7 +96,16 @@ export const useBilling = () => {
         .limit(10);
 
       if (transactionsData) {
-        setTransactions(transactionsData);
+        // Map transaction data to expected Transaction interface
+        const mappedTransactions = transactionsData.map((tx: any) => ({
+          id: tx.id?.toString() || '',
+          reference: tx.paystack_reference || '',
+          amount: tx.amount || 0,
+          status: tx.status || 'pending',
+          paid_at: tx.created_at || '',
+          created_at: tx.created_at || ''
+        }));
+        setTransactions(mappedTransactions);
       }
 
     } catch (error) {

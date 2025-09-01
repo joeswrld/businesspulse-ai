@@ -129,13 +129,13 @@ export default function Dashboard() {
       
       // Try optimized single query first
       try {
-        const { data, error } = await supabase.rpc('get_dashboard_data', {
+        const { data, error } = await (supabase as any).rpc('get_dashboard_data', {
           user_id_param: user.id,
           limit_param: 50
         });
 
-        if (!error && data && data.length > 0) {
-          const result = data[0];
+        if (!error && data && (data as any).length > 0) {
+          const result = (data as any)[0];
           
           // Parse feedbacks
           const feedbacksData = result.feedbacks ? JSON.parse(result.feedbacks) : [];
@@ -162,7 +162,7 @@ export default function Dashboard() {
       console.log('Loading data using individual queries...');
       
       // Get user's project IDs
-      const { data: projectSettings, error: settingsError } = await supabase
+      const { data: projectSettings, error: settingsError } = await (supabase as any)
         .from('feedback_settings')
         .select('project_id')
         .eq('user_id', user.id)
@@ -180,7 +180,7 @@ export default function Dashboard() {
       // Get feedbacks for user's projects
       let feedbacksData: Feedback[] = [];
       if (projectIds.length > 0) {
-        const { data: feedbacks, error: feedbacksError } = await supabase
+        const { data: feedbacks, error: feedbacksError } = await (supabase as any)
           .from('feedbacks')
           .select('*')
           .in('project_id', projectIds)
@@ -192,7 +192,7 @@ export default function Dashboard() {
           throw new Error('Failed to load feedbacks');
         }
 
-        feedbacksData = feedbacks || [];
+        feedbacksData = (feedbacks || []) as any;
         console.log('Feedbacks loaded via individual query:', feedbacksData.length);
       }
 
@@ -212,7 +212,7 @@ export default function Dashboard() {
       
       // Set the data
       setFeedbacks(feedbacksData);
-      setSubscription(subscriptionData);
+      setSubscription(subscriptionData as any);
 
       console.log('Dashboard data loaded successfully via individual queries');
 
