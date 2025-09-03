@@ -365,3 +365,137 @@ export function getFeaturesNeedingUpgrade(checks: Record<FeatureType, UsageCheck
     .filter(([_, check]) => !check.canUse)
     .map(([feature, _]) => feature as FeatureType);
 }
+
+// ============================================================================
+// NEW USAGE ENFORCEMENT SYSTEM USING usage_counters TABLE
+// ============================================================================
+
+/**
+ * Check if user can use a specific feature using the new usage_counters system
+ */
+export async function checkUsageWithCounters(
+  userId: string,
+  feature: FeatureType
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('check_and_consume_usage', {
+      p_user_id: userId,
+      p_kind: feature
+    });
+
+    if (error) {
+      console.error('Error checking usage with counters:', error);
+      return false;
+    }
+
+    return data as boolean;
+  } catch (error) {
+    console.error('Error in checkUsageWithCounters:', error);
+    return false;
+  }
+}
+
+/**
+ * Get usage summary using the new usage_counters system
+ */
+export async function getUsageSummaryWithCounters(
+  userId: string
+): Promise<any> {
+  try {
+    const { data, error } = await supabase.rpc('get_user_usage_summary', {
+      p_user_id: userId
+    });
+
+    if (error) {
+      console.error('Error getting usage summary with counters:', error);
+      return null;
+    }
+
+    return data && data.length > 0 ? data[0] : null;
+  } catch (error) {
+    console.error('Error in getUsageSummaryWithCounters:', error);
+    return null;
+  }
+}
+
+/**
+ * Refresh usage counters for a user
+ */
+export async function refreshUsageCounters(userId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.rpc('refresh_usage_for_user', {
+      p_user_id: userId
+    });
+
+    if (error) {
+      console.error('Error refreshing usage counters:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in refreshUsageCounters:', error);
+    return false;
+  }
+}
+
+/**
+ * Enforce usage limit using the new counters system
+ */
+export async function enforceUsageLimitWithCounters(
+  userId: string,
+  feature: FeatureType,
+  onLimitReached?: () => void
+): Promise<boolean> {
+  try {
+    const canUse = await checkUsageWithCounters(userId, feature);
+    
+    if (!canUse) {
+      // Get usage summary to show detailed info
+      const summary = await getUsageSummaryWithCounters(userId);
+      
+      if (summary) {
+        const featureCount = summary[`${feature}_count`];
+        const featureLimit = summary[`${feature}_limit`];
+        const featureName = feature.charAt(0).toUpperCase() + feature.slice(1);
+        
+        if (featureLimit === -1) {
+          toast.error('Limit Reached', {
+            description: `You have reached your ${featureName} limit (${featureCount}). Contact support for assistance.`
+          });
+        } else {
+          toast.error('Limit Reached', {
+            description: `You have reached your ${featureName} limit (${featureCount}/${featureLimit}). Upgrade your plan for higher limits.`,
+            action: {
+              label: 'Upgrade Now',
+              onClick: () => {
+                window.location.href = '/billing';
+              }
+            }
+          });
+        }
+      } else {
+        toast.error('Limit Reached', {
+          description: `You have reached your ${feature} limit. Upgrade your plan for higher limits.`,
+          action: {
+            label: 'Upgrade Now',
+            onClick: () => {
+              window.location.href = '/billing';
+            }
+          }
+        });
+      }
+      
+      onLimitReached?.();
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in enforceUsageLimitWithCounters:', error);
+    toast.error('Error', {
+      description: 'Unable to check usage limits. Please try again.'
+    });
+    return false;
+  }
+}

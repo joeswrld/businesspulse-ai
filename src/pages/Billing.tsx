@@ -48,6 +48,7 @@ import {
 } from 'lucide-react';
 import PaystackPayment from '@/components/PaystackPayment';
 import UsageTracker from '@/components/billing/UsageTracker';
+import UsageOverview from '@/components/billing/UsageOverview';
 import PlanComparison from '@/components/billing/PlanComparison';
 
 type UpgradePlan = 'pro' | 'business' | null;
@@ -898,6 +899,12 @@ NoteX Team
           onUpgrade={(plan) => handleUpgradeClick(plan)}
         />
       )}
+
+      {/* New Usage Overview - Real-time counters from source tables */}
+      <UsageOverview 
+        userId={user?.id || ''}
+        onUpgrade={(plan) => handleUpgradeClick(plan)}
+      />
 
       {/* Plan Comparison */}
       <PlanComparison 
