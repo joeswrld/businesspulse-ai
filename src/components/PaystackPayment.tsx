@@ -188,8 +188,26 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
     try {
       console.log('Processing successful payment:', response);
       
-      // Use simple success handling for now
-      const result = { success: true };
+      // Create subscription via Paystack API
+      const subscriptionResponse = await fetch('/api/create-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          plan_code: currentPlanDetails.planCode,
+          email: user?.email,
+          reference: response.reference,
+          amount: amount
+        }),
+      });
+
+      if (!subscriptionResponse.ok) {
+        const error = await subscriptionResponse.json();
+        throw new Error(error.message || 'Failed to create subscription');
+      }
+
+      const result = await subscriptionResponse.json();
 
       if (result.success) {
         toast.success(`🎉 Welcome to ${planName}! Your subscription has been activated.`);

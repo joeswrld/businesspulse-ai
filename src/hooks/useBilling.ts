@@ -46,7 +46,7 @@ export const useBilling = () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) return;
 
-      // Get user profile from profiles table instead
+      // Get user profile from profiles table
       const { data: userData } = await supabase
         .from('profiles')
         .select('*')
@@ -66,10 +66,13 @@ export const useBilling = () => {
         });
       }
 
-      // Get subscription
+      // Get subscription from new billing system
       const { data: subscriptionData } = await supabase
         .from('user_subscriptions')
-        .select('*')
+        .select(`
+          *,
+          plans!inner(name, tier)
+        `)
         .eq('user_id', authUser.id)
         .single();
 
@@ -77,18 +80,18 @@ export const useBilling = () => {
         // Map subscription data to expected Subscription interface
         setSubscription({
           id: subscriptionData.id,
-          plan_code: (subscriptionData as any).plan_code || '',
-          plan_name: (subscriptionData as any).plan_name || '',
+          plan_code: subscriptionData.plan_code || '',
+          plan_name: (subscriptionData as any).plans?.name || '',
           status: subscriptionData.status || 'inactive',
           current_period_start: subscriptionData.current_period_start || '',
           current_period_end: subscriptionData.current_period_end || '',
-          cancel_at_period_end: (subscriptionData as any).cancel_at_period_end || false,
+          cancel_at_period_end: subscriptionData.cancel_at_period_end || false,
           canceled_at: (subscriptionData as any).canceled_at || null
         });
       }
 
-      // Get transactions with type assertion
-      const { data: transactionsData } = await (supabase as any)
+      // Get transactions from new billing system
+      const { data: transactionsData } = await supabase
         .from('transactions')
         .select('*')
         .eq('user_id', authUser.id)
@@ -99,8 +102,8 @@ export const useBilling = () => {
         // Map transaction data to expected Transaction interface
         const mappedTransactions = transactionsData.map((tx: any) => ({
           id: tx.id?.toString() || '',
-          reference: tx.paystack_reference || '',
-          amount: tx.amount || 0,
+          reference: tx.reference || '',
+          amount: tx.amount_kobo ? tx.amount_kobo / 100 : 0, // Convert from kobo to naira
           status: tx.status || 'pending',
           paid_at: tx.created_at || '',
           created_at: tx.created_at || ''
@@ -183,19 +186,22 @@ export const useBilling = () => {
     // Check if user has active subscription
     if (subscription?.status === 'active') return true;
     
-    // Check if user is still in trial period
-    if (user.trial_end && new Date(user.trial_end) > new Date()) return true;
+    // Check if user is still in trial period (8 days from signup)
+    if (subscription?.status === 'trialing' && subscription?.current_period_end) {
+      return new Date(subscription.current_period_end) > new Date();
+    }
     
     return false;
   };
 
   const isTrialActive = () => {
-    return user?.trial_end && new Date(user.trial_end) > new Date();
+    return subscription?.status === 'trialing' && subscription?.current_period_end && 
+           new Date(subscription.current_period_end) > new Date();
   };
 
   const getTrialDaysRemaining = () => {
-    if (!user?.trial_end) return 0;
-    const trialEnd = new Date(user.trial_end);
+    if (!subscription?.current_period_end) return 0;
+    const trialEnd = new Date(subscription.current_period_end);
     const now = new Date();
     const diffTime = trialEnd.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));

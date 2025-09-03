@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Plan limits configuration
+// Plan limits configuration - matches the real-world billing flow
 const PLAN_LIMITS = {
   free: {
     feedback: 50,
@@ -157,10 +157,10 @@ serve(async (req) => {
 
     console.log(`[${new Date().toISOString()}] Processing usage increment for user ${user.id}, action: ${requestBody.action}`)
 
-    // Get current usage and subscription data
+    // Get current usage and subscription data from new billing system
     const [usageResult, subscriptionResult] = await Promise.all([
       supabase
-        .from('usage_tracking')
+        .from('usage_counters')
         .select('*')
         .eq('user_id', user.id)
         .single(),
@@ -206,11 +206,12 @@ serve(async (req) => {
       )
     }
 
-    // Increment usage
+    // Increment usage using the new billing system
     const { data: usageData, error: dbError } = await supabase
-      .rpc('increment_usage', {
+      .rpc('try_consume_usage', {
         p_user_id: user.id,
-        p_action: requestBody.action
+        p_kind: requestBody.action,
+        p_amount: 1
       })
 
     if (dbError) {
