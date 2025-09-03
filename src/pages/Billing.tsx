@@ -38,13 +38,87 @@ import {
   Check,
   X,
   Infinity,
-  Play
+  Play,
+  CreditCard,
+  CalendarDays,
+  Timer,
+  Sparkles,
+  Target,
+  Activity
 } from 'lucide-react';
 import PaystackPayment from '@/components/PaystackPayment';
 import UsageTracker from '@/components/billing/UsageTracker';
 import PlanComparison from '@/components/billing/PlanComparison';
 
 type UpgradePlan = 'pro' | 'business' | null;
+
+// Helper function to calculate subscription end date
+const calculateSubscriptionEndDate = (billingProfile: any, currentPlan: string) => {
+  if (currentPlan === 'trial' && billingProfile?.trial_ends_at) {
+    return new Date(billingProfile.trial_ends_at);
+  }
+  
+  if (billingProfile?.next_billing_date) {
+    return new Date(billingProfile.next_billing_date);
+  }
+  
+  return null;
+};
+
+// Helper function to get subscription status color and icon
+const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, isTrialExpired: boolean, isPaymentPastDue: boolean, isInGracePeriod: boolean) => {
+  if (currentPlan === 'trial') {
+    if (isTrialExpired) {
+      return {
+        color: 'bg-red-100 text-red-800 border-red-300',
+        icon: <XCircle className="h-4 w-4" />,
+        label: 'Trial Expired',
+        description: 'Your free trial has ended'
+      };
+    } else {
+      return {
+        color: 'bg-blue-100 text-blue-800 border-blue-300',
+        icon: <Clock className="h-4 w-4" />,
+        label: 'Free Trial',
+        description: 'Enjoying your free trial'
+      };
+    }
+  }
+  
+  if (isPaymentPastDue) {
+    if (isInGracePeriod) {
+      return {
+        color: 'bg-orange-100 text-orange-800 border-orange-300',
+        icon: <AlertTriangle className="h-4 w-4" />,
+        label: 'Payment Due',
+        description: 'Payment failed - grace period active'
+      };
+    } else {
+      return {
+        color: 'bg-red-100 text-red-800 border-red-300',
+        icon: <XCircle className="h-4 w-4" />,
+        label: 'Payment Failed',
+        description: 'Account suspended due to failed payment'
+      };
+    }
+  }
+  
+  if (billingProfile?.subscription_status === 'active') {
+    return {
+      color: 'bg-green-100 text-green-800 border-green-300',
+      icon: <CheckCircle className="h-4 w-4" />,
+      label: 'Active',
+      description: 'Subscription is active and up to date'
+    };
+  }
+  
+  return {
+    color: 'bg-gray-100 text-gray-800 border-gray-300',
+    icon: <Clock className="h-4 w-4" />,
+    label: 'Inactive',
+    description: 'No active subscription'
+  };
+};
 
 const BillingPage: React.FC = () => {
   const { user } = useAuth();
@@ -264,15 +338,27 @@ NoteX Team
 
 
 
+  // Calculate subscription end date
+  const subscriptionEndDate = calculateSubscriptionEndDate(billingProfile, currentPlan);
+  const statusDisplay = getSubscriptionStatusDisplay(billingProfile, currentPlan, isTrialExpired, isPaymentPastDue, isInGracePeriod);
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Billing & Usage</h1>
-        <p className="text-muted-foreground">
-          Manage your subscription and view usage statistics
-        </p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <CreditCard className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Billing & Subscription</h1>
+              <p className="text-gray-600 mt-1">
+                Manage your subscription, track usage, and view billing history
+              </p>
+            </div>
+          </div>
+        </div>
 
       {/* Paystack Configuration Error Alert */}
       {showConfigError && (
@@ -351,318 +437,453 @@ NoteX Team
         </Alert>
       )}
 
-      {/* Current Plan Overview */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Crown className="h-5 w-5" />
-                Current Plan
-              </CardTitle>
-              <CardDescription>
-                Your current subscription and billing status
-              </CardDescription>
+        {/* Current Plan Overview */}
+        <Card className="mb-8 shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl">
+                  <Crown className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-bold text-gray-900">
+                    {getPlanDisplayName(currentPlan)}
+                  </CardTitle>
+                  <CardDescription className="text-gray-600">
+                    {statusDisplay.description}
+                  </CardDescription>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge className={`${statusDisplay.color} px-3 py-1 text-sm font-medium`}>
+                  <div className="flex items-center gap-2">
+                    {statusDisplay.icon}
+                    {statusDisplay.label}
+                  </div>
+                </Badge>
+                {refreshing && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge className={getCurrentPlanDisplay().color}>
-                {getCurrentPlanDisplay().label}
-              </Badge>
-              {refreshing && <Loader2 className="h-4 w-4 animate-spin" />}
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {/* Plan Price */}
+              <div className="text-center p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                <div className="flex items-center justify-center mb-2">
+                  <DollarSign className="h-5 w-5 text-gray-600" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900 mb-1">
+                  {planPricing.price === 0 ? 'Free' : formatCurrency(planPricing.price, planPricing.currency)}
+                </div>
+                <div className="text-sm text-gray-600">per {planPricing.period}</div>
+              </div>
+              
+              {/* Trial Days or Next Billing */}
+              {currentPlan === 'trial' && !isTrialExpired && (
+                <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
+                  <div className="flex items-center justify-center mb-2">
+                    <Timer className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-blue-900 mb-1">{trialDaysLeft}</div>
+                  <div className="text-sm text-blue-600">trial days left</div>
+                </div>
+              )}
+              
+              {subscriptionEndDate && currentPlan !== 'trial' && (
+                <div className="text-center p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200">
+                  <div className="flex items-center justify-center mb-2">
+                    <CalendarDays className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div className="text-lg font-bold text-green-900 mb-1">
+                    {subscriptionEndDate.toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </div>
+                  <div className="text-sm text-green-600">
+                    {isPaymentPastDue ? 'Payment Due' : 'Next Billing'}
+                  </div>
+                </div>
+              )}
+
+              {/* Grace Period */}
+              {isPaymentPastDue && isInGracePeriod && (
+                <div className="text-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200">
+                  <div className="flex items-center justify-center mb-2">
+                    <AlertTriangle className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-orange-900 mb-1">{gracePeriodDaysLeft}</div>
+                  <div className="text-sm text-orange-600">grace period days</div>
+                </div>
+              )}
+
+              {/* Plan Status */}
+              <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200">
+                <div className="flex items-center justify-center mb-2">
+                  <Activity className="h-5 w-5 text-purple-600" />
+                </div>
+                <div className="text-lg font-bold text-purple-900 mb-1 capitalize">
+                  {billingProfile?.subscription_status || 'trial'}
+                </div>
+                <div className="text-sm text-purple-600">subscription status</div>
+              </div>
+            </div>
+
+            {/* Plan Features */}
+            <div className="mt-8">
+              <div className="flex items-center gap-2 mb-6">
+                <Sparkles className="h-5 w-5 text-blue-600" />
+                <h4 className="text-lg font-semibold text-gray-900">Plan Features</h4>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="p-4 bg-white/60 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Download className="h-4 w-4 text-green-600" />
+                    <span className="font-medium text-gray-900">Export Formats</span>
+                  </div>
+                  <p className="text-sm text-gray-600">{planLimits.export.join(', ')}</p>
+                </div>
+                <div className="p-4 bg-white/60 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-3 mb-2">
+                    <MessageSquare className="h-4 w-4 text-blue-600" />
+                    <span className="font-medium text-gray-900">Support</span>
+                  </div>
+                  <p className="text-sm text-gray-600">{planLimits.support.join(', ')}</p>
+                </div>
+                <div className="p-4 bg-white/60 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Shield className="h-4 w-4 text-purple-600" />
+                    <span className="font-medium text-gray-900">Data Retention</span>
+                  </div>
+                  <p className="text-sm text-gray-600">{planLimits.retention}</p>
+                </div>
+                <div className="p-4 bg-white/60 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Users className="h-4 w-4 text-orange-600" />
+                    <span className="font-medium text-gray-900">Team Members</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {planLimits.teams === -1 ? 'Unlimited' : planLimits.teams}
+                  </p>
+                </div>
+                <div className="p-4 bg-white/60 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Star className="h-4 w-4 text-yellow-600" />
+                    <span className="font-medium text-gray-900">Priority Support</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {currentPlan === 'business' ? 'Yes' : 'No'}
+                  </p>
+                </div>
+                <div className="p-4 bg-white/60 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Target className="h-4 w-4 text-red-600" />
+                    <span className="font-medium text-gray-900">API Access</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {currentPlan === 'business' ? 'Yes' : 'No'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Usage Overview */}
+            <div className="mt-8">
+              <div className="flex items-center gap-2 mb-6">
+                <BarChart3 className="h-5 w-5 text-blue-600" />
+                <h4 className="text-lg font-semibold text-gray-900">Usage Overview</h4>
+              </div>
+              <p className="text-sm text-gray-600 mb-6">
+                Track your current usage against your {getPlanDisplayName(currentPlan)} limits
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Feedback Collection */}
+                <div className="p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-green-200 rounded-lg">
+                      <MessageSquare className="h-5 w-5 text-green-700" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-green-900">Feedback Collection</h5>
+                      <span className="text-xs text-green-700 bg-green-200 px-2 py-1 rounded-full font-medium">
+                        {currentPlan === 'business' ? 'Unlimited' : 'Limited'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-green-700 font-medium">Current Usage</span>
+                      <span className="text-sm font-bold text-green-900">
+                        {usageData?.feedback_count || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-green-700 font-medium">Plan Limit</span>
+                      <span className="text-sm font-bold text-green-900">
+                        {currentPlan === 'trial' ? '50' : 
+                         currentPlan === 'pro' ? '300' : '∞'}
+                      </span>
+                    </div>
+                    {currentPlan !== 'business' && (
+                      <div className="space-y-2">
+                        <Progress 
+                          value={Math.min(100, ((usageData?.feedback_count || 0) / (currentPlan === 'trial' ? 50 : 300)) * 100)} 
+                          className="h-3 bg-green-200"
+                        />
+                        <div className="text-xs text-green-600 text-center">
+                          {Math.round(((usageData?.feedback_count || 0) / (currentPlan === 'trial' ? 50 : 300)) * 100)}% used
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* AI Insights */}
+                <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-blue-200 rounded-lg">
+                      <Brain className="h-5 w-5 text-blue-700" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-blue-900">AI Insights</h5>
+                      <span className="text-xs text-blue-700 bg-blue-200 px-2 py-1 rounded-full font-medium">
+                        {currentPlan === 'business' ? 'Unlimited' : 'Limited'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-blue-700 font-medium">Current Usage</span>
+                      <span className="text-sm font-bold text-blue-900">
+                        {usageData?.insights_count || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-blue-700 font-medium">Plan Limit</span>
+                      <span className="text-sm font-bold text-blue-900">
+                        {currentPlan === 'trial' ? '5' : 
+                         currentPlan === 'pro' ? '50' : '∞'}
+                      </span>
+                    </div>
+                    {currentPlan !== 'business' && (
+                      <div className="space-y-2">
+                        <Progress 
+                          value={Math.min(100, ((usageData?.insights_count || 0) / (currentPlan === 'trial' ? 5 : 50)) * 100)} 
+                          className="h-3 bg-blue-200"
+                        />
+                        <div className="text-xs text-blue-600 text-center">
+                          {Math.round(((usageData?.insights_count || 0) / (currentPlan === 'trial' ? 5 : 50)) * 100)}% used
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Analytics Reports */}
+                <div className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-purple-200 rounded-lg">
+                      <BarChart3 className="h-5 w-5 text-purple-700" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-purple-900">Analytics Reports</h5>
+                      <span className="text-xs text-purple-700 bg-purple-200 px-2 py-1 rounded-full font-medium">
+                        {currentPlan === 'business' ? 'Unlimited' : 'Limited'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-purple-700 font-medium">Current Usage</span>
+                      <span className="text-sm font-bold text-purple-900">
+                        {usageData?.reports_count || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-purple-700 font-medium">Plan Limit</span>
+                      <span className="text-sm font-bold text-purple-900">
+                        {currentPlan === 'trial' ? '2' : 
+                         currentPlan === 'pro' ? '20' : '∞'}
+                      </span>
+                    </div>
+                    {currentPlan !== 'business' && (
+                      <div className="space-y-2">
+                        <Progress 
+                          value={Math.min(100, ((usageData?.reports_count || 0) / (currentPlan === 'trial' ? 2 : 20)) * 100)} 
+                          className="h-3 bg-purple-200"
+                        />
+                        <div className="text-xs text-purple-600 text-center">
+                          {Math.round(((usageData?.reports_count || 0) / (currentPlan === 'trial' ? 2 : 20)) * 100)}% used
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Detailed Reports */}
+                <div className="p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-orange-200 rounded-lg">
+                      <FileText className="h-5 w-5 text-orange-700" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-orange-900">Detailed Reports</h5>
+                      <span className="text-xs text-orange-700 bg-orange-200 px-2 py-1 rounded-full font-medium">
+                        {currentPlan === 'business' ? 'Unlimited' : 'Limited'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-orange-700 font-medium">Current Usage</span>
+                      <span className="text-sm font-bold text-orange-900">
+                        {usageData?.detailed_reports_count || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-orange-700 font-medium">Plan Limit</span>
+                      <span className="text-sm font-bold text-orange-900">
+                        {currentPlan === 'trial' ? '1' : 
+                         currentPlan === 'pro' ? '10' : '∞'}
+                      </span>
+                    </div>
+                    {currentPlan !== 'business' && (
+                      <div className="space-y-2">
+                        <Progress 
+                          value={Math.min(100, ((usageData?.detailed_reports_count || 0) / (currentPlan === 'trial' ? 1 : 10)) * 100)} 
+                          className="h-3 bg-orange-200"
+                        />
+                        <div className="text-xs text-orange-600 text-center">
+                          {Math.round(((usageData?.detailed_reports_count || 0) / (currentPlan === 'trial' ? 1 : 10)) * 100)}% used
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Team Members */}
+                <div className="p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-gray-200 rounded-lg">
+                      <Users className="h-5 w-5 text-gray-700" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-gray-900">Team Members</h5>
+                      <span className="text-xs text-gray-700 bg-gray-200 px-2 py-1 rounded-full font-medium">
+                        Coming Soon
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-700 font-medium">Current Usage</span>
+                      <span className="text-sm font-bold text-gray-900">
+                        {usageData?.team_members_count || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-700 font-medium">Plan Limit</span>
+                      <span className="text-sm font-bold text-gray-900">
+                        {currentPlan === 'trial' ? '1' : 
+                         currentPlan === 'pro' ? '5' : '∞'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500 italic text-center">Feature coming soon</div>
+                  </div>
+                </div>
+
+                {/* Export Data */}
+                <div className="p-6 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl border border-indigo-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-indigo-200 rounded-lg">
+                      <Download className="h-5 w-5 text-indigo-700" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-indigo-900">Export Data</h5>
+                      <span className="text-xs text-indigo-700 bg-indigo-200 px-2 py-1 rounded-full font-medium">
+                        {currentPlan === 'business' ? 'All Formats' : 'Limited'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-indigo-700 font-medium">Current Usage</span>
+                      <span className="text-sm font-bold text-indigo-900">
+                        {usageData?.export_count || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-indigo-700 font-medium">Available Formats</span>
+                      <span className="text-sm font-bold text-indigo-900">
+                        {currentPlan === 'trial' ? 'CSV' : 
+                         currentPlan === 'pro' ? 'CSV, PDF, Excel' : 'All'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-indigo-600 text-center">Data export capabilities</div>
+                  </div>
+                </div>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-gray-900">
-                {planPricing.price === 0 ? 'Free' : formatCurrency(planPricing.price, planPricing.currency)}
-              </div>
-              <div className="text-sm text-gray-600">per {planPricing.period}</div>
-            </div>
-            
-            {currentPlan === 'trial' && !isTrialExpired && (
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-900">{trialDaysLeft}</div>
-                <div className="text-sm text-blue-600">trial days left</div>
-              </div>
-            )}
-            
-            {nextBillingDate && (
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-bold text-gray-900">
-                  {formatDate(nextBillingDate)}
-                </div>
-                <div className="text-sm text-gray-600">Next billing</div>
-              </div>
-            )}
-          </div>
 
-          {/* Plan Features */}
-          <div className="mt-6">
-            <h4 className="font-semibold mb-3">Plan Features</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-green-600" />
-                  <span>Export: {planLimits.export.join(', ')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-green-600" />
-                  <span>Support: {planLimits.support.join(', ')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-green-600" />
-                  <span>Data Retention: {planLimits.retention}</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-green-600" />
-                  <span>Teams: {planLimits.teams === -1 ? 'Unlimited' : planLimits.teams}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-green-600" />
-                  <span>Priority Support: {currentPlan === 'business' ? 'Yes' : 'No'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-green-600" />
-                  <span>API Access: {currentPlan === 'business' ? 'Yes' : 'No'}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Usage Overview */}
-          <div className="mt-6">
-            <h4 className="font-semibold mb-4 flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-blue-600" />
-              Usage Overview
-            </h4>
-            <p className="text-sm text-muted-foreground mb-4">
-              Track your current usage against your business plan limits
-            </p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Feedback Collection */}
-              <div className="p-4 border rounded-lg bg-gradient-to-br from-green-50 to-green-100">
-                <div className="flex items-center gap-3 mb-3">
-                  <MessageSquare className="h-5 w-5 text-green-600" />
-                  <div>
-                    <h5 className="font-medium text-green-800">Feedback Collection</h5>
-                    <span className="text-xs text-green-600 bg-green-200 px-2 py-1 rounded-full">Good</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-green-700">Usage</span>
-                    <span className="text-sm font-medium text-green-800">
-                      {usageData?.feedback_count || 0} responses
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-green-700">Limit</span>
-                    <span className="text-sm font-medium text-green-800">
-                      {currentPlan === 'trial' ? '50 responses' : 
-                       currentPlan === 'pro' ? '300 responses' : 'Unlimited usage'}
-                    </span>
-                  </div>
-                  {currentPlan !== 'business' && (
-                    <Progress 
-                      value={Math.min(100, ((usageData?.feedback_count || 0) / (currentPlan === 'trial' ? 50 : 300)) * 100)} 
-                      className="h-2"
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* AI Insights */}
-              <div className="p-4 border rounded-lg bg-gradient-to-br from-blue-50 to-blue-100">
-                <div className="flex items-center gap-3 mb-3">
-                  <Brain className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <h5 className="font-medium text-blue-800">AI Insights</h5>
-                    <span className="text-xs text-blue-600 bg-blue-200 px-2 py-1 rounded-full">Good</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-blue-700">Usage</span>
-                    <span className="text-sm font-medium text-blue-800">
-                      {usageData?.insights_count || 0} insights
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-blue-700">Limit</span>
-                    <span className="text-sm font-medium text-blue-800">
-                      {currentPlan === 'trial' ? '5 insights' : 
-                       currentPlan === 'pro' ? '50 insights' : 'Unlimited usage'}
-                    </span>
-                  </div>
-                  {currentPlan !== 'business' && (
-                    <Progress 
-                      value={Math.min(100, ((usageData?.insights_count || 0) / (currentPlan === 'trial' ? 5 : 50)) * 100)} 
-                      className="h-2"
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* Analytics Reports */}
-              <div className="p-4 border rounded-lg bg-gradient-to-br from-purple-50 to-purple-100">
-                <div className="flex items-center gap-3 mb-3">
-                  <BarChart3 className="h-5 w-5 text-purple-600" />
-                  <div>
-                    <h5 className="font-medium text-purple-800">Analytics Reports</h5>
-                    <span className="text-xs text-purple-600 bg-purple-200 px-2 py-1 rounded-full">Good</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-purple-700">Usage</span>
-                    <span className="text-sm font-medium text-purple-800">
-                      {usageData?.reports_count || 0} reports
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-purple-700">Limit</span>
-                    <span className="text-sm font-medium text-purple-800">
-                      {currentPlan === 'trial' ? '2 reports' : 
-                       currentPlan === 'pro' ? '20 reports' : 'Unlimited usage'}
-                    </span>
-                  </div>
-                  {currentPlan !== 'business' && (
-                    <Progress 
-                      value={Math.min(100, ((usageData?.reports_count || 0) / (currentPlan === 'trial' ? 2 : 20)) * 100)} 
-                      className="h-2"
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* Detailed Reports */}
-              <div className="p-4 border rounded-lg bg-gradient-to-br from-orange-50 to-orange-100">
-                <div className="flex items-center gap-3 mb-3">
-                  <FileText className="h-5 w-5 text-orange-600" />
-                  <div>
-                    <h5 className="font-medium text-orange-800">Detailed Reports</h5>
-                    <span className="text-xs text-orange-600 bg-orange-200 px-2 py-1 rounded-full">Good</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-orange-700">Usage</span>
-                    <span className="text-sm font-medium text-orange-800">
-                      {usageData?.detailed_reports_count || 0} reports
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-orange-700">Limit</span>
-                    <span className="text-sm font-medium text-orange-800">
-                      {currentPlan === 'trial' ? '1 report' : 
-                       currentPlan === 'pro' ? '10 reports' : 'Unlimited usage'}
-                    </span>
-                  </div>
-                  {currentPlan !== 'business' && (
-                    <Progress 
-                      value={Math.min(100, ((usageData?.detailed_reports_count || 0) / (currentPlan === 'trial' ? 1 : 10)) * 100)} 
-                      className="h-2"
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* Team Members */}
-              <div className="p-4 border rounded-lg bg-gradient-to-br from-gray-50 to-gray-100">
-                <div className="flex items-center gap-3 mb-3">
-                  <Users className="h-5 w-5 text-gray-600" />
-                  <div>
-                    <h5 className="font-medium text-gray-800">Team Members</h5>
-                    <span className="text-xs text-gray-600 bg-gray-200 px-2 py-1 rounded-full">Coming Soon</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-700">Usage</span>
-                    <span className="text-sm font-medium text-gray-800">
-                      {usageData?.team_members_count || 0} members
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-700">Limit</span>
-                    <span className="text-sm font-medium text-gray-800">
-                      {currentPlan === 'trial' ? '1 member' : 
-                       currentPlan === 'pro' ? '5 members' : 'Unlimited members'}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-500 italic">Feature coming soon</div>
-                </div>
-              </div>
-
-              {/* Export Data */}
-              <div className="p-4 border rounded-lg bg-gradient-to-br from-indigo-50 to-indigo-100">
-                <div className="flex items-center gap-3 mb-3">
-                  <Download className="h-5 w-5 text-indigo-600" />
-                  <div>
-                    <h5 className="font-medium text-indigo-800">Export Data</h5>
-                    <span className="text-xs text-indigo-600 bg-indigo-200 px-2 py-1 rounded-full">Good</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-indigo-700">Usage</span>
-                    <span className="text-sm font-medium text-indigo-800">
-                      {usageData?.export_count || 0} exports
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-indigo-700">Limit</span>
-                    <span className="text-sm font-medium text-indigo-800">
-                      {currentPlan === 'trial' ? 'CSV only' : 
-                       currentPlan === 'pro' ? 'CSV, PDF, Excel' : 'All formats'}
-                    </span>
-                  </div>
-                  <div className="text-xs text-indigo-500">Data export capabilities</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-wrap gap-3 pt-4">
-            {currentPlan === 'trial' && !isTrialExpired && (
-              <>
-                <Button onClick={() => handleUpgradeClick('pro')} className="bg-green-600 hover:bg-green-700">
-                  <Zap className="h-4 w-4 mr-2" />
-                  Upgrade to Pro
+            {/* Action Buttons */}
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <div className="flex flex-wrap gap-4">
+                {currentPlan === 'trial' && !isTrialExpired && (
+                  <>
+                    <Button 
+                      onClick={() => handleUpgradeClick('pro')} 
+                      className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+                    >
+                      <Zap className="h-5 w-5 mr-2" />
+                      Upgrade to Pro
+                    </Button>
+                    <Button 
+                      onClick={() => handleUpgradeClick('business')} 
+                      variant="outline"
+                      className="border-2 border-purple-200 text-purple-700 hover:bg-purple-50 px-6 py-3 rounded-lg font-medium transition-all duration-200"
+                    >
+                      <Crown className="h-5 w-5 mr-2" />
+                      Upgrade to Business
+                    </Button>
+                  </>
+                )}
+                
+                {isSubscriptionActive && (
+                  <Button 
+                    variant="outline" 
+                    onClick={handleCancelSubscription} 
+                    disabled={cancelling}
+                    className="border-2 border-red-200 text-red-700 hover:bg-red-50 px-6 py-3 rounded-lg font-medium transition-all duration-200"
+                  >
+                    {cancelling ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <X className="h-5 w-5 mr-2" />}
+                    Cancel Subscription
+                  </Button>
+                )}
+                
+                {currentPlan === 'pro' && (
+                  <Button 
+                    onClick={() => handleUpgradeClick('business')} 
+                    variant="outline"
+                    className="border-2 border-purple-200 text-purple-700 hover:bg-purple-50 px-6 py-3 rounded-lg font-medium transition-all duration-200"
+                  >
+                    <Crown className="h-5 w-5 mr-2" />
+                    Upgrade to Business
+                  </Button>
+                )}
+                
+                <Button 
+                  variant="ghost" 
+                  onClick={refreshData} 
+                  disabled={refreshing}
+                  className="text-gray-600 hover:text-gray-800 hover:bg-gray-100 px-6 py-3 rounded-lg font-medium transition-all duration-200"
+                >
+                  <RefreshCw className={`h-5 w-5 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                  Refresh Data
                 </Button>
-                <Button onClick={() => handleUpgradeClick('business')} variant="outline">
-                  <Crown className="h-4 w-4 mr-2" />
-                  Upgrade to Business
-                </Button>
-              </>
-            )}
-            
-            
-            {isSubscriptionActive && (
-              <Button variant="outline" onClick={handleCancelSubscription} disabled={cancelling}>
-                {cancelling ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <X className="h-4 w-4 mr-2" />}
-                Cancel Subscription
-              </Button>
-            )}
-            
-            {currentPlan === 'pro' && (
-              <Button onClick={() => handleUpgradeClick('business')} variant="outline">
-                <Crown className="h-4 w-4 mr-2" />
-                Upgrade to Business
-              </Button>
-            )}
-            
-            <Button variant="ghost" onClick={refreshData} disabled={refreshing}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-          </div>
+              </div>
+            </div>
         </CardContent>
       </Card>
 
@@ -684,108 +905,111 @@ NoteX Team
         onUpgrade={(plan) => handleUpgradeClick(plan)}
       />
 
-      {/* Transaction History */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Receipt className="h-5 w-5" />
-            Transaction History
-          </CardTitle>
-          <CardDescription>
-            Your payment and subscription history
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {transactions.length === 0 ? (
-            <div className="text-center py-8">
-              <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No transactions yet</h3>
-              <p className="text-muted-foreground">
-                Your transaction history will appear here once you make your first payment.
-              </p>
+        {/* Transaction History */}
+        <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Receipt className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <CardTitle className="text-xl font-bold text-gray-900">Transaction History</CardTitle>
+                <CardDescription className="text-gray-600">
+                  Your payment and subscription history
+                </CardDescription>
+              </div>
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Receipt</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+          </CardHeader>
+          <CardContent>
+            {transactions.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="p-4 bg-gray-100 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                  <Receipt className="h-10 w-10 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No transactions yet</h3>
+                <p className="text-gray-600 max-w-md mx-auto">
+                  Your transaction history will appear here once you make your first payment.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
                 {transactions.map((transaction) => {
                   const statusDisplay = getStatusDisplay(transaction.status);
                   return (
-                    <TableRow key={transaction.id}>
-                      <TableCell className="font-medium">
-                        {formatDate(transaction.created_at)}
-                      </TableCell>
-                      <TableCell>
-                        {transaction.description || 'Subscription Payment'}
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium">
-                          {formatCurrency(transaction.amount, transaction.currency)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {statusDisplay.icon}
-                          <Badge 
-                            variant={transaction.status === 'success' ? 'default' : 
-                                   transaction.status === 'pending' ? 'secondary' : 'destructive'}
-                            className="text-xs"
-                          >
-                            {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-                          </Badge>
+                    <div key={transaction.id} className="p-4 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className={`p-2 rounded-lg ${
+                            transaction.status === 'success' ? 'bg-green-100' : 
+                            transaction.status === 'pending' ? 'bg-yellow-100' : 'bg-red-100'
+                          }`}>
+                            {statusDisplay.icon}
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {transaction.description || 'Subscription Payment'}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {formatDate(transaction.created_at)}
+                            </div>
+                          </div>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {/* Download Receipt Button */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => downloadReceipt(transaction)}
-                          disabled={transaction.status !== 'success'}
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Receipt
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="font-semibold text-gray-900">
+                              {formatCurrency(transaction.amount, transaction.currency)}
+                            </div>
+                            <Badge 
+                              variant={transaction.status === 'success' ? 'default' : 
+                                     transaction.status === 'pending' ? 'secondary' : 'destructive'}
+                              className="text-xs"
+                            >
+                              {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                            </Badge>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => downloadReceipt(transaction)}
+                            disabled={transaction.status !== 'success'}
+                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Receipt
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   );
                 })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Upgrade Plan Modal */}
-      {upgradePlanModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <PaystackPayment
-              plan={upgradePlanModal}
-              planName={upgradePlanModal === 'pro' ? 'Pro' : 'Business'}
-              planPrice={getPlanPrice(upgradePlanModal)}
-              onSuccess={async ({ reference, plan: paidPlan }) => {
-                try {
-                  toast.success(`🎉 Welcome to ${upgradePlanModal === 'pro' ? 'Pro' : 'Business'}! Your subscription has been activated.`);
-                  setUpgradePlanModal(null);
-                  await refreshData();
-                } catch (e: any) {
-                  toast.error(e?.message || 'Failed to activate subscription');
-                }
-              }}
-              onCancel={() => setUpgradePlanModal(null)}
-            />
+        {/* Upgrade Plan Modal */}
+        {upgradePlanModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+              <PaystackPayment
+                plan={upgradePlanModal}
+                planName={upgradePlanModal === 'pro' ? 'Pro' : 'Business'}
+                planPrice={getPlanPrice(upgradePlanModal)}
+                onSuccess={async ({ reference, plan: paidPlan }) => {
+                  try {
+                    toast.success(`🎉 Welcome to ${upgradePlanModal === 'pro' ? 'Pro' : 'Business'}! Your subscription has been activated.`);
+                    setUpgradePlanModal(null);
+                    await refreshData();
+                  } catch (e: any) {
+                    toast.error(e?.message || 'Failed to activate subscription');
+                  }
+                }}
+                onCancel={() => setUpgradePlanModal(null)}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
