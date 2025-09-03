@@ -203,11 +203,30 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
       });
 
       if (!subscriptionResponse.ok) {
-        const error = await subscriptionResponse.json();
+        let error;
+        try {
+          const errorText = await subscriptionResponse.text();
+          if (errorText) {
+            error = JSON.parse(errorText);
+          } else {
+            error = { message: 'Empty response from server' };
+          }
+        } catch (parseError) {
+          error = { message: 'Failed to parse server response' };
+        }
         throw new Error(error.message || 'Failed to create subscription');
       }
 
-      const result = await subscriptionResponse.json();
+      let result;
+      try {
+        const responseText = await subscriptionResponse.text();
+        if (!responseText) {
+          throw new Error('Empty response from server');
+        }
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error('Failed to parse server response');
+      }
 
       if (result.success) {
         toast.success(`🎉 Welcome to ${planName}! Your subscription has been activated.`);

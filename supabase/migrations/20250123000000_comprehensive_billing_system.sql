@@ -2,11 +2,19 @@
 -- This migration implements the complete SaaS billing flow with Paystack integration
 
 -- ========== ENUMS ==========
-CREATE TYPE IF NOT EXISTS subscription_status AS ENUM (
-  'trialing', 'active', 'past_due', 'non_renewing', 'canceled', 'completed', 'attention'
-);
+DO $$ BEGIN
+    CREATE TYPE subscription_status AS ENUM (
+      'trialing', 'active', 'past_due', 'non_renewing', 'canceled', 'completed', 'attention'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-CREATE TYPE IF NOT EXISTS plan_tier AS ENUM ('free', 'pro', 'business');
+DO $$ BEGIN
+    CREATE TYPE plan_tier AS ENUM ('free', 'pro', 'business');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- ========== PLANS TABLE ==========
 CREATE TABLE IF NOT EXISTS plans (
