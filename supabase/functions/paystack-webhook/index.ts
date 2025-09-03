@@ -181,6 +181,10 @@ async function handleSubscriptionCreate(supabase: any, data: any) {
       planTier = 'pro'
     }
 
+    // Calculate billing period (monthly)
+    const now = new Date()
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate())
+
     // Update or create user subscription
     const { error: subError } = await supabase
       .from('user_subscriptions')
@@ -189,8 +193,8 @@ async function handleSubscriptionCreate(supabase: any, data: any) {
         plan_code: data.plan?.plan_code || 'PLN_4z2wpgmw41w2k7r',
         plan_tier: planTier,
         status: 'active',
-        current_period_start: new Date().toISOString(),
-        current_period_end: new Date(Date.now() + 30*24*60*60*1000).toISOString(),
+        current_period_start: now.toISOString(),
+        current_period_end: nextMonth.toISOString(),
         paystack_subscription_code: data.subscription_code,
         paystack_email_token: data.email_token
       }, {
@@ -202,17 +206,17 @@ async function handleSubscriptionCreate(supabase: any, data: any) {
       return
     }
 
-    // Reset usage counters for new plan
+    // Reset usage counters for new plan (monthly window)
     const { error: usageError } = await supabase
       .from('usage_counters')
       .upsert({
         user_id: userId,
-        period_start: new Date().toISOString(),
-        period_end: new Date(Date.now() + 30*24*60*60*1000).toISOString(),
+        period_start: now.toISOString(),
+        period_end: nextMonth.toISOString(),
         feedback_count: 0,
         insights_count: 0,
         reports_count: 0,
-        last_reset: new Date().toISOString()
+        last_reset: now.toISOString()
       }, {
         onConflict: 'user_id'
       })
@@ -285,7 +289,7 @@ async function handleChargeSuccess(supabase: any, data: any) {
     // Find user by subscription ID
     const { data: subscription, error: findError } = await supabase
       .from('user_subscriptions')
-      .select('user_id')
+      .select('user_id, plan_tier')
       .eq('paystack_subscription_code', data.subscription)
       .single()
 
@@ -294,18 +298,43 @@ async function handleChargeSuccess(supabase: any, data: any) {
       return
     }
 
+    // Calculate next billing period (monthly)
+    const now = new Date()
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate())
+
     // Update subscription period
     const { error: updateError } = await supabase
       .from('user_subscriptions')
       .update({
         status: 'active',
-        current_period_start: new Date().toISOString(),
-        current_period_end: new Date(Date.now() + 30*24*60*60*1000).toISOString()
+        current_period_start: now.toISOString(),
+        current_period_end: nextMonth.toISOString()
       })
       .eq('paystack_subscription_code', data.subscription)
 
     if (updateError) {
       console.error('Error updating subscription for charge success:', updateError)
+    }
+
+    // Reset usage counters for monthly renewal (except Business which is unlimited)
+    if (subscription.plan_tier !== 'business') {
+      const { error: usageError } = await supabase
+        .from('usage_counters')
+        .upsert({
+          user_id: subscription.user_id,
+          period_start: now.toISOString(),
+          period_end: nextMonth.toISOString(),
+          feedback_count: 0,
+          insights_count: 0,
+          reports_count: 0,
+          last_reset: now.toISOString()
+        }, {
+          onConflict: 'user_id'
+        })
+
+      if (usageError) {
+        console.error('Error resetting usage counters for renewal:', usageError)
+      }
     }
 
     // Create transaction record

@@ -122,21 +122,24 @@ const BillingPage: React.FC = () => {
         setUser(userObj);
       }
 
-      // Get subscription (if exists)
+      // Get subscription from new billing system
       const { data: subscriptionData } = await supabase
         .from('user_subscriptions')
-        .select('*')
+        .select(`
+          *,
+          plans!inner(name, tier)
+        `)
         .eq('user_id', authUser.id)
         .single();
 
       if (subscriptionData) {
-        // Map the subscription data to our interface using type assertion
+        // Map the subscription data to our interface
         const subData = subscriptionData as any;
         const subscriptionObj: Subscription = {
           id: subData.id,
-          plan_code: subData.plan_code || subData.plan_name || 'PLN_default',
-          plan_name: subData.plan_name || 'Unknown Plan',
-          status: subData.status || '',
+          plan_code: subData.plan_code || 'free',
+          plan_name: subData.plans?.name || 'Free Trial',
+          status: subData.status || 'trialing',
           current_period_start: subData.current_period_start || '',
           current_period_end: subData.current_period_end || '',
           cancel_at_period_end: subData.cancel_at_period_end || false,
@@ -241,7 +244,8 @@ const BillingPage: React.FC = () => {
     }
   };
 
-  const isTrialActive = user?.trial_end && new Date(user.trial_end) > new Date();
+  const isTrialActive = subscription?.status === 'trialing' && subscription?.current_period_end && 
+                       new Date(subscription.current_period_end) > new Date();
   const hasActiveSubscription = subscription?.status === 'active';
 
   if (loading) {
@@ -287,7 +291,7 @@ const BillingPage: React.FC = () => {
                   <div className="flex items-center justify-center gap-1">
                     <Clock className="h-4 w-4 text-blue-600" />
                     <span className="text-blue-600">
-                      {Math.ceil((new Date(user?.trial_end || '').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
+                      {Math.ceil((new Date(subscription?.current_period_end || '').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
                     </span>
                   </div>
                 ) : subscription?.current_period_end ? (
@@ -315,7 +319,7 @@ const BillingPage: React.FC = () => {
               </div>
               <p className="text-blue-700 text-sm mt-1">
                 Love what you see? Upgrade anytime during your trial to unlock unlimited features. 
-                Your trial ends on {new Date(user?.trial_end || '').toLocaleDateString()}.
+                Your trial ends on {new Date(subscription?.current_period_end || '').toLocaleDateString()}.
               </p>
             </div>
           )}
