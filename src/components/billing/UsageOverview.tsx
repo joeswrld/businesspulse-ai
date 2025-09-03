@@ -13,7 +13,12 @@ import {
   CheckCircle,
   Infinity,
   RefreshCw,
-  Loader2
+  Loader2,
+  Lock,
+  Clock,
+  Zap,
+  Crown,
+  XCircle
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -44,6 +49,7 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [trialExpired, setTrialExpired] = useState(false);
 
   const loadUsageData = async () => {
     try {
@@ -60,7 +66,23 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
       }
 
       if (data && data.length > 0) {
-        setUsage(data[0]);
+        const usageData = data[0];
+        setUsage(usageData);
+        
+        // Check if trial has expired
+        if (usageData.plan_code === 'free') {
+          const { data: billingData } = await supabase
+            .from('billing_profiles')
+            .select('trial_ends_at')
+            .eq('id', userId)
+            .single();
+          
+          if (billingData?.trial_ends_at) {
+            const trialEnd = new Date(billingData.trial_ends_at);
+            const now = new Date();
+            setTrialExpired(now > trialEnd);
+          }
+        }
       }
     } catch (error) {
       console.error('Error in loadUsageData:', error);
@@ -85,6 +107,10 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
 
   useEffect(() => {
     loadUsageData();
+    
+    // Set up real-time updates every 30 seconds
+    const interval = setInterval(loadUsageData, 30000);
+    return () => clearInterval(interval);
   }, [userId]);
 
   if (loading) {
@@ -107,6 +133,39 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
             Unable to load usage data. Please try again.
           </AlertDescription>
         </Alert>
+      </Card>
+    );
+  }
+
+  // Trial expired state
+  if (trialExpired && usage.plan_code === 'free') {
+    return (
+      <Card className="p-6 rounded-xl shadow-lg bg-white border-0 border-red-200">
+        <div className="text-center py-8">
+          <div className="p-4 bg-red-100 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+            <XCircle className="h-10 w-10 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Free Trial Expired</h2>
+          <p className="text-gray-600 mb-6 max-w-md mx-auto">
+            Your Free Trial has expired. Upgrade to Pro or Business to continue collecting feedback and generating insights.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Button
+              onClick={() => onUpgrade?.('pro')}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Zap className="h-4 w-4 mr-2" />
+              Upgrade to Pro
+            </Button>
+            <Button
+              onClick={() => onUpgrade?.('business')}
+              variant="outline"
+            >
+              <Crown className="h-4 w-4 mr-2" />
+              Upgrade to Business
+            </Button>
+          </div>
+        </div>
       </Card>
     );
   }
@@ -169,26 +228,38 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
   };
 
   const getStatusIcon = (feature: any) => {
-    if (feature.limit === -1) return <Infinity className="h-4 w-4" />;
-    if (isLimitReached(feature)) return <AlertTriangle className="h-4 w-4" />;
-    if (getUsagePercentage(feature) > 80) return <AlertTriangle className="h-4 w-4" />;
-    return <CheckCircle className="h-4 w-4" />;
+    if (feature.limit === -1) return <Infinity className="h-4 w-4 text-green-600" />;
+    if (isLimitReached(feature)) return <Lock className="h-4 w-4 text-red-600" />;
+    if (getUsagePercentage(feature) > 80) return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+    return <CheckCircle className="h-4 w-4 text-green-600" />;
   };
 
   return (
-    <Card className="p-4 rounded-xl shadow bg-white">
-      <div className="flex items-center justify-between mb-4">
+    <Card className="p-6 rounded-xl shadow-lg bg-white border-0">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-bold">Usage Overview</h2>
-          <p className="text-sm text-gray-600">
-            Current plan: <Badge variant="outline">{usage.plan_name}</Badge>
-          </p>
+          <h2 className="text-2xl font-bold text-gray-900">Usage Overview</h2>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-gray-600">
+              Current plan: 
+            </p>
+            <Badge variant="outline" className="font-medium">
+              {usage.plan_name}
+            </Badge>
+            {usage.plan_code === 'free' && (
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                <Clock className="h-3 w-3 mr-1" />
+                Trial
+              </Badge>
+            )}
+          </div>
         </div>
         <Button
           variant="outline"
           size="sm"
           onClick={refreshUsage}
           disabled={refreshing}
+          className="border-gray-300 hover:bg-gray-50"
         >
           {refreshing ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -199,65 +270,138 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
         </Button>
       </div>
 
-      <div className="space-y-4">
-        {features.map((feature) => (
-          <div key={feature.key} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <feature.icon className={`h-4 w-4 ${getStatusColor(feature)}`} />
-                <span className="font-medium">{feature.name}</span>
-                {getStatusIcon(feature)}
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-medium">
-                  {feature.count}
-                  {feature.limit === -1 ? (
-                    <span className="text-green-600"> / ∞</span>
-                  ) : (
-                    <span> / {feature.limit}</span>
+      {/* Usage Alerts */}
+      {features.some(feature => isLimitReached(feature)) && (
+        <Alert className="mb-6 border-red-200 bg-red-50">
+          <AlertTriangle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800">
+            <strong>Some features have reached their limits!</strong> Upgrade your plan to continue using these features.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {features.some(feature => getUsagePercentage(feature) > 80) && !features.some(feature => isLimitReached(feature)) && (
+        <Alert className="mb-6 border-yellow-200 bg-yellow-50">
+          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          <AlertDescription className="text-yellow-800">
+            <strong>Usage Warning:</strong> Some features are approaching their limits. Consider upgrading soon.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {features.map((feature) => {
+          const percentage = getUsagePercentage(feature);
+          const reached = isLimitReached(feature);
+          const IconComponent = feature.icon;
+          
+          return (
+            <div 
+              key={feature.key} 
+              className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+                reached 
+                  ? 'border-red-200 bg-red-50' 
+                  : percentage >= 80 
+                    ? 'border-yellow-200 bg-yellow-50' 
+                    : 'border-gray-200 bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <IconComponent className={`h-5 w-5 ${getStatusColor(feature)}`} />
+                  <span className="font-semibold text-gray-900">{feature.name}</span>
+                  {getStatusIcon(feature)}
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-gray-900">
+                    {feature.count}
+                    {feature.limit === -1 ? (
+                      <span className="text-green-600 text-sm"> / ∞</span>
+                    ) : (
+                      <span className="text-gray-600 text-sm"> / {feature.limit}</span>
+                    )}
+                  </div>
+                  {feature.limit !== -1 && (
+                    <div className="text-xs text-gray-500">
+                      {feature.remaining > 0 ? `${feature.remaining} remaining` : 'Limit reached'}
+                    </div>
                   )}
                 </div>
-                {feature.limit !== -1 && (
-                  <div className="text-xs text-gray-500">
-                    {feature.remaining > 0 ? `${feature.remaining} remaining` : 'Limit reached'}
-                  </div>
-                )}
               </div>
+              
+              {feature.limit !== -1 && (
+                <div className="space-y-2">
+                  <Progress 
+                    value={percentage} 
+                    className="h-3"
+                  />
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>
+                      {reached ? 'Limit reached' : `${feature.remaining} remaining`}
+                    </span>
+                    <span className="font-medium">{Math.round(percentage)}%</span>
+                  </div>
+                </div>
+              )}
+              
+              {feature.limit === -1 && (
+                <div className="flex items-center gap-2 text-sm text-green-600 bg-green-100 p-2 rounded">
+                  <Infinity className="h-4 w-4" />
+                  <span>Unlimited usage</span>
+                </div>
+              )}
+              
+              <p className="text-xs text-gray-500 mt-3">{feature.description}</p>
+              
+              {reached && (
+                <div className="mt-3 p-2 bg-red-100 rounded text-xs text-red-700">
+                  <strong>Upgrade required!</strong> You've reached the limit for this feature.
+                </div>
+              )}
+              
+              {percentage >= 80 && !reached && (
+                <div className="mt-3 p-2 bg-yellow-100 rounded text-xs text-yellow-700">
+                  <strong>Almost full!</strong> Consider upgrading soon to avoid hitting limits.
+                </div>
+              )}
             </div>
-            
-            {feature.limit !== -1 && (
-              <Progress 
-                value={getUsagePercentage(feature)} 
-                className="h-2"
-              />
-            )}
-            
-            <p className="text-xs text-gray-500">{feature.description}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
+      {/* Upgrade Prompts */}
       {usage.plan_code === 'free' && (
-        <Alert className="mt-4">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            You're on the free plan. Upgrade to Pro or Business for higher limits and unlimited access.
+        <Alert className="mt-6 border-blue-200 bg-blue-50">
+          <Zap className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <strong>Upgrade to unlock more features!</strong> Get higher limits and unlimited access with Pro or Business plans.
             {onUpgrade && (
-              <Button
-                variant="default"
-                size="sm"
-                className="ml-2"
-                onClick={() => onUpgrade('pro')}
-              >
-                Upgrade Now
-              </Button>
+              <div className="flex gap-2 mt-3">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => onUpgrade('pro')}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  Upgrade to Pro
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onUpgrade('business')}
+                >
+                  <Crown className="h-4 w-4 mr-2" />
+                  Upgrade to Business
+                </Button>
+              </div>
             )}
           </AlertDescription>
         </Alert>
       )}
 
-      <div className="mt-4 text-xs text-gray-500 text-center">
-        Last updated: {new Date().toLocaleTimeString()}
+      <div className="mt-6 text-xs text-gray-500 text-center">
+        Last updated: {new Date().toLocaleTimeString()} • Updates every 30 seconds
       </div>
     </Card>
   );
