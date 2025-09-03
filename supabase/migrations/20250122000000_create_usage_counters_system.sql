@@ -1,6 +1,3 @@
--- Create usage_counters table for tracking actual row counts from source tables
--- This migration sets up the infrastructure for enforcing plan limits based on actual usage
-
 -- Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -41,15 +38,30 @@ SECURITY DEFINER
 AS $$
 BEGIN
   UPDATE usage_counters
-  SET feedback_count = (SELECT COUNT(*) FROM feedbacks f 
-                        JOIN feedback_settings fs ON f.project_id = fs.project_id 
-                        WHERE fs.user_id = p_user_id),
-      insights_count = (SELECT COUNT(*) FROM insights WHERE user_id = p_user_id),
-      analytics_count = (SELECT COUNT(*) FROM analytics_daily WHERE user_id = p_user_id),
-      reports_count = (SELECT COUNT(*) FROM analytics_history WHERE user_id = p_user_id),
+  SET feedback_count = (
+        SELECT COUNT(*) 
+        FROM feedbacks f 
+        JOIN feedback_settings fs ON f.project_id = fs.project_id 
+        WHERE fs.user_id = p_user_id
+      ),
+      insights_count = (
+        SELECT COUNT(*) 
+        FROM ai_insights i 
+        WHERE i.user_id = p_user_id
+      ),
+      analytics_count = (
+        SELECT COUNT(*) 
+        FROM analytics_history a 
+        WHERE a.user_id = p_user_id
+      ),
+      reports_count = (
+        SELECT COUNT(*) 
+        FROM reports r 
+        WHERE r.user_id = p_user_id
+      ),
       updated_at = NOW()
   WHERE user_id = p_user_id;
-  
+
   -- If no record exists, create one
   IF NOT FOUND THEN
     INSERT INTO usage_counters (user_id, feedback_count, insights_count, analytics_count, reports_count)
@@ -58,9 +70,9 @@ BEGIN
       (SELECT COUNT(*) FROM feedbacks f 
        JOIN feedback_settings fs ON f.project_id = fs.project_id 
        WHERE fs.user_id = p_user_id),
-      (SELECT COUNT(*) FROM insights WHERE user_id = p_user_id),
-      (SELECT COUNT(*) FROM analytics_daily WHERE user_id = p_user_id),
-      (SELECT COUNT(*) FROM analytics_history WHERE user_id = p_user_id)
+      (SELECT COUNT(*) FROM ai_insights i WHERE i.user_id = p_user_id),
+      (SELECT COUNT(*) FROM analytics_history a WHERE a.user_id = p_user_id),
+      (SELECT COUNT(*) FROM reports r WHERE r.user_id = p_user_id)
     );
   END IF;
 END;
@@ -95,7 +107,7 @@ BEGIN
   -- Refresh usage counters
   PERFORM refresh_usage_for_user(p_user_id);
 
-  -- Check limits based on feature type
+  -- Check limits
   IF p_kind = 'feedback' THEN
     SELECT feedback_count INTO used_val FROM usage_counters WHERE user_id = p_user_id;
     limit_val := (plan_limits->>'feedback')::INT;
@@ -122,7 +134,7 @@ BEGIN
 END;
 $$;
 
--- Create function to get user's current usage and limits
+-- Create function to get usage summary
 CREATE OR REPLACE FUNCTION get_user_usage_summary(p_user_id UUID)
 RETURNS TABLE (
   plan_code TEXT,
@@ -190,7 +202,7 @@ BEGIN
     END,
     CASE 
       WHEN (user_plan_limits->>'reports')::INT = -1 THEN -1
-      ELSE GREATEST(0, (user_plan_limits->>'analytics')::INT - uc.analytics_count)
+      ELSE GREATEST(0, (user_plan_limits->>'reports')::INT - uc.reports_count)
     END
   FROM usage_counters uc
   CROSS JOIN plans p
@@ -198,15 +210,14 @@ BEGIN
 END;
 $$;
 
--- Create indexes for performance
+-- Indexes
 CREATE INDEX IF NOT EXISTS idx_usage_counters_user_id ON usage_counters(user_id);
 CREATE INDEX IF NOT EXISTS idx_plans_code ON plans(code);
 
--- Enable RLS for security
+-- RLS
 ALTER TABLE usage_counters ENABLE ROW LEVEL SECURITY;
 ALTER TABLE plans ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies
 CREATE POLICY "Users can read their usage"
 ON usage_counters
 FOR SELECT
@@ -227,7 +238,7 @@ ON plans
 FOR SELECT
 USING (true);
 
--- Create trigger to update updated_at timestamp
+-- Updated_at triggers
 CREATE OR REPLACE FUNCTION update_usage_counters_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -240,7 +251,6 @@ CREATE TRIGGER update_usage_counters_updated_at
   BEFORE UPDATE ON usage_counters
   FOR EACH ROW EXECUTE FUNCTION update_usage_counters_updated_at();
 
--- Create trigger to update plans updated_at timestamp
 CREATE OR REPLACE FUNCTION update_plans_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -260,15 +270,8 @@ SELECT
   COALESCE((SELECT COUNT(*) FROM feedbacks f 
             JOIN feedback_settings fs ON f.project_id = fs.project_id 
             WHERE fs.user_id = u.id), 0),
-  COALESCE((SELECT COUNT(*) FROM insights WHERE user_id = u.id), 0),
-  COALESCE((SELECT COUNT(*) FROM analytics_daily WHERE user_id = u.id), 0),
-  COALESCE((SELECT COUNT(*) FROM analytics_history WHERE user_id = u.id), 0)
+  COALESCE((SELECT COUNT(*) FROM ai_insights i WHERE i.user_id = u.id), 0),
+  COALESCE((SELECT COUNT(*) FROM analytics_history a WHERE a.user_id = u.id), 0),
+  COALESCE((SELECT COUNT(*) FROM reports r WHERE r.user_id = u.id), 0)
 FROM auth.users u
 ON CONFLICT (user_id) DO NOTHING;
-
--- Add comments for documentation
-COMMENT ON TABLE usage_counters IS 'Tracks actual row counts from source tables for usage enforcement';
-COMMENT ON TABLE plans IS 'Defines plan limits and features';
-COMMENT ON FUNCTION refresh_usage_for_user(UUID) IS 'Refreshes usage counters from source tables';
-COMMENT ON FUNCTION check_and_consume_usage(UUID, TEXT) IS 'Checks if user can consume a feature and enforces limits';
-COMMENT ON FUNCTION get_user_usage_summary(UUID) IS 'Returns comprehensive usage summary with limits and remaining counts';
