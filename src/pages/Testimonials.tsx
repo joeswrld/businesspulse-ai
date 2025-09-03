@@ -13,83 +13,65 @@ const Testimonials = () => {
     {
       name: "Sarah Johnson",
       role: "CEO",
-      company: "TechFlow Solutions",
       industry: "SaaS",
-      content: "FeedbackFlow transformed how we understand our customers. The AI sentiment analysis helped us identify pain points we never knew existed, leading to a 40% increase in customer satisfaction.",
+      content: "NoteX transformed how we understand our customers. The AI sentiment analysis helped us identify pain points we never knew existed, leading to a 40% increase in customer satisfaction.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
     },
     {
       name: "Michael Chen",
       role: "Product Manager",
-      company: "InnovateCorp",
       industry: "E-commerce",
       content: "The real-time feedback analytics is a game-changer. We can now track customer sentiment live and make product adjustments instantly. Our NPS score grew from 45 to 78 in just 3 months.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
     },
     {
       name: "Emily Rodriguez",
       role: "Founder",
-      company: "StartupXYZ",
       industry: "Startup",
       content: "Finally, a feedback platform that speaks our language. The AI insights are spot-on, and the widget integration is so seamless our customers love using it.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
     },
     {
       name: "David Okafor",
       role: "Customer Success Manager",
-      company: "Enterprise Solutions Ltd",
       industry: "Enterprise",
       content: "The feedback collection is incredibly powerful. It processes customer responses in minutes and gives insights that would take our team days to discover manually.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
     },
     {
       name: "Jennifer Kim",
       role: "Marketing Director",
-      company: "Growth Marketing Pro",
       industry: "Marketing",
       content: "NoteX's reports save us 15+ hours per week. The actionable insights help us create better campaigns and our customer retention improved by 35%.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face",
     },
     {
       name: "Alex Thompson",
       role: "Co-founder",
-      company: "NextGen Tech",
       industry: "SaaS",
       content: "The trial convinced us immediately. The AI-powered feedback analysis helped us optimize our product features and increase our customer satisfaction by 45%. Absolutely worth it.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
     },
     {
       name: "Lisa Wang",
       role: "UX Designer",
-      company: "Design Studio Co",
       industry: "Design",
       content: "The sentiment analysis feature is incredible. We can now understand exactly how users feel about our designs and iterate faster than ever before.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face",
     },
     {
       name: "Marcus Johnson",
       role: "Operations Director",
-      company: "Service Excellence Inc",
       industry: "Service",
       content: "NoteX helped us identify service gaps we didn't know existed. Our customer satisfaction scores improved by 60% in the first quarter.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face",
     },
     {
       name: "Sofia Martinez",
       role: "Head of Product",
-      company: "Mobile Apps Plus",
       industry: "Mobile",
       content: "The real-time feedback widget is perfect for our mobile app. Users can give feedback instantly, and we get insights immediately. Game changer!",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=150&h=150&fit=crop&crop=face",
     }
   ];
 
@@ -216,15 +198,10 @@ const Testimonials = () => {
 
                   {/* Author */}
                   <div className="flex items-center space-x-3 pt-2">
-                    <img
-                      src={testimonial.image}
-                      alt={testimonial.name}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
                     <div>
                       <div className="font-semibold text-sm">{testimonial.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {testimonial.role} at {testimonial.company}
+                        {testimonial.role}  {testimonial.company}
                       </div>
                       <Badge variant="secondary" className="text-xs mt-1">
                         {testimonial.industry}

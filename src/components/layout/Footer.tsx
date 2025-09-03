@@ -58,7 +58,7 @@ const Footer = () => {
               <div className="space-y-3">
                 <div className="flex items-center space-x-3 text-sm">
                   <Mail className="h-4 w-4 text-primary" />
-                  <span>hello@notex.com</span>
+                  <span>admin@notex.com.ng</span>
                 </div>
               </div>
             </div>
@@ -158,7 +158,7 @@ const Footer = () => {
         <div className="py-6 border-t border-secondary-foreground/20">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-secondary-foreground/80">
-              © 2024 NoteX. All rights reserved.
+              © 2025 NoteX. All rights reserved.
             </div>
             
             {/* Social Links */}

@@ -13,7 +13,7 @@ import {
 import { Link } from "react-router-dom";
 
 const PrivacyPolicy = () => {
-  const lastUpdated = "January 15, 2024";
+  const lastUpdated = "January 15, 2025";
 
   const sections = [
     {
@@ -172,11 +172,9 @@ const PrivacyPolicy = () => {
             </p>
             <div className="space-y-2">
               <p className="text-sm">
-                <strong>Email:</strong> privacy@feedbackflow.com
+                <strong>Email:</strong> admin@notex.com.ng
               </p>
-              <p className="text-sm">
-                <strong>Address:</strong> FeedbackFlow Inc., 123 Privacy Street, Security City, SC 12345
-              </p>
+             
             </div>
           </div>
 

@@ -275,11 +275,11 @@ const AuthPage = () => {
               <div className="mt-6 pt-4 border-t border-border">
                 <p className="text-xs text-muted-foreground text-center">
                   By creating an account, you agree to our{" "}
-                  <Link to="/terms" className="text-primary hover:underline">
+                  <Link to="/terms-of-service" className="text-primary hover:underline">
                     Terms of Service
                   </Link>{" "}
                   and{" "}
-                  <Link to="/privacy" className="text-primary hover:underline">
+                  <Link to="/privacy-policy" className="text-primary hover:underline">
                     Privacy Policy
                   </Link>
                 </p>

@@ -226,12 +226,6 @@ const PricingSection = () => {
                     <td className="text-center py-3 px-4">12 months</td>
                     <td className="text-center py-3 px-4">Unlimited</td>
                   </tr>
-                  <tr>
-                    <td className="py-3 px-4 font-medium">API Calls</td>
-                    <td className="text-center py-3 px-4">100/month</td>
-                    <td className="text-center py-3 px-4">5,000/month</td>
-                    <td className="text-center py-3 px-4">Unlimited</td>
-                  </tr>
                 </tbody>
               </table>
             </div>

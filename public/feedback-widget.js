@@ -379,7 +379,7 @@
               You have reached your feedback submission limit.
             </div>
             <div style="font-size: 12px; color: #7c2d12; background: #fef3c7; padding: 8px; border-radius: 4px; border: 1px solid #f59e0b;">
-              Please contact the admin to increase your limit or upgrade your plan.
+              Please contact the admin to increase their limit or upgrade their plan.
             </div>
           </div>
         `;

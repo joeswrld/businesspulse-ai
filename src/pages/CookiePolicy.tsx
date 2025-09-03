@@ -11,7 +11,7 @@ import {
 import { Link } from "react-router-dom";
 
 const CookiePolicy = () => {
-  const lastUpdated = "January 15, 2024";
+  const lastUpdated = "January 14, 2025";
 
   const cookieTypes = [
     {
@@ -63,7 +63,7 @@ const CookiePolicy = () => {
               <span className="gradient-text">Policy</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-4">
-              This policy explains how FeedbackFlow uses cookies and similar technologies 
+              This policy explains how NoteX uses cookies and similar technologies 
               to provide, protect, and improve our services.
             </p>
             <p className="text-sm text-muted-foreground">
