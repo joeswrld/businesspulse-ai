@@ -111,7 +111,26 @@ export async function getUserSubscription(userId: string): Promise<SubscriptionD
       return null;
     }
 
-    return data as SubscriptionData;
+    // Map the data to match SubscriptionData interface
+    if (data) {
+      return {
+        id: data.id,
+        user_id: data.user_id,
+        plan_code: data.plan_code || 'free',
+        plan_tier: data.plan_name?.toLowerCase() === 'pro' ? 'pro' : 
+                   data.plan_name?.toLowerCase() === 'business' ? 'business' : 'free',
+        status: data.status as any,
+        current_period_start: data.current_period_start,
+        current_period_end: data.current_period_end,
+        cancel_at_period_end: data.cancel_at_period_end || false,
+        paystack_subscription_code: (data as any).paystack_subscription_id,
+        paystack_email_token: (data as any).paystack_email_token,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      } as SubscriptionData;
+    }
+
+    return null;
   } catch (error) {
     console.error('Error in getUserSubscription:', error);
     return null;
@@ -123,8 +142,9 @@ export async function getUserSubscription(userId: string): Promise<SubscriptionD
  */
 export async function getUserUsage(userId: string): Promise<UsageData | null> {
   try {
-    const { data, error } = await supabase
-      .from('usage_counters')
+    // Use usage_tracking table with type assertion
+    const { data, error } = await (supabase as any)
+      .from('usage_tracking')
       .select('*')
       .eq('user_id', userId)
       .single();
@@ -134,7 +154,21 @@ export async function getUserUsage(userId: string): Promise<UsageData | null> {
       return null;
     }
 
-    return data as UsageData;
+    // Map usage_tracking data to UsageData interface
+    if (data) {
+      return {
+        user_id: data.user_id,
+        period_start: data.created_at,
+        period_end: new Date(new Date(data.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        feedback_count: data.feedback_count || 0,
+        insights_count: data.insights_count || 0,
+        reports_count: data.reports_count || 0,
+        last_reset: data.updated_at,
+        updated_at: data.updated_at,
+      } as UsageData;
+    }
+
+    return null;
   } catch (error) {
     console.error('Error in getUserUsage:', error);
     return null;

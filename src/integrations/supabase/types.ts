@@ -127,6 +127,45 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          ip_address: unknown | null
+          new_values: Json | null
+          old_values: Json | null
+          record_id: string | null
+          table_name: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       billing: {
         Row: {
           created_at: string | null
@@ -1307,6 +1346,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_team_invitation_stats: {
         Args: { team_uuid: string }
         Returns: {
@@ -1366,6 +1409,15 @@ export type Database = {
           is_valid: boolean
           taken_by_email: string
           taken_by_user_id: string
+        }[]
+      }
+      validate_security_policies: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          issues: string[]
+          policies_count: number
+          rls_enabled: boolean
+          table_name: string
         }[]
       }
     }
