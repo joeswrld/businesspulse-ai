@@ -41,7 +41,9 @@ SECURITY DEFINER
 AS $$
 BEGIN
   UPDATE usage_counters
-  SET feedback_count = (SELECT COUNT(*) FROM feedbacks WHERE user_id = p_user_id),
+  SET feedback_count = (SELECT COUNT(*) FROM feedbacks f 
+                        JOIN feedback_settings fs ON f.project_id = fs.project_id 
+                        WHERE fs.user_id = p_user_id),
       insights_count = (SELECT COUNT(*) FROM insights WHERE user_id = p_user_id),
       analytics_count = (SELECT COUNT(*) FROM analytics_daily WHERE user_id = p_user_id),
       reports_count = (SELECT COUNT(*) FROM analytics_history WHERE user_id = p_user_id),
@@ -53,7 +55,9 @@ BEGIN
     INSERT INTO usage_counters (user_id, feedback_count, insights_count, analytics_count, reports_count)
     VALUES (
       p_user_id,
-      (SELECT COUNT(*) FROM feedbacks WHERE user_id = p_user_id),
+      (SELECT COUNT(*) FROM feedbacks f 
+       JOIN feedback_settings fs ON f.project_id = fs.project_id 
+       WHERE fs.user_id = p_user_id),
       (SELECT COUNT(*) FROM insights WHERE user_id = p_user_id),
       (SELECT COUNT(*) FROM analytics_daily WHERE user_id = p_user_id),
       (SELECT COUNT(*) FROM analytics_history WHERE user_id = p_user_id)
@@ -253,7 +257,9 @@ CREATE TRIGGER update_plans_updated_at
 INSERT INTO usage_counters (user_id, feedback_count, insights_count, analytics_count, reports_count)
 SELECT 
   u.id,
-  COALESCE((SELECT COUNT(*) FROM feedbacks WHERE user_id = u.id), 0),
+  COALESCE((SELECT COUNT(*) FROM feedbacks f 
+            JOIN feedback_settings fs ON f.project_id = fs.project_id 
+            WHERE fs.user_id = u.id), 0),
   COALESCE((SELECT COUNT(*) FROM insights WHERE user_id = u.id), 0),
   COALESCE((SELECT COUNT(*) FROM analytics_daily WHERE user_id = u.id), 0),
   COALESCE((SELECT COUNT(*) FROM analytics_history WHERE user_id = u.id), 0)
