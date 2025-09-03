@@ -25,12 +25,26 @@ serve(async (req) => {
     }
 
     // Get request body
-    const { reference, plan, amount, email } = await req.json()
+    let body;
+    try {
+      body = await req.json();
+    } catch (error) {
+      console.error('Failed to parse request body:', error);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    const { reference, plan, amount, email } = body;
 
     // Validate required fields
     if (!reference || !plan || !amount || !email) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields' }),
+        JSON.stringify({ error: 'Missing required fields', received: { reference, plan, amount, email } }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -78,7 +92,24 @@ serve(async (req) => {
       )
     }
 
-    const paystackData = await paystackResponse.json()
+    let paystackData;
+    try {
+      const responseText = await paystackResponse.text();
+      if (!responseText) {
+        throw new Error('Empty response from Paystack');
+      }
+      paystackData = JSON.parse(responseText);
+    } catch (error) {
+      console.error('Failed to parse Paystack response:', error);
+      return new Response(
+        JSON.stringify({ error: 'Invalid response from Paystack', details: 'Failed to parse response' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+    
     console.log('Paystack response:', JSON.stringify(paystackData, null, 2))
 
     if (paystackData.status === false) {
