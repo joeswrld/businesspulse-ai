@@ -46,18 +46,27 @@ export const useBilling = () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) return;
 
-      // Get user profile
+      // Get user profile from profiles table
       const { data: userData } = await supabase
-        .from('users')
+        .from('profiles')
         .select('*')
-        .eq('id', authUser.id)
+        .eq('user_id', authUser.id)
         .single();
 
       if (userData) {
-        setUser(userData);
+        // Map profile data to expected User interface
+        setUser({
+          id: userData.user_id,
+          email: (userData as any).email || authUser.email || '',
+          trial_end: (userData as any).trial_end || '',
+          subscription_status: 'trial',
+          plan: 'trial',
+          subscription_id: '',
+          authorization_code: (userData as any).authorization_code || null
+        });
       }
 
-      // Get subscription
+      // Get subscription from new billing system
       const { data: subscriptionData } = await supabase
         .from('user_subscriptions')
         .select('*')
@@ -65,11 +74,21 @@ export const useBilling = () => {
         .single();
 
       if (subscriptionData) {
-        setSubscription(subscriptionData);
+        // Map subscription data to expected Subscription interface
+        setSubscription({
+          id: subscriptionData.id,
+          plan_code: subscriptionData.plan_code || '',
+          plan_name: subscriptionData.plan_name || '',
+          status: subscriptionData.status || 'inactive',
+          current_period_start: subscriptionData.current_period_start || '',
+          current_period_end: subscriptionData.current_period_end || '',
+          cancel_at_period_end: subscriptionData.cancel_at_period_end || false,
+          canceled_at: subscriptionData.canceled_at || null
+        });
       }
 
-      // Get transactions
-      const { data: transactionsData } = await supabase
+      // Get transactions from new billing system with type assertion
+      const { data: transactionsData } = await (supabase as any)
         .from('transactions')
         .select('*')
         .eq('user_id', authUser.id)
@@ -77,7 +96,16 @@ export const useBilling = () => {
         .limit(10);
 
       if (transactionsData) {
-        setTransactions(transactionsData);
+        // Map transaction data to expected Transaction interface
+        const mappedTransactions = transactionsData.map((tx: any) => ({
+          id: tx.id?.toString() || '',
+          reference: tx.reference || '',
+          amount: tx.amount_kobo ? tx.amount_kobo / 100 : 0, // Convert from kobo to naira
+          status: tx.status || 'pending',
+          paid_at: tx.created_at || '',
+          created_at: tx.created_at || ''
+        }));
+        setTransactions(mappedTransactions);
       }
 
     } catch (error) {
@@ -155,19 +183,22 @@ export const useBilling = () => {
     // Check if user has active subscription
     if (subscription?.status === 'active') return true;
     
-    // Check if user is still in trial period
-    if (user.trial_end && new Date(user.trial_end) > new Date()) return true;
+    // Check if user is still in trial period (8 days from signup)
+    if (subscription?.status === 'trialing' && subscription?.current_period_end) {
+      return new Date(subscription.current_period_end) > new Date();
+    }
     
     return false;
   };
 
   const isTrialActive = () => {
-    return user?.trial_end && new Date(user.trial_end) > new Date();
+    return subscription?.status === 'trialing' && subscription?.current_period_end && 
+           new Date(subscription.current_period_end) > new Date();
   };
 
   const getTrialDaysRemaining = () => {
-    if (!user?.trial_end) return 0;
-    const trialEnd = new Date(user.trial_end);
+    if (!subscription?.current_period_end) return 0;
+    const trialEnd = new Date(subscription.current_period_end);
     const now = new Date();
     const diffTime = trialEnd.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));

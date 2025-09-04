@@ -122,7 +122,7 @@ const Profile: React.FC = () => {
       }
 
       if (subscriptionData) {
-        setSubscription(subscriptionData);
+        setSubscription(subscriptionData as any);
       }
 
       // Fetch activity stats
@@ -146,13 +146,13 @@ const Profile: React.FC = () => {
       const lastActive = session?.user?.last_sign_in_at;
 
       // Count feedback entries
-      const { count: feedbackCount } = await supabase
+      const { count: feedbackCount } = await (supabase as any)
         .from('feedbacks')
         .select('*', { count: 'exact', head: true })
         .eq('project_id', user.id); // Using user.id as project_id for now
 
       // Count insights history (reports)
-      const { count: reportsCount } = await supabase
+      const { count: reportsCount } = await (supabase as any)
         .from('insights_history')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);

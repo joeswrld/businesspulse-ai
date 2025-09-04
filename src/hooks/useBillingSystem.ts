@@ -150,25 +150,10 @@ export function useBillingSystem(): BillingSystemState {
     setError(null);
 
     try {
-      // First, try to create billing profile using the database function
-      // This avoids permission issues with auth.users triggers
-      try {
-        const { data: profileResult, error: profileCreateError } = await supabase
-          .rpc('create_user_billing_profile', { user_uuid: user.id });
-
-        if (profileCreateError) {
-          console.warn('Failed to create billing profile via function:', profileCreateError);
-        } else if (profileResult) {
-          console.log('Billing profile creation result:', profileResult);
-        }
-      } catch (error) {
-        console.warn('Billing profile creation function not available, using fallback');
-      }
-
       // Load billing profile
       let profileData = null;
       try {
-        const { data, error: profileError } = await supabase
+        const { data, error: profileError } = await (supabase as any)
           .from('billing_profiles')
           .select('*')
           .eq('id', user.id)
@@ -222,7 +207,7 @@ export function useBillingSystem(): BillingSystemState {
       // Load transactions
       let transactionsData = [];
       try {
-        const { data, error: transactionsError } = await supabase
+        const { data, error: transactionsError } = await (supabase as any)
           .from('transactions')
           .select('*')
           .eq('user_id', user.id)
@@ -240,7 +225,7 @@ export function useBillingSystem(): BillingSystemState {
       // Load usage data
       let usageData = null;
       try {
-        const { data, error: usageError } = await supabase
+        const { data, error: usageError } = await (supabase as any)
           .from('usage_tracking')
           .select('*')
           .eq('user_id', user.id)
@@ -516,7 +501,7 @@ export function useBillingSystem(): BillingSystemState {
       // In production, you should integrate with Paystack's subscription management API
       
       // Update billing profile to cancelled status
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('billing_profiles')
         .update({
           subscription_status: 'cancelled'

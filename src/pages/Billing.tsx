@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBillingSystem, getPlanLimits, formatCurrency, formatDate, getPlanDisplayName, getPlanPrice, getPlanPricing } from '@/hooks/useBillingSystem';
@@ -52,6 +53,10 @@ import UsageOverview from '@/components/billing/UsageOverview';
 import PlanComparison from '@/components/billing/PlanComparison';
 
 type UpgradePlan = 'pro' | 'business' | null;
+
+import React from 'react';
+import SimpleBillingPage from '@/components/billing/SimpleBillingPage';
+
 
 // Helper function to calculate subscription end date
 const calculateSubscriptionEndDate = (billingProfile: any, currentPlan: string) => {
@@ -122,6 +127,7 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
 };
 
 const BillingPage: React.FC = () => {
+ 
   const { user } = useAuth();
   const {
     billingProfile,
@@ -1019,6 +1025,9 @@ NoteX Team
       </div>
     </div>
   );
+
+  return <SimpleBillingPage />;
+
 };
 
 export default BillingPage;

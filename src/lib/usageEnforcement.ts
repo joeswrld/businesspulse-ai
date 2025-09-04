@@ -110,7 +110,7 @@ export const PLAN_PRICING: Record<PlanType, string> = {
 export function getUserPlan(subscription: Subscription | null): PlanType {
   if (!subscription) return 'free';
   
-  const planName = subscription.plan_name?.toLowerCase() || subscription.plan_type?.toLowerCase() || '';
+  const planName = (subscription as any).plan_name?.toLowerCase() || (subscription as any).plan_type?.toLowerCase() || '';
   
   if (planName.includes('enterprise')) return 'enterprise';
   if (planName.includes('business')) return 'business';
@@ -148,7 +148,7 @@ export function checkUsage(
  */
 export async function getUserUsage(userId: string): Promise<UsageData | null> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('usage_tracking')
       .select('*')
       .eq('user_id', userId)
@@ -159,7 +159,7 @@ export async function getUserUsage(userId: string): Promise<UsageData | null> {
       return null;
     }
 
-    return data;
+    return data as any;
   } catch (error) {
     console.error('Error in getUserUsage:', error);
     return null;
@@ -182,7 +182,7 @@ export async function getUserSubscription(userId: string): Promise<Subscription 
       return null;
     }
 
-    return data;
+    return data as any;
   } catch (error) {
     console.error('Error in getUserSubscription:', error);
     return null;

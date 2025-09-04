@@ -7,7 +7,7 @@ import { Loader2, CreditCard, CheckCircle, XCircle, ExternalLink, RefreshCw, Rot
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { verifyPaystackPayment, simplePaymentVerification } from '@/utils/paystackVerification';
+// import { verifyPaystackPayment, simplePaymentVerification } from '@/utils/paystackVerification';
 
 interface PaystackPaymentProps {
   plan: 'pro' | 'business';
@@ -188,30 +188,51 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
     try {
       console.log('Processing successful payment:', response);
       
-      // Use local verification function instead of Edge Function
-      const result = await verifyPaystackPayment({
-        reference: response.reference,
-        plan: plan,
-        amount: amount,
-        email: user?.email || 'user@example.com'
+      // Create subscription via Paystack API
+      const subscriptionResponse = await fetch('/api/create-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          plan_code: currentPlanDetails.planCode,
+          email: user?.email,
+          reference: response.reference,
+          amount: amount
+        }),
       });
+
+      if (!subscriptionResponse.ok) {
+        let error;
+        try {
+          const errorText = await subscriptionResponse.text();
+          if (errorText) {
+            error = JSON.parse(errorText);
+          } else {
+            error = { message: 'Empty response from server' };
+          }
+        } catch (parseError) {
+          error = { message: 'Failed to parse server response' };
+        }
+        throw new Error(error.message || 'Failed to create subscription');
+      }
+
+      let result;
+      try {
+        const responseText = await subscriptionResponse.text();
+        if (!responseText) {
+          throw new Error('Empty response from server');
+        }
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error('Failed to parse server response');
+      }
 
       if (result.success) {
         toast.success(`🎉 Welcome to ${planName}! Your subscription has been activated.`);
         onSuccess({ reference: response.reference, plan });
       } else {
-        // Check if the error is retryable
-        if (result.retryable) {
-          setError(`${result.message} (Retryable - check your internet connection)`);
-          toast.error(result.message, {
-            action: {
-              label: 'Retry',
-              onClick: () => handlePaymentSuccess(response)
-            }
-          });
-        } else {
-          throw new Error(result.error || 'Failed to update subscription');
-        }
+        throw new Error('Failed to update subscription');
       }
     } catch (err) {
       console.error('Payment verification error:', err);
