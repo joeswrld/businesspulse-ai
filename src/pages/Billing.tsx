@@ -47,7 +47,6 @@ import {
   Activity
 } from 'lucide-react';
 import PaystackPayment from '@/components/PaystackPayment';
-import UsageTracker from '@/components/billing/UsageTracker';
 import UsageOverview from '@/components/billing/UsageOverview';
 import PlanComparison from '@/components/billing/PlanComparison';
 
@@ -126,7 +125,6 @@ const BillingPage: React.FC = () => {
   const {
     billingProfile,
     transactions,
-    usageData,
     loading,
     error,
     refreshing,
@@ -589,245 +587,6 @@ NoteX Team
               </div>
             </div>
 
-            {/* Usage Overview */}
-            <div className="mt-8">
-              <div className="flex items-center gap-2 mb-6">
-                <BarChart3 className="h-5 w-5 text-blue-600" />
-                <h4 className="text-lg font-semibold text-gray-900">Usage Overview</h4>
-              </div>
-              <p className="text-sm text-gray-600 mb-6">
-                Track your current usage against your {getPlanDisplayName(currentPlan)} limits
-              </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {/* Feedback Collection */}
-                <div className="p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-green-200 rounded-lg">
-                      <MessageSquare className="h-5 w-5 text-green-700" />
-                    </div>
-                    <div>
-                      <h5 className="font-semibold text-green-900">Feedback Collection</h5>
-                      <span className="text-xs text-green-700 bg-green-200 px-2 py-1 rounded-full font-medium">
-                        {currentPlan === 'business' ? 'Unlimited' : 'Limited'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-green-700 font-medium">Current Usage</span>
-                      <span className="text-sm font-bold text-green-900">
-                        {usageData?.feedback_count || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-green-700 font-medium">Plan Limit</span>
-                      <span className="text-sm font-bold text-green-900">
-                        {currentPlan === 'trial' ? '50' : 
-                         currentPlan === 'pro' ? '300' : '∞'}
-                      </span>
-                    </div>
-                    {currentPlan !== 'business' && (
-                      <div className="space-y-2">
-                        <Progress 
-                          value={Math.min(100, ((usageData?.feedback_count || 0) / (currentPlan === 'trial' ? 50 : 300)) * 100)} 
-                          className="h-3 bg-green-200"
-                        />
-                        <div className="text-xs text-green-600 text-center">
-                          {Math.round(((usageData?.feedback_count || 0) / (currentPlan === 'trial' ? 50 : 300)) * 100)}% used
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* AI Insights */}
-                <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-blue-200 rounded-lg">
-                      <Brain className="h-5 w-5 text-blue-700" />
-                    </div>
-                    <div>
-                      <h5 className="font-semibold text-blue-900">AI Insights</h5>
-                      <span className="text-xs text-blue-700 bg-blue-200 px-2 py-1 rounded-full font-medium">
-                        {currentPlan === 'business' ? 'Unlimited' : 'Limited'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-blue-700 font-medium">Current Usage</span>
-                      <span className="text-sm font-bold text-blue-900">
-                        {usageData?.insights_count || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-blue-700 font-medium">Plan Limit</span>
-                      <span className="text-sm font-bold text-blue-900">
-                        {currentPlan === 'trial' ? '5' : 
-                         currentPlan === 'pro' ? '50' : '∞'}
-                      </span>
-                    </div>
-                    {currentPlan !== 'business' && (
-                      <div className="space-y-2">
-                        <Progress 
-                          value={Math.min(100, ((usageData?.insights_count || 0) / (currentPlan === 'trial' ? 5 : 50)) * 100)} 
-                          className="h-3 bg-blue-200"
-                        />
-                        <div className="text-xs text-blue-600 text-center">
-                          {Math.round(((usageData?.insights_count || 0) / (currentPlan === 'trial' ? 5 : 50)) * 100)}% used
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Analytics Reports */}
-                <div className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-purple-200 rounded-lg">
-                      <BarChart3 className="h-5 w-5 text-purple-700" />
-                    </div>
-                    <div>
-                      <h5 className="font-semibold text-purple-900">Analytics Reports</h5>
-                      <span className="text-xs text-purple-700 bg-purple-200 px-2 py-1 rounded-full font-medium">
-                        {currentPlan === 'business' ? 'Unlimited' : 'Limited'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-700 font-medium">Current Usage</span>
-                      <span className="text-sm font-bold text-purple-900">
-                        {usageData?.reports_count || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-purple-700 font-medium">Plan Limit</span>
-                      <span className="text-sm font-bold text-purple-900">
-                        {currentPlan === 'trial' ? '2' : 
-                         currentPlan === 'pro' ? '20' : '∞'}
-                      </span>
-                    </div>
-                    {currentPlan !== 'business' && (
-                      <div className="space-y-2">
-                        <Progress 
-                          value={Math.min(100, ((usageData?.reports_count || 0) / (currentPlan === 'trial' ? 2 : 20)) * 100)} 
-                          className="h-3 bg-purple-200"
-                        />
-                        <div className="text-xs text-purple-600 text-center">
-                          {Math.round(((usageData?.reports_count || 0) / (currentPlan === 'trial' ? 2 : 20)) * 100)}% used
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Detailed Reports */}
-                <div className="p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-orange-200 rounded-lg">
-                      <FileText className="h-5 w-5 text-orange-700" />
-                    </div>
-                    <div>
-                      <h5 className="font-semibold text-orange-900">Detailed Reports</h5>
-                      <span className="text-xs text-orange-700 bg-orange-200 px-2 py-1 rounded-full font-medium">
-                        {currentPlan === 'business' ? 'Unlimited' : 'Limited'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-orange-700 font-medium">Current Usage</span>
-                      <span className="text-sm font-bold text-orange-900">
-                        {usageData?.detailed_reports_count || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-orange-700 font-medium">Plan Limit</span>
-                      <span className="text-sm font-bold text-orange-900">
-                        {currentPlan === 'trial' ? '1' : 
-                         currentPlan === 'pro' ? '10' : '∞'}
-                      </span>
-                    </div>
-                    {currentPlan !== 'business' && (
-                      <div className="space-y-2">
-                        <Progress 
-                          value={Math.min(100, ((usageData?.detailed_reports_count || 0) / (currentPlan === 'trial' ? 1 : 10)) * 100)} 
-                          className="h-3 bg-orange-200"
-                        />
-                        <div className="text-xs text-orange-600 text-center">
-                          {Math.round(((usageData?.detailed_reports_count || 0) / (currentPlan === 'trial' ? 1 : 10)) * 100)}% used
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Team Members */}
-                <div className="p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-gray-200 rounded-lg">
-                      <Users className="h-5 w-5 text-gray-700" />
-                    </div>
-                    <div>
-                      <h5 className="font-semibold text-gray-900">Team Members</h5>
-                      <span className="text-xs text-gray-700 bg-gray-200 px-2 py-1 rounded-full font-medium">
-                        Coming Soon
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-700 font-medium">Current Usage</span>
-                      <span className="text-sm font-bold text-gray-900">
-                        {usageData?.team_members_count || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-700 font-medium">Plan Limit</span>
-                      <span className="text-sm font-bold text-gray-900">
-                        {currentPlan === 'trial' ? '1' : 
-                         currentPlan === 'pro' ? '5' : '∞'}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-500 italic text-center">Feature coming soon</div>
-                  </div>
-                </div>
-
-                {/* Export Data */}
-                <div className="p-6 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl border border-indigo-200 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-indigo-200 rounded-lg">
-                      <Download className="h-5 w-5 text-indigo-700" />
-                    </div>
-                    <div>
-                      <h5 className="font-semibold text-indigo-900">Export Data</h5>
-                      <span className="text-xs text-indigo-700 bg-indigo-200 px-2 py-1 rounded-full font-medium">
-                        {currentPlan === 'business' ? 'All Formats' : 'Limited'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-indigo-700 font-medium">Current Usage</span>
-                      <span className="text-sm font-bold text-indigo-900">
-                        {usageData?.export_count || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-indigo-700 font-medium">Available Formats</span>
-                      <span className="text-sm font-bold text-indigo-900">
-                        {currentPlan === 'trial' ? 'CSV' : 
-                         currentPlan === 'pro' ? 'CSV, PDF, Excel' : 'All'}
-                      </span>
-                    </div>
-                    <div className="text-xs text-indigo-600 text-center">Data export capabilities</div>
-                  </div>
-                </div>
-            </div>
-          </div>
-
             {/* Action Buttons */}
             <div className="mt-8 pt-6 border-t border-gray-200">
               <div className="flex flex-wrap gap-4">
@@ -890,17 +649,7 @@ NoteX Team
 
 
 
-      {/* Usage Tracking */}
-      {usageData && (
-        <UsageTracker 
-          usageData={usageData}
-          planLimits={planLimits}
-          currentPlan={currentPlan}
-          onUpgrade={(plan) => handleUpgradeClick(plan)}
-        />
-      )}
-
-      {/* New Usage Overview - Real-time counters from source tables */}
+      {/* Usage Overview - Real-time counters from source tables */}
       <UsageOverview 
         userId={user?.id || ''}
         onUpgrade={(plan) => handleUpgradeClick(plan)}
