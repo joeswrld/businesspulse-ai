@@ -40,6 +40,14 @@ interface UsageSummary {
   reports_remaining: number;
 }
 
+interface SubscriptionDetails {
+  next_billing_date: string | null;
+  trial_ends_at: string | null;
+  subscription_status: string;
+  plan_price: number | null;
+  plan_currency: string | null;
+}
+
 interface UsageOverviewProps {
   userId: string;
   onUpgrade?: (plan: 'pro' | 'business') => void;
@@ -47,6 +55,7 @@ interface UsageOverviewProps {
 
 export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps) {
   const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [trialExpired, setTrialExpired] = useState(false);
@@ -55,33 +64,38 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
     try {
       setLoading(true);
       
-      const { data, error } = await supabase.rpc('get_user_usage_summary', {
+      // Fetch usage data
+      const { data: usageData, error: usageError } = await supabase.rpc('get_user_usage_summary', {
         p_user_id: userId
       });
 
-      if (error) {
-        console.error('Error fetching usage data:', error);
+      if (usageError) {
+        console.error('Error fetching usage data:', usageError);
         toast.error('Failed to load usage data');
         return;
       }
 
-      if (data && data.length > 0) {
-        const usageData = data[0];
-        setUsage(usageData);
+      // Fetch subscription details
+      const { data: subscriptionData, error: subscriptionError } = await supabase
+        .from('billing_profiles')
+        .select('next_billing_date, trial_ends_at, subscription_status, plan_price, plan_currency')
+        .eq('id', userId)
+        .single();
+
+      if (usageData && usageData.length > 0) {
+        const usage = usageData[0];
+        setUsage(usage);
+        
+        // Set subscription data
+        if (subscriptionData) {
+          setSubscription(subscriptionData);
+        }
         
         // Check if trial has expired
-        if (usageData.plan_code === 'free') {
-          const { data: billingData } = await supabase
-            .from('billing_profiles')
-            .select('trial_ends_at')
-            .eq('id', userId)
-            .single();
-          
-          if (billingData?.trial_ends_at) {
-            const trialEnd = new Date(billingData.trial_ends_at);
-            const now = new Date();
-            setTrialExpired(now > trialEnd);
-          }
+        if (usage.plan_code === 'free' && subscriptionData?.trial_ends_at) {
+          const trialEnd = new Date(subscriptionData.trial_ends_at);
+          const now = new Date();
+          setTrialExpired(now > trialEnd);
         }
       }
     } catch (error) {
@@ -103,6 +117,32 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
     } finally {
       setRefreshing(false);
     }
+  };
+
+  // Helper functions
+  const formatCurrency = (amount: number, currency: string = 'NGN') => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const getPlanPricing = (planCode: string) => {
+    const pricing = {
+      'free': { price: 0, currency: 'NGN', period: '8 days' },
+      'pro': { price: 3500000, currency: 'NGN', period: '30 days' }, // ₦35,000 in kobo
+      'business': { price: 5300000, currency: 'NGN', period: '30 days' } // ₦53,000 in kobo
+    };
+    return pricing[planCode as keyof typeof pricing] || pricing.free;
   };
 
   useEffect(() => {
@@ -223,14 +263,18 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
   const getStatusColor = (feature: any) => {
     if (feature.limit === -1) return 'text-green-600';
     if (isLimitReached(feature)) return 'text-red-600';
-    if (getUsagePercentage(feature) > 80) return 'text-yellow-600';
+    const percentage = getUsagePercentage(feature);
+    if (percentage >= 70 && percentage < 90) return 'text-yellow-600';
+    if (percentage >= 90) return 'text-orange-600';
     return 'text-green-600';
   };
 
   const getStatusIcon = (feature: any) => {
     if (feature.limit === -1) return <Infinity className="h-4 w-4 text-green-600" />;
     if (isLimitReached(feature)) return <Lock className="h-4 w-4 text-red-600" />;
-    if (getUsagePercentage(feature) > 80) return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+    const percentage = getUsagePercentage(feature);
+    if (percentage >= 70 && percentage < 90) return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+    if (percentage >= 90) return <AlertTriangle className="h-4 w-4 text-orange-600" />;
     return <CheckCircle className="h-4 w-4 text-green-600" />;
   };
 
@@ -239,18 +283,40 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Usage Overview</h2>
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-gray-600">
-              Current plan: 
-            </p>
-            <Badge variant="outline" className="font-medium">
-              {usage.plan_name}
-            </Badge>
-            {usage.plan_code === 'free' && (
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                <Clock className="h-3 w-3 mr-1" />
-                Trial
+          <div className="mt-2 space-y-1">
+            <div className="flex items-center gap-2">
+              <p className="text-gray-600">
+                Current Plan: 
+              </p>
+              <Badge variant="outline" className="font-medium">
+                {usage.plan_name}
               </Badge>
+              {usage.plan_code === 'free' && (
+                <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                  <Clock className="h-3 w-3 mr-1" />
+                  Trial
+                </Badge>
+              )}
+            </div>
+            
+            {/* Show pricing and renewal date */}
+            {usage.plan_code !== 'free' && (
+              <div className="flex items-center gap-4 text-sm text-gray-600">
+                <span>
+                  {formatCurrency(getPlanPricing(usage.plan_code).price / 100, getPlanPricing(usage.plan_code).currency)}/month
+                </span>
+                {subscription?.next_billing_date && (
+                  <span>
+                    Next Renewal: {formatDate(subscription.next_billing_date)}
+                  </span>
+                )}
+              </div>
+            )}
+            
+            {usage.plan_code === 'free' && subscription?.trial_ends_at && (
+              <div className="text-sm text-gray-600">
+                Trial ends: {formatDate(subscription.trial_ends_at)}
+              </div>
             )}
           </div>
         </div>
@@ -280,11 +346,20 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
         </Alert>
       )}
 
-      {features.some(feature => getUsagePercentage(feature) > 80) && !features.some(feature => isLimitReached(feature)) && (
+      {features.some(feature => getUsagePercentage(feature) >= 90) && !features.some(feature => isLimitReached(feature)) && (
+        <Alert className="mb-6 border-orange-200 bg-orange-50">
+          <AlertTriangle className="h-4 w-4 text-orange-600" />
+          <AlertDescription className="text-orange-800">
+            <strong>Usage Warning:</strong> Some features are very close to their limits. Consider upgrading soon.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {features.some(feature => getUsagePercentage(feature) >= 70 && getUsagePercentage(feature) < 90) && !features.some(feature => getUsagePercentage(feature) >= 90) && (
         <Alert className="mb-6 border-yellow-200 bg-yellow-50">
           <AlertTriangle className="h-4 w-4 text-yellow-600" />
           <AlertDescription className="text-yellow-800">
-            <strong>Usage Warning:</strong> Some features are approaching their limits. Consider upgrading soon.
+            <strong>Usage Notice:</strong> Some features are approaching their limits. Keep an eye on your usage.
           </AlertDescription>
         </Alert>
       )}
@@ -355,13 +430,19 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
               
               {reached && (
                 <div className="mt-3 p-2 bg-red-100 rounded text-xs text-red-700">
-                  <strong>Upgrade required!</strong> You've reached the limit for this feature.
+                  <strong>Limit reached!</strong> You've used {feature.count}/{feature.limit} {feature.name.toLowerCase()}. Upgrade to Business for unlimited access.
                 </div>
               )}
               
-              {percentage >= 80 && !reached && (
+              {percentage >= 90 && !reached && (
+                <div className="mt-3 p-2 bg-orange-100 rounded text-xs text-orange-700">
+                  <strong>Very close to limit!</strong> You've used {feature.count}/{feature.limit} {feature.name.toLowerCase()}. Only {feature.remaining} remaining.
+                </div>
+              )}
+              
+              {percentage >= 70 && percentage < 90 && !reached && (
                 <div className="mt-3 p-2 bg-yellow-100 rounded text-xs text-yellow-700">
-                  <strong>Almost full!</strong> Consider upgrading soon to avoid hitting limits.
+                  <strong>Approaching limit.</strong> You've used {feature.count}/{feature.limit} {feature.name.toLowerCase()}. {feature.remaining} remaining.
                 </div>
               )}
             </div>
@@ -390,6 +471,29 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
                   variant="outline"
                   size="sm"
                   onClick={() => onUpgrade('business')}
+                >
+                  <Crown className="h-4 w-4 mr-2" />
+                  Upgrade to Business
+                </Button>
+              </div>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Pro Plan Upgrade Prompts */}
+      {usage.plan_code === 'pro' && (features.some(feature => isLimitReached(feature)) || features.some(feature => getUsagePercentage(feature) >= 90)) && (
+        <Alert className="mt-6 border-purple-200 bg-purple-50">
+          <Crown className="h-4 w-4 text-purple-600" />
+          <AlertDescription className="text-purple-800">
+            <strong>Maxing out your Pro plan?</strong> Upgrade to Business for unlimited access to all features.
+            {onUpgrade && (
+              <div className="flex gap-2 mt-3">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => onUpgrade('business')}
+                  className="bg-purple-600 hover:bg-purple-700"
                 >
                   <Crown className="h-4 w-4 mr-2" />
                   Upgrade to Business
