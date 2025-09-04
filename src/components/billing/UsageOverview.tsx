@@ -51,9 +51,10 @@ interface SubscriptionDetails {
 interface UsageOverviewProps {
   userId: string;
   onUpgrade?: (plan: 'pro' | 'business') => void;
+  refreshTrigger?: number; // Add this to trigger refresh when plan changes
 }
 
-export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps) {
+export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: UsageOverviewProps) {
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,39 +65,62 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
     try {
       setLoading(true);
       
-      // Fetch usage data
-      const { data: usageData, error: usageError } = await supabase.rpc('get_user_usage_summary', {
-        p_user_id: userId
-      });
+      // First, fetch the current billing profile to get the actual plan
+      const { data: billingProfile, error: billingError } = await supabase
+        .from('billing_profiles')
+        .select('plan, next_billing_date, trial_ends_at, subscription_status, plan_price, plan_currency')
+        .eq('id', userId)
+        .single();
 
-      if (usageError) {
-        console.error('Error fetching usage data:', usageError);
+      if (billingError) {
+        console.error('Error fetching billing profile:', billingError);
+        toast.error('Failed to load billing data');
+        return;
+      }
+
+      // Fetch usage counters
+      const { data: usageCounters, error: countersError } = await supabase
+        .from('usage_counters')
+        .select('feedback_count, insights_count, analytics_count, reports_count')
+        .eq('user_id', userId)
+        .single();
+
+      if (countersError) {
+        console.error('Error fetching usage counters:', countersError);
         toast.error('Failed to load usage data');
         return;
       }
 
-      // Fetch subscription details
-      const { data: subscriptionData, error: subscriptionError } = await supabase
-        .from('billing_profiles')
-        .select('next_billing_date, trial_ends_at, subscription_status, plan_price, plan_currency')
-        .eq('id', userId)
-        .single();
+      // Get plan limits based on the actual plan from billing profile
+      const currentPlan = billingProfile?.plan || 'free';
+      const planLimits = getPlanLimits(currentPlan);
 
-      if (usageData && usageData.length > 0) {
-        const usage = usageData[0];
-        setUsage(usage);
-        
-        // Set subscription data
-        if (subscriptionData) {
-          setSubscription(subscriptionData);
-        }
-        
-        // Check if trial has expired
-        if (usage.plan_code === 'free' && subscriptionData?.trial_ends_at) {
-          const trialEnd = new Date(subscriptionData.trial_ends_at);
-          const now = new Date();
-          setTrialExpired(now > trialEnd);
-        }
+      // Create usage summary with correct plan data
+      const usageSummary = {
+        plan_code: currentPlan,
+        plan_name: getPlanDisplayName(currentPlan),
+        feedback_count: usageCounters?.feedback_count || 0,
+        insights_count: usageCounters?.insights_count || 0,
+        analytics_count: usageCounters?.analytics_count || 0,
+        reports_count: usageCounters?.reports_count || 0,
+        feedback_limit: planLimits.feedback,
+        insights_limit: planLimits.insights,
+        analytics_limit: planLimits.analytics,
+        reports_limit: planLimits.reports,
+        feedback_remaining: Math.max(0, planLimits.feedback - (usageCounters?.feedback_count || 0)),
+        insights_remaining: Math.max(0, planLimits.insights - (usageCounters?.insights_count || 0)),
+        analytics_remaining: Math.max(0, planLimits.analytics - (usageCounters?.analytics_count || 0)),
+        reports_remaining: Math.max(0, planLimits.reports - (usageCounters?.reports_count || 0))
+      };
+
+      setUsage(usageSummary);
+      setSubscription(billingProfile);
+      
+      // Check if trial has expired
+      if (currentPlan === 'free' && billingProfile?.trial_ends_at) {
+        const trialEnd = new Date(billingProfile.trial_ends_at);
+        const now = new Date();
+        setTrialExpired(now > trialEnd);
       }
     } catch (error) {
       console.error('Error in loadUsageData:', error);
@@ -145,6 +169,24 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
     return pricing[planCode as keyof typeof pricing] || pricing.free;
   };
 
+  const getPlanLimits = (planCode: string) => {
+    const limits = {
+      'free': { feedback: 50, insights: 5, analytics: 5, reports: 2 },
+      'pro': { feedback: 300, insights: 50, analytics: 100, reports: 20 },
+      'business': { feedback: -1, insights: -1, analytics: -1, reports: -1 } // unlimited
+    };
+    return limits[planCode as keyof typeof limits] || limits.free;
+  };
+
+  const getPlanDisplayName = (planCode: string) => {
+    const names = {
+      'free': 'Free Trial',
+      'pro': 'Pro Plan',
+      'business': 'Business Plan'
+    };
+    return names[planCode as keyof typeof names] || 'Free Trial';
+  };
+
   useEffect(() => {
     loadUsageData();
     
@@ -152,6 +194,13 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
     const interval = setInterval(loadUsageData, 30000);
     return () => clearInterval(interval);
   }, [userId]);
+
+  // Watch for refreshTrigger changes (when plan changes)
+  useEffect(() => {
+    if (refreshTrigger) {
+      loadUsageData();
+    }
+  }, [refreshTrigger]);
 
   if (loading) {
     return (
@@ -450,59 +499,6 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
         })}
       </div>
 
-      {/* Upgrade Prompts */}
-      {usage.plan_code === 'free' && (
-        <Alert className="mt-6 border-blue-200 bg-blue-50">
-          <Zap className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-800">
-            <strong>Upgrade to unlock more features!</strong> Get higher limits and unlimited access with Pro or Business plans.
-            {onUpgrade && (
-              <div className="flex gap-2 mt-3">
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => onUpgrade('pro')}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Zap className="h-4 w-4 mr-2" />
-                  Upgrade to Pro
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onUpgrade('business')}
-                >
-                  <Crown className="h-4 w-4 mr-2" />
-                  Upgrade to Business
-                </Button>
-              </div>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Pro Plan Upgrade Prompts */}
-      {usage.plan_code === 'pro' && (features.some(feature => isLimitReached(feature)) || features.some(feature => getUsagePercentage(feature) >= 90)) && (
-        <Alert className="mt-6 border-purple-200 bg-purple-50">
-          <Crown className="h-4 w-4 text-purple-600" />
-          <AlertDescription className="text-purple-800">
-            <strong>Maxing out your Pro plan?</strong> Upgrade to Business for unlimited access to all features.
-            {onUpgrade && (
-              <div className="flex gap-2 mt-3">
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => onUpgrade('business')}
-                  className="bg-purple-600 hover:bg-purple-700"
-                >
-                  <Crown className="h-4 w-4 mr-2" />
-                  Upgrade to Business
-                </Button>
-              </div>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
 
       <div className="mt-6 text-xs text-gray-500 text-center">
         Last updated: {new Date().toLocaleTimeString()} • Updates every 30 seconds

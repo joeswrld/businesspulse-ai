@@ -147,6 +147,7 @@ const BillingPage: React.FC = () => {
   const [cancelling, setCancelling] = useState(false);
   const [upgradePlanModal, setUpgradePlanModal] = useState<UpgradePlan>(null);
   const [showConfigError, setShowConfigError] = useState(false);
+  const [usageRefreshTrigger, setUsageRefreshTrigger] = useState(0);
 
   // Handle subscription cancellation
   const handleCancelSubscription = async () => {
@@ -172,6 +173,11 @@ const BillingPage: React.FC = () => {
     }
     
     setUpgradePlanModal(plan);
+  };
+
+  // Trigger usage refresh when plan changes
+  const triggerUsageRefresh = () => {
+    setUsageRefreshTrigger(prev => prev + 1);
   };
 
   // Download transaction receipt
@@ -653,6 +659,7 @@ NoteX Team
       <UsageOverview 
         userId={user?.id || ''}
         onUpgrade={(plan) => handleUpgradeClick(plan)}
+        refreshTrigger={usageRefreshTrigger}
       />
 
       {/* Plan Comparison */}
@@ -756,6 +763,8 @@ NoteX Team
                     toast.success(`🎉 Welcome to ${upgradePlanModal === 'pro' ? 'Pro' : 'Business'}! Your subscription has been activated.`);
                     setUpgradePlanModal(null);
                     await refreshData();
+                    // Trigger usage overview refresh to show new plan limits
+                    triggerUsageRefresh();
                   } catch (e: any) {
                     toast.error(e?.message || 'Failed to activate subscription');
                   }
