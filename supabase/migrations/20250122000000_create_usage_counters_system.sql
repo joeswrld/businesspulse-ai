@@ -8,6 +8,10 @@ DROP POLICY IF EXISTS "Users can insert their usage" ON usage_counters;
 DROP POLICY IF EXISTS "Users can delete their usage" ON usage_counters;
 DROP POLICY IF EXISTS "Everyone can read plans" ON plans;
 
+-- Clean up existing triggers to avoid conflicts
+DROP TRIGGER IF EXISTS update_usage_counters_updated_at ON usage_counters;
+DROP TRIGGER IF EXISTS update_plans_updated_at ON plans;
+
 -- Create usage_counters table
 CREATE TABLE IF NOT EXISTS usage_counters (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
