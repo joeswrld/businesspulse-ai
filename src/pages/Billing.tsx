@@ -151,6 +151,17 @@ const BillingPage: React.FC = () => {
 
   // Handle subscription cancellation
   const handleCancelSubscription = async () => {
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      'Are you sure you want to cancel your subscription?\n\n' +
+      'You will continue to have access to your current plan until the end of your billing period.\n\n' +
+      'This action cannot be undone.'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     setCancelling(true);
     try {
       await cancelSubscription();
@@ -616,7 +627,7 @@ NoteX Team
                   </>
                 )}
                 
-                {isSubscriptionActive && (
+                {(isSubscriptionActive || currentPlan === 'pro' || currentPlan === 'business') && (
                   <Button 
                     variant="outline" 
                     onClick={handleCancelSubscription} 
