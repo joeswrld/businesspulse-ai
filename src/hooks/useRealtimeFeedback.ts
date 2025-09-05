@@ -33,6 +33,8 @@ export const useRealtimeFeedback = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const maxReconnectAttempts = 5;
 
   // Calculate counts from feedbacks
   const calculateCounts = useCallback((feedbackList: FeedbackNotification[]): FeedbackCounts => {
@@ -140,15 +142,17 @@ export const useRealtimeFeedback = () => {
     }
   }, [user, analyzeSentiment, calculateCounts]);
 
-  // Setup real-time subscription
+  // Setup real-time subscription with reconnection
   useEffect(() => {
     if (!user) return;
 
-    setRealtimeStatus('connecting');
-    
-    // Get user's project IDs for the subscription
+    let channel: any = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+
     const setupRealtime = async () => {
       try {
+        setRealtimeStatus('connecting');
+        
         const { data: feedbackSettings } = await (supabase as any)
           .from('feedback_settings')
           .select('project_id')
@@ -166,81 +170,104 @@ export const useRealtimeFeedback = () => {
           return;
         }
 
-        // Create a channel for each project
-        const channels = projectIds.map(projectId => {
-          return supabase
-            .channel(`feedbacks-${projectId}`)
-            .on('postgres_changes', {
-              event: '*',
-              schema: 'public',
-              table: 'feedbacks',
-              filter: `project_id=eq.${projectId}`
-            }, async (payload) => {
-              console.log('Real-time feedback event received:', payload);
+        // Create a single channel for all projects
+        channel = supabase
+          .channel(`feedbacks-${user.id}`, {
+            config: {
+              presence: { key: user.id },
+              broadcast: { self: true }
+            }
+          })
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'feedbacks',
+            filter: `project_id=in.(${projectIds.join(',')})`
+          }, async (payload) => {
+            console.log('Real-time feedback event received:', payload);
+            
+            if (payload.eventType === 'INSERT') {
+              const newFeedback = payload.new as FeedbackNotification;
+              const feedbackWithTags = {
+                ...newFeedback,
+                tags: [],
+                sentiment: analyzeSentiment(newFeedback.message)
+              };
               
-              if (payload.eventType === 'INSERT') {
-                const newFeedback = payload.new as FeedbackNotification;
-                const feedbackWithTags = {
-                  ...newFeedback,
-                  tags: [],
-                  sentiment: analyzeSentiment(newFeedback.message)
-                };
-                
-                setFeedbacks(prev => {
-                  const updated = [feedbackWithTags, ...prev];
-                  setCounts(calculateCounts(updated));
-                  return updated;
-                });
-              } else if (payload.eventType === 'UPDATE') {
-                const updatedFeedback = payload.new as FeedbackNotification;
-                
-                setFeedbacks(prev => {
-                  const updated = prev.map(f => 
-                    f.id === updatedFeedback.id ? { ...f, ...updatedFeedback } : f
-                  );
-                  setCounts(calculateCounts(updated));
-                  return updated;
-                });
-              } else if (payload.eventType === 'DELETE') {
-                const deletedFeedback = payload.old as FeedbackNotification;
-                
-                setFeedbacks(prev => {
-                  const updated = prev.filter(f => f.id !== deletedFeedback.id);
-                  setCounts(calculateCounts(updated));
-                  return updated;
-                });
-              }
-            })
-            .subscribe((status) => {
-              if (status === 'SUBSCRIBED') {
-                setRealtimeStatus('connected');
-              } else if (status === 'CHANNEL_ERROR') {
-                setRealtimeStatus('error');
-              } else {
-                setRealtimeStatus('disconnected');
-              }
-            });
-        });
-
-        return () => {
-          channels.forEach(channel => {
-            supabase.removeChannel(channel);
+              setFeedbacks(prev => {
+                const updated = [feedbackWithTags, ...prev];
+                setCounts(calculateCounts(updated));
+                return updated;
+              });
+            } else if (payload.eventType === 'UPDATE') {
+              const updatedFeedback = payload.new as FeedbackNotification;
+              
+              setFeedbacks(prev => {
+                const updated = prev.map(f => 
+                  f.id === updatedFeedback.id ? { ...f, ...updatedFeedback } : f
+                );
+                setCounts(calculateCounts(updated));
+                return updated;
+              });
+            } else if (payload.eventType === 'DELETE') {
+              const deletedFeedback = payload.old as FeedbackNotification;
+              
+              setFeedbacks(prev => {
+                const updated = prev.filter(f => f.id !== deletedFeedback.id);
+                setCounts(calculateCounts(updated));
+                return updated;
+              });
+            }
+          })
+          .subscribe((status) => {
+            console.log('Real-time subscription status:', status);
+            if (status === 'SUBSCRIBED') {
+              setRealtimeStatus('connected');
+              setReconnectAttempts(0);
+            } else if (status === 'CHANNEL_ERROR') {
+              setRealtimeStatus('error');
+              handleReconnection();
+            } else if (status === 'TIMED_OUT') {
+              setRealtimeStatus('disconnected');
+              handleReconnection();
+            } else {
+              setRealtimeStatus('disconnected');
+            }
           });
-        };
+
       } catch (error) {
         console.error('Error setting up real-time subscription:', error);
+        setRealtimeStatus('error');
+        handleReconnection();
+      }
+    };
+
+    const handleReconnection = () => {
+      if (reconnectAttempts < maxReconnectAttempts) {
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Exponential backoff, max 30s
+        console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
+        
+        reconnectTimeout = setTimeout(() => {
+          setReconnectAttempts(prev => prev + 1);
+          setupRealtime();
+        }, delay);
+      } else {
+        console.error('Max reconnection attempts reached');
         setRealtimeStatus('error');
       }
     };
 
-    const cleanup = setupRealtime();
+    setupRealtime();
 
     return () => {
-      if (cleanup) {
-        cleanup.then(cleanupFn => cleanupFn && cleanupFn());
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (channel) {
+        supabase.removeChannel(channel);
       }
     };
-  }, [user, analyzeSentiment, calculateCounts]);
+  }, [user, analyzeSentiment, calculateCounts, reconnectAttempts]);
 
   // Load data on mount
   useEffect(() => {
@@ -310,15 +337,29 @@ export const useRealtimeFeedback = () => {
     }
   }, []);
 
+  // Manual refresh function
+  const refreshFeedbacks = useCallback(async () => {
+    await loadFeedbacks();
+  }, [loadFeedbacks]);
+
+  // Force reconnection
+  const forceReconnect = useCallback(() => {
+    setReconnectAttempts(0);
+    setRealtimeStatus('connecting');
+  }, []);
+
   return {
     feedbacks,
     counts,
     loading,
     error,
     realtimeStatus,
-    loadFeedbacks,
+    reconnectAttempts,
+    maxReconnectAttempts,
+    loadFeedbacks: refreshFeedbacks,
     updateFeedbackStatus,
     addTagToFeedback,
-    removeTagFromFeedback
+    removeTagFromFeedback,
+    forceReconnect
   };
 };

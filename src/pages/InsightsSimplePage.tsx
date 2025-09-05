@@ -26,7 +26,8 @@ import {
   CheckSquare,
   Square,
   Filter,
-  Download
+  Download,
+  XCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -135,23 +136,30 @@ const InsightsSimplePage: React.FC = () => {
 
   // Handle feedback selection
   const handleFeedbackSelection = (feedbackId: string, checked: boolean) => {
+    console.log('Individual checkbox clicked:', feedbackId, checked);
     const newSelection = new Set(selectedFeedbacks);
     if (checked) {
       newSelection.add(feedbackId);
     } else {
       newSelection.delete(feedbackId);
     }
+    console.log('New selection:', Array.from(newSelection));
     setSelectedFeedbacks(newSelection);
   };
 
   // Handle select all
   const handleSelectAll = () => {
+    console.log('Select All clicked. Current selection:', selectedFeedbacks.size, 'Total feedbacks:', feedbacks.length);
+    
     if (selectedFeedbacks.size === feedbacks.length && feedbacks.length > 0) {
       // Deselect all
+      console.log('Deselecting all feedbacks');
       setSelectedFeedbacks(new Set());
     } else {
       // Select all available feedbacks
-      setSelectedFeedbacks(new Set(feedbacks.map(f => f.id)));
+      const allFeedbackIds = feedbacks.map(f => f.id);
+      console.log('Selecting all feedbacks:', allFeedbackIds);
+      setSelectedFeedbacks(new Set(allFeedbackIds));
     }
   };
 
@@ -397,22 +405,34 @@ const InsightsSimplePage: React.FC = () => {
                     variant="outline"
                     onClick={handleSelectAll}
                     disabled={feedbacks.length === 0}
+                    className={selectedFeedbacks.size === feedbacks.length && feedbacks.length > 0 ? 'bg-blue-50 border-blue-200' : ''}
                   >
                     {selectedFeedbacks.size === feedbacks.length && feedbacks.length > 0 ? (
                       <>
                         <Square className="h-4 w-4 mr-2" />
-                        Deselect All
+                        Deselect All ({selectedFeedbacks.size})
                       </>
                     ) : (
                       <>
                         <CheckSquare className="h-4 w-4 mr-2" />
-                        Select All
+                        Select All ({feedbacks.length})
                       </>
                     )}
                   </Button>
                   <span className="text-sm text-gray-600">
                     {selectedFeedbacks.size} of {feedbacks.length} selected
                   </span>
+                  {selectedFeedbacks.size > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedFeedbacks(new Set())}
+                      className="h-8 px-2 text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      <XCircle className="h-3 w-3 mr-1" />
+                      Clear
+                    </Button>
+                  )}
                 </div>
                 <Button
                   onClick={generateAnalysis}
