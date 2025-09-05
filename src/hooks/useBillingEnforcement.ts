@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import {
   checkFeatureUsage,
   enforceUsageLimit,
@@ -266,10 +267,18 @@ export function useBillingEnforcementWithTracking(): UseBillingEnforcementReturn
 
       // If they can use it, track the usage via the usage API
       // This will increment the counter and enforce limits server-side
-      const response = await fetch('/api/usage', {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No active session found');
+      }
+
+      const supabaseUrl = (supabase as any).supabaseUrl;
+      const response = await fetch(`${supabaseUrl}/functions/v1/usage`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ action: feature }),
       });
