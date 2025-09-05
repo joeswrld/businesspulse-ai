@@ -188,12 +188,24 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
     try {
       console.log('Processing successful payment:', response);
       
+      // Get Supabase session for authorization
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        console.error('Failed to get session:', sessionError);
+        setError('Authentication required. Please log in again.');
+        toast.error('Authentication required. Please log in again.');
+        setLoading(false);
+        return;
+      }
+      
       // Verify payment via Supabase Edge Function
       const verifyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-payment`;
       const subscriptionResponse = await fetch(verifyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           reference: response.reference,
