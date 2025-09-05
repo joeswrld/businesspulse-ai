@@ -64,30 +64,92 @@ const FeedbackSettings = () => {
   const [projectIdStatus, setProjectIdStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [setupAttempted, setSetupAttempted] = useState(false);
 
+  // Test Supabase connection and storage
+  const testSupabaseConnection = async () => {
+    try {
+      console.log('Testing Supabase connection...');
+      
+      // Test basic connection
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      console.log('Auth test:', { authData, authError });
+      
+      // Test storage access
+      const { data: bucketsData, error: bucketsError } = await supabase.storage.listBuckets();
+      console.log('Storage test:', { bucketsData, bucketsError });
+      
+      // Test database access
+      const { data: dbData, error: dbError } = await supabase
+        .from('feedback_settings')
+        .select('id')
+        .limit(1);
+      console.log('Database test:', { dbData, dbError });
+      
+      return {
+        auth: !authError,
+        storage: !bucketsError,
+        database: !dbError,
+        buckets: bucketsData || []
+      };
+    } catch (error) {
+      console.error('Connection test failed:', error);
+      return {
+        auth: false,
+        storage: false,
+        database: false,
+        buckets: [],
+        error: error.message
+      };
+    }
+  };
+
   // Ensure storage bucket exists
   const ensureStorageBucket = async () => {
     try {
+      console.log('Checking storage buckets...');
+      
       // Try to list the bucket to check if it exists
       const { data, error } = await supabase.storage.listBuckets();
       
+      console.log('Storage buckets response:', { data, error });
+      
       if (error) {
         console.error('Error listing buckets:', error);
+        toast.error(`Storage error: ${error.message}`);
         return false;
       }
 
       const bucketExists = data?.some(bucket => bucket.id === 'business-logos');
+      console.log('Bucket exists check:', { bucketExists, buckets: data });
       
       if (!bucketExists) {
         console.log('Business logos bucket does not exist. Please create it in Supabase Storage.');
-        toast.error('Storage bucket not configured. Please contact support to set up logo uploads.');
+        toast.error('Storage bucket "business-logos" not found. Please create it in Supabase Storage settings.');
         return false;
       }
 
       return true;
     } catch (error) {
       console.error('Error checking storage bucket:', error);
+      toast.error(`Storage check failed: ${error.message}`);
       return false;
     }
+  };
+
+  // Simple base64 upload (fallback method)
+  const handleBase64Upload = async (file: File) => {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64String = e.target?.result as string;
+        if (base64String) {
+          resolve(base64String);
+        } else {
+          reject(new Error('Failed to convert file to base64'));
+        }
+      };
+      reader.onerror = () => reject(new Error('File reading failed'));
+      reader.readAsDataURL(file);
+    });
   };
 
   // Handle logo upload
@@ -109,89 +171,26 @@ const FeedbackSettings = () => {
 
     setUploadingLogo(true);
 
+    // Try base64 upload first (most reliable)
     try {
-      // Check if storage bucket exists
-      const bucketExists = await ensureStorageBucket();
-      if (!bucketExists) {
-        setUploadingLogo(false);
-        return;
-      }
-
-      // Create a unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${settings.user_id}/${settings.project_id}/logo.${fileExt}`;
-
-      console.log('Uploading logo:', { fileName, fileSize: file.size, fileType: file.type });
-
-      // Upload to Supabase storage
-      const { data, error } = await supabase.storage
-        .from('business-logos')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
-
-      if (error) {
-        console.error('Upload error details:', error);
-        
-        // Try fallback: convert to base64 and store in database
-        if (error.message.includes('bucket') || error.message.includes('permission')) {
-          console.log('Storage upload failed, trying base64 fallback...');
-          
-          // Convert file to base64
-          const reader = new FileReader();
-          reader.onload = async (e) => {
-            const base64String = e.target?.result as string;
-            
-            // Update settings with base64 image
-            const updatedSettings = {
-              ...settings,
-              business_logo: base64String
-            };
-
-            setSettings(updatedSettings);
-            toast.success('Logo uploaded successfully! (Using fallback method)');
-            setUploadingLogo(false);
-          };
-          
-          reader.onerror = () => {
-            toast.error('Failed to process image. Please try again.');
-            setUploadingLogo(false);
-          };
-          
-          reader.readAsDataURL(file);
-          return;
-        } else if (error.message.includes('size')) {
-          toast.error('File size too large. Please choose a smaller image.');
-        } else {
-          toast.error(`Upload failed: ${error.message}`);
-        }
-        return;
-      }
-
-      console.log('Upload successful:', data);
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('business-logos')
-        .getPublicUrl(fileName);
-
-      console.log('Public URL generated:', publicUrl);
-
-      // Update settings with new logo URL
+      console.log('Using base64 upload method...');
+      const base64String = await handleBase64Upload(file);
+      
+      // Update settings with base64 image
       const updatedSettings = {
         ...settings,
-        business_logo: publicUrl
+        business_logo: base64String
       };
 
       setSettings(updatedSettings);
       toast.success('Logo uploaded successfully!');
-
-    } catch (error) {
-      console.error('Logo upload error:', error);
-      toast.error('Failed to upload logo. Please try again.');
-    } finally {
       setUploadingLogo(false);
+      return;
+    } catch (error) {
+      console.error('Base64 upload failed:', error);
+      toast.error('Failed to process image. Please try again.');
+      setUploadingLogo(false);
+      return;
     }
   };
 
@@ -1173,6 +1172,36 @@ const FeedbackSettings = () => {
                       Paste a direct link to your logo image
                     </p>
                   </div>
+                  
+                  {/* Debug Section - Remove in production */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="mt-4 p-3 bg-gray-100 rounded-lg">
+                      <p className="text-sm font-medium mb-2">Debug Tools</p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          const result = await testSupabaseConnection();
+                          console.log('Connection test result:', result);
+                          toast.info(`Connection test completed. Check console for details.`);
+                        }}
+                        className="mr-2"
+                      >
+                        Test Supabase Connection
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          const result = await ensureStorageBucket();
+                          console.log('Bucket check result:', result);
+                          toast.info(`Bucket check: ${result ? 'OK' : 'Failed'}`);
+                        }}
+                      >
+                        Check Storage Bucket
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
