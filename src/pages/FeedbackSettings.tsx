@@ -17,7 +17,6 @@ import {
   AlertCircle,
   RefreshCw
 } from "lucide-react";
-import WhatsAppFeedbackSection from "@/components/feedback/WhatsAppFeedbackSection";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -1055,10 +1054,6 @@ const FeedbackSettings = () => {
           </CardContent>
         </Card>
 
-        {/* WhatsApp Feedback */}
-        {settings?.project_id && settings.project_id.trim() !== '' && (
-          <WhatsAppFeedbackSection projectId={settings.project_id} />
-        )}
       </div>
     </div>
   );
