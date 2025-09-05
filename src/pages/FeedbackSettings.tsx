@@ -977,73 +977,12 @@ const FeedbackSettings = () => {
                 </div>
               )}
               
-              {/* Debug info - remove this in production */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
-                  <p><strong>Debug Info:</strong></p>
-                  <p>Current User ID: {user?.id}</p>
-                  <p>Project ID: {settings?.project_id}</p>
-                  <p>Status: {projectIdStatus}</p>
-                  <p>Locked: {settings?.project_id_locked ? 'Yes' : 'No'}</p>
-                  <div className="flex space-x-2 mt-2">
-                    <Button 
-                      size="sm" 
-                      onClick={async () => {
-                        if (settings?.project_id) {
-                          const { data, error } = await (supabase as any)
-                            .from('feedback_settings')
-                            .select('id, user_id, project_id')
-                            .eq('project_id', settings.project_id.trim())
-                            .neq('user_id', user?.id)
-                            .limit(1);
-                          console.log('Direct validation result:', { data, error });
-                          if (data && data.length > 0) {
-                            alert(`Project ID is TAKEN by user: ${(data[0] as any).user_id}`);
-                          } else {
-                            alert('Project ID is AVAILABLE');
-                          }
-                        }
-                      }}
-                    >
-                      Test Direct Query
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      onClick={async () => {
-                        const { data, error } = await (supabase as any)
-                          .from('feedback_settings')
-                          .select('project_id, user_id')
-                          .not('project_id', 'is', null)
-                          .neq('project_id', '');
-                        console.log('All project IDs:', { data, error });
-                        if (data && data.length > 0) {
-                          const projectList = data.map((item: any) => `${item.project_id} (${item.user_id})`).join('\n');
-                          alert(`All Project IDs:\n${projectList}`);
-                        } else {
-                          alert('No project IDs found');
-                        }
-                      }}
-                    >
-                      Show All IDs
-                    </Button>
-                  </div>
-                </div>
-              )}
+              
             </div>
           </CardContent>
         </Card>
 
-        {/* Logo Upload */}
-        <LogoUpload 
-          onLogoUploaded={(logoUrl) => {
-            console.log('Logo uploaded successfully:', logoUrl);
-            toast.success('Logo uploaded successfully!');
-          }}
-          onLogoDeleted={() => {
-            console.log('Logo deleted successfully');
-            toast.success('Logo deleted successfully!');
-          }}
-        />
+        
 
         {/* Widget Customization */}
         <Card>
@@ -1259,35 +1198,9 @@ const FeedbackSettings = () => {
                     </p>
                   </div>
                   
-                  {/* Debug Section - Remove in production */}
-                  {process.env.NODE_ENV === 'development' && (
-                    <div className="mt-4 p-3 bg-gray-100 rounded-lg">
-                      <p className="text-sm font-medium mb-2">Debug Tools</p>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={async () => {
-                          const result = await testSupabaseConnection();
-                          console.log('Connection test result:', result);
-                          toast.info(`Connection test completed. Check console for details.`);
-                        }}
-                        className="mr-2"
-                      >
-                        Test Supabase Connection
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={async () => {
-                          const result = await ensureStorageBucket();
-                          console.log('Bucket check result:', result);
-                          toast.info(`Bucket check: ${result ? 'OK' : 'Failed'}`);
-                        }}
-                      >
-                        Check Storage Bucket
-                      </Button>
-                    </div>
-                  )}
+                  
+                      
+                      
                 </div>
               </div>
             </div>

@@ -677,19 +677,7 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Debug Info - Remove this in production */}
-      {process.env.NODE_ENV === 'development' && (
-        <Card className="rounded-xl shadow-lg border-2 border-yellow-200 bg-yellow-50">
-          <CardContent className="p-4">
-            <div className="text-sm text-yellow-800">
-              <strong>Debug Info:</strong> Feedbacks: {feedbacks.length} | 
-              Loading: {loading.toString()} | 
-              User: {user?.email} | 
-              Subscription: {subscription?.plan_name || 'None'}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      
 
       {/* Top Row - KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
