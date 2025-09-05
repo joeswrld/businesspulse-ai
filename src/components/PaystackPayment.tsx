@@ -201,18 +201,27 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
       
       // Verify payment via Supabase Edge Function
       const verifyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-payment`;
+      
+      const requestBody = {
+        reference: response.reference,
+        plan: plan,
+        amount: amount,
+        email: user?.email
+      };
+      
+      console.log('Sending payment verification request:', {
+        url: verifyUrl,
+        body: requestBody,
+        hasAuthToken: !!session.access_token
+      });
+      
       const subscriptionResponse = await fetch(verifyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({
-          reference: response.reference,
-          plan: plan,
-          amount: amount,
-          email: user?.email
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!subscriptionResponse.ok) {
@@ -227,7 +236,16 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
         } catch (parseError) {
           error = { message: 'Failed to parse server response' };
         }
-        throw new Error(error.message || 'Failed to create subscription');
+        
+        console.error('Payment verification failed:', {
+          status: subscriptionResponse.status,
+          statusText: subscriptionResponse.statusText,
+          error: error
+        });
+        
+        // Show specific error message
+        const errorMessage = error.details || error.message || 'Failed to create subscription';
+        throw new Error(`Payment verification failed: ${errorMessage}`);
       }
 
       let result;
@@ -242,15 +260,28 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
       }
 
       if (result.success) {
+        console.log('Payment verification successful:', result);
         toast.success(`🎉 Welcome to ${planName}! Your subscription has been activated.`);
         onSuccess({ reference: response.reference, plan });
       } else {
-        throw new Error('Failed to update subscription');
+        console.error('Payment verification failed - success=false:', result);
+        throw new Error(result.message || 'Failed to update subscription');
       }
     } catch (err) {
       console.error('Payment verification error:', err);
-      setError(err instanceof Error ? err.message : 'Payment verification failed');
-      toast.error('Payment verification failed. Please contact support.');
+      const errorMessage = err instanceof Error ? err.message : 'Payment verification failed';
+      setError(errorMessage);
+      
+      // Show more specific error message
+      if (errorMessage.includes('Authentication required')) {
+        toast.error('Please log in again to complete your payment.');
+      } else if (errorMessage.includes('Amount mismatch')) {
+        toast.error('Payment amount verification failed. Please try again.');
+      } else if (errorMessage.includes('Payment verification failed')) {
+        toast.error('Payment verification failed. Please check your payment and try again.');
+      } else {
+        toast.error(`Payment verification failed: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -423,12 +454,12 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
                     <span>{navigator.onLine ? 'Online' : 'Offline'}</span>
                   </div>
                   
-                  {/* Retry Button for Network Errors */}
-                  {error.includes('Retryable') && (
+                  {/* Retry Button for Payment Verification Errors */}
+                  {(error.includes('Payment verification failed') || error.includes('Failed to create subscription') || error.includes('Failed to update subscription')) && (
                     <Button 
                       onClick={() => {
                         setError(null);
-                        handlePayment();
+                        setLoading(false);
                       }} 
                       size="sm" 
                       variant="outline"
