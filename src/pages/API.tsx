@@ -87,42 +87,42 @@ const API = () => {
       description: "Official JavaScript SDK for browser and Node.js",
       version: "v2.1.0",
       popular: true,
-      code: "npm install @feedbackflow/sdk"
+      code: "npm install @notex/sdk"
     },
     {
       name: "Python",
       description: "Python SDK for server-side integration",
       version: "v1.8.0",
       popular: true,
-      code: "pip install feedbackflow-sdk"
+      code: "pip install notex-sdk"
     },
     {
       name: "PHP",
       description: "PHP SDK for web applications",
       version: "v1.5.0",
       popular: false,
-      code: "composer require feedbackflow/sdk"
+      code: "composer require notex/sdk"
     },
     {
       name: "Ruby",
       description: "Ruby gem for Ruby on Rails applications",
       version: "v1.3.0",
       popular: false,
-      code: "gem install feedbackflow-sdk"
+      code: "gem install notex-sdk"
     },
     {
       name: "Go",
       description: "Go SDK for high-performance applications",
       version: "v1.2.0",
       popular: false,
-      code: "go get github.com/feedbackflow/sdk"
+      code: "go get github.com/notex/sdk"
     },
     {
       name: "Java",
       description: "Java SDK for enterprise applications",
       version: "v1.1.0",
       popular: false,
-      code: "implementation 'com.feedbackflow:sdk:1.1.0'"
+      code: "implementation 'com.notex:sdk:1.1.0'"
     }
   ];
 
@@ -220,18 +220,18 @@ const API = () => {
             </div>
             <pre className="text-slate-300 text-sm overflow-x-auto">
 {`// Initialize the SDK
-const feedbackflow = new FeedbackFlow({
+const notex = new NoteX({
   apiKey: 'your-api-key-here'
 });
 
 // Get all feedback
-const feedbacks = await feedbackflow.feedbacks.list({
+const feedbacks = await notex.feedbacks.list({
   projectId: 'your-project-id',
   limit: 10
 });
 
 // Create new feedback
-const newFeedback = await feedbackflow.feedbacks.create({
+const newFeedback = await notex.feedbacks.create({
   projectId: 'your-project-id',
   content: 'Great product!',
   rating: 5,
@@ -250,7 +250,7 @@ console.log(feedbacks);`}
           <div className="text-center max-w-3xl mx-auto mb-12">
             <h2 className="text-3xl font-bold mb-6">API Features</h2>
             <p className="text-lg text-muted-foreground">
-              Everything you need to build powerful integrations with FeedbackFlow.
+              Everything you need to build powerful integrations with NoteX.
             </p>
           </div>
           
@@ -413,7 +413,7 @@ console.log(feedbacks);`}
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Build?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Start integrating FeedbackFlow into your applications today. 
+            Start integrating NoteX into your applications today. 
             Get your API key and start building powerful feedback integrations.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

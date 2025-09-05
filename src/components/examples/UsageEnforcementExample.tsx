@@ -49,9 +49,7 @@ const UsageEnforcementExample: React.FC = () => {
     
     try {
       // First check if user can use the feature
-      const canUse = await enforceUsageLimit(feature as any, () => {
-        console.log(`Limit reached for ${feature}`);
-      });
+      const canUse = await enforceUsageLimit(feature as any, feature as any);
 
       if (canUse) {
         // Track usage

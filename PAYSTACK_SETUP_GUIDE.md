@@ -1,192 +1,226 @@
-# Paystack Integration Setup Guide
+# Complete Paystack Integration Setup Guide
 
-This guide will help you set up Paystack subscriptions for your NoteX BI platform with Pro (₦35,000/month) and Business (₦53,000/month) plans.
+This guide will help you set up Paystack integration with your NoteX billing system.
 
-## 🔹 1. Paystack Dashboard Setup
+## 🔧 **Environment Variables Setup**
 
-### Create Plans in Paystack
-1. Login to [Paystack Dashboard](https://dashboard.paystack.com/)
-2. Navigate to **Products & Plans**
-3. Create two subscription plans:
-
-   **Pro Plan:**
-   - Name: Pro Plan
-   - Amount: ₦35,000
-   - Interval: Monthly
-   - Plan Code: `PLN_4z2wpgmw41w2k7r`
-
-   **Business Plan:**
-   - Name: Business Plan
-   - Amount: ₦53,000
-   - Interval: Monthly
-   - Plan Code: `PLN_esryg99ztsy9xc8`
-
-### Get API Keys
-1. Go to **Settings → API Keys & Webhooks**
-2. Copy your **Secret Key** (starts with `sk_test_` or `sk_live_`)
-3. Copy your **Public Key** (starts with `pk_test_` or `pk_live_`)
-
-## 🔹 2. Supabase Environment Variables
-
-Set these environment variables in your Supabase dashboard:
-
-1. Go to **Settings → API**
-2. Add the following environment variables:
+Add these environment variables to your `.env.local` file:
 
 ```bash
+# Paystack Configuration
+NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_test_your_public_key_here
 PAYSTACK_SECRET_KEY=sk_test_your_secret_key_here
-PAYSTACK_PUBLIC_KEY=pk_test_your_public_key_here
+
+# Supabase Configuration (if not already set)
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# App Configuration
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-## 🔹 3. Deploy Supabase Functions
+## 🚀 **Paystack Account Setup**
 
-Run the deployment script:
+### **1. Create Paystack Account**
+1. Go to [Paystack Dashboard](https://dashboard.paystack.com)
+2. Sign up for a new account
+3. Complete your business verification
+
+### **2. Get Your API Keys**
+1. Go to **Settings** → **API Keys & Webhooks**
+2. Copy your **Public Key** (starts with `pk_test_` or `pk_live_`)
+3. Copy your **Secret Key** (starts with `sk_test_` or `sk_live_`)
+
+### **3. Configure Webhooks (Optional)**
+1. Go to **Settings** → **Webhooks**
+2. Add webhook URL: `https://your-domain.com/api/paystack/webhook`
+3. Select events: `charge.success`, `subscription.disable`, `subscription.enable`
+
+## 📊 **Database Setup**
+
+Run the safe migration to create required tables:
 
 ```bash
-./deploy-paystack-functions.sh
+# Run the safe migration
+./run-safe-migration.sh
+
+# Or manually run in Supabase SQL Editor
+# Copy contents of safe-billing-migration.sql and execute
 ```
 
-This will deploy three functions:
-- `create-subscription` - Creates new subscriptions
-- `paystack-webhook` - Handles Paystack webhook events
-- `manage-subscription` - Manages subscription operations
+## 🧪 **Testing the Integration**
 
-## 🔹 4. Configure Paystack Webhook
-
-1. In Paystack Dashboard, go to **Settings → API Keys & Webhooks**
-2. Add a new webhook with URL:
+### **Test Payment Flow**
+1. **Start your development server**:
+   ```bash
+   npm run dev
    ```
-   https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/paystack-webhook
+
+2. **Navigate to billing page**:
    ```
-3. Select these events:
-   - `subscription.create`
-   - `subscription.disable`
-   - `charge.success`
-   - `charge.failed`
-   - `invoice.payment_failed`
-   - `invoice.payment_success`
+   http://localhost:3000/billing
+   ```
 
-## 🔹 5. Database Migration
+3. **Test upgrade flow**:
+   - Click "Upgrade to Pro" or "Upgrade to Business"
+   - Paystack modal should open
+   - Use test card: `4084 0840 8408 4081`
+   - Expiry: Any future date
+   - CVV: Any 3 digits
+   - PIN: Any 4 digits
 
-Run the database migration to add subscription fields:
+### **Test Cards for Development**
+```bash
+# Successful payment
+Card: 4084 0840 8408 4081
+Expiry: 12/25
+CVV: 123
+PIN: 1234
 
-```sql
--- This is already included in the migration file
--- supabase/migrations/20240101000000_add_subscription_fields.sql
+# Failed payment
+Card: 4084 0840 8408 4082
+Expiry: 12/25
+CVV: 123
+PIN: 1234
+
+# Insufficient funds
+Card: 4084 0840 8408 4083
+Expiry: 12/25
+CVV: 123
+PIN: 1234
 ```
 
-## 🔹 6. Frontend Integration
+## 🔍 **Troubleshooting**
 
-The frontend is already integrated with:
-- `PaystackPayment` component for payment processing
-- Updated `Billing` page with subscription management
-- Real-time subscription status updates
+### **Common Issues**
 
-## 🔹 7. Testing the Integration
+#### **1. "Paystack script not loaded"**
+```javascript
+// Check if script is loaded in index.html
+<script src="https://js.paystack.co/v1/inline.js" async></script>
+```
 
-### Test Card Details
-Use these test cards for testing:
+#### **2. "Invalid API key"**
+- Verify your API keys are correct
+- Check if you're using test keys for development
+- Ensure keys are properly set in environment variables
 
-**Successful Payment:**
-- Card Number: `4084 0840 8408 4081`
-- Expiry: Any future date
-- CVV: Any 3 digits
-- PIN: Any 4 digits
+#### **3. "Payment verification failed"**
+- Check if Paystack secret key is correct
+- Verify the reference matches
+- Check network connectivity to Paystack API
 
-**Failed Payment:**
-- Card Number: `4084 0840 8408 4082`
-- Expiry: Any future date
-- CVV: Any 3 digits
-- PIN: Any 4 digits
+#### **4. "User not found"**
+- Ensure user is authenticated
+- Check if user email exists in Supabase auth
+- Verify service role key has admin access
 
-### Test Flow
-1. Navigate to `/billing`
-2. Click "Upgrade" on Pro or Business plan
-3. Enter test email and payment details
-4. Complete payment
-5. Verify subscription status updates
+### **Debug Steps**
 
-## 🔹 8. Production Checklist
+1. **Check browser console** for JavaScript errors
+2. **Check server logs** for API errors
+3. **Verify database tables** exist and have data
+4. **Test API endpoints** directly with Postman
 
-Before going live:
+## 📈 **Production Deployment**
 
-- [ ] Switch to Paystack live keys
-- [ ] Update plan codes to live plan codes
-- [ ] Test webhook delivery
-- [ ] Verify subscription management functions
-- [ ] Test payment failure scenarios
-- [ ] Set up monitoring for webhook events
+### **1. Update Environment Variables**
+```bash
+# Production Paystack keys
+NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_live_your_live_public_key
+PAYSTACK_SECRET_KEY=sk_live_your_live_secret_key
 
-## 🔹 9. Feature Access Control
+# Production app URL
+NEXT_PUBLIC_APP_URL=https://your-domain.com
+```
 
-The system automatically controls feature access based on subscription:
+### **2. Update Paystack Settings**
+1. Go to Paystack Dashboard
+2. Switch to **Live Mode**
+3. Update webhook URLs to production domain
+4. Test with real cards (small amounts)
 
-### Free Trial (8 days)
-- AI Insights: 20 total
-- Data Sources: 1
-- Team Members: 1
-- AI Reports: 2
-- Business Analytics: Basic
+### **3. Monitor Transactions**
+1. Check Paystack Dashboard for transactions
+2. Monitor Supabase logs for errors
+3. Set up error tracking (Sentry, etc.)
 
-### Pro Plan (₦35,000/month)
-- AI Insights: 500 per month
-- Data Sources: 5
-- Team Members: 5
-- AI Reports: 20 per month
-- Business Analytics: Real-time + export
+## 🔒 **Security Best Practices**
 
-### Business Plan (₦53,000/month)
-- AI Insights: Unlimited
-- Data Sources: Unlimited
-- Team Members: Unlimited
-- AI Reports: Unlimited
-- Business Analytics: Enterprise-grade
+### **1. API Key Security**
+- Never commit API keys to version control
+- Use environment variables for all secrets
+- Rotate keys regularly
+- Use different keys for test/production
 
-## 🔹 10. Troubleshooting
+### **2. Payment Verification**
+- Always verify payments server-side
+- Check amount, currency, and reference
+- Log all payment attempts
+- Implement webhook verification
 
-### Common Issues
+### **3. Error Handling**
+- Don't expose sensitive data in error messages
+- Log errors for debugging
+- Implement retry mechanisms
+- Graceful fallbacks for failed payments
 
-**Webhook not receiving events:**
-- Check webhook URL is correct
-- Verify webhook is active in Paystack
-- Check Supabase function logs
+## 📊 **Monitoring & Analytics**
 
-**Payment fails:**
-- Verify Paystack keys are correct
-- Check card details are valid
-- Review Paystack dashboard for errors
+### **1. Track Payment Events**
+```javascript
+// Add to your payment success callback
+analytics.track('payment_success', {
+  plan: 'pro',
+  amount: 3500000,
+  currency: 'NGN',
+  reference: 'notex_pro_123456'
+});
+```
 
-**Subscription not updating:**
-- Check database migration ran successfully
-- Verify webhook events are being processed
-- Review Supabase function logs
-
-### Support
-
-For issues:
-1. Check Supabase function logs
-2. Review Paystack dashboard events
-3. Check browser console for errors
-4. Verify environment variables are set correctly
-
-## 🔹 11. Monitoring
-
-Monitor these metrics:
-- Subscription creation success rate
+### **2. Monitor Key Metrics**
 - Payment success rate
-- Webhook delivery success rate
-- Subscription cancellation rate
-- Revenue per plan
+- Conversion rate (trial to paid)
+- Average transaction value
+- Failed payment reasons
 
-## 🔹 12. Security
+### **3. Set Up Alerts**
+- Failed payment notifications
+- High error rates
+- Unusual transaction patterns
 
-Security measures implemented:
-- Webhook signature verification
-- Environment variable protection
-- CORS headers configuration
-- Input validation and sanitization
-- Error handling and logging
+## 🎯 **Complete Integration Checklist**
 
----
+- [ ] **Environment variables** configured
+- [ ] **Paystack account** created and verified
+- [ ] **API keys** obtained and configured
+- [ ] **Database tables** created via migration
+- [ ] **Payment component** integrated
+- [ ] **API endpoints** created and tested
+- [ ] **Transaction history** displaying correctly
+- [ ] **Test payments** working
+- [ ] **Error handling** implemented
+- [ ] **Production deployment** ready
 
-**Need help?** Check the Supabase function logs or contact support with specific error messages.
+## 🚀 **Next Steps**
+
+After successful integration:
+
+1. **Add usage tracking** to your features
+2. **Implement webhook handling** for real-time updates
+3. **Add subscription management** features
+4. **Set up analytics** and monitoring
+5. **Test with real users** (small amounts)
+
+## 📞 **Support**
+
+If you encounter issues:
+
+1. **Check Paystack documentation**: https://paystack.com/docs
+2. **Review Supabase logs** for database errors
+3. **Check browser console** for JavaScript errors
+4. **Test API endpoints** directly
+5. **Contact support** with specific error messages
+
+Your Paystack integration is now complete! 🎉

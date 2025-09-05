@@ -154,11 +154,11 @@ const Settings = () => {
       }
 
       if (subscriptionData) {
-        setSubscription(subscriptionData);
+        setSubscription(subscriptionData as any);
       }
 
       // Fetch notification preferences
-      const { data: notificationsData, error: notificationsError } = await supabase
+      const { data: notificationsData, error: notificationsError } = await (supabase as any)
         .from('notification_preferences')
         .select('*')
         .eq('user_id', user.id)
@@ -169,10 +169,10 @@ const Settings = () => {
       }
 
       if (notificationsData) {
-        setNotifications(notificationsData);
+        setNotifications(notificationsData as any);
       } else {
         // Create default notification preferences
-        const { data: newNotifications } = await supabase
+        const { data: newNotifications } = await (supabase as any)
           .from('notification_preferences')
           .insert({
             user_id: user.id,
@@ -184,7 +184,7 @@ const Settings = () => {
           .single();
         
         if (newNotifications) {
-          setNotifications(newNotifications);
+          setNotifications(newNotifications as any);
         }
       }
 
@@ -432,7 +432,7 @@ const Settings = () => {
 
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('notification_preferences')
         .update({
           feedback_alerts: notifications.feedback_alerts,

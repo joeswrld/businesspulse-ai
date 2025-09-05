@@ -50,7 +50,7 @@ const Blog = () => {
     },
     {
       id: 2,
-      title: "New Sentiment Analysis Features: What's New in FeedbackFlow v2.1",
+      title: "New Sentiment Analysis Features: What's New in NoteX v2.1",
       excerpt: "Discover the latest improvements to our sentiment analysis engine and how they help you understand customer emotions better.",
       author: "Michael Chen",
       authorImage: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face",
@@ -64,7 +64,7 @@ const Blog = () => {
     {
       id: 3,
       title: "Case Study: How TechFlow Increased NPS Score from 45 to 78",
-      excerpt: "A detailed look at how TechFlow used FeedbackFlow to transform their customer feedback strategy and achieve remarkable results.",
+      excerpt: "A detailed look at how TechFlow used NoteX to transform their customer feedback strategy and achieve remarkable results.",
       author: "Emily Rodriguez",
       authorImage: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=40&h=40&fit=crop&crop=face",
       date: "January 10, 2024",
@@ -103,7 +103,7 @@ const Blog = () => {
     {
       id: 6,
       title: "Setting Up Your First Feedback Widget: Step-by-Step Tutorial",
-      excerpt: "A comprehensive tutorial on how to set up and customize your first feedback widget with FeedbackFlow.",
+      excerpt: "A comprehensive tutorial on how to set up and customize your first feedback widget with NoteX.",
       author: "Alex Thompson",
       authorImage: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&fit=crop&crop=face",
       date: "January 3, 2024",
@@ -334,7 +334,7 @@ const Blog = () => {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Start collecting feedback today and see how FeedbackFlow can help you understand 
+            Start collecting feedback today and see how NoteX can help you understand 
             your customers better and drive growth.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

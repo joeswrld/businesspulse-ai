@@ -116,7 +116,7 @@ export default function Analytics() {
       setLoading(true);
       
       // Get user's project IDs from feedback_settings
-      const { data: projectSettings, error: projectError } = await supabase
+      const { data: projectSettings, error: projectError } = await (supabase as any)
         .from('feedback_settings')
         .select('project_id')
         .eq('user_id', user.id);
@@ -132,10 +132,10 @@ export default function Analytics() {
         return;
       }
 
-      const projectIds = projectSettings.map(setting => setting.project_id).filter(Boolean);
+      const projectIds = projectSettings?.map((setting: any) => setting.project_id).filter(Boolean) || [];
 
       // Get feedbacks for user's projects
-      const { data: feedbacksData, error: feedbacksError } = await supabase
+      const { data: feedbacksData, error: feedbacksError } = await (supabase as any)
         .from('feedbacks')
         .select('*')
         .in('project_id', projectIds)
@@ -147,7 +147,7 @@ export default function Analytics() {
         return;
       }
 
-      setFeedbacks(feedbacksData || []);
+      setFeedbacks((feedbacksData || []) as any);
     } catch (error) {
       console.error('Error in loadFeedbacks:', error);
       toast.error('Failed to load feedbacks');

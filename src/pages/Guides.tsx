@@ -13,7 +13,7 @@ import { Link } from "react-router-dom";
 const Guides = () => {
   const guides = [
     {
-      title: "Getting Started with FeedbackFlow",
+      title: "Getting Started with NoteX",
       description: "Complete beginner's guide to setting up your first feedback widget",
       readTime: "10 min read",
       difficulty: "Beginner",
@@ -28,7 +28,7 @@ const Guides = () => {
     },
     {
       title: "Integrating with React Applications",
-      description: "Step-by-step guide to integrating FeedbackFlow with React apps",
+      description: "Step-by-step guide to integrating NoteX with React apps",
       readTime: "12 min read",
       difficulty: "Intermediate",
       popular: true
@@ -58,7 +58,7 @@ const Guides = () => {
               <span className="gradient-text">Guides</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-8">
-              Step-by-step guides and tutorials to help you get the most out of FeedbackFlow.
+              Step-by-step guides and tutorials to help you get the most out of NoteX.
             </p>
           </div>
         </div>

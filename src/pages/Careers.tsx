@@ -61,7 +61,7 @@ const Careers = () => {
       type: "Full-time",
       experience: "2+ years",
       salary: "$80k - $110k",
-      description: "Help customers succeed with FeedbackFlow by providing exceptional support and guidance.",
+      description: "Help customers succeed with NoteX by providing exceptional support and guidance.",
       requirements: [
         "2+ years of customer success or account management experience",
         "Strong communication and problem-solving skills",

@@ -119,7 +119,7 @@ serve(async (req) => {
     let userPlan = 'free'
     if (subscriptionData) {
       if (subscriptionData.status === 'active') {
-        userPlan = subscriptionData.plan_id || 'pro'
+        userPlan = subscriptionData.plan_name || subscriptionData.plan_type || 'pro'
       } else if (subscriptionData.status === 'trialing') {
         userPlan = 'free'
       }

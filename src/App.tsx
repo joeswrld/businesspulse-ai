@@ -57,7 +57,7 @@ const Community = lazy(() => import("./pages/Community"));
 const Templates = lazy(() => import("./pages/Templates"));
 const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
+// const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
 
 const queryClient = new QueryClient();
 
@@ -244,11 +244,11 @@ const App = () => (
                 </Suspense>
               </ProtectedRoute>
             } />
-            <Route path="/teams/invite/:token" element={
+            {/* <Route path="/teams/invite/:token" element={
               <Suspense fallback={<LoadingSpinner />}>
                 <TeamInvitation />
               </Suspense>
-            } />
+            } /> */}
 
             <Route path="/profile" element={
               <ProtectedRoute>

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { checkAndSetupDatabase } from '@/utils/databaseCheck';
+// import { checkAndSetupDatabase } from '@/utils/databaseCheck';
 import { 
   BarChart3, 
   Users, 
@@ -129,13 +129,13 @@ export default function Dashboard() {
       
       // Try optimized single query first
       try {
-        const { data, error } = await supabase.rpc('get_dashboard_data', {
+        const { data, error } = await (supabase as any).rpc('get_dashboard_data', {
           user_id_param: user.id,
           limit_param: 50
         });
 
-        if (!error && data && data.length > 0) {
-          const result = data[0];
+        if (!error && data && (data as any).length > 0) {
+          const result = (data as any)[0];
           
           // Parse feedbacks
           const feedbacksData = result.feedbacks ? JSON.parse(result.feedbacks) : [];
@@ -162,7 +162,7 @@ export default function Dashboard() {
       console.log('Loading data using individual queries...');
       
       // Get user's project IDs
-      const { data: projectSettings, error: settingsError } = await supabase
+      const { data: projectSettings, error: settingsError } = await (supabase as any)
         .from('feedback_settings')
         .select('project_id')
         .eq('user_id', user.id)
@@ -180,7 +180,7 @@ export default function Dashboard() {
       // Get feedbacks for user's projects
       let feedbacksData: Feedback[] = [];
       if (projectIds.length > 0) {
-        const { data: feedbacks, error: feedbacksError } = await supabase
+        const { data: feedbacks, error: feedbacksError } = await (supabase as any)
           .from('feedbacks')
           .select('*')
           .in('project_id', projectIds)
@@ -192,7 +192,7 @@ export default function Dashboard() {
           throw new Error('Failed to load feedbacks');
         }
 
-        feedbacksData = feedbacks || [];
+        feedbacksData = (feedbacks || []) as any;
         console.log('Feedbacks loaded via individual query:', feedbacksData.length);
       }
 
@@ -212,7 +212,7 @@ export default function Dashboard() {
       
       // Set the data
       setFeedbacks(feedbacksData);
-      setSubscription(subscriptionData);
+      setSubscription(subscriptionData as any);
 
       console.log('Dashboard data loaded successfully via individual queries');
 
@@ -538,15 +538,22 @@ export default function Dashboard() {
       };
     }
 
-    // Safely get subscription properties with defaults
-    const planName = subscription.plan_name || subscription.subscription_type || 'free';
-    const planType = subscription.plan_type || 'free';
+    // Derive plan from available fields (plan_name preferred). Fallback to legacy fields.
+    const derivedPlan = (() => {
+      const planName = (subscription as any).plan_name?.toLowerCase?.() || (subscription as any).plan_type?.toLowerCase?.() || '';
+      if (planName.includes('business')) return 'business';
+      if (planName.includes('pro') || planName.includes('premium')) return 'pro';
+      if (planName.includes('trial')) return 'trial';
+      return (subscription as any).plan_type || 'free';
+    })();
+    const planType = derivedPlan;
+    const planName = derivedPlan;
     const trialEnd = subscription.trial_end || subscription.current_period_end;
     
     console.log('🔍 Plan info extracted:', { planName, planType, trialEnd });
     
     // Check if user is currently in trial
-    const isTrial = subscription.status === 'trialing' || planName === 'free_trial' || planName === 'free';
+    const isTrial = subscription.status === 'trialing' || planName === 'free_trial' || planName === 'free' || planName === 'trial';
     let daysLeft = 0;
     if (isTrial && subscription.trial_end) {
       const trialEnd = new Date(subscription.trial_end);
@@ -562,8 +569,6 @@ export default function Dashboard() {
       upgradeText = 'Upgrade to Pro';
       upgradeLink = '/billing?plan=pro';
     } else if (planName === 'pro') {
-
-    } else if ((subscription.plan_name || '').toLowerCase() === 'pro') {
 
       upgradeText = 'Upgrade to Business';
       upgradeLink = '/billing?plan=business';

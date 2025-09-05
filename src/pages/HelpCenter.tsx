@@ -162,7 +162,7 @@ const HelpCenter = () => {
       title: "Email Support",
       description: "Get help via email within 24 hours",
       action: "Send Email",
-      href: "mailto:support@feedbackflow.com"
+      href: "mailto:support@notex.com"
     },
     {
       icon: MessageSquare,
@@ -211,7 +211,7 @@ const HelpCenter = () => {
               <span className="gradient-text">Help?</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-8">
-              Find answers to common questions, learn how to use FeedbackFlow effectively, 
+              Find answers to common questions, learn how to use NoteX effectively, 
               and get the support you need to succeed.
             </p>
 
@@ -345,7 +345,7 @@ const HelpCenter = () => {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Start collecting feedback today and see how FeedbackFlow can help you understand 
+            Start collecting feedback today and see how NoteX can help you understand 
             your customers better and drive growth.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

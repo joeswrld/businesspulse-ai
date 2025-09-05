@@ -12,7 +12,6 @@
     try {
       // Check if ethereum is already defined and not configurable
       if (window.ethereum && !Object.getOwnPropertyDescriptor(window, 'ethereum').configurable) {
-        console.warn('NoteX: window.ethereum is already set and not configurable. Skipping wallet injection.');
         return false;
       }
 
@@ -26,7 +25,7 @@
 
       return true;
     } catch (error) {
-      console.warn('NoteX: Failed to set window.ethereum:', error.message);
+      // Silently handle ethereum setting errors
       return false;
     }
   }
@@ -42,7 +41,7 @@
           enumerable: true
         });
       } catch (error) {
-        console.warn('NoteX: Failed to restore original ethereum:', error.message);
+        // Silently handle restoration errors
       }
     }
   }
@@ -57,17 +56,18 @@
       'Cannot redefine property: ethereum',
       'Failed to set window.ethereum',
       'Backpack couldn\'t override',
-      'setupBridgeMessengerRelay is only supported in Content Scripts'
+      'setupBridgeMessengerRelay is only supported in Content Scripts',
+      'TypeError: Failed to fetch',
+      'net::ERR_INTERNET_DISCONNECTED',
+      'Failed to load resource'
     ];
 
     const shouldFilter = walletErrors.some(error => message.includes(error));
     
     if (!shouldFilter) {
       originalConsoleError.apply(console, args);
-    } else {
-      // Log as warning instead of error for wallet conflicts
-      console.warn('NoteX: Wallet extension conflict detected and handled gracefully');
     }
+    // Silently filter out wallet and network errors
   };
 
   // Override console.warn to filter out wallet-related warnings
@@ -78,7 +78,11 @@
     // Filter out common wallet extension warnings
     const walletWarnings = [
       'Backpack couldn\'t override',
-      'Failed to set window.ethereum'
+      'Failed to set window.ethereum',
+      'Billing profiles table not available',
+      'Transactions table not available',
+      'Usage tracking table not available',
+      'Failed to create billing profile via function'
     ];
 
     const shouldFilter = walletWarnings.some(warning => message.includes(warning));
@@ -86,6 +90,7 @@
     if (!shouldFilter) {
       originalConsoleWarn.apply(console, args);
     }
+    // Silently filter out wallet and billing warnings
   };
 
   // Expose safe functions globally

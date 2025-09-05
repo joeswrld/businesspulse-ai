@@ -91,8 +91,11 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       };
     }
 
-    const planName = subscription.plan_name || 'Free Trial';
-    const isTrial = subscription.plan_type === 'trial';
+    const planName = (subscription as any)?.plan_name?.toLowerCase?.() || (subscription as any)?.plan_type?.toLowerCase?.() || '';
+    const planType = planName.includes('business') ? 'business'
+      : (planName.includes('pro') || planName.includes('premium')) ? 'pro'
+      : (subscription as any).plan_type || 'free';
+    const isTrial = planType === 'trial' || (subscription as any).status === 'trialing';
     
     if (isTrial) {
       return {
@@ -103,7 +106,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       };
     }
 
-    if (subscription.plan_type === 'pro') {
+    if (planType === 'pro') {
       return {
         planName: 'Pro',
         planType: 'pro',
@@ -167,8 +170,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           {/* Logo */}
           <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white/50 backdrop-blur-sm">
             <Link to="/dashboard" className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
-                <img src="/favicon.ico" alt="NoteX" className="h-6 w-6" />
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+                <img src="/favicon.ico" alt="FeedbackFlow" className="h-6 w-6" />
               </div>
               {!sidebarCollapsed && (
                 <div className="transition-opacity duration-300">

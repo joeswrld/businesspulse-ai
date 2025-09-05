@@ -43,7 +43,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (seededSettingsFor === userId) return;
 
       // Probe if row exists
-      const { data: existing } = await supabase
+      const { data: existing } = await (supabase as any)
         .from('feedback_settings')
         .select('id')
         .eq('user_id', userId)
@@ -51,9 +51,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (!existing || existing.length === 0) {
         // Create row idempotently
-        await supabase
+        await (supabase as any)
           .from('feedback_settings')
-          .upsert({ user_id: userId } as any, { onConflict: 'user_id' });
+          .upsert({ user_id: userId }, { onConflict: 'user_id' });
       }
       setSeededSettingsFor(userId);
     } catch (e) {
