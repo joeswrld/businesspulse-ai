@@ -367,7 +367,12 @@ const FeedbackSettings = () => {
           theme: 'dark',
           brand_color: '#2563eb',
           redirect_url: null,
-          notify_email: null
+          notify_email: null,
+          business_name: 'Our Business',
+          business_logo: null,
+          show_rating: true,
+          show_contact_info: true,
+          custom_fields: []
         };
 
         try {
@@ -621,6 +626,11 @@ const FeedbackSettings = () => {
             project_id: settings.project_id,
             project_id_locked: true, // Lock the project ID after first save
             notify_email: settings.notify_email,
+            business_name: settings.business_name,
+            business_logo: settings.business_logo,
+            show_rating: settings.show_rating,
+            show_contact_info: settings.show_contact_info,
+            custom_fields: settings.custom_fields,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
@@ -647,6 +657,11 @@ const FeedbackSettings = () => {
                 project_id: settings.project_id,
                 project_id_locked: true,
                 notify_email: settings.notify_email,
+                business_name: settings.business_name,
+                business_logo: settings.business_logo,
+                show_rating: settings.show_rating,
+                show_contact_info: settings.show_contact_info,
+                custom_fields: settings.custom_fields,
                 updated_at: new Date().toISOString()
               })
               .eq('user_id', user.id)
@@ -685,6 +700,11 @@ const FeedbackSettings = () => {
             project_id: settings.project_id,
             project_id_locked: true, // Lock the project ID after first save
             notify_email: settings.notify_email,
+            business_name: settings.business_name,
+            business_logo: settings.business_logo,
+            show_rating: settings.show_rating,
+            show_contact_info: settings.show_contact_info,
+            custom_fields: settings.custom_fields,
             updated_at: new Date().toISOString()
           })
           .eq('id', settings.id)
@@ -712,6 +732,11 @@ const FeedbackSettings = () => {
                 project_id: settings.project_id,
                 project_id_locked: true,
                 notify_email: settings.notify_email,
+                business_name: settings.business_name,
+                business_logo: settings.business_logo,
+                show_rating: settings.show_rating,
+                show_contact_info: settings.show_contact_info,
+                custom_fields: settings.custom_fields,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
               })
