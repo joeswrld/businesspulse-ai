@@ -40,6 +40,11 @@ const Billing = lazy(() => import("./pages/Billing"));
 
 const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
 
+// Feedback form pages
+const QRFeedbackPage = lazy(() => import("./pages/feedback/qr/[project_id]"));
+const EmailFeedbackPage = lazy(() => import("./pages/feedback/email/[project_id]"));
+const ThankYouPage = lazy(() => import("./pages/feedback/thank-you"));
+
 const Testimonials = lazy(() => import("./pages/Testimonials"));
 const About = lazy(() => import("./pages/About"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -158,6 +163,23 @@ const App = () => (
             <Route path="/cookie-policy" element={
               <Suspense fallback={<LoadingSpinner />}>
                 <CookiePolicy />
+              </Suspense>
+            } />
+            
+            {/* Feedback form routes - Public access */}
+            <Route path="/feedback/qr/:project_id" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <QRFeedbackPage />
+              </Suspense>
+            } />
+            <Route path="/feedback/email/:project_id" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <EmailFeedbackPage />
+              </Suspense>
+            } />
+            <Route path="/feedback/thank-you" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <ThankYouPage />
               </Suspense>
             } />
             

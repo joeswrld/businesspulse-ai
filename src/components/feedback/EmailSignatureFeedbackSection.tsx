@@ -79,8 +79,9 @@ export default function EmailSignatureFeedbackSection({ projectId }: EmailSignat
         return;
       }
 
-      // Generate new email link
-      const emailLinkUrl = `https://notex.com.ng/feedback/email/${projectId}`;
+      // Generate new email link using current domain
+      const baseUrl = window.location.origin;
+      const emailLinkUrl = `${baseUrl}/feedback/email/${projectId}`;
       console.log('Generated new email link:', emailLinkUrl);
 
       // Insert new link into database

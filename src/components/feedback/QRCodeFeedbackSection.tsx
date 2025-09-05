@@ -86,8 +86,9 @@ export default function QRCodeFeedbackSection({ projectId }: QRCodeFeedbackSecti
         return;
       }
 
-      // Generate new QR link
-      const qrLinkUrl = `https://notex.com.ng/feedback/qr/${projectId}`;
+      // Generate new QR link using current domain
+      const baseUrl = window.location.origin;
+      const qrLinkUrl = `${baseUrl}/feedback/qr/${projectId}`;
       console.log('Generated new QR link:', qrLinkUrl);
 
       // Insert new link into database

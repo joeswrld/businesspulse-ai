@@ -1,11 +1,11 @@
 import React from 'react';
-import { useRouter } from 'next/router';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Home, MessageCircle } from 'lucide-react';
 
 const ThankYouPage = () => {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -37,7 +37,7 @@ const ThankYouPage = () => {
 
             <div className="flex flex-col space-y-3">
               <Button
-                onClick={() => router.push('/')}
+                onClick={() => navigate('/')}
                 className="w-full"
               >
                 <Home className="h-4 w-4 mr-2" />
