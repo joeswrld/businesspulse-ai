@@ -12,7 +12,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useBillingEnforcement } from '@/hooks/useBillingEnforcement';
+import { useBillingEnforcementWithTracking } from '@/hooks/useBillingEnforcement';
 import UpgradeModal from '@/components/billing/UpgradeModal';
 import UsageDashboard from '@/components/billing/UsageDashboard';
 import { type PlanTier, type FeatureType } from '@/lib/billingEnforcement';
@@ -34,7 +34,7 @@ const BillingEnforcementExample: React.FC = () => {
     isTrialActive,
     needsUpgrade,
     featuresNeedingUpgrade
-  } = useBillingEnforcement();
+  } = useBillingEnforcementWithTracking();
 
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [blockedFeature, setBlockedFeature] = useState<FeatureType | undefined>();

@@ -69,10 +69,7 @@ export const useBilling = () => {
       // Get subscription from new billing system
       const { data: subscriptionData } = await supabase
         .from('user_subscriptions')
-        .select(`
-          *,
-          plans!inner(name, tier)
-        `)
+        .select('*')
         .eq('user_id', authUser.id)
         .single();
 
@@ -81,17 +78,17 @@ export const useBilling = () => {
         setSubscription({
           id: subscriptionData.id,
           plan_code: subscriptionData.plan_code || '',
-          plan_name: (subscriptionData as any).plans?.name || '',
+          plan_name: subscriptionData.plan_name || '',
           status: subscriptionData.status || 'inactive',
           current_period_start: subscriptionData.current_period_start || '',
           current_period_end: subscriptionData.current_period_end || '',
           cancel_at_period_end: subscriptionData.cancel_at_period_end || false,
-          canceled_at: (subscriptionData as any).canceled_at || null
+          canceled_at: subscriptionData.canceled_at || null
         });
       }
 
-      // Get transactions from new billing system
-      const { data: transactionsData } = await supabase
+      // Get transactions from new billing system with type assertion
+      const { data: transactionsData } = await (supabase as any)
         .from('transactions')
         .select('*')
         .eq('user_id', authUser.id)

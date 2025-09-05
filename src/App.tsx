@@ -39,6 +39,12 @@ const Feedback = lazy(() => import("./pages/Feedback"));
 const Billing = lazy(() => import("./pages/Billing"));
 
 const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
+const RealtimeTest = lazy(() => import("./pages/RealtimeTest"));
+
+// Feedback form pages
+const QRFeedbackPage = lazy(() => import("./pages/feedback/qr/[project_id]"));
+const EmailFeedbackPage = lazy(() => import("./pages/feedback/email/[project_id]"));
+const ThankYouPage = lazy(() => import("./pages/feedback/thank-you"));
 
 const Testimonials = lazy(() => import("./pages/Testimonials"));
 const About = lazy(() => import("./pages/About"));
@@ -161,6 +167,23 @@ const App = () => (
               </Suspense>
             } />
             
+            {/* Feedback form routes - Public access */}
+            <Route path="/feedback/qr/:project_id" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <QRFeedbackPage />
+              </Suspense>
+            } />
+            <Route path="/feedback/email/:project_id" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <EmailFeedbackPage />
+              </Suspense>
+            } />
+            <Route path="/feedback/thank-you" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <ThankYouPage />
+              </Suspense>
+            } />
+            
             {/* Protected routes */}
             <Route path="/dashboard" element={
               <ProtectedRoute>
@@ -240,6 +263,15 @@ const App = () => (
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <FeedbackSettings />
+                  </DashboardLayout>
+                </Suspense>
+              </ProtectedRoute>
+            } />
+            <Route path="/realtime-test" element={
+              <ProtectedRoute>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <RealtimeTest />
                   </DashboardLayout>
                 </Suspense>
               </ProtectedRoute>

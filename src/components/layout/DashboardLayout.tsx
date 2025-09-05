@@ -27,6 +27,7 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useFeedbackNotifications } from "@/hooks/useFeedbackNotifications";
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -37,6 +38,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
+  const { newCount: feedbackNewCount } = useFeedbackNotifications();
 
 
   // Load user data
@@ -125,7 +127,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
   const navigation = [
     { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Collect Feedback", href: "/feedback", icon: MessageSquare }, 
+    { name: "Collect Feedback", href: "/feedback", icon: MessageSquare, notificationCount: feedbackNewCount }, 
     { name: "AI Insights", href: "/insights-simple", icon: Brain },
     { name: "Reports & Analytics", href: "/reports", icon: FileText },
     { name: "Business Metrics", href: "/analytics", icon: BarChart3 },
@@ -293,7 +295,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                       title={sidebarCollapsed ? item.name : undefined}
                     >
                       <div className={cn(
-                        "p-1 rounded-lg transition-colors",
+                        "p-1 rounded-lg transition-colors relative",
                         isActive 
                           ? "bg-white/20" 
                           : "bg-slate-100 group-hover:bg-slate-200"
@@ -302,13 +304,31 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                           "h-4 w-4",
                           isActive ? "text-white" : "text-slate-600"
                         )} />
+                        {item.notificationCount && item.notificationCount > 0 && (
+                          <Badge 
+                            variant="destructive" 
+                            className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 flex items-center justify-center text-xs font-bold bg-red-500 hover:bg-red-600"
+                          >
+                            {item.notificationCount > 9 ? '9+' : item.notificationCount}
+                          </Badge>
+                        )}
                       </div>
                       {!sidebarCollapsed && (
                         <>
                           <span className="flex-1">{item.name}</span>
-                          {isActive && (
-                            <div className="w-2 h-2 bg-white rounded-full"></div>
-                          )}
+                          <div className="flex items-center space-x-2">
+                            {item.notificationCount && item.notificationCount > 0 && (
+                              <Badge 
+                                variant="destructive" 
+                                className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs font-bold bg-red-500 hover:bg-red-600"
+                              >
+                                {item.notificationCount > 99 ? '99+' : item.notificationCount}
+                              </Badge>
+                            )}
+                            {isActive && (
+                              <div className="w-2 h-2 bg-white rounded-full"></div>
+                            )}
+                          </div>
                         </>
                       )}
                     </Link>
