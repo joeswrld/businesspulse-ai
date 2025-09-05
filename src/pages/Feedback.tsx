@@ -37,6 +37,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRealtimeFeedback } from "@/hooks/useRealtimeFeedback";
+import { useFeedbackWebhook } from "@/hooks/useFeedbackWebhook";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Feedback {
@@ -73,6 +74,9 @@ const Feedback = () => {
     addTagToFeedback, 
     removeTagFromFeedback 
   } = useRealtimeFeedback();
+
+  // Enable email notifications via webhook
+  useFeedbackWebhook();
   
   // Local state for UI
   const [searchTerm, setSearchTerm] = useState('');
