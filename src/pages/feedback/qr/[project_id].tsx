@@ -26,11 +26,9 @@ interface ProjectData {
 
 interface FeedbackSubmission {
   project_id: string;
-  channel: string;
   message: string;
-  rating?: number;
-  customer_name?: string;
-  customer_email?: string;
+  name?: string;
+  email?: string;
 }
 
 const QRFeedbackPage = () => {
@@ -152,13 +150,17 @@ const QRFeedbackPage = () => {
     setSubmitting(true);
 
     try {
+      // Build message with rating if provided
+      let message = feedback.trim();
+      if (rating && rating > 0) {
+        message = message ? `${message}\n\nRating: ${rating}/5` : `Rating: ${rating}/5`;
+      }
+      
       const feedbackData: FeedbackSubmission = {
         project_id: project_id,
-        channel: 'qr',
-        message: feedback.trim() || `Rating: ${rating}/5`,
-        rating: rating || undefined,
-        customer_name: customerName.trim() || undefined,
-        customer_email: customerEmail.trim() || undefined
+        message: message || 'No message provided',
+        name: customerName.trim() || undefined,
+        email: customerEmail.trim() || undefined
       };
 
       const { data, error } = await supabase
