@@ -1,0 +1,275 @@
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { MessageCircle, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+
+interface ProjectData {
+  id: string;
+  user_id: string;
+  project_id: string;
+  title?: string;
+  brand_color?: string;
+}
+
+interface FeedbackSubmission {
+  project_id: string;
+  channel: string;
+  message: string;
+}
+
+const QRFeedbackPage = () => {
+  const router = useRouter();
+  const { project_id } = router.query;
+  
+  const [project, setProject] = useState<ProjectData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState('');
+
+  // Fetch project data
+  useEffect(() => {
+    const fetchProject = async () => {
+      if (!project_id || typeof project_id !== 'string') return;
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        // First try to get project from feedback_settings table
+        const { data: feedbackSettings, error: feedbackError } = await supabase
+          .from('feedback_settings')
+          .select('*')
+          .eq('project_id', project_id)
+          .single();
+
+        if (feedbackError && feedbackError.code !== 'PGRST116') {
+          console.error('Error fetching feedback settings:', feedbackError);
+          throw new Error('Failed to fetch project information');
+        }
+
+        if (feedbackSettings) {
+          setProject({
+            id: feedbackSettings.id,
+            user_id: feedbackSettings.user_id,
+            project_id: feedbackSettings.project_id,
+            title: feedbackSettings.title || 'Feedback Form',
+            brand_color: feedbackSettings.brand_color || '#3b82f6'
+          });
+          return;
+        }
+
+        // If not found in feedback_settings, show generic project
+        setProject({
+          id: project_id,
+          user_id: '',
+          project_id: project_id,
+          title: 'Feedback Form',
+          brand_color: '#3b82f6'
+        });
+
+      } catch (err) {
+        console.error('Error fetching project:', err);
+        setError('Project not found. Please check the QR code and try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProject();
+  }, [project_id]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!feedback.trim()) {
+      toast.error('Please enter your feedback before submitting.');
+      return;
+    }
+
+    if (!project_id || typeof project_id !== 'string') {
+      toast.error('Invalid project ID.');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const feedbackData: FeedbackSubmission = {
+        project_id: project_id,
+        channel: 'qr',
+        message: feedback.trim()
+      };
+
+      const { data, error } = await supabase
+        .from('feedbacks')
+        .insert([feedbackData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error submitting feedback:', error);
+        throw new Error('Failed to submit feedback. Please try again.');
+      }
+
+      console.log('Feedback submitted successfully:', data);
+      setSubmitted(true);
+      toast.success('Thank you! Your feedback has been submitted.');
+
+      // Redirect to thank you page after 3 seconds
+      setTimeout(() => {
+        router.push('/feedback/thank-you');
+      }, 3000);
+
+    } catch (err) {
+      console.error('Error submitting feedback:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      toast.error(errorMessage);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-center space-x-2">
+              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+              <span className="text-gray-600">Loading feedback form...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              <span>Error</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+            <Button 
+              onClick={() => router.back()} 
+              variant="outline" 
+              className="w-full mt-4"
+            >
+              Go Back
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 text-center">
+            <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h2>
+            <p className="text-gray-600 mb-4">
+              Your feedback has been submitted successfully. We appreciate your input!
+            </p>
+            <p className="text-sm text-gray-500">
+              Redirecting to thank you page...
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <div className="max-w-md mx-auto">
+        <Card className="shadow-lg">
+          <CardHeader className="text-center pb-4">
+            <div className="flex items-center justify-center mb-4">
+              <MessageCircle 
+                className="h-8 w-8" 
+                style={{ color: project?.brand_color || '#3b82f6' }}
+              />
+            </div>
+            <CardTitle className="text-2xl font-bold text-gray-900">
+              {project?.title || 'Share Your Feedback'}
+            </CardTitle>
+            <CardDescription className="text-gray-600">
+              We value your opinion and would love to hear from you
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="feedback" className="text-sm font-medium text-gray-700">
+                  Your Feedback
+                </Label>
+                <Textarea
+                  id="feedback"
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  placeholder="Tell us about your experience, suggestions, or any feedback you'd like to share..."
+                  className="min-h-[120px] resize-none"
+                  disabled={submitting}
+                />
+                <p className="text-xs text-gray-500">
+                  Your feedback helps us improve our services
+                </p>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={submitting || !feedback.trim()}
+                className="w-full"
+                style={{ 
+                  backgroundColor: project?.brand_color || '#3b82f6',
+                  borderColor: project?.brand_color || '#3b82f6'
+                }}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Send Feedback
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <p className="text-xs text-gray-500 text-center">
+                Powered by NoteX • Your feedback is secure and private
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default QRFeedbackPage;
