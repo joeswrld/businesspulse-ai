@@ -150,9 +150,31 @@ serve(async (req) => {
     
     console.log('Paystack response:', JSON.stringify(paystackData, null, 2))
 
+    // Check if Paystack returned an error
     if (paystackData.status === false) {
+      console.error('Paystack verification failed:', paystackData.message);
       return new Response(
-        JSON.stringify({ error: 'Payment verification failed', details: paystackData.message }),
+        JSON.stringify({ 
+          error: 'Payment verification failed', 
+          details: paystackData.message || 'Unknown Paystack error',
+          paystack_response: paystackData
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Check if we have transaction data
+    if (!paystackData.data) {
+      console.error('No transaction data in Paystack response');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid Paystack response', 
+          details: 'No transaction data received',
+          paystack_response: paystackData
+        }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -174,13 +196,20 @@ serve(async (req) => {
     }
 
     // Check if amount matches (Paystack amounts are in kobo)
-    if (transaction.amount !== amount) {
-      console.error(`Amount mismatch: expected ${amount}, got ${transaction.amount}`)
+    // Convert amount to number if it's a string
+    const expectedAmount = typeof amount === 'string' ? parseInt(amount) : amount;
+    const receivedAmount = transaction.amount;
+    
+    console.log(`Amount comparison: expected ${expectedAmount} (${typeof expectedAmount}), received ${receivedAmount} (${typeof receivedAmount})`);
+    
+    if (receivedAmount !== expectedAmount) {
+      console.error(`Amount mismatch: expected ${expectedAmount}, got ${receivedAmount}`)
       return new Response(
         JSON.stringify({ 
           error: 'Amount mismatch', 
-          expected: amount, 
-          received: transaction.amount 
+          expected: expectedAmount, 
+          received: receivedAmount,
+          details: 'Payment amount does not match expected amount'
         }),
         { 
           status: 400, 
@@ -205,8 +234,24 @@ serve(async (req) => {
     }
 
     // Create or update billing profile
+    const billingProfileData = {
+      id: user.id,
+      plan: plan,
+      trial_ends_at: null,
+      next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+      subscription_status: 'active',
+      paystack_customer_id: transaction.customer?.customer_code || null,
+      paystack_subscription_id: transaction.subscription?.subscription_code || null,
+      created_at: new Date().toISOString()
+    };
+
+    console.log('Creating/updating billing profile:', billingProfileData);
+
     const { error: billingError } = await supabase
       .from('billing_profiles')
+
+      .upsert(billingProfileData, {
+
       .upsert({
         id: user.id,
         plan: plan,
@@ -217,13 +262,18 @@ serve(async (req) => {
         paystack_subscription_id: transaction.subscription?.subscription_code || null,
         created_at: new Date().toISOString()
       }, {
+
         onConflict: 'id'
       })
 
     if (billingError) {
       console.error('Billing profile update error:', billingError)
       return new Response(
-        JSON.stringify({ error: 'Failed to update billing profile', details: billingError.message }),
+        JSON.stringify({ 
+          error: 'Failed to update billing profile', 
+          details: billingError.message,
+          billing_data: billingProfileData
+        }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -234,8 +284,23 @@ serve(async (req) => {
     console.log('Billing profile updated successfully')
 
     // Create transaction record
+    const transactionData = {
+      user_id: user.id,
+      amount: expectedAmount, // Use the validated amount
+      currency: 'NGN',
+      status: 'success',
+      description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan Subscription`,
+      paystack_reference: reference,
+      created_at: new Date().toISOString()
+    };
+
+    console.log('Creating transaction record:', transactionData);
+
     const { error: transactionError } = await supabase
       .from('transactions')
+
+      .insert(transactionData)
+
       .insert({
         user_id: user.id,
         amount: amount,
@@ -246,10 +311,15 @@ serve(async (req) => {
         created_at: new Date().toISOString()
       })
 
+
     if (transactionError) {
       console.error('Transaction record error:', transactionError)
       return new Response(
-        JSON.stringify({ error: 'Failed to record transaction', details: transactionError.message }),
+        JSON.stringify({ 
+          error: 'Failed to record transaction', 
+          details: transactionError.message,
+          transaction_data: transactionData
+        }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -260,8 +330,26 @@ serve(async (req) => {
     console.log('Transaction record created successfully')
 
     // Update user subscription
+    const subscriptionData = {
+      user_id: user.id,
+      plan_code: plan === 'pro' ? 'PLN_4z2wpgmw41w2k7r' : 'PLN_esryg99ztsy9xc8',
+      plan_name: plan === 'pro' ? 'Pro Plan' : 'Business Plan',
+      status: 'active',
+      current_period_start: new Date().toISOString(),
+      current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      cancel_at_period_end: false,
+      canceled_at: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    console.log('Creating/updating user subscription:', subscriptionData);
+
     const { error: subscriptionError } = await supabase
       .from('user_subscriptions')
+
+      .upsert(subscriptionData, {
+
       .upsert({
         user_id: user.id,
         plan_code: plan === 'pro' ? 'PLN_4z2wpgmw41w2k7r' : 'PLN_esryg99ztsy9xc8',
@@ -274,13 +362,18 @@ serve(async (req) => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }, {
+
         onConflict: 'user_id'
       })
 
     if (subscriptionError) {
       console.error('Subscription update error:', subscriptionError)
       return new Response(
-        JSON.stringify({ error: 'Failed to update subscription', details: subscriptionError.message }),
+        JSON.stringify({ 
+          error: 'Failed to update subscription', 
+          details: subscriptionError.message,
+          subscription_data: subscriptionData
+        }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -294,7 +387,26 @@ serve(async (req) => {
     console.log(`User ${user.id} upgraded to ${plan} plan successfully`)
 
     // Return success response
+    const successResponse = {
+      success: true,
+      message: 'Subscription activated successfully',
+      data: {
+        user_id: user.id,
+        plan: plan,
+        reference: reference,
+        amount: expectedAmount,
+        paystack_transaction_id: transaction.id,
+        subscription_status: 'active',
+        next_billing_date: billingProfileData.next_billing_date
+      }
+    };
+
+    console.log('Payment verification successful:', successResponse);
+
     return new Response(
+
+      JSON.stringify(successResponse),
+
       JSON.stringify({
         success: true,
         message: 'Subscription activated successfully',
@@ -306,6 +418,7 @@ serve(async (req) => {
           paystack_transaction_id: transaction.id
         }
       }),
+
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

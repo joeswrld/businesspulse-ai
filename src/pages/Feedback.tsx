@@ -37,6 +37,8 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRealtimeFeedback } from "@/hooks/useRealtimeFeedback";
+import { useFeedbackWebhook } from "@/hooks/useFeedbackWebhook";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Feedback {
   id: string;
@@ -72,6 +74,9 @@ const Feedback = () => {
     addTagToFeedback, 
     removeTagFromFeedback 
   } = useRealtimeFeedback();
+
+  // Enable email notifications via webhook
+  useFeedbackWebhook();
   
   // Local state for UI
   const [searchTerm, setSearchTerm] = useState('');
@@ -174,7 +179,6 @@ const Feedback = () => {
 
   // Bulk action functions
   const handleSelectAll = () => {
-    const filteredFeedbacks = getFilteredFeedbacks();
     if (selectedFeedbacks.size === filteredFeedbacks.length) {
       setSelectedFeedbacks(new Set());
     } else {
@@ -206,7 +210,7 @@ const Feedback = () => {
 
       toast.success(`Marked ${selectedFeedbacks.size} feedback as reviewed`);
       setSelectedFeedbacks(new Set());
-      await loadProjectAndFeedbacks();
+      await loadFeedbacks(); // Use the hook method
     } catch (error) {
       console.error('Error marking feedback as reviewed:', error);
       toast.error('Failed to mark feedback as reviewed');
@@ -229,7 +233,7 @@ const Feedback = () => {
 
       toast.success(`Marked ${selectedFeedbacks.size} feedback as resolved`);
       setSelectedFeedbacks(new Set());
-      await loadProjectAndFeedbacks();
+      await loadFeedbacks(); // Use the hook method
     } catch (error) {
       console.error('Error marking feedback as resolved:', error);
       toast.error('Failed to mark feedback as resolved');
@@ -445,12 +449,12 @@ const Feedback = () => {
                 <div className="flex items-center space-x-2">
                   <input
                     type="checkbox"
-                    checked={selectedFeedbacks.size === filteredFeedbacks.length && filteredFeedbacks.length > 0}
+                    checked={filteredFeedbacks.length > 0 && selectedFeedbacks.size === filteredFeedbacks.length}
                     onChange={handleSelectAll}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
                   <span className="text-sm font-medium text-gray-700">
-                    {selectedFeedbacks.size === filteredFeedbacks.length && filteredFeedbacks.length > 0
+                    {filteredFeedbacks.length > 0 && selectedFeedbacks.size === filteredFeedbacks.length
                       ? 'Deselect All'
                       : 'Select All'
                     }
