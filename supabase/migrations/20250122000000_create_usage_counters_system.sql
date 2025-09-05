@@ -1,6 +1,13 @@
 -- Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Clean up existing policies to avoid conflicts
+DROP POLICY IF EXISTS "Users can read their usage" ON usage_counters;
+DROP POLICY IF EXISTS "Users can update their usage" ON usage_counters;
+DROP POLICY IF EXISTS "Users can insert their usage" ON usage_counters;
+DROP POLICY IF EXISTS "Users can delete their usage" ON usage_counters;
+DROP POLICY IF EXISTS "Everyone can read plans" ON plans;
+
 -- Create usage_counters table
 CREATE TABLE IF NOT EXISTS usage_counters (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
