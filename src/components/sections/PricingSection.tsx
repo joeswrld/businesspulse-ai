@@ -21,7 +21,6 @@ const PricingSection = () => {
         "Reports → Up to 2 basic reports",
         "Team Members → Coming Soon",
         "Export Data → CSV format",
-        "Email Support → Community forum access",
         "Data Retention → 30 days",
       ],
       buttonText: "Start Free Trial",
@@ -43,11 +42,9 @@ const PricingSection = () => {
         "Reports → Up to 20 reports/month",
         "Team Members → Coming Soon",
         "Export Data → CSV, PDF, Excel formats",
-        "Priority Support → Email & chat support",
+        "Automated Alerts →Teams(Coming Soon), Email, ",
         "Advanced Analytics → Trend detection",
         "Data Retention → 12 months",
-        "Automated Workflows → Basic automation",
-        "Slack/Teams Integration → Basic notifications",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "hero" as const,
@@ -69,8 +66,6 @@ const PricingSection = () => {
         "Team Members → Coming Soon",
         "Everything in Pro",
         "Predictive Analytics → AI-powered trend projection",
-        "Automated Alerts → Slack, Teams, Email, SMS",
-        "Dedicated Support & SLA → 4-hour response time",
         "Compliance → GDPR, SOC2, HIPAA ready",
         "Data Retention → Unlimited",
       ],
@@ -214,12 +209,7 @@ const PricingSection = () => {
                     <td className="text-center py-3 px-4">12 months</td>
                     <td className="text-center py-3 px-4">Unlimited</td>
                   </tr>
-                  <tr>
-                    <td className="py-3 px-4 font-medium">API Calls</td>
-                    <td className="text-center py-3 px-4">100/month</td>
-                    <td className="text-center py-3 px-4">5,000/month</td>
-                    <td className="text-center py-3 px-4">Unlimited</td>
-                  </tr>
+                  
                 </tbody>
               </table>
             </div>
@@ -238,9 +228,6 @@ const PricingSection = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button variant="hero" size="lg" asChild>
                 <Link to="/auth">Start Your Free Trial ✨</Link>
-              </Button>
-              <Button variant="outline" size="lg">
-                Schedule Demo
               </Button>
             </div>
           </div>

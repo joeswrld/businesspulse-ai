@@ -172,10 +172,7 @@ const PrivacyPolicy = () => {
             </p>
             <div className="space-y-2">
               <p className="text-sm">
-                <strong>Email:</strong> privacy@feedbackflow.com
-              </p>
-              <p className="text-sm">
-                <strong>Address:</strong> FeedbackFlow Inc., 123 Privacy Street, Security City, SC 12345
+                <strong>Email:</strong> admin@notex.com.ng
               </p>
             </div>
           </div>
@@ -206,9 +203,6 @@ const PrivacyPolicy = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" asChild>
               <Link to="/auth">Start Your Free Trial ✨</Link>
-            </Button>
-            <Button variant="outline" size="lg">
-              Contact Privacy Team
             </Button>
           </div>
         </div>

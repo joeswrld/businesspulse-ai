@@ -21,7 +21,7 @@ const HowItWorksSection = () => {
         "Easy widget integration",
         "Customizable design",
         "Mobile-friendly interface",
-        "Multi-language support"
+        "QR Code and Email Feedback Forms support"
       ],
       badge: "Setup"
     },

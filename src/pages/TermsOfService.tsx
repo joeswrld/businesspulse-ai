@@ -212,10 +212,7 @@ const TermsOfService = () => {
             </p>
             <div className="space-y-2">
               <p className="text-sm">
-                <strong>Email:</strong> legal@feedbackflow.com
-              </p>
-              <p className="text-sm">
-                <strong>Address:</strong> FeedbackFlow Inc., 123 Legal Street, Compliance City, CC 12345
+                <strong>Email:</strong> admin@notex.com.ng
               </p>
             </div>
           </div>
