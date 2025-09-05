@@ -275,3 +275,41 @@ SELECT
   COALESCE((SELECT COUNT(*) FROM reports r WHERE r.user_id = u.id), 0)
 FROM auth.users u
 ON CONFLICT (user_id) DO NOTHING;
+
+-- Create function to create user billing profile
+CREATE OR REPLACE FUNCTION create_user_billing_profile(user_uuid UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  result JSONB;
+BEGIN
+  -- Check if billing profile already exists
+  IF EXISTS (SELECT 1 FROM billing_profiles WHERE id = user_uuid) THEN
+    RETURN jsonb_build_object('success', true, 'message', 'Billing profile already exists');
+  END IF;
+
+  -- Create billing profile with trial plan
+  INSERT INTO billing_profiles (
+    id, 
+    plan, 
+    trial_ends_at, 
+    subscription_status
+  ) VALUES (
+    user_uuid,
+    'trial',
+    NOW() + INTERVAL '8 days',
+    'trial'
+  );
+
+  -- Create usage counter entry
+  INSERT INTO usage_counters (user_id) VALUES (user_uuid)
+  ON CONFLICT (user_id) DO NOTHING;
+
+  RETURN jsonb_build_object('success', true, 'message', 'Billing profile created successfully');
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN jsonb_build_object('success', false, 'error', SQLERRM);
+END;
+$$;
