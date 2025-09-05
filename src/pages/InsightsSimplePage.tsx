@@ -3,6 +3,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useUsageEnforcement } from '@/hooks/useUsageEnforcement';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
+import { useRealtimeFeedback } from '@/hooks/useRealtimeFeedback';
+import { FeedbackBadgeGroup } from '@/components/ui/FeedbackBadge';
 import { toast } from 'sonner';
 import { 
   Brain, 
@@ -76,10 +78,17 @@ const InsightsSimplePage: React.FC = () => {
   const { checkUsage, enforceLimit } = useUsageEnforcement();
   const { trackUsage } = useUsageTracking();
   
+  // Use real-time feedback hook
+  const { 
+    feedbacks, 
+    counts, 
+    loading: feedbackLoading, 
+    error: feedbackError, 
+    realtimeStatus 
+  } = useRealtimeFeedback();
+  
   // State
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [selectedFeedbacks, setSelectedFeedbacks] = useState<Set<string>>(new Set());
-  const [isLoadingFeedbacks, setIsLoadingFeedbacks] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentAnalysis, setCurrentAnalysis] = useState<GeminiAnalysis | null>(null);
   const [analysisHistory, setAnalysisHistory] = useState<InsightHistory[]>([]);
@@ -89,59 +98,6 @@ const InsightsSimplePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('analysis');
 
-  // Load user's feedbacks
-  const loadFeedbacks = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      setIsLoadingFeedbacks(true);
-      setError(null);
-
-      // Get user's feedback settings to find their project IDs
-      const { data: feedbackSettings, error: settingsError } = await (supabase as any)
-        .from('feedback_settings')
-        .select('project_id')
-        .eq('user_id', user.id);
-
-      if (settingsError) {
-        console.error('Error loading feedback settings:', settingsError);
-        setError('Failed to load feedback settings');
-        return;
-      }
-
-      if (!feedbackSettings || feedbackSettings.length === 0) {
-        setFeedbacks([]);
-        return;
-      }
-
-      const projectIds = feedbackSettings.map(setting => setting.project_id).filter(Boolean);
-
-      if (projectIds.length === 0) {
-        setFeedbacks([]);
-        return;
-      }
-
-      // Get feedbacks for user's projects
-      const { data: feedbacksData, error: feedbacksError } = await (supabase as any)
-        .from('feedbacks')
-        .select('*')
-        .in('project_id', projectIds)
-        .order('timestamp', { ascending: false });
-
-      if (feedbacksError) {
-        console.error('Error loading feedbacks:', feedbacksError);
-        setError('Failed to load feedbacks');
-        return;
-      }
-
-      setFeedbacks((feedbacksData || []) as any);
-    } catch (error) {
-      console.error('Error in loadFeedbacks:', error);
-      setError('Failed to load feedbacks');
-    } finally {
-      setIsLoadingFeedbacks(false);
-    }
-  }, [user]);
 
   // Load analysis history
   const loadAnalysisHistory = useCallback(async () => {
@@ -174,9 +130,8 @@ const InsightsSimplePage: React.FC = () => {
 
   // Load data on component mount
   useEffect(() => {
-    loadFeedbacks();
     loadAnalysisHistory();
-  }, [loadFeedbacks, loadAnalysisHistory]);
+  }, [loadAnalysisHistory]);
 
   // Handle feedback selection
   const handleFeedbackSelection = (feedbackId: string, checked: boolean) => {
@@ -191,9 +146,11 @@ const InsightsSimplePage: React.FC = () => {
 
   // Handle select all
   const handleSelectAll = () => {
-    if (selectedFeedbacks.size === feedbacks.length) {
+    if (selectedFeedbacks.size === feedbacks.length && feedbacks.length > 0) {
+      // Deselect all
       setSelectedFeedbacks(new Set());
     } else {
+      // Select all available feedbacks
       setSelectedFeedbacks(new Set(feedbacks.map(f => f.id)));
     }
   };
@@ -340,17 +297,26 @@ const InsightsSimplePage: React.FC = () => {
           <p className="text-gray-600 mt-2">
             Analyze your user feedback with AI-powered insights
           </p>
+          <div className="flex items-center space-x-4 mt-3">
+            <div className="flex items-center space-x-1 text-sm text-gray-500">
+              <div className={`w-2 h-2 rounded-full ${
+                realtimeStatus === 'connected' ? 'bg-green-500' : 
+                realtimeStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+              }`}></div>
+              <span className="capitalize">{realtimeStatus}</span>
+            </div>
+            <FeedbackBadgeGroup counts={counts} />
+          </div>
         </div>
         <div className="flex items-center space-x-2">
           <Button
             variant="outline"
             onClick={() => {
-              loadFeedbacks();
               loadAnalysisHistory();
             }}
-            disabled={isLoadingFeedbacks || isLoadingHistory}
+            disabled={isLoadingHistory}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingFeedbacks || isLoadingHistory ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingHistory ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
@@ -432,7 +398,7 @@ const InsightsSimplePage: React.FC = () => {
                     onClick={handleSelectAll}
                     disabled={feedbacks.length === 0}
                   >
-                    {selectedFeedbacks.size === feedbacks.length ? (
+                    {selectedFeedbacks.size === feedbacks.length && feedbacks.length > 0 ? (
                       <>
                         <Square className="h-4 w-4 mr-2" />
                         Deselect All
@@ -479,7 +445,7 @@ const InsightsSimplePage: React.FC = () => {
               )}
 
               {/* Feedbacks List */}
-              {isLoadingFeedbacks ? (
+              {feedbackLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin mr-2" />
                   <span>Loading feedbacks...</span>
