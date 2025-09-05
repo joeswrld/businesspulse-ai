@@ -188,17 +188,18 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
     try {
       console.log('Processing successful payment:', response);
       
-      // Create subscription via Paystack API
-      const subscriptionResponse = await fetch('/api/create-subscription', {
+      // Verify payment via Supabase Edge Function
+      const verifyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-payment`;
+      const subscriptionResponse = await fetch(verifyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          plan_code: currentPlanDetails.planCode,
-          email: user?.email,
           reference: response.reference,
-          amount: amount
+          plan: plan,
+          amount: amount,
+          email: user?.email
         }),
       });
 
