@@ -23,17 +23,29 @@ export default function WhatsAppFeedbackSection({ projectId }: WhatsAppFeedbackS
       if (!projectId) return;
 
       try {
+        console.log('Loading existing WhatsApp link for project:', projectId);
         const { data: existingLink, error } = await supabase
           .from('whatsapp_links')
           .select('link')
           .eq('project_id', projectId)
           .single();
 
-        if (!error && existingLink) {
+        if (error && error.code !== 'PGRST116') {
+          console.warn('Error loading existing WhatsApp link:', error);
+          console.warn('Error details:', {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint
+          });
+        } else if (!error && existingLink) {
+          console.log('Loaded existing WhatsApp link:', existingLink.link);
           setWhatsappLink(existingLink.link);
+        } else {
+          console.log('No existing WhatsApp link found for project:', projectId);
         }
       } catch (error) {
-        console.warn('Error loading existing WhatsApp link:', error);
+        console.warn('Unexpected error loading existing WhatsApp link:', error);
         // Don't show error to user, just log it
       }
     };
@@ -49,6 +61,8 @@ export default function WhatsAppFeedbackSection({ projectId }: WhatsAppFeedbackS
 
     setLoading(true);
     try {
+      console.log('Generating WhatsApp link for project:', projectId);
+
       // Check if link already exists for this project
       const { data: existingLink, error: fetchError } = await supabase
         .from('whatsapp_links')
@@ -58,11 +72,18 @@ export default function WhatsAppFeedbackSection({ projectId }: WhatsAppFeedbackS
 
       if (fetchError && fetchError.code !== 'PGRST116') {
         console.error('Error fetching existing WhatsApp link:', fetchError);
-        throw new Error('Failed to check existing links');
+        console.error('Error details:', {
+          code: fetchError.code,
+          message: fetchError.message,
+          details: fetchError.details,
+          hint: fetchError.hint
+        });
+        throw new Error(`Failed to check existing links: ${fetchError.message}`);
       }
 
       // If link already exists, use it
       if (existingLink) {
+        console.log('Found existing WhatsApp link:', existingLink.link);
         setWhatsappLink(existingLink.link);
         toast.success('WhatsApp link loaded successfully!');
         return;
@@ -70,6 +91,7 @@ export default function WhatsAppFeedbackSection({ projectId }: WhatsAppFeedbackS
 
       // Generate new WhatsApp link
       const whatsappLink = `https://notex.com.ng/wa-feedback/${projectId}`;
+      console.log('Generated new WhatsApp link:', whatsappLink);
 
       // Insert new link into database
       const { data: newLink, error: insertError } = await supabase
@@ -83,14 +105,22 @@ export default function WhatsAppFeedbackSection({ projectId }: WhatsAppFeedbackS
 
       if (insertError) {
         console.error('Error inserting WhatsApp link:', insertError);
-        throw new Error('Failed to create WhatsApp link');
+        console.error('Insert error details:', {
+          code: insertError.code,
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint
+        });
+        throw new Error(`Failed to create WhatsApp link: ${insertError.message}`);
       }
 
+      console.log('Successfully created WhatsApp link:', newLink.link);
       setWhatsappLink(newLink.link);
       toast.success('WhatsApp link generated successfully!');
     } catch (error) {
       console.error('Error generating WhatsApp link:', error);
-      toast.error('Failed to generate WhatsApp link. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(`Failed to generate WhatsApp link: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
