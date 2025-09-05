@@ -210,12 +210,17 @@ const EmailFeedbackPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-center space-x-2">
-              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-              <span className="text-gray-600">Loading feedback form...</span>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <div className="relative">
+                <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+              </div>
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">Loading</h3>
+                <p className="text-sm text-gray-600">Preparing your feedback form...</p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -225,26 +230,25 @@ const EmailFeedbackPage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-red-600">
-              <AlertCircle className="h-5 w-5" />
-              <span>Error</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-            <Button 
-              onClick={() => navigate(-1)} 
-              variant="outline" 
-              className="w-full mt-4"
-            >
-              Go Back
-            </Button>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-red-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertCircle className="h-8 w-8 text-red-600" />
+              </div>
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Something went wrong</h3>
+                <p className="text-sm text-gray-600 mb-6">{error}</p>
+                <Button 
+                  onClick={() => navigate(-1)} 
+                  variant="outline" 
+                  className="w-full border-gray-300 hover:bg-gray-50"
+                >
+                  Go Back
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -253,17 +257,29 @@ const EmailFeedbackPage = () => {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-6 text-center">
-            <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h2>
-            <p className="text-gray-600 mb-4">
-              Your feedback has been submitted successfully. We appreciate your input!
-            </p>
-            <p className="text-sm text-gray-500">
-              Redirecting to thank you page...
-            </p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center justify-center space-y-6">
+              <div className="relative">
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="h-10 w-10 text-green-600" />
+                </div>
+                <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                </div>
+              </div>
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h2>
+                <p className="text-gray-600 mb-4">
+                  Your feedback has been submitted successfully. We appreciate your input!
+                </p>
+                <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Redirecting to thank you page...</span>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -271,61 +287,69 @@ const EmailFeedbackPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-md mx-auto">
-        <Card className="shadow-lg">
-          <CardHeader className="text-center pb-4">
-            {/* Business Logo */}
-            {project?.business_logo && (
-              <div className="flex justify-center mb-4">
-                <img
-                  src={project.business_logo}
-                  alt={project.business_name || 'Business Logo'}
-                  className="h-16 w-16 object-contain"
-                />
-              </div>
-            )}
-            
-            {/* Business Name */}
-            {project?.business_name && (
-              <div className="mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  {project.business_name}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 py-8 px-4">
+      <div className="max-w-lg mx-auto">
+        <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-sm overflow-hidden">
+          {/* Header Section */}
+          <div className="relative bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-8 text-white">
+            <div className="absolute inset-0 bg-black/10"></div>
+            <div className="relative">
+              {/* Business Logo */}
+              {project?.business_logo && (
+                <div className="mb-4 flex justify-center">
+                  <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                    <img
+                      src={project.business_logo}
+                      alt={project.business_name || 'Business Logo'}
+                      className="h-12 w-auto rounded-lg object-contain"
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {/* Business Name */}
+              {project?.business_name && (
+                <div className="mb-3">
+                  <h1 className="text-xl font-bold text-center">
+                    {project.business_name}
+                  </h1>
+                </div>
+              )}
+              
+              <div className="flex items-center justify-center space-x-3 mb-3">
+                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                  <Mail className="h-5 w-5" />
+                </div>
+                <h2 className="text-2xl font-bold">
+                  {project?.title || 'Share Your Feedback'}
                 </h2>
               </div>
-            )}
-            
-            <div className="flex items-center justify-center mb-4">
-              <Mail 
-                className="h-8 w-8" 
-                style={{ color: project?.brand_color || '#3b82f6' }}
-              />
+              
+              <p className="text-blue-100 text-center text-sm">
+                Quick feedback from your email - tell us how we're doing
+              </p>
             </div>
-            <CardTitle className="text-2xl font-bold text-gray-900">
-              {project?.title || 'Share Your Feedback'}
-            </CardTitle>
-            <CardDescription className="text-gray-600">
-              Quick feedback from your email - tell us how we're doing
-            </CardDescription>
-          </CardHeader>
+          </div>
           
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+          <CardContent className="p-8">
+            <form onSubmit={handleSubmit} className="space-y-8">
               {/* Quick Rating */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium text-gray-700">
-                  Quick Rating <span className="text-red-500">*</span>
-                </Label>
-                <div className="flex justify-center space-x-2">
+              <div className="space-y-4">
+                <div className="text-center">
+                  <Label className="text-base font-semibold text-gray-800">
+                    Quick Rating <span className="text-red-500">*</span>
+                  </Label>
+                </div>
+                <div className="flex justify-center space-x-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
                       type="button"
                       onClick={() => setRating(star)}
-                      className={`p-1 transition-colors ${
+                      className={`p-2 rounded-full transition-all duration-200 ${
                         rating && star <= rating
-                          ? 'text-yellow-400'
-                          : 'text-gray-300 hover:text-yellow-300'
+                          ? 'text-yellow-400 bg-yellow-50 scale-110'
+                          : 'text-gray-300 hover:text-yellow-300 hover:bg-yellow-50 hover:scale-105'
                       }`}
                       disabled={submitting}
                     >
@@ -334,28 +358,30 @@ const EmailFeedbackPage = () => {
                   ))}
                 </div>
                 {rating && (
-                  <p className="text-center text-sm text-gray-600">
-                    You rated: {rating} out of 5 stars
-                  </p>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-gray-700">
+                      You rated: <span className="text-yellow-600 font-bold">{rating}</span> out of 5 stars
+                    </p>
+                  </div>
                 )}
               </div>
 
               {/* Contact Information */}
               {project?.show_contact_info && (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {project?.show_name && (
-                    <div className="space-y-2">
-                      <Label htmlFor="customerName" className="text-sm font-medium text-gray-700">
+                    <div className="space-y-3">
+                      <Label htmlFor="customerName" className="text-base font-semibold text-gray-800">
                         Your Name <span className="text-red-500">*</span>
                       </Label>
                       <div className="relative">
-                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <User className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                         <Input
                           id="customerName"
                           value={customerName}
                           onChange={(e) => setCustomerName(e.target.value)}
-                          placeholder="Enter your name"
-                          className="pl-10"
+                          placeholder="Enter your full name"
+                          className="pl-12 h-12 text-base border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
                           disabled={submitting}
                         />
                       </div>
@@ -363,19 +389,19 @@ const EmailFeedbackPage = () => {
                   )}
 
                   {project?.show_email && (
-                    <div className="space-y-2">
-                      <Label htmlFor="customerEmail" className="text-sm font-medium text-gray-700">
+                    <div className="space-y-3">
+                      <Label htmlFor="customerEmail" className="text-base font-semibold text-gray-800">
                         Your Email <span className="text-red-500">*</span>
                       </Label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                         <Input
                           id="customerEmail"
                           type="email"
                           value={customerEmail}
                           onChange={(e) => setCustomerEmail(e.target.value)}
-                          placeholder="Enter your email"
-                          className="pl-10"
+                          placeholder="Enter your email address"
+                          className="pl-12 h-12 text-base border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
                           disabled={submitting}
                         />
                       </div>
@@ -385,8 +411,8 @@ const EmailFeedbackPage = () => {
               )}
 
               {/* Written Feedback */}
-              <div className="space-y-2">
-                <Label htmlFor="feedback" className="text-sm font-medium text-gray-700">
+              <div className="space-y-3">
+                <Label htmlFor="feedback" className="text-base font-semibold text-gray-800">
                   Additional Comments <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
@@ -394,38 +420,41 @@ const EmailFeedbackPage = () => {
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
                   placeholder="Any additional thoughts or suggestions..."
-                  className="min-h-[100px] resize-none"
+                  className="min-h-[140px] resize-none text-base border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
                   disabled={submitting}
                 />
               </div>
 
-              <Button
-                type="submit"
-                disabled={submitting || (!feedback.trim() && !rating)}
-                className="w-full"
-                style={{ 
-                  backgroundColor: project?.brand_color || '#3b82f6',
-                  borderColor: project?.brand_color || '#3b82f6'
-                }}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <Mail className="h-4 w-4 mr-2" />
-                    Send Feedback
-                  </>
-                )}
-              </Button>
+              <div className="pt-4">
+                <Button
+                  type="submit"
+                  disabled={submitting || (!feedback.trim() && !rating)}
+                  className="w-full h-14 text-base font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                  style={{ 
+                    backgroundColor: project?.brand_color || '#3b82f6',
+                    borderColor: project?.brand_color || '#3b82f6'
+                  }}
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-3 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-5 w-5 mr-3" />
+                      Send Feedback
+                    </>
+                  )}
+                </Button>
+              </div>
             </form>
 
-            <div className="mt-6 pt-4 border-t border-gray-200">
-              <p className="text-xs text-gray-500 text-center">
-                Powered by NoteX • Your feedback is secure and private
-              </p>
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span>Powered by NoteX • Your feedback is secure and private</span>
+              </div>
             </div>
           </CardContent>
         </Card>
