@@ -64,6 +64,32 @@ const FeedbackSettings = () => {
   const [projectIdStatus, setProjectIdStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [setupAttempted, setSetupAttempted] = useState(false);
 
+  // Ensure storage bucket exists
+  const ensureStorageBucket = async () => {
+    try {
+      // Try to list the bucket to check if it exists
+      const { data, error } = await supabase.storage.listBuckets();
+      
+      if (error) {
+        console.error('Error listing buckets:', error);
+        return false;
+      }
+
+      const bucketExists = data?.some(bucket => bucket.id === 'business-logos');
+      
+      if (!bucketExists) {
+        console.log('Business logos bucket does not exist. Please create it in Supabase Storage.');
+        toast.error('Storage bucket not configured. Please contact support to set up logo uploads.');
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error checking storage bucket:', error);
+      return false;
+    }
+  };
+
   // Handle logo upload
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -84,9 +110,18 @@ const FeedbackSettings = () => {
     setUploadingLogo(true);
 
     try {
+      // Check if storage bucket exists
+      const bucketExists = await ensureStorageBucket();
+      if (!bucketExists) {
+        setUploadingLogo(false);
+        return;
+      }
+
       // Create a unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `${settings.user_id}/${settings.project_id}/logo.${fileExt}`;
+
+      console.log('Uploading logo:', { fileName, fileSize: file.size, fileType: file.type });
 
       // Upload to Supabase storage
       const { data, error } = await supabase.storage
@@ -97,14 +132,51 @@ const FeedbackSettings = () => {
         });
 
       if (error) {
-        console.error('Upload error:', error);
-        throw new Error('Failed to upload logo');
+        console.error('Upload error details:', error);
+        
+        // Try fallback: convert to base64 and store in database
+        if (error.message.includes('bucket') || error.message.includes('permission')) {
+          console.log('Storage upload failed, trying base64 fallback...');
+          
+          // Convert file to base64
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            const base64String = e.target?.result as string;
+            
+            // Update settings with base64 image
+            const updatedSettings = {
+              ...settings,
+              business_logo: base64String
+            };
+
+            setSettings(updatedSettings);
+            toast.success('Logo uploaded successfully! (Using fallback method)');
+            setUploadingLogo(false);
+          };
+          
+          reader.onerror = () => {
+            toast.error('Failed to process image. Please try again.');
+            setUploadingLogo(false);
+          };
+          
+          reader.readAsDataURL(file);
+          return;
+        } else if (error.message.includes('size')) {
+          toast.error('File size too large. Please choose a smaller image.');
+        } else {
+          toast.error(`Upload failed: ${error.message}`);
+        }
+        return;
       }
+
+      console.log('Upload successful:', data);
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('business-logos')
         .getPublicUrl(fileName);
+
+      console.log('Public URL generated:', publicUrl);
 
       // Update settings with new logo URL
       const updatedSettings = {
@@ -1041,36 +1113,66 @@ const FeedbackSettings = () => {
                   </div>
                 )}
                 
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoUpload}
-                    className="hidden"
-                    id="logo-upload"
-                    disabled={uploadingLogo}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => document.getElementById('logo-upload')?.click()}
-                    disabled={uploadingLogo}
-                  >
-                    {uploadingLogo ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Uploading...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-4 w-4 mr-2" />
-                        {settings?.business_logo ? 'Change Logo' : 'Upload Logo'}
-                      </>
-                    )}
-                  </Button>
-                  <p className="text-xs text-gray-500">
-                    PNG, JPG, or GIF (max 5MB)
-                  </p>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                      id="logo-upload"
+                      disabled={uploadingLogo}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('logo-upload')?.click()}
+                      disabled={uploadingLogo}
+                    >
+                      {uploadingLogo ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4 mr-2" />
+                          {settings?.business_logo ? 'Change Logo' : 'Upload Logo'}
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-gray-500">
+                      PNG, JPG, or GIF (max 5MB)
+                    </p>
+                  </div>
+                  
+                  <div className="text-center text-sm text-gray-500">
+                    OR
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="logoUrl" className="text-sm font-medium">
+                      Logo URL (Alternative)
+                    </Label>
+                    <Input
+                      id="logoUrl"
+                      type="url"
+                      placeholder="https://example.com/logo.png"
+                      value={settings?.business_logo?.startsWith('http') ? settings.business_logo : ''}
+                      onChange={(e) => {
+                        const url = e.target.value;
+                        if (url && (url.startsWith('http') || url.startsWith('data:'))) {
+                          setSettings(prev => prev ? { ...prev, business_logo: url } : null);
+                        } else if (url === '') {
+                          setSettings(prev => prev ? { ...prev, business_logo: '' } : null);
+                        }
+                      }}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Paste a direct link to your logo image
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
