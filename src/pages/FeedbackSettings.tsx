@@ -17,6 +17,8 @@ import {
   AlertCircle,
   RefreshCw
 } from "lucide-react";
+import QRCodeFeedbackSection from "@/components/feedback/QRCodeFeedbackSection";
+import EmailSignatureFeedbackSection from "@/components/feedback/EmailSignatureFeedbackSection";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -1053,6 +1055,16 @@ const FeedbackSettings = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* QR Code Feedback */}
+        {settings?.project_id && settings.project_id.trim() !== '' && (
+          <QRCodeFeedbackSection projectId={settings.project_id} />
+        )}
+
+        {/* Email Signature Feedback */}
+        {settings?.project_id && settings.project_id.trim() !== '' && (
+          <EmailSignatureFeedbackSection projectId={settings.project_id} />
+        )}
 
       </div>
     </div>
