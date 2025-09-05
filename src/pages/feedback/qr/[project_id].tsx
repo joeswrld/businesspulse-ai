@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { MessageCircle, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { MessageCircle, CheckCircle, AlertCircle, Loader2, Star, User, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -15,12 +15,21 @@ interface ProjectData {
   project_id: string;
   title?: string;
   brand_color?: string;
+  business_name?: string;
+  business_logo?: string;
+  show_rating?: boolean;
+  show_contact_info?: boolean;
+  show_name?: boolean;
+  show_email?: boolean;
 }
 
 interface FeedbackSubmission {
   project_id: string;
   channel: string;
   message: string;
+  rating?: number;
+  customer_name?: string;
+  customer_email?: string;
 }
 
 const QRFeedbackPage = () => {
@@ -33,6 +42,9 @@ const QRFeedbackPage = () => {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState('');
+  const [rating, setRating] = useState<number | null>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
 
   // Fetch project data
   useEffect(() => {
@@ -61,7 +73,13 @@ const QRFeedbackPage = () => {
             user_id: feedbackSettings.user_id,
             project_id: feedbackSettings.project_id,
             title: feedbackSettings.title || 'Feedback Form',
-            brand_color: feedbackSettings.brand_color || '#3b82f6'
+            brand_color: feedbackSettings.brand_color || '#3b82f6',
+            business_name: feedbackSettings.business_name,
+            business_logo: feedbackSettings.business_logo,
+            show_rating: feedbackSettings.show_rating !== false,
+            show_contact_info: feedbackSettings.show_contact_info !== false,
+            show_name: feedbackSettings.show_name,
+            show_email: feedbackSettings.show_email
           });
           return;
         }
@@ -89,8 +107,8 @@ const QRFeedbackPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!feedback.trim()) {
-      toast.error('Please enter your feedback before submitting.');
+    if (!feedback.trim() && !rating) {
+      toast.error('Please provide either a rating or written feedback.');
       return;
     }
 
@@ -105,7 +123,10 @@ const QRFeedbackPage = () => {
       const feedbackData: FeedbackSubmission = {
         project_id: project_id,
         channel: 'qr',
-        message: feedback.trim()
+        message: feedback.trim() || `Rating: ${rating}/5`,
+        rating: rating || undefined,
+        customer_name: customerName.trim() || undefined,
+        customer_email: customerEmail.trim() || undefined
       };
 
       const { data, error } = await supabase
@@ -204,6 +225,26 @@ const QRFeedbackPage = () => {
       <div className="max-w-md mx-auto">
         <Card className="shadow-lg">
           <CardHeader className="text-center pb-4">
+            {/* Business Logo */}
+            {project?.business_logo && (
+              <div className="flex justify-center mb-4">
+                <img
+                  src={project.business_logo}
+                  alt={project.business_name || 'Business Logo'}
+                  className="h-16 w-16 object-contain"
+                />
+              </div>
+            )}
+            
+            {/* Business Name */}
+            {project?.business_name && (
+              <div className="mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {project.business_name}
+                </h2>
+              </div>
+            )}
+            
             <div className="flex items-center justify-center mb-4">
               <MessageCircle 
                 className="h-8 w-8" 
@@ -219,7 +260,83 @@ const QRFeedbackPage = () => {
           </CardHeader>
           
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Rating System */}
+              {project?.show_rating && (
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">
+                    How would you rate your experience?
+                  </Label>
+                  <div className="flex justify-center space-x-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setRating(star)}
+                        className={`p-1 transition-colors ${
+                          rating && star <= rating
+                            ? 'text-yellow-400'
+                            : 'text-gray-300 hover:text-yellow-300'
+                        }`}
+                        disabled={submitting}
+                      >
+                        <Star className="h-8 w-8 fill-current" />
+                      </button>
+                    ))}
+                  </div>
+                  {rating && (
+                    <p className="text-center text-sm text-gray-600">
+                      You rated: {rating} out of 5 stars
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Contact Information */}
+              {project?.show_contact_info && (
+                <div className="space-y-4">
+                  {project?.show_name && (
+                    <div className="space-y-2">
+                      <Label htmlFor="customerName" className="text-sm font-medium text-gray-700">
+                        Your Name (Optional)
+                      </Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="customerName"
+                          value={customerName}
+                          onChange={(e) => setCustomerName(e.target.value)}
+                          placeholder="Enter your name"
+                          className="pl-10"
+                          disabled={submitting}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {project?.show_email && (
+                    <div className="space-y-2">
+                      <Label htmlFor="customerEmail" className="text-sm font-medium text-gray-700">
+                        Your Email (Optional)
+                      </Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="customerEmail"
+                          type="email"
+                          value={customerEmail}
+                          onChange={(e) => setCustomerEmail(e.target.value)}
+                          placeholder="Enter your email"
+                          className="pl-10"
+                          disabled={submitting}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Feedback Text */}
               <div className="space-y-2">
                 <Label htmlFor="feedback" className="text-sm font-medium text-gray-700">
                   Your Feedback
@@ -239,7 +356,7 @@ const QRFeedbackPage = () => {
 
               <Button
                 type="submit"
-                disabled={submitting || !feedback.trim()}
+                disabled={submitting || (!feedback.trim() && !rating)}
                 className="w-full"
                 style={{ 
                   backgroundColor: project?.brand_color || '#3b82f6',

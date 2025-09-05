@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Mail, CheckCircle, AlertCircle, Loader2, Star } from 'lucide-react';
+import { Mail, CheckCircle, AlertCircle, Loader2, Star, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -15,6 +15,12 @@ interface ProjectData {
   project_id: string;
   title?: string;
   brand_color?: string;
+  business_name?: string;
+  business_logo?: string;
+  show_rating?: boolean;
+  show_contact_info?: boolean;
+  show_name?: boolean;
+  show_email?: boolean;
 }
 
 interface FeedbackSubmission {
@@ -22,6 +28,8 @@ interface FeedbackSubmission {
   channel: string;
   message: string;
   rating?: number;
+  customer_name?: string;
+  customer_email?: string;
 }
 
 const EmailFeedbackPage = () => {
@@ -35,6 +43,8 @@ const EmailFeedbackPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState('');
   const [rating, setRating] = useState<number | null>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
 
   // Fetch project data
   useEffect(() => {
@@ -63,7 +73,13 @@ const EmailFeedbackPage = () => {
             user_id: feedbackSettings.user_id,
             project_id: feedbackSettings.project_id,
             title: feedbackSettings.title || 'Feedback Form',
-            brand_color: feedbackSettings.brand_color || '#3b82f6'
+            brand_color: feedbackSettings.brand_color || '#3b82f6',
+            business_name: feedbackSettings.business_name,
+            business_logo: feedbackSettings.business_logo,
+            show_rating: feedbackSettings.show_rating !== false,
+            show_contact_info: feedbackSettings.show_contact_info !== false,
+            show_name: feedbackSettings.show_name,
+            show_email: feedbackSettings.show_email
           });
           return;
         }
@@ -108,7 +124,9 @@ const EmailFeedbackPage = () => {
         project_id: project_id,
         channel: 'email',
         message: feedback.trim() || `Rating: ${rating}/5`,
-        rating: rating || undefined
+        rating: rating || undefined,
+        customer_name: customerName.trim() || undefined,
+        customer_email: customerEmail.trim() || undefined
       };
 
       const { data, error } = await supabase
@@ -207,6 +225,26 @@ const EmailFeedbackPage = () => {
       <div className="max-w-md mx-auto">
         <Card className="shadow-lg">
           <CardHeader className="text-center pb-4">
+            {/* Business Logo */}
+            {project?.business_logo && (
+              <div className="flex justify-center mb-4">
+                <img
+                  src={project.business_logo}
+                  alt={project.business_name || 'Business Logo'}
+                  className="h-16 w-16 object-contain"
+                />
+              </div>
+            )}
+            
+            {/* Business Name */}
+            {project?.business_name && (
+              <div className="mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {project.business_name}
+                </h2>
+              </div>
+            )}
+            
             <div className="flex items-center justify-center mb-4">
               <Mail 
                 className="h-8 w-8" 
@@ -251,6 +289,50 @@ const EmailFeedbackPage = () => {
                   </p>
                 )}
               </div>
+
+              {/* Contact Information */}
+              {project?.show_contact_info && (
+                <div className="space-y-4">
+                  {project?.show_name && (
+                    <div className="space-y-2">
+                      <Label htmlFor="customerName" className="text-sm font-medium text-gray-700">
+                        Your Name (Optional)
+                      </Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="customerName"
+                          value={customerName}
+                          onChange={(e) => setCustomerName(e.target.value)}
+                          placeholder="Enter your name"
+                          className="pl-10"
+                          disabled={submitting}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {project?.show_email && (
+                    <div className="space-y-2">
+                      <Label htmlFor="customerEmail" className="text-sm font-medium text-gray-700">
+                        Your Email (Optional)
+                      </Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="customerEmail"
+                          type="email"
+                          value={customerEmail}
+                          onChange={(e) => setCustomerEmail(e.target.value)}
+                          placeholder="Enter your email"
+                          className="pl-10"
+                          disabled={submitting}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Written Feedback */}
               <div className="space-y-2">

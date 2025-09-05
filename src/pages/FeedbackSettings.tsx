@@ -15,7 +15,13 @@ import {
   Save,
   Lock,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Upload,
+  Building2,
+  Image,
+  Star,
+  User,
+  Mail
 } from "lucide-react";
 import QRCodeFeedbackSection from "@/components/feedback/QRCodeFeedbackSection";
 import EmailSignatureFeedbackSection from "@/components/feedback/EmailSignatureFeedbackSection";
@@ -36,6 +42,11 @@ interface FeedbackSettings {
   theme: 'light' | 'dark';
   brand_color: string;
   notify_email: string | null;
+  business_name?: string;
+  business_logo?: string;
+  show_rating?: boolean;
+  show_contact_info?: boolean;
+  custom_fields?: any[];
   created_at: string;
   updated_at: string;
 }
@@ -49,8 +60,68 @@ const FeedbackSettings = () => {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [projectIdStatus, setProjectIdStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [setupAttempted, setSetupAttempted] = useState(false);
+
+  // Handle logo upload
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !settings) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingLogo(true);
+
+    try {
+      // Create a unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${settings.user_id}/${settings.project_id}/logo.${fileExt}`;
+
+      // Upload to Supabase storage
+      const { data, error } = await supabase.storage
+        .from('business-logos')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) {
+        console.error('Upload error:', error);
+        throw new Error('Failed to upload logo');
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('business-logos')
+        .getPublicUrl(fileName);
+
+      // Update settings with new logo URL
+      const updatedSettings = {
+        ...settings,
+        business_logo: publicUrl
+      };
+
+      setSettings(updatedSettings);
+      toast.success('Logo uploaded successfully!');
+
+    } catch (error) {
+      console.error('Logo upload error:', error);
+      toast.error('Failed to upload logo. Please try again.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   // Check if feedback_settings table exists and create it if needed
   const ensureTableExists = useCallback(async () => {
@@ -913,6 +984,116 @@ const FeedbackSettings = () => {
               <Switch
                 checked={settings?.show_email || false}
                 onCheckedChange={(checked) => setSettings(prev => prev ? { ...prev, show_email: checked } : null)}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Business Branding */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Building2 className="h-5 w-5" />
+              <span>Business Branding</span>
+            </CardTitle>
+            <CardDescription>
+              Customize your business information that will appear on feedback forms.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="businessName" className="text-sm font-medium">
+                Business Name
+              </Label>
+              <Input
+                id="businessName"
+                value={settings?.business_name || ''}
+                onChange={(e) => setSettings(prev => prev ? { ...prev, business_name: e.target.value } : null)}
+                placeholder="Your Business Name"
+                className="mt-1"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                This will be displayed at the top of your feedback forms
+              </p>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Business Logo</Label>
+              <div className="mt-2 space-y-3">
+                {settings?.business_logo && (
+                  <div className="flex items-center space-x-3">
+                    <img
+                      src={settings.business_logo}
+                      alt="Business Logo"
+                      className="h-16 w-16 object-contain border rounded-lg bg-gray-50"
+                    />
+                    <div>
+                      <p className="text-sm text-gray-600">Current logo</p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSettings(prev => prev ? { ...prev, business_logo: '' } : null)}
+                        className="mt-1"
+                      >
+                        Remove Logo
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                    id="logo-upload"
+                    disabled={uploadingLogo}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById('logo-upload')?.click()}
+                    disabled={uploadingLogo}
+                  >
+                    {uploadingLogo ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        {settings?.business_logo ? 'Change Logo' : 'Upload Logo'}
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-gray-500">
+                    PNG, JPG, or GIF (max 5MB)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">Show Rating System</Label>
+                <p className="text-xs text-gray-500">Display star rating in feedback forms</p>
+              </div>
+              <Switch
+                checked={settings?.show_rating !== false}
+                onCheckedChange={(checked) => setSettings(prev => prev ? { ...prev, show_rating: checked } : null)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">Show Contact Information</Label>
+                <p className="text-xs text-gray-500">Display contact fields in feedback forms</p>
+              </div>
+              <Switch
+                checked={settings?.show_contact_info !== false}
+                onCheckedChange={(checked) => setSettings(prev => prev ? { ...prev, show_contact_info: checked } : null)}
               />
             </div>
           </CardContent>
