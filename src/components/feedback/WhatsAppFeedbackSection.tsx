@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { MessageCircle, Copy, Check, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface WhatsAppFeedbackSectionProps {
   projectId: string;
@@ -16,6 +17,30 @@ export default function WhatsAppFeedbackSection({ projectId }: WhatsAppFeedbackS
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Load existing WhatsApp link when component mounts
+  useEffect(() => {
+    const loadExistingLink = async () => {
+      if (!projectId) return;
+
+      try {
+        const { data: existingLink, error } = await supabase
+          .from('whatsapp_links')
+          .select('link')
+          .eq('project_id', projectId)
+          .single();
+
+        if (!error && existingLink) {
+          setWhatsappLink(existingLink.link);
+        }
+      } catch (error) {
+        console.warn('Error loading existing WhatsApp link:', error);
+        // Don't show error to user, just log it
+      }
+    };
+
+    loadExistingLink();
+  }, [projectId]);
+
   const generateWhatsAppLink = async () => {
     if (!projectId) {
       toast.error('Project ID is required to generate WhatsApp link');
@@ -24,20 +49,44 @@ export default function WhatsAppFeedbackSection({ projectId }: WhatsAppFeedbackS
 
     setLoading(true);
     try {
-      const response = await fetch('/api/feedback/whatsapp-link', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ project_id: projectId }),
-      });
+      // Check if link already exists for this project
+      const { data: existingLink, error: fetchError } = await supabase
+        .from('whatsapp_links')
+        .select('link')
+        .eq('project_id', projectId)
+        .single();
 
-      if (!response.ok) {
-        throw new Error('Failed to generate WhatsApp link');
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching existing WhatsApp link:', fetchError);
+        throw new Error('Failed to check existing links');
       }
 
-      const data = await response.json();
-      setWhatsappLink(data.link);
+      // If link already exists, use it
+      if (existingLink) {
+        setWhatsappLink(existingLink.link);
+        toast.success('WhatsApp link loaded successfully!');
+        return;
+      }
+
+      // Generate new WhatsApp link
+      const whatsappLink = `https://notex.com.ng/wa-feedback/${projectId}`;
+
+      // Insert new link into database
+      const { data: newLink, error: insertError } = await supabase
+        .from('whatsapp_links')
+        .insert({
+          project_id: projectId,
+          link: whatsappLink
+        })
+        .select('link')
+        .single();
+
+      if (insertError) {
+        console.error('Error inserting WhatsApp link:', insertError);
+        throw new Error('Failed to create WhatsApp link');
+      }
+
+      setWhatsappLink(newLink.link);
       toast.success('WhatsApp link generated successfully!');
     } catch (error) {
       console.error('Error generating WhatsApp link:', error);
