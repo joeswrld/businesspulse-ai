@@ -137,8 +137,24 @@ const EmailFeedbackPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!feedback.trim() && !rating) {
-      toast.error('Please provide either a rating or written feedback.');
+    // Validate all required fields
+    if (!rating || rating < 1) {
+      toast.error('Please provide a rating.');
+      return;
+    }
+
+    if (!customerName.trim()) {
+      toast.error('Please enter your name.');
+      return;
+    }
+
+    if (!customerEmail.trim()) {
+      toast.error('Please enter your email.');
+      return;
+    }
+
+    if (!feedback.trim()) {
+      toast.error('Please provide additional comments.');
       return;
     }
 
@@ -298,7 +314,7 @@ const EmailFeedbackPage = () => {
               {/* Quick Rating */}
               <div className="space-y-3">
                 <Label className="text-sm font-medium text-gray-700">
-                  Quick Rating (Optional)
+                  Quick Rating <span className="text-red-500">*</span>
                 </Label>
                 <div className="flex justify-center space-x-2">
                   {[1, 2, 3, 4, 5].map((star) => (
@@ -330,7 +346,7 @@ const EmailFeedbackPage = () => {
                   {project?.show_name && (
                     <div className="space-y-2">
                       <Label htmlFor="customerName" className="text-sm font-medium text-gray-700">
-                        Your Name (Optional)
+                        Your Name <span className="text-red-500">*</span>
                       </Label>
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -349,7 +365,7 @@ const EmailFeedbackPage = () => {
                   {project?.show_email && (
                     <div className="space-y-2">
                       <Label htmlFor="customerEmail" className="text-sm font-medium text-gray-700">
-                        Your Email (Optional)
+                        Your Email <span className="text-red-500">*</span>
                       </Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -371,7 +387,7 @@ const EmailFeedbackPage = () => {
               {/* Written Feedback */}
               <div className="space-y-2">
                 <Label htmlFor="feedback" className="text-sm font-medium text-gray-700">
-                  Additional Comments (Optional)
+                  Additional Comments <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                   id="feedback"
