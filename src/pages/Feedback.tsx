@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FeedbackBadgeGroup } from "@/components/ui/FeedbackBadge";
 import { 
   MessageSquare, 
   Clock, 
@@ -35,7 +36,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeFeedback } from "@/hooks/useRealtimeFeedback";
 
 interface Feedback {
   id: string;
@@ -59,167 +60,33 @@ interface FeedbackTag {
 const Feedback = () => {
   const { user } = useAuth();
   
-  // State management
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  // Use the real-time feedback hook
+  const { 
+    feedbacks, 
+    counts, 
+    loading, 
+    error, 
+    realtimeStatus, 
+    loadFeedbacks, 
+    updateFeedbackStatus, 
+    addTagToFeedback, 
+    removeTagFromFeedback 
+  } = useRealtimeFeedback();
+  
+  // Local state for UI
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'new' | 'reviewed' | 'resolved'>('all');
   const [sentimentFilter, setSentimentFilter] = useState<'all' | 'positive' | 'negative' | 'neutral'>('all');
   const [dateFilter, setDateFilter] = useState<'7d' | '30d' | 'all'>('all');
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
-  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
   const [showTagInput, setShowTagInput] = useState<string | null>(null);
   const [newTag, setNewTag] = useState('');
   const [selectedFeedbacks, setSelectedFeedbacks] = useState<Set<string>>(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
-  // Load project ID and feedbacks
-  const loadProjectAndFeedbacks = useCallback(async () => {
-    if (!user) return;
+  // Check if user has any projects configured
+  const hasProjects = feedbacks.length > 0 || !loading;
 
-    try {
-      setLoading(true);
-      
-      // Get user's project ID
-      const { data: projectSettings, error: projectError } = await (supabase as any)
-        .from('feedback_settings')
-        .select('project_id')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (projectError) {
-        console.error('Error loading project settings:', projectError);
-        toast.error('Failed to load project configuration');
-        return;
-      }
-
-      if (!projectSettings || projectSettings.length === 0) {
-        setProjectId(null);
-        setLoading(false);
-        return;
-      }
-
-      const projectId = (projectSettings as any)?.[0]?.project_id;
-      if (!projectId || projectId.trim() === '') {
-        setProjectId(null);
-        setLoading(false);
-        return;
-      }
-
-      setProjectId(projectId);
-
-      // Load feedbacks for the project
-      const { data: feedbacksData, error: feedbacksError } = await (supabase as any)
-        .from('feedbacks')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('timestamp', { ascending: false });
-
-      if (feedbacksError) {
-        console.error('Error loading feedbacks:', feedbacksError);
-        toast.error('Failed to load feedbacks');
-        return;
-      }
-
-      // Load tags for each feedback
-      const feedbacksWithTags = await Promise.all(
-        (feedbacksData || []).map(async (feedback: any) => {
-          const { data: tagsData } = await (supabase as any)
-            .from('feedback_tags')
-            .select('tag')
-            .eq('feedback_id', feedback.id);
-          
-          return {
-            ...feedback,
-            tags: (tagsData as any)?.map((t: any) => t.tag) || [],
-            sentiment: analyzeSentiment(feedback.message)
-          };
-        })
-      );
-
-      setFeedbacks(feedbacksWithTags as any);
-      setLoading(false);
-
-    } catch (error) {
-      console.error('Error in loadProjectAndFeedbacks:', error);
-      toast.error('Failed to load data');
-      setLoading(false);
-    }
-  }, [user]);
-
-  // Load data on mount
-  useEffect(() => {
-    loadProjectAndFeedbacks();
-  }, [loadProjectAndFeedbacks]);
-
-  // Setup real-time subscription
-  useEffect(() => {
-    if (!projectId) return;
-
-    setRealtimeStatus('connecting');
-    
-    const channel = supabase
-      .channel(`feedbacks-${projectId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'feedbacks',
-        filter: `project_id=eq.${projectId}`
-      }, async (payload) => {
-        console.log('Real-time event received:', payload);
-        
-        if (payload.eventType === 'INSERT') {
-          const newFeedback = payload.new as Feedback;
-          const feedbackWithTags = {
-            ...newFeedback,
-            tags: [],
-            sentiment: analyzeSentiment(newFeedback.message)
-          };
-          setFeedbacks(prev => [feedbackWithTags, ...prev]);
-          toast.success('New feedback received!');
-        } else if (payload.eventType === 'UPDATE') {
-          const updatedFeedback = payload.new as Feedback;
-          setFeedbacks(prev => prev.map(f => 
-            f.id === updatedFeedback.id ? { ...f, ...updatedFeedback } : f
-          ));
-        } else if (payload.eventType === 'DELETE') {
-          const deletedFeedback = payload.old as Feedback;
-          setFeedbacks(prev => prev.filter(f => f.id !== deletedFeedback.id));
-        }
-      })
-      .subscribe((status) => {
-        setRealtimeStatus(status === 'SUBSCRIBED' ? 'connected' : 'disconnected');
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [projectId]);
-
-  // Analyze sentiment from message content
-  const analyzeSentiment = (message: string): 'positive' | 'negative' | 'neutral' => {
-    const positiveWords = [
-      'great', 'good', 'excellent', 'amazing', 'wonderful', 'fantastic', 'love', 'like', 'happy', 'satisfied',
-      'perfect', 'awesome', 'outstanding', 'brilliant', 'superb', 'terrific', 'pleased', 'impressed', 'smooth',
-      'fast', 'easy', 'intuitive', 'beautiful', 'clean', 'modern', 'helpful', 'supportive', 'responsive'
-    ];
-    
-    const negativeWords = [
-      'bad', 'terrible', 'awful', 'horrible', 'hate', 'dislike', 'angry', 'frustrated', 'annoyed', 'disappointed',
-      'broken', 'slow', 'difficult', 'confusing', 'ugly', 'cluttered', 'buggy', 'crash', 'error', 'fail',
-      'useless', 'waste', 'problem', 'issue', 'complaint', 'unhappy', 'dissatisfied', 'poor', 'weak'
-    ];
-
-    const messageLower = message.toLowerCase();
-    const positiveCount = positiveWords.filter(word => messageLower.includes(word)).length;
-    const negativeCount = negativeWords.filter(word => messageLower.includes(word)).length;
-
-    if (positiveCount > negativeCount) return 'positive';
-    if (negativeCount > positiveCount) return 'negative';
-    return 'neutral';
-  };
 
   // Filter feedbacks based on all filters
   const filteredFeedbacks = useMemo(() => {
@@ -253,24 +120,12 @@ const Feedback = () => {
     });
   }, [feedbacks, searchTerm, statusFilter, sentimentFilter, dateFilter]);
 
-  // Update feedback status
-  const updateFeedbackStatus = async (feedbackId: string, newStatus: 'new' | 'reviewed' | 'resolved') => {
+  // Update feedback status using the hook
+  const handleUpdateFeedbackStatus = async (feedbackId: string, newStatus: 'new' | 'reviewed' | 'resolved') => {
     setUpdating(feedbackId);
     
     try {
-      const { error } = await (supabase as any)
-        .from('feedbacks')
-        .update({ status: newStatus })
-        .eq('id', feedbackId);
-
-      if (error) {
-        throw error;
-      }
-
-      setFeedbacks(prev => prev.map(f => 
-        f.id === feedbackId ? { ...f, status: newStatus } : f
-      ));
-
+      await updateFeedbackStatus(feedbackId, newStatus);
       toast.success(`Feedback marked as ${newStatus}`);
     } catch (error) {
       console.error('Error updating feedback status:', error);
@@ -280,30 +135,12 @@ const Feedback = () => {
     }
   };
 
-  // Add tag to feedback
-  const addTagToFeedback = async (feedbackId: string, tag: string) => {
+  // Add tag to feedback using the hook
+  const handleAddTagToFeedback = async (feedbackId: string, tag: string) => {
     if (!tag.trim()) return;
 
     try {
-      // Insert tag into feedback_tags table
-      const { error } = await (supabase as any)
-        .from('feedback_tags')
-        .insert({
-          feedback_id: feedbackId,
-          tag: tag.trim().toLowerCase()
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      // Update local state
-      setFeedbacks(prev => prev.map(f => 
-        f.id === feedbackId 
-          ? { ...f, tags: [...(f.tags || []), tag.trim().toLowerCase()] }
-          : f
-      ));
-
+      await addTagToFeedback(feedbackId, tag);
       setNewTag('');
       setShowTagInput(null);
       toast.success('Tag added successfully');
@@ -313,25 +150,10 @@ const Feedback = () => {
     }
   };
 
-  // Remove tag from feedback
-  const removeTagFromFeedback = async (feedbackId: string, tagToRemove: string) => {
+  // Remove tag from feedback using the hook
+  const handleRemoveTagFromFeedback = async (feedbackId: string, tagToRemove: string) => {
     try {
-      const { error } = await (supabase as any)
-        .from('feedback_tags')
-        .delete()
-        .eq('feedback_id', feedbackId)
-        .eq('tag', tagToRemove);
-
-      if (error) {
-        throw error;
-      }
-
-      setFeedbacks(prev => prev.map(f => 
-        f.id === feedbackId 
-          ? { ...f, tags: (f.tags || []).filter(tag => tag !== tagToRemove) }
-          : f
-      ));
-
+      await removeTagFromFeedback(feedbackId, tagToRemove);
       toast.success('Tag removed successfully');
     } catch (error) {
       console.error('Error removing tag:', error);
@@ -486,7 +308,7 @@ const Feedback = () => {
     );
   }
 
-  if (!projectId) {
+  if (!hasProjects && !loading) {
     return (
       <div className="container mx-auto p-6">
         <Card className="max-w-2xl mx-auto text-center">
@@ -526,7 +348,7 @@ const Feedback = () => {
           <p className="text-gray-600 mt-2">
             Manage and respond to user feedback in real-time
           </p>
-          <div className="flex items-center space-x-2 mt-2">
+          <div className="flex items-center space-x-4 mt-3">
             <div className="flex items-center space-x-1 text-sm text-gray-500">
               <div className={`w-2 h-2 rounded-full ${
                 realtimeStatus === 'connected' ? 'bg-green-500' : 
@@ -534,17 +356,14 @@ const Feedback = () => {
               }`}></div>
               <span className="capitalize">{realtimeStatus}</span>
             </div>
-            <span className="text-gray-400">•</span>
-            <span className="text-sm text-gray-500">
-              {feedbacks.length} feedback entries
-            </span>
+            <FeedbackBadgeGroup counts={counts} />
           </div>
         </div>
         
         <div className="flex items-center space-x-2">
           <Button
             variant="outline"
-            onClick={loadProjectAndFeedbacks}
+            onClick={loadFeedbacks}
             disabled={loading}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -758,7 +577,7 @@ const Feedback = () => {
                         key={index} 
                         variant="outline" 
                         className="text-xs cursor-pointer hover:bg-red-50"
-                        onClick={() => removeTagFromFeedback(feedback.id, tag)}
+                        onClick={() => handleRemoveTagFromFeedback(feedback.id, tag)}
                       >
                         {tag}
                         <XCircle className="h-3 w-3 ml-1" />
@@ -784,11 +603,11 @@ const Feedback = () => {
                       value={newTag}
                       onChange={(e) => setNewTag(e.target.value)}
                       className="text-sm"
-                      onKeyPress={(e) => e.key === 'Enter' && addTagToFeedback(feedback.id, newTag)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddTagToFeedback(feedback.id, newTag)}
                     />
                     <Button
                       size="sm"
-                      onClick={() => addTagToFeedback(feedback.id, newTag)}
+                      onClick={() => handleAddTagToFeedback(feedback.id, newTag)}
                       disabled={!newTag.trim()}
                     >
                       Add
@@ -813,7 +632,7 @@ const Feedback = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => updateFeedbackStatus(feedback.id, 'resolved')}
+                        onClick={() => handleUpdateFeedbackStatus(feedback.id, 'resolved')}
                         disabled={updating === feedback.id}
                       >
                         {updating === feedback.id ? (
@@ -829,7 +648,7 @@ const Feedback = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => updateFeedbackStatus(feedback.id, 'reviewed')}
+                        onClick={() => handleUpdateFeedbackStatus(feedback.id, 'reviewed')}
                         disabled={updating === feedback.id}
                       >
                         <Eye className="h-3 w-3 mr-1" />

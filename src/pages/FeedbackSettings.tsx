@@ -28,6 +28,7 @@ import EmailSignatureFeedbackSection from "@/components/feedback/EmailSignatureF
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import LogoUpload from "@/components/LogoUpload";
 
 interface FeedbackSettings {
   id: string;
@@ -1031,6 +1032,18 @@ const FeedbackSettings = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Logo Upload */}
+        <LogoUpload 
+          onLogoUploaded={(logoUrl) => {
+            console.log('Logo uploaded successfully:', logoUrl);
+            toast.success('Logo uploaded successfully!');
+          }}
+          onLogoDeleted={() => {
+            console.log('Logo deleted successfully');
+            toast.success('Logo deleted successfully!');
+          }}
+        />
 
         {/* Widget Customization */}
         <Card>

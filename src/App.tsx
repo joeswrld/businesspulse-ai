@@ -39,6 +39,7 @@ const Feedback = lazy(() => import("./pages/Feedback"));
 const Billing = lazy(() => import("./pages/Billing"));
 
 const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
+const RealtimeTest = lazy(() => import("./pages/RealtimeTest"));
 
 // Feedback form pages
 const QRFeedbackPage = lazy(() => import("./pages/feedback/qr/[project_id]"));
@@ -262,6 +263,15 @@ const App = () => (
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <FeedbackSettings />
+                  </DashboardLayout>
+                </Suspense>
+              </ProtectedRoute>
+            } />
+            <Route path="/realtime-test" element={
+              <ProtectedRoute>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <RealtimeTest />
                   </DashboardLayout>
                 </Suspense>
               </ProtectedRoute>

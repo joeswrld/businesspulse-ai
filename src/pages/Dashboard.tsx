@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FeedbackBadgeGroup } from '@/components/ui/FeedbackBadge';
+import { useRealtimeFeedback } from '@/hooks/useRealtimeFeedback';
 import { toast } from 'sonner';
 // import { checkAndSetupDatabase } from '@/utils/databaseCheck';
 import { 
@@ -108,8 +110,16 @@ interface AIInsight {
 export default function Dashboard() {
   const { user } = useAuth();
   
+  // Use real-time feedback hook
+  const { 
+    feedbacks, 
+    counts, 
+    loading: feedbackLoading, 
+    error: feedbackError, 
+    realtimeStatus 
+  } = useRealtimeFeedback();
+  
   // State management
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,83 +129,14 @@ export default function Dashboard() {
   const [generatingInsight, setGeneratingInsight] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Load user's data with fallback to individual queries
-  const loadDashboardData = useCallback(async () => {
+  // Load subscription data only (feedback is handled by the hook)
+  const loadSubscriptionData = useCallback(async () => {
     if (!user) return;
 
     try {
       setLoading(true);
-      console.log('Loading dashboard data for user:', user.id);
+      console.log('Loading subscription data for user:', user.id);
       
-      // Try optimized single query first
-      try {
-        const { data, error } = await (supabase as any).rpc('get_dashboard_data', {
-          user_id_param: user.id,
-          limit_param: 50
-        });
-
-        if (!error && data && (data as any).length > 0) {
-          const result = (data as any)[0];
-          
-          // Parse feedbacks
-          const feedbacksData = result.feedbacks ? JSON.parse(result.feedbacks) : [];
-          console.log('Feedbacks loaded via RPC:', feedbacksData.length);
-          setFeedbacks(feedbacksData);
-
-          // Parse subscription
-          const subscriptionData = result.subscription && result.subscription !== 'null' 
-            ? JSON.parse(result.subscription) 
-            : null;
-          console.log('Subscription loaded via RPC:', subscriptionData);
-          setSubscription(subscriptionData);
-
-          console.log('Dashboard data loaded successfully via RPC');
-          return;
-        } else {
-          console.warn('RPC query failed or returned no data, falling back to individual queries:', error);
-        }
-      } catch (rpcError) {
-        console.warn('RPC function not available, falling back to individual queries:', rpcError);
-      }
-
-      // Fallback: Load data using individual queries
-      console.log('Loading data using individual queries...');
-      
-      // Get user's project IDs
-      const { data: projectSettings, error: settingsError } = await (supabase as any)
-        .from('feedback_settings')
-        .select('project_id')
-        .eq('user_id', user.id)
-        .not('project_id', 'is', null)
-        .neq('project_id', '');
-
-      if (settingsError) {
-        console.error('Error loading project settings:', settingsError);
-        throw new Error('Failed to load project settings');
-      }
-
-      const projectIds = projectSettings?.map(s => s.project_id) || [];
-      console.log('Found project IDs:', projectIds);
-
-      // Get feedbacks for user's projects
-      let feedbacksData: Feedback[] = [];
-      if (projectIds.length > 0) {
-        const { data: feedbacks, error: feedbacksError } = await (supabase as any)
-          .from('feedbacks')
-          .select('*')
-          .in('project_id', projectIds)
-          .order('timestamp', { ascending: false })
-          .limit(50);
-
-        if (feedbacksError) {
-          console.error('Error loading feedbacks:', feedbacksError);
-          throw new Error('Failed to load feedbacks');
-        }
-
-        feedbacksData = (feedbacks || []) as any;
-        console.log('Feedbacks loaded via individual query:', feedbacksData.length);
-      }
-
       // Get subscription data
       const { data: subscriptionData, error: subscriptionError } = await supabase
         .from('user_subscriptions')
@@ -208,17 +149,12 @@ export default function Dashboard() {
         // Don't throw error for subscription, it's optional
       }
 
-      console.log('Subscription loaded via individual query:', subscriptionData);
-      
-      // Set the data
-      setFeedbacks(feedbacksData);
+      console.log('Subscription loaded:', subscriptionData);
       setSubscription(subscriptionData as any);
 
-      console.log('Dashboard data loaded successfully via individual queries');
-
     } catch (error) {
-      console.error('Error in loadDashboardData:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred while loading dashboard data');
+      console.error('Error in loadSubscriptionData:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred while loading subscription data');
     } finally {
       setLoading(false);
     }
@@ -227,10 +163,10 @@ export default function Dashboard() {
   // Load data on component mount
   useEffect(() => {
     if (user) {
-      // Load dashboard data directly (database setup is handled by auth context)
-      loadDashboardData();
+      // Load subscription data (feedback is handled by the hook)
+      loadSubscriptionData();
     }
-  }, [loadDashboardData, user]);
+  }, [loadSubscriptionData, user]);
 
   // Analyze sentiment from message content
   const analyzeSentiment = (message: string): 'positive' | 'negative' | 'neutral' => {
@@ -277,14 +213,14 @@ export default function Dashboard() {
     return foundThemes.slice(0, 3);
   };
 
-  // Calculate dashboard stats
+  // Calculate dashboard stats using real-time counts
   const dashboardStats = useMemo((): DashboardStats => {
     console.log('Calculating dashboard stats for', feedbacks.length, 'feedbacks');
     
     if (feedbacks.length === 0) {
       console.log('No feedbacks, returning empty stats');
       return {
-        totalFeedback: 0,
+        totalFeedback: counts.total,
         positiveSentiment: 0,
         negativeSentiment: 0,
         neutralSentiment: 0,
@@ -683,21 +619,21 @@ export default function Dashboard() {
           <p className="text-gray-600 mt-2">
             Real-time overview of your feedback and insights
           </p>
-          <div className="flex items-center space-x-2 mt-2">
+          <div className="flex items-center space-x-4 mt-3">
             <div className="flex items-center space-x-1 text-sm text-gray-500">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span>Live</span>
+              <div className={`w-2 h-2 rounded-full ${
+                realtimeStatus === 'connected' ? 'bg-green-500' : 
+                realtimeStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+              }`}></div>
+              <span className="capitalize">{realtimeStatus}</span>
             </div>
-            <span className="text-gray-400">•</span>
-            <span className="text-sm text-gray-500">
-              {feedbacks.length > 0 ? `${feedbacks.length} feedback entries` : 'No feedback yet'}
-            </span>
+            <FeedbackBadgeGroup counts={counts} />
           </div>
         </div>
         <div className="flex items-center space-x-2">
           <Button
             variant="outline"
-            onClick={loadDashboardData}
+            onClick={loadSubscriptionData}
             disabled={loading}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
