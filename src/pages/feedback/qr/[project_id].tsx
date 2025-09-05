@@ -46,14 +46,23 @@ const QRFeedbackPage = () => {
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
 
+  // Debug logging
+  console.log('QRFeedbackPage rendered with project_id:', project_id);
+
   // Fetch project data
   useEffect(() => {
     const fetchProject = async () => {
-      if (!project_id || typeof project_id !== 'string') return;
+      if (!project_id || typeof project_id !== 'string') {
+        console.log('No valid project_id provided');
+        setError('Invalid project ID');
+        setLoading(false);
+        return;
+      }
 
       try {
         setLoading(true);
         setError(null);
+        console.log('Fetching project data for:', project_id);
 
         // First try to get project from feedback_settings table
         const { data: feedbackSettings, error: feedbackError } = await supabase
@@ -62,12 +71,15 @@ const QRFeedbackPage = () => {
           .eq('project_id', project_id)
           .single();
 
+        console.log('Feedback settings query result:', { feedbackSettings, feedbackError });
+
         if (feedbackError && feedbackError.code !== 'PGRST116') {
           console.error('Error fetching feedback settings:', feedbackError);
-          throw new Error('Failed to fetch project information');
+          // Don't throw error, just use fallback
         }
 
         if (feedbackSettings) {
+          console.log('Found feedback settings, setting project data');
           setProject({
             id: feedbackSettings.id,
             user_id: feedbackSettings.user_id,
@@ -81,21 +93,40 @@ const QRFeedbackPage = () => {
             show_name: feedbackSettings.show_name,
             show_email: feedbackSettings.show_email
           });
-          return;
+        } else {
+          console.log('No feedback settings found, using fallback project data');
+          // If not found in feedback_settings, show generic project
+          setProject({
+            id: project_id,
+            user_id: '',
+            project_id: project_id,
+            title: 'Feedback Form',
+            brand_color: '#3b82f6',
+            business_name: 'Our Business',
+            business_logo: '',
+            show_rating: true,
+            show_contact_info: true,
+            show_name: true,
+            show_email: true
+          });
         }
 
-        // If not found in feedback_settings, show generic project
+      } catch (err) {
+        console.error('Error fetching project:', err);
+        // Use fallback project data instead of showing error
         setProject({
           id: project_id,
           user_id: '',
           project_id: project_id,
           title: 'Feedback Form',
-          brand_color: '#3b82f6'
+          brand_color: '#3b82f6',
+          business_name: 'Our Business',
+          business_logo: '',
+          show_rating: true,
+          show_contact_info: true,
+          show_name: true,
+          show_email: true
         });
-
-      } catch (err) {
-        console.error('Error fetching project:', err);
-        setError('Project not found. Please check the QR code and try again.');
       } finally {
         setLoading(false);
       }
@@ -189,7 +220,7 @@ const QRFeedbackPage = () => {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
             <Button 
-              onClick={() => router.back()} 
+              onClick={() => navigate(-1)} 
               variant="outline" 
               className="w-full mt-4"
             >
