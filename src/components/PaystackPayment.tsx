@@ -380,46 +380,64 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            Upgrade to {planName}
-          </CardTitle>
-          <CardDescription>
-            Complete your payment to activate your {planName} subscription
-          </CardDescription>
+    <div className="space-y-6">
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
+              <CreditCard className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-xl font-bold text-gray-900">
+                Upgrade to {planName}
+              </CardTitle>
+              <CardDescription className="text-gray-600">
+                Complete your payment to activate your {planName} subscription
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {/* Plan Summary */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-medium">Plan:</span>
-              <Badge variant="secondary">{currentPlanDetails.name}</Badge>
-            </div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-medium">Duration:</span>
-              <span className="text-sm text-gray-600">{currentPlanDetails.duration}</span>
-            </div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-medium">Price:</span>
-              <span className="text-lg font-bold">{formatPrice(amount)}/month</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-medium">Features:</span>
-              <span className="text-sm text-gray-600">{currentPlanDetails.features.length} features</span>
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-6 rounded-xl border border-gray-200">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-gray-700">Plan:</span>
+                  <Badge className="bg-blue-100 text-blue-800 border-blue-200">{currentPlanDetails.name}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-gray-700">Duration:</span>
+                  <span className="text-sm text-gray-600">{currentPlanDetails.duration}</span>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-gray-700">Price:</span>
+                  <span className="text-xl font-bold text-gray-900">{formatPrice(amount)}/month</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-gray-700">Features:</span>
+                  <span className="text-sm text-gray-600">{currentPlanDetails.features.length} features</span>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Plan Benefits */}
-          <div className="space-y-2">
-            <h4 className="font-medium">Plan Benefits:</h4>
-            <ul className="text-sm text-gray-600 space-y-1">
+          <div className="space-y-4">
+            <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-blue-600" />
+              Plan Benefits
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {currentPlanDetails.features.map((feature, index) => (
-                <li key={index}>• {feature}</li>
+                <div key={index} className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm text-gray-700">{feature}</span>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
 
           {/* Error Display */}
@@ -524,25 +542,25 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <Button
               onClick={handlePayment}
               disabled={loading || !paystackReady}
-              className="flex-1 bg-green-600 hover:bg-green-700"
+              className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-8 py-3 rounded-lg font-semibold shadow-sm hover:shadow-md transition-all duration-200"
             >
               {loading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Processing...
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Processing Payment...
                 </>
               ) : !paystackReady ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                   Initializing...
                 </>
               ) : (
                 <>
-                  <CreditCard className="h-4 w-4 mr-2" />
+                  <CreditCard className="h-5 w-5 mr-2" />
                   Pay {formatPrice(amount)}
                 </>
               )}
@@ -551,14 +569,18 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
               onClick={onCancel}
               variant="outline"
               disabled={loading}
+              className="px-8 py-3 rounded-lg font-medium border-gray-300 text-gray-700 hover:bg-gray-50 transition-all duration-200"
             >
               Cancel
             </Button>
           </div>
 
           {/* Security Notice */}
-          <div className="text-xs text-gray-500 text-center">
-            🔒 Your payment is secured by Paystack. We never store your card details.
+          <div className="flex items-center justify-center gap-2 p-4 bg-green-50 rounded-lg border border-green-200">
+            <Shield className="h-4 w-4 text-green-600" />
+            <span className="text-sm text-green-700 font-medium">
+              Your payment is secured by Paystack. We never store your card details.
+            </span>
           </div>
         </CardContent>
       </Card>

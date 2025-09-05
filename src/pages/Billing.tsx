@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBillingSystem, getPlanLimits, formatCurrency, formatDate, getPlanDisplayName, getPlanPrice, getPlanPricing } from '@/hooks/useBillingSystem';
@@ -45,17 +44,16 @@ import {
   Timer,
   Sparkles,
   Target,
-  Activity
+  Activity,
+  Settings,
+  Bell,
+  HelpCircle
 } from 'lucide-react';
 import PaystackPayment from '@/components/PaystackPayment';
 import UsageOverview from '@/components/billing/UsageOverview';
 import PlanComparison from '@/components/billing/PlanComparison';
 
 type UpgradePlan = 'pro' | 'business' | null;
-
-import React from 'react';
-import SimpleBillingPage from '@/components/billing/SimpleBillingPage';
-
 
 // Helper function to calculate subscription end date
 const calculateSubscriptionEndDate = (billingProfile: any, currentPlan: string) => {
@@ -75,14 +73,14 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
   if (currentPlan === 'trial') {
     if (isTrialExpired) {
       return {
-        color: 'bg-red-100 text-red-800 border-red-300',
+        color: 'bg-red-50 text-red-700 border-red-200',
         icon: <XCircle className="h-4 w-4" />,
         label: 'Trial Expired',
         description: 'Your free trial has ended'
       };
     } else {
       return {
-        color: 'bg-blue-100 text-blue-800 border-blue-300',
+        color: 'bg-blue-50 text-blue-700 border-blue-200',
         icon: <Clock className="h-4 w-4" />,
         label: 'Free Trial',
         description: 'Enjoying your free trial'
@@ -93,14 +91,14 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
   if (isPaymentPastDue) {
     if (isInGracePeriod) {
       return {
-        color: 'bg-orange-100 text-orange-800 border-orange-300',
+        color: 'bg-orange-50 text-orange-700 border-orange-200',
         icon: <AlertTriangle className="h-4 w-4" />,
         label: 'Payment Due',
         description: 'Payment failed - grace period active'
       };
     } else {
       return {
-        color: 'bg-red-100 text-red-800 border-red-300',
+        color: 'bg-red-50 text-red-700 border-red-200',
         icon: <XCircle className="h-4 w-4" />,
         label: 'Payment Failed',
         description: 'Account suspended due to failed payment'
@@ -110,7 +108,7 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
   
   if (billingProfile?.subscription_status === 'active') {
     return {
-      color: 'bg-green-100 text-green-800 border-green-300',
+      color: 'bg-green-50 text-green-700 border-green-200',
       icon: <CheckCircle className="h-4 w-4" />,
       label: 'Active',
       description: 'Subscription is active and up to date'
@@ -118,7 +116,7 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
   }
   
   return {
-    color: 'bg-gray-100 text-gray-800 border-gray-300',
+    color: 'bg-gray-50 text-gray-700 border-gray-200',
     icon: <Clock className="h-4 w-4" />,
     label: 'Inactive',
     description: 'No active subscription'
@@ -126,7 +124,6 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
 };
 
 const BillingPage: React.FC = () => {
- 
   const { user } = useAuth();
   const {
     billingProfile,
@@ -157,16 +154,13 @@ const BillingPage: React.FC = () => {
 
   // Handle subscription cancellation
   const handleCancelSubscription = async () => {
-    // Show confirmation dialog
     const confirmed = window.confirm(
       'Are you sure you want to cancel your subscription?\n\n' +
       'You will continue to have access to your current plan until the end of your billing period.\n\n' +
       'This action cannot be undone.'
     );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     setCancelling(true);
     try {
@@ -200,7 +194,6 @@ const BillingPage: React.FC = () => {
   // Download transaction receipt
   const downloadReceipt = (transaction: any) => {
     try {
-      // Create receipt content
       const receiptContent = `
 NoteX - Transaction Receipt
 
@@ -216,7 +209,6 @@ Thank you for your payment!
 NoteX Team
       `.trim();
 
-      // Create blob and download
       const blob = new Blob([receiptContent], { type: 'text/plain' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -251,29 +243,29 @@ NoteX Team
   // Get current plan display info
   const getCurrentPlanDisplay = () => {
     const planName = getPlanDisplayName(currentPlan);
-    let color = 'bg-gray-100 text-gray-800 border-gray-300';
+    let color = 'bg-gray-50 text-gray-700 border-gray-200';
     let statusLabel = '';
 
     if (currentPlan === 'trial') {
-      color = 'bg-blue-100 text-blue-800 border-blue-300';
+      color = 'bg-blue-50 text-blue-700 border-blue-200';
       if (isTrialExpired) {
         statusLabel = ' - Expired';
       } else {
         statusLabel = ` - ${trialDaysLeft} days left`;
       }
     } else if (currentPlan === 'pro') {
-      color = 'bg-green-100 text-green-800 border-green-300';
+      color = 'bg-green-50 text-green-700 border-green-200';
     } else if (currentPlan === 'business') {
-      color = 'bg-amber-100 text-amber-800 border-amber-300';
+      color = 'bg-amber-50 text-amber-700 border-amber-200';
     }
 
     if (isPaymentPastDue) {
       if (isInGracePeriod) {
         statusLabel = ` - Payment Due (${gracePeriodDaysLeft} days grace)`;
-        color = 'bg-orange-100 text-orange-800 border-orange-300';
+        color = 'bg-orange-50 text-orange-700 border-orange-200';
       } else {
         statusLabel = ' - Payment Failed';
-        color = 'bg-red-100 text-red-800 border-red-300';
+        color = 'bg-red-50 text-red-700 border-red-200';
       }
     }
 
@@ -290,51 +282,56 @@ NoteX Team
   // Check if user is authenticated
   if (!user) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Billing & Usage</h1>
-          <p className="text-muted-foreground">
-            Manage your subscription and view usage statistics
-          </p>
-        </div>
-        
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            Please log in to view your billing information.
-          </AlertDescription>
-        </Alert>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <Lock className="h-6 w-6 text-gray-600" />
+            </div>
+            <CardTitle className="text-xl">Authentication Required</CardTitle>
+            <CardDescription>
+              Please log in to view your billing information
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <Skeleton className="h-8 w-64 mb-2" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-        
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-6 w-32 mb-2" />
-                <Skeleton className="h-4 w-48" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {[1, 2, 3, 4, 5].map((j) => (
-                    <div key={j} className="flex justify-between items-center">
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-4 w-12" />
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="space-y-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <Skeleton className="h-8 w-64 mb-2" />
+                <Skeleton className="h-4 w-96" />
+              </div>
+              <Skeleton className="h-10 w-32" />
+            </div>
+            
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="border-0 shadow-sm">
+                  <CardHeader className="pb-4">
+                    <Skeleton className="h-6 w-32 mb-2" />
+                    <Skeleton className="h-4 w-48" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {[1, 2, 3, 4, 5].map((j) => (
+                        <div key={j} className="flex justify-between items-center">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-4 w-12" />
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -342,142 +339,112 @@ NoteX Team
 
   if (error) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Billing & Usage</h1>
-          <p className="text-muted-foreground">
-            Manage your subscription and view usage statistics
-          </p>
-        </div>
-        
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+            </div>
+            <CardTitle className="text-xl text-red-900">Error Loading Billing</CardTitle>
+            <CardDescription className="text-red-700">{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={refreshData} className="w-full">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
-
-
 
   // Calculate subscription end date
   const subscriptionEndDate = calculateSubscriptionEndDate(billingProfile, currentPlan);
   const statusDisplay = getSubscriptionStatusDisplay(billingProfile, currentPlan, isTrialExpired, isPaymentPastDue, isInGracePeriod);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <CreditCard className="h-6 w-6 text-blue-600" />
-            </div>
+          <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Billing & Subscription</h1>
               <p className="text-gray-600 mt-1">
                 Manage your subscription, track usage, and view billing history
               </p>
             </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshData}
+                disabled={refreshing}
+                className="text-gray-600 hover:text-gray-800"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
           </div>
         </div>
 
-      {/* Paystack Configuration Error Alert */}
-      {showConfigError && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            <strong>Payment System Not Configured!</strong> The Paystack payment system is not properly configured.
-            <div className="mt-3 space-y-2">
-              <p className="text-sm">
-                To fix this issue, you need to configure your Paystack public key in the environment variables.
-              </p>
-              <div className="text-sm space-y-1">
-                <p><strong>Steps to fix:</strong></p>
-                <ol className="list-decimal list-inside space-y-1 ml-2">
-                  <li>Get your Paystack key from <a href="https://dashboard.paystack.com/settings/developers" target="_blank" rel="noopener noreferrer" className="underline">Paystack Dashboard</a></li>
-                  <li>Update the <code className="bg-red-100 px-1 rounded">VITE_PAYSTACK_PUBLIC_KEY</code> in your <code className="bg-red-100 px-1 rounded">.env.local</code> file</li>
-                  <li>Restart your development server</li>
-                </ol>
-              </div>
-              <div className="flex gap-2 mt-3">
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={() => setShowConfigError(false)}
-                >
-                  Dismiss
+        {/* Critical Alerts */}
+        {isTrialExpired && (
+          <Alert className="mb-6 border-red-200 bg-red-50">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">
+              <strong>Trial Expired!</strong> Your free trial has ended. Upgrade to Pro or Business to continue using advanced features.
+              <div className="mt-3 flex gap-2">
+                <Button size="sm" onClick={() => handleUpgradeClick('pro')} className="bg-red-600 hover:bg-red-700">
+                  Upgrade to Pro
                 </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => window.open('PAYSTACK_KEY_FIX.md', '_blank')}
-                >
-                  View Fix Guide
+                <Button size="sm" variant="outline" onClick={() => handleUpgradeClick('business')} className="border-red-300 text-red-700 hover:bg-red-50">
+                  Upgrade to Business
                 </Button>
               </div>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
+            </AlertDescription>
+          </Alert>
+        )}
 
+        {isPaymentPastDue && !isInGracePeriod && (
+          <Alert className="mb-6 border-red-200 bg-red-50">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">
+              <strong>Payment Failed!</strong> Your payment method has failed. Please contact support to resolve this issue.
+            </AlertDescription>
+          </Alert>
+        )}
 
-
-      {/* Critical Alerts */}
-      {isTrialExpired && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            <strong>Trial Expired!</strong> Your free trial has ended. Upgrade to Pro or Business to continue using advanced features.
-            <div className="mt-3 flex gap-2">
-              <Button size="sm" onClick={() => handleUpgradeClick('pro')}>
-                Upgrade to Pro
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => handleUpgradeClick('business')}>
-                Upgrade to Business
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
-
-            {isPaymentPastDue && !isInGracePeriod && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            <strong>Payment Failed!</strong> Your payment method has failed. Please contact support to resolve this issue.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {isPaymentPastDue && isInGracePeriod && (
-        <Alert>
-          <Clock className="h-4 w-4" />
-          <AlertDescription>
-            <strong>Payment Due!</strong> Your payment has failed, but you have {gracePeriodDaysLeft} days to resolve this before your account is suspended. Please contact support.
-          </AlertDescription>
-        </Alert>
-      )}
+        {isPaymentPastDue && isInGracePeriod && (
+          <Alert className="mb-6 border-orange-200 bg-orange-50">
+            <Clock className="h-4 w-4 text-orange-600" />
+            <AlertDescription className="text-orange-800">
+              <strong>Payment Due!</strong> Your payment has failed, but you have {gracePeriodDaysLeft} days to resolve this before your account is suspended. Please contact support.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Current Plan Overview */}
-        <Card className="mb-8 shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-          <CardHeader className="pb-4">
+        <Card className="mb-8 border-0 shadow-sm">
+          <CardHeader className="pb-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl">
                   <Crown className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl font-bold text-gray-900">
+                  <CardTitle className="text-2xl font-bold text-gray-900">
                     {getPlanDisplayName(currentPlan)}
                   </CardTitle>
-                  <CardDescription className="text-gray-600">
+                  <CardDescription className="text-gray-600 text-base">
                     {statusDisplay.description}
                   </CardDescription>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Badge className={`${statusDisplay.color} px-3 py-1 text-sm font-medium`}>
+                <Badge className={`${statusDisplay.color} px-4 py-2 text-sm font-medium border`}>
                   <div className="flex items-center gap-2">
                     {statusDisplay.icon}
                     {statusDisplay.label}
@@ -488,13 +455,13 @@ NoteX Team
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Plan Price */}
-              <div className="text-center p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                <div className="flex items-center justify-center mb-2">
-                  <DollarSign className="h-5 w-5 text-gray-600" />
+              <div className="text-center p-6 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="flex items-center justify-center mb-3">
+                  <DollarSign className="h-6 w-6 text-gray-600" />
                 </div>
-                <div className="text-2xl font-bold text-gray-900 mb-1">
+                <div className="text-3xl font-bold text-gray-900 mb-2">
                   {planPricing.price === 0 ? 'Free' : formatCurrency(planPricing.price, planPricing.currency)}
                 </div>
                 <div className="text-sm text-gray-600">per {planPricing.period}</div>
@@ -502,21 +469,21 @@ NoteX Team
               
               {/* Trial Days or Next Billing */}
               {currentPlan === 'trial' && !isTrialExpired && (
-                <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
-                  <div className="flex items-center justify-center mb-2">
-                    <Timer className="h-5 w-5 text-blue-600" />
+                <div className="text-center p-6 bg-blue-50 rounded-xl border border-blue-200">
+                  <div className="flex items-center justify-center mb-3">
+                    <Timer className="h-6 w-6 text-blue-600" />
                   </div>
-                  <div className="text-2xl font-bold text-blue-900 mb-1">{trialDaysLeft}</div>
+                  <div className="text-3xl font-bold text-blue-900 mb-2">{trialDaysLeft}</div>
                   <div className="text-sm text-blue-600">trial days left</div>
                 </div>
               )}
               
               {subscriptionEndDate && currentPlan !== 'trial' && (
-                <div className="text-center p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200">
-                  <div className="flex items-center justify-center mb-2">
-                    <CalendarDays className="h-5 w-5 text-green-600" />
+                <div className="text-center p-6 bg-green-50 rounded-xl border border-green-200">
+                  <div className="flex items-center justify-center mb-3">
+                    <CalendarDays className="h-6 w-6 text-green-600" />
                   </div>
-                  <div className="text-lg font-bold text-green-900 mb-1">
+                  <div className="text-xl font-bold text-green-900 mb-2">
                     {subscriptionEndDate.toLocaleDateString('en-US', { 
                       month: 'short', 
                       day: 'numeric',
@@ -531,93 +498,35 @@ NoteX Team
 
               {/* Grace Period */}
               {isPaymentPastDue && isInGracePeriod && (
-                <div className="text-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200">
-                  <div className="flex items-center justify-center mb-2">
-                    <AlertTriangle className="h-5 w-5 text-orange-600" />
+                <div className="text-center p-6 bg-orange-50 rounded-xl border border-orange-200">
+                  <div className="flex items-center justify-center mb-3">
+                    <AlertTriangle className="h-6 w-6 text-orange-600" />
                   </div>
-                  <div className="text-2xl font-bold text-orange-900 mb-1">{gracePeriodDaysLeft}</div>
+                  <div className="text-3xl font-bold text-orange-900 mb-2">{gracePeriodDaysLeft}</div>
                   <div className="text-sm text-orange-600">grace period days</div>
                 </div>
               )}
 
               {/* Plan Status */}
-              <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200">
-                <div className="flex items-center justify-center mb-2">
-                  <Activity className="h-5 w-5 text-purple-600" />
+              <div className="text-center p-6 bg-purple-50 rounded-xl border border-purple-200">
+                <div className="flex items-center justify-center mb-3">
+                  <Activity className="h-6 w-6 text-purple-600" />
                 </div>
-                <div className="text-lg font-bold text-purple-900 mb-1 capitalize">
+                <div className="text-lg font-bold text-purple-900 mb-2 capitalize">
                   {billingProfile?.subscription_status || 'trial'}
                 </div>
                 <div className="text-sm text-purple-600">subscription status</div>
               </div>
             </div>
 
-            {/* Plan Features */}
-            <div className="mt-8">
-              <div className="flex items-center gap-2 mb-6">
-                <Sparkles className="h-5 w-5 text-blue-600" />
-                <h4 className="text-lg font-semibold text-gray-900">Plan Features</h4>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="p-4 bg-white/60 rounded-lg border border-gray-200">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Download className="h-4 w-4 text-green-600" />
-                    <span className="font-medium text-gray-900">Export Formats</span>
-                  </div>
-                  <p className="text-sm text-gray-600">{planLimits.export.join(', ')}</p>
-                </div>
-                <div className="p-4 bg-white/60 rounded-lg border border-gray-200">
-                  <div className="flex items-center gap-3 mb-2">
-                    <MessageSquare className="h-4 w-4 text-blue-600" />
-                    <span className="font-medium text-gray-900">Support</span>
-                  </div>
-                  <p className="text-sm text-gray-600">{planLimits.support.join(', ')}</p>
-                </div>
-                <div className="p-4 bg-white/60 rounded-lg border border-gray-200">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Shield className="h-4 w-4 text-purple-600" />
-                    <span className="font-medium text-gray-900">Data Retention</span>
-                  </div>
-                  <p className="text-sm text-gray-600">{planLimits.retention}</p>
-                </div>
-                <div className="p-4 bg-white/60 rounded-lg border border-gray-200">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Users className="h-4 w-4 text-orange-600" />
-                    <span className="font-medium text-gray-900">Team Members</span>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    {planLimits.teams === -1 ? 'Unlimited' : planLimits.teams}
-                  </p>
-                </div>
-                <div className="p-4 bg-white/60 rounded-lg border border-gray-200">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Star className="h-4 w-4 text-yellow-600" />
-                    <span className="font-medium text-gray-900">Priority Support</span>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    {currentPlan === 'business' ? 'Yes' : 'No'}
-                  </p>
-                </div>
-                <div className="p-4 bg-white/60 rounded-lg border border-gray-200">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Target className="h-4 w-4 text-red-600" />
-                    <span className="font-medium text-gray-900">API Access</span>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    {currentPlan === 'business' ? 'Yes' : 'No'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
             {/* Action Buttons */}
             <div className="mt-8 pt-6 border-t border-gray-200">
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-3">
                 {currentPlan === 'trial' && !isTrialExpired && (
                   <>
                     <Button 
                       onClick={() => handleUpgradeClick('pro')} 
-                      className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+                      className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200"
                     >
                       <Zap className="h-5 w-5 mr-2" />
                       Upgrade to Pro
@@ -655,39 +564,31 @@ NoteX Team
                     Upgrade to Business
                   </Button>
                 )}
-                
-                <Button 
-                  variant="ghost" 
-                  onClick={refreshData} 
-                  disabled={refreshing}
-                  className="text-gray-600 hover:text-gray-800 hover:bg-gray-100 px-6 py-3 rounded-lg font-medium transition-all duration-200"
-                >
-                  <RefreshCw className={`h-5 w-5 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                  Refresh Data
-                </Button>
               </div>
             </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
+        {/* Usage Overview */}
+        <div className="mb-8">
+          <UsageOverview 
+            userId={user?.id || ''}
+            onUpgrade={(plan) => handleUpgradeClick(plan)}
+            refreshTrigger={usageRefreshTrigger}
+          />
+        </div>
 
-
-      {/* Usage Overview - Real-time counters from source tables */}
-      <UsageOverview 
-        userId={user?.id || ''}
-        onUpgrade={(plan) => handleUpgradeClick(plan)}
-        refreshTrigger={usageRefreshTrigger}
-      />
-
-      {/* Plan Comparison */}
-      <PlanComparison 
-        currentPlan={currentPlan}
-        onUpgrade={(plan) => handleUpgradeClick(plan)}
-      />
+        {/* Plan Comparison */}
+        <div className="mb-8">
+          <PlanComparison 
+            currentPlan={currentPlan}
+            onUpgrade={(plan) => handleUpgradeClick(plan)}
+          />
+        </div>
 
         {/* Transaction History */}
-        <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-          <CardHeader className="pb-4">
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 rounded-lg">
                 <Receipt className="h-5 w-5 text-blue-600" />
@@ -716,17 +617,17 @@ NoteX Team
                 {transactions.map((transaction) => {
                   const statusDisplay = getStatusDisplay(transaction.status);
                   return (
-                    <div key={transaction.id} className="p-4 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                    <div key={transaction.id} className="p-6 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow duration-200">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                          <div className={`p-2 rounded-lg ${
+                          <div className={`p-3 rounded-lg ${
                             transaction.status === 'success' ? 'bg-green-100' : 
                             transaction.status === 'pending' ? 'bg-yellow-100' : 'bg-red-100'
                           }`}>
                             {statusDisplay.icon}
                           </div>
                           <div>
-                            <div className="font-medium text-gray-900">
+                            <div className="font-semibold text-gray-900 text-lg">
                               {transaction.description || 'Subscription Payment'}
                             </div>
                             <div className="text-sm text-gray-600">
@@ -736,7 +637,7 @@ NoteX Team
                         </div>
                         <div className="flex items-center gap-4">
                           <div className="text-right">
-                            <div className="font-semibold text-gray-900">
+                            <div className="text-xl font-bold text-gray-900">
                               {formatCurrency(transaction.amount, transaction.currency)}
                             </div>
                             <Badge 
@@ -780,7 +681,6 @@ NoteX Team
                     toast.success(`🎉 Welcome to ${upgradePlanModal === 'pro' ? 'Pro' : 'Business'}! Your subscription has been activated.`);
                     setUpgradePlanModal(null);
                     await refreshData();
-                    // Trigger usage overview refresh to show new plan limits
                     triggerUsageRefresh();
                   } catch (e: any) {
                     toast.error(e?.message || 'Failed to activate subscription');
@@ -794,9 +694,6 @@ NoteX Team
       </div>
     </div>
   );
-
-  return <SimpleBillingPage />;
-
 };
 
 export default BillingPage;
