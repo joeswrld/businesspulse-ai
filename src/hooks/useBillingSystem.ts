@@ -396,7 +396,16 @@ export function useBillingSystem(): BillingSystemState {
 
   const isSubscriptionActive = useCallback(() => {
     try {
-      return billingProfile?.subscription_status === 'active';
+      // Show cancel button for all paid plans (pro, business) regardless of subscription_status
+      // Also show for active subscriptions
+      const currentPlan = billingProfile?.plan;
+      const subscriptionStatus = billingProfile?.subscription_status;
+      
+      return (
+        subscriptionStatus === 'active' || 
+        currentPlan === 'pro' || 
+        currentPlan === 'business'
+      );
     } catch (error) {
       console.warn('Error checking subscription status:', error);
       return false;
@@ -497,6 +506,53 @@ export function useBillingSystem(): BillingSystemState {
 
   const cancelSubscription = useCallback(async () => {
     try {
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      // Ensure billing profile exists for all users
+      let profileToUse = billingProfile;
+      if (!profileToUse) {
+        // Try to create a billing profile for users who don't have one
+        try {
+          const { data: createResult, error: createError } = await supabase
+            .rpc('create_user_billing_profile', { user_uuid: user.id });
+          
+          if (createError || !createResult?.success) {
+            console.warn('Failed to create billing profile:', createError);
+            // Create a minimal profile locally
+            profileToUse = {
+              id: user.id,
+              plan: 'trial',
+              subscription_status: 'trial',
+              trial_ends_at: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
+              next_billing_date: null,
+              paystack_customer_id: null,
+              paystack_subscription_id: null,
+              created_at: new Date().toISOString()
+            };
+          } else {
+            // Fetch the newly created profile
+            const { data: newProfile } = await supabase
+              .from('billing_profiles')
+              .select('*')
+              .eq('id', user.id)
+              .single();
+            
+            if (newProfile) {
+              profileToUse = newProfile;
+            }
+          }
+        } catch (error) {
+          console.warn('Error creating billing profile:', error);
+          throw new Error('Unable to access billing information. Please try again.');
+        }
+      }
+
+      if (!profileToUse?.id) {
+        throw new Error('No billing profile found');
+      }
+
       // For now, we'll update the local database since we don't have Edge Functions
       // In production, you should integrate with Paystack's subscription management API
       
@@ -506,25 +562,59 @@ export function useBillingSystem(): BillingSystemState {
         .update({
           subscription_status: 'cancelled'
         })
-        .eq('id', billingProfile?.id);
+        .eq('id', profileToUse.id);
 
       if (updateError) {
-        throw new Error(updateError.message);
+        throw new Error(`Failed to update billing profile: ${updateError.message}`);
       }
 
-      // Update user subscription status
-      const { error: subscriptionError } = await supabase
+      // Check if user_subscriptions record exists, if not create one
+      const { data: existingSubscription, error: checkError } = await supabase
         .from('user_subscriptions')
-        .update({
-          status: 'cancelled',
-          cancel_at_period_end: true,
-          canceled_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', billingProfile?.id);
+        .select('*')
+        .eq('user_id', profileToUse.id)
+        .single();
 
-      if (subscriptionError) {
-        throw new Error(subscriptionError.message);
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.warn('Error checking user_subscriptions:', checkError);
+      }
+
+      if (existingSubscription) {
+        // Update existing subscription
+        const { error: subscriptionError } = await supabase
+          .from('user_subscriptions')
+          .update({
+            status: 'cancelled',
+            cancel_at_period_end: true,
+            canceled_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', profileToUse.id);
+
+        if (subscriptionError) {
+          console.warn('Failed to update user_subscriptions:', subscriptionError);
+          // Don't throw error here, billing profile update is more important
+        }
+      } else {
+        // Create new subscription record for old users
+        const { error: createError } = await supabase
+          .from('user_subscriptions')
+          .insert({
+            user_id: profileToUse.id,
+            plan_code: profileToUse.plan || 'trial',
+            plan_name: profileToUse.plan === 'pro' ? 'Pro Plan' : 
+                      profileToUse.plan === 'business' ? 'Business Plan' : 'Free Trial',
+            status: 'cancelled',
+            cancel_at_period_end: true,
+            canceled_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+
+        if (createError) {
+          console.warn('Failed to create user_subscriptions record:', createError);
+          // Don't throw error here, billing profile update is more important
+        }
       }
 
       toast.success('Subscription cancelled successfully. You can continue using your plan until the end of your current billing period.');
@@ -534,7 +624,7 @@ export function useBillingSystem(): BillingSystemState {
       console.error('Error cancelling subscription:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to cancel subscription');
     }
-  }, [billingProfile, refreshData]);
+  }, [user, billingProfile, refreshData]);
 
   const upgradePlan = useCallback(async (plan: 'pro' | 'business') => {
     // This will be handled by the PaystackPayment component

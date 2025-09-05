@@ -15,8 +15,16 @@ import {
   Save,
   Lock,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Upload,
+  Building2,
+  Image,
+  Star,
+  User,
+  Mail
 } from "lucide-react";
+import QRCodeFeedbackSection from "@/components/feedback/QRCodeFeedbackSection";
+import EmailSignatureFeedbackSection from "@/components/feedback/EmailSignatureFeedbackSection";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +42,11 @@ interface FeedbackSettings {
   theme: 'light' | 'dark';
   brand_color: string;
   notify_email: string | null;
+  business_name?: string;
+  business_logo?: string;
+  show_rating?: boolean;
+  show_contact_info?: boolean;
+  custom_fields?: any[];
   created_at: string;
   updated_at: string;
 }
@@ -47,8 +60,139 @@ const FeedbackSettings = () => {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [projectIdStatus, setProjectIdStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [setupAttempted, setSetupAttempted] = useState(false);
+
+  // Test Supabase connection and storage
+  const testSupabaseConnection = async () => {
+    try {
+      console.log('Testing Supabase connection...');
+      
+      // Test basic connection
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      console.log('Auth test:', { authData, authError });
+      
+      // Test storage access
+      const { data: bucketsData, error: bucketsError } = await supabase.storage.listBuckets();
+      console.log('Storage test:', { bucketsData, bucketsError });
+      
+      // Test database access
+      const { data: dbData, error: dbError } = await supabase
+        .from('feedback_settings')
+        .select('id')
+        .limit(1);
+      console.log('Database test:', { dbData, dbError });
+      
+      return {
+        auth: !authError,
+        storage: !bucketsError,
+        database: !dbError,
+        buckets: bucketsData || []
+      };
+    } catch (error) {
+      console.error('Connection test failed:', error);
+      return {
+        auth: false,
+        storage: false,
+        database: false,
+        buckets: [],
+        error: error.message
+      };
+    }
+  };
+
+  // Ensure storage bucket exists
+  const ensureStorageBucket = async () => {
+    try {
+      console.log('Checking storage buckets...');
+      
+      // Try to list the bucket to check if it exists
+      const { data, error } = await supabase.storage.listBuckets();
+      
+      console.log('Storage buckets response:', { data, error });
+      
+      if (error) {
+        console.error('Error listing buckets:', error);
+        toast.error(`Storage error: ${error.message}`);
+        return false;
+      }
+
+      const bucketExists = data?.some(bucket => bucket.id === 'business-logos');
+      console.log('Bucket exists check:', { bucketExists, buckets: data });
+      
+      if (!bucketExists) {
+        console.log('Business logos bucket does not exist. Please create it in Supabase Storage.');
+        toast.error('Storage bucket "business-logos" not found. Please create it in Supabase Storage settings.');
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error checking storage bucket:', error);
+      toast.error(`Storage check failed: ${error.message}`);
+      return false;
+    }
+  };
+
+  // Simple base64 upload (fallback method)
+  const handleBase64Upload = async (file: File) => {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64String = e.target?.result as string;
+        if (base64String) {
+          resolve(base64String);
+        } else {
+          reject(new Error('Failed to convert file to base64'));
+        }
+      };
+      reader.onerror = () => reject(new Error('File reading failed'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Handle logo upload
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !settings) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingLogo(true);
+
+    // Try base64 upload first (most reliable)
+    try {
+      console.log('Using base64 upload method...');
+      const base64String = await handleBase64Upload(file);
+      
+      // Update settings with base64 image
+      const updatedSettings = {
+        ...settings,
+        business_logo: base64String
+      };
+
+      setSettings(updatedSettings);
+      toast.success('Logo uploaded successfully!');
+      setUploadingLogo(false);
+      return;
+    } catch (error) {
+      console.error('Base64 upload failed:', error);
+      toast.error('Failed to process image. Please try again.');
+      setUploadingLogo(false);
+      return;
+    }
+  };
 
   // Check if feedback_settings table exists and create it if needed
   const ensureTableExists = useCallback(async () => {
@@ -224,7 +368,12 @@ const FeedbackSettings = () => {
           theme: 'dark',
           brand_color: '#2563eb',
           redirect_url: null,
-          notify_email: null
+          notify_email: null,
+          business_name: 'Our Business',
+          business_logo: null,
+          show_rating: true,
+          show_contact_info: true,
+          custom_fields: []
         };
 
         try {
@@ -525,6 +674,11 @@ const FeedbackSettings = () => {
             project_id: settings.project_id,
             project_id_locked: true, // Lock the project ID after first save
             notify_email: settings.notify_email,
+            business_name: settings.business_name,
+            business_logo: settings.business_logo,
+            show_rating: settings.show_rating,
+            show_contact_info: settings.show_contact_info,
+            custom_fields: settings.custom_fields,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
@@ -551,6 +705,11 @@ const FeedbackSettings = () => {
                 project_id: settings.project_id,
                 project_id_locked: true,
                 notify_email: settings.notify_email,
+                business_name: settings.business_name,
+                business_logo: settings.business_logo,
+                show_rating: settings.show_rating,
+                show_contact_info: settings.show_contact_info,
+                custom_fields: settings.custom_fields,
                 updated_at: new Date().toISOString()
               })
               .eq('user_id', user.id)
@@ -589,6 +748,11 @@ const FeedbackSettings = () => {
             project_id: settings.project_id,
             project_id_locked: true, // Lock the project ID after first save
             notify_email: settings.notify_email,
+            business_name: settings.business_name,
+            business_logo: settings.business_logo,
+            show_rating: settings.show_rating,
+            show_contact_info: settings.show_contact_info,
+            custom_fields: settings.custom_fields,
             updated_at: new Date().toISOString()
           })
           .eq('id', settings.id)
@@ -616,6 +780,11 @@ const FeedbackSettings = () => {
                 project_id: settings.project_id,
                 project_id_locked: true,
                 notify_email: settings.notify_email,
+                business_name: settings.business_name,
+                business_logo: settings.business_logo,
+                show_rating: settings.show_rating,
+                show_contact_info: settings.show_contact_info,
+                custom_fields: settings.custom_fields,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
               })
@@ -964,6 +1133,176 @@ const FeedbackSettings = () => {
           </CardContent>
         </Card>
 
+        {/* Business Branding */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Building2 className="h-5 w-5" />
+              <span>Business Branding</span>
+            </CardTitle>
+            <CardDescription>
+              Customize your business information that will appear on feedback forms.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="businessName" className="text-sm font-medium">
+                Business Name
+              </Label>
+              <Input
+                id="businessName"
+                value={settings?.business_name || ''}
+                onChange={(e) => setSettings(prev => prev ? { ...prev, business_name: e.target.value } : null)}
+                placeholder="Your Business Name"
+                className="mt-1"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                This will be displayed at the top of your feedback forms
+              </p>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Business Logo</Label>
+              <div className="mt-2 space-y-3">
+                {settings?.business_logo && (
+                  <div className="flex items-center space-x-3">
+                    <img
+                      src={settings.business_logo}
+                      alt="Business Logo"
+                      className="h-16 w-16 object-contain border rounded-lg bg-gray-50"
+                    />
+                    <div>
+                      <p className="text-sm text-gray-600">Current logo</p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSettings(prev => prev ? { ...prev, business_logo: '' } : null)}
+                        className="mt-1"
+                      >
+                        Remove Logo
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                      id="logo-upload"
+                      disabled={uploadingLogo}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('logo-upload')?.click()}
+                      disabled={uploadingLogo}
+                    >
+                      {uploadingLogo ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4 mr-2" />
+                          {settings?.business_logo ? 'Change Logo' : 'Upload Logo'}
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-gray-500">
+                      PNG, JPG, or GIF (max 5MB)
+                    </p>
+                  </div>
+                  
+                  <div className="text-center text-sm text-gray-500">
+                    OR
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="logoUrl" className="text-sm font-medium">
+                      Logo URL (Alternative)
+                    </Label>
+                    <Input
+                      id="logoUrl"
+                      type="url"
+                      placeholder="https://example.com/logo.png"
+                      value={settings?.business_logo?.startsWith('http') ? settings.business_logo : ''}
+                      onChange={(e) => {
+                        const url = e.target.value;
+                        if (url && (url.startsWith('http') || url.startsWith('data:'))) {
+                          setSettings(prev => prev ? { ...prev, business_logo: url } : null);
+                        } else if (url === '') {
+                          setSettings(prev => prev ? { ...prev, business_logo: '' } : null);
+                        }
+                      }}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Paste a direct link to your logo image
+                    </p>
+                  </div>
+                  
+                  {/* Debug Section - Remove in production */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="mt-4 p-3 bg-gray-100 rounded-lg">
+                      <p className="text-sm font-medium mb-2">Debug Tools</p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          const result = await testSupabaseConnection();
+                          console.log('Connection test result:', result);
+                          toast.info(`Connection test completed. Check console for details.`);
+                        }}
+                        className="mr-2"
+                      >
+                        Test Supabase Connection
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          const result = await ensureStorageBucket();
+                          console.log('Bucket check result:', result);
+                          toast.info(`Bucket check: ${result ? 'OK' : 'Failed'}`);
+                        }}
+                      >
+                        Check Storage Bucket
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">Show Rating System</Label>
+                <p className="text-xs text-gray-500">Display star rating in feedback forms</p>
+              </div>
+              <Switch
+                checked={settings?.show_rating !== false}
+                onCheckedChange={(checked) => setSettings(prev => prev ? { ...prev, show_rating: checked } : null)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">Show Contact Information</Label>
+                <p className="text-xs text-gray-500">Display contact fields in feedback forms</p>
+              </div>
+              <Switch
+                checked={settings?.show_contact_info !== false}
+                onCheckedChange={(checked) => setSettings(prev => prev ? { ...prev, show_contact_info: checked } : null)}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Notifications */}
         <Card>
           <CardHeader>
@@ -1101,6 +1440,17 @@ const FeedbackSettings = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* QR Code Feedback */}
+        {settings?.project_id && settings.project_id.trim() !== '' && (
+          <QRCodeFeedbackSection projectId={settings.project_id} />
+        )}
+
+        {/* Email Signature Feedback */}
+        {settings?.project_id && settings.project_id.trim() !== '' && (
+          <EmailSignatureFeedbackSection projectId={settings.project_id} />
+        )}
+
       </div>
     </div>
   );

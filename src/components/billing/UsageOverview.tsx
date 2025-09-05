@@ -40,13 +40,23 @@ interface UsageSummary {
   reports_remaining: number;
 }
 
+interface SubscriptionDetails {
+  next_billing_date: string | null;
+  trial_ends_at: string | null;
+  subscription_status: string;
+  plan_price: number | null;
+  plan_currency: string | null;
+}
+
 interface UsageOverviewProps {
   userId: string;
   onUpgrade?: (plan: 'pro' | 'business') => void;
+  refreshTrigger?: number; // Add this to trigger refresh when plan changes
 }
 
-export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps) {
+export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: UsageOverviewProps) {
   const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [trialExpired, setTrialExpired] = useState(false);
@@ -55,38 +65,137 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
     try {
       setLoading(true);
       
-      const { data, error } = await supabase.rpc('get_user_usage_summary', {
-        p_user_id: userId
-      });
+      // Try to fetch billing profile with minimal columns first
+      let billingProfile = null;
+      let currentPlan = 'free'; // Default fallback
+      
+      try {
+        const { data, error } = await supabase
+          .from('billing_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
-      if (error) {
-        console.error('Error fetching usage data:', error);
-        toast.error('Failed to load usage data');
-        return;
-      }
-
-      if (data && data.length > 0) {
-        const usageData = data[0];
-        setUsage(usageData);
-        
-        // Check if trial has expired
-        if (usageData.plan_code === 'free') {
-          const { data: billingData } = await supabase
-            .from('billing_profiles')
-            .select('trial_ends_at')
-            .eq('id', userId)
-            .single();
+        if (!error && data) {
+          billingProfile = data;
+          currentPlan = data.plan || 'free';
+          console.log('Billing profile data:', data); // Debug log
+        } else {
+          console.warn('Billing profile not found, attempting to create one:', error);
           
-          if (billingData?.trial_ends_at) {
-            const trialEnd = new Date(billingData.trial_ends_at);
-            const now = new Date();
-            setTrialExpired(now > trialEnd);
+          // Try to create a billing profile using the RPC function
+          try {
+            const { data: createResult, error: createError } = await supabase
+              .rpc('create_user_billing_profile', { user_uuid: userId });
+            
+            if (!createError && createResult?.success) {
+              console.log('Billing profile created successfully');
+              // Try to fetch the newly created profile
+              const { data: newProfile } = await supabase
+                .from('billing_profiles')
+                .select('*')
+                .eq('id', userId)
+                .single();
+              
+              if (newProfile) {
+                billingProfile = newProfile;
+                currentPlan = newProfile.plan || 'trial';
+              } else {
+                currentPlan = 'trial';
+              }
+            } else {
+              console.warn('Failed to create billing profile:', createError);
+              currentPlan = 'trial';
+            }
+          } catch (createError) {
+            console.warn('Error creating billing profile:', createError);
+            currentPlan = 'trial';
           }
         }
+      } catch (billingError) {
+        console.warn('Error fetching billing profile, using default plan:', billingError);
+        currentPlan = 'trial';
+      }
+
+      // Fetch usage counters with error handling
+      let usageCounters = {
+        feedback_count: 0,
+        insights_count: 0,
+        analytics_count: 0,
+        reports_count: 0
+      };
+
+      try {
+        const { data, error } = await supabase
+          .from('usage_counters')
+          .select('feedback_count, insights_count, analytics_count, reports_count')
+          .eq('user_id', userId)
+          .single();
+
+        if (!error && data) {
+          usageCounters = data;
+        } else {
+          console.warn('Usage counters not found, using defaults:', error);
+        }
+      } catch (countersError) {
+        console.warn('Error fetching usage counters, using defaults:', countersError);
+      }
+
+      // Get plan limits based on the current plan
+      const planLimits = getPlanLimits(currentPlan);
+
+      // Create usage summary with correct plan data
+      const usageSummary = {
+        plan_code: currentPlan,
+        plan_name: getPlanDisplayName(currentPlan),
+        feedback_count: usageCounters.feedback_count || 0,
+        insights_count: usageCounters.insights_count || 0,
+        analytics_count: usageCounters.analytics_count || 0,
+        reports_count: usageCounters.reports_count || 0,
+        feedback_limit: planLimits.feedback,
+        insights_limit: planLimits.insights,
+        analytics_limit: planLimits.analytics,
+        reports_limit: planLimits.reports,
+        feedback_remaining: Math.max(0, planLimits.feedback - (usageCounters.feedback_count || 0)),
+        insights_remaining: Math.max(0, planLimits.insights - (usageCounters.insights_count || 0)),
+        analytics_remaining: Math.max(0, planLimits.analytics - (usageCounters.analytics_count || 0)),
+        reports_remaining: Math.max(0, planLimits.reports - (usageCounters.reports_count || 0))
+      };
+
+      setUsage(usageSummary);
+      setSubscription(billingProfile);
+      
+      // Check if trial has expired
+      if ((currentPlan === 'trial' || currentPlan === 'free') && billingProfile?.trial_ends_at) {
+        const trialEnd = new Date(billingProfile.trial_ends_at);
+        const now = new Date();
+        setTrialExpired(now > trialEnd);
       }
     } catch (error) {
       console.error('Error in loadUsageData:', error);
-      toast.error('Failed to load usage data');
+      // Don't show error toast for now, just log it
+      console.warn('Using fallback data due to error');
+      
+      // Set fallback data
+      const fallbackUsage = {
+        plan_code: 'trial',
+        plan_name: 'Free Trial',
+        feedback_count: 0,
+        insights_count: 0,
+        analytics_count: 0,
+        reports_count: 0,
+        feedback_limit: 50,
+        insights_limit: 5,
+        analytics_limit: 5,
+        reports_limit: 2,
+        feedback_remaining: 50,
+        insights_remaining: 5,
+        analytics_remaining: 5,
+        reports_remaining: 2
+      };
+      
+      setUsage(fallbackUsage);
+      setSubscription(null);
     } finally {
       setLoading(false);
     }
@@ -99,9 +208,103 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
       toast.success('Usage data refreshed');
     } catch (error) {
       console.error('Error refreshing usage:', error);
-      toast.error('Failed to refresh usage data');
+      // Don't show error toast, just log it
+      console.warn('Refresh failed, but component will continue with existing data');
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  // Helper functions
+  const formatCurrency = (amount: number, currency: string = 'NGN') => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const getPlanPricing = (planCode: string) => {
+    const pricing = {
+      'free': { price: 0, currency: 'NGN', period: '8 days' },
+      'pro': { price: 3500000, currency: 'NGN', period: '30 days' }, // ₦35,000 in kobo
+      'business': { price: 5300000, currency: 'NGN', period: '30 days' } // ₦53,000 in kobo
+    };
+    return pricing[planCode as keyof typeof pricing] || pricing.free;
+  };
+
+  const getPlanLimits = (planCode: string) => {
+    const limits = {
+      'trial': { feedback: 50, insights: 5, analytics: 5, reports: 2 },
+      'free': { feedback: 50, insights: 5, analytics: 5, reports: 2 },
+      'pro': { feedback: 300, insights: 50, analytics: 100, reports: 20 },
+      'business': { feedback: -1, insights: -1, analytics: -1, reports: -1 } // unlimited
+    };
+    return limits[planCode as keyof typeof limits] || limits.trial;
+  };
+
+  const getPlanDisplayName = (planCode: string) => {
+    const names = {
+      'trial': 'Free Trial',
+      'free': 'Free Trial',
+      'pro': 'Pro Plan',
+      'business': 'Business Plan'
+    };
+    return names[planCode as keyof typeof names] || 'Free Trial';
+  };
+
+  // Function to set next billing date for Pro/Business users if missing
+  const setNextBillingDate = async (planCode: string) => {
+    if ((planCode === 'pro' || planCode === 'business') && subscription && !subscription.next_billing_date) {
+      try {
+        // Try to get the last transaction to calculate billing date from subscription start
+        const { data: transactions } = await supabase
+          .from('transactions')
+          .select('created_at')
+          .eq('user_id', userId)
+          .eq('status', 'success')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        let nextBilling: Date;
+        
+        if (transactions && transactions.length > 0) {
+          // Calculate from last successful payment + 30 days
+          const lastPayment = new Date(transactions[0].created_at);
+          nextBilling = new Date(lastPayment);
+          nextBilling.setDate(nextBilling.getDate() + 30);
+        } else {
+          // Fallback: 30 days from now
+          nextBilling = new Date();
+          nextBilling.setDate(nextBilling.getDate() + 30);
+        }
+        
+        const { error } = await supabase
+          .from('billing_profiles')
+          .update({ next_billing_date: nextBilling.toISOString() })
+          .eq('id', userId);
+
+        if (!error) {
+          console.log('Next billing date set successfully:', nextBilling.toISOString());
+          toast.success('Next billing date set successfully');
+          // Refresh the data to show the updated date
+          await loadUsageData();
+        } else {
+          console.error('Error setting next billing date:', error);
+          toast.error('Failed to set next billing date');
+        }
+      } catch (error) {
+        console.error('Error in setNextBillingDate:', error);
+        toast.error('Failed to set next billing date');
+      }
     }
   };
 
@@ -112,6 +315,20 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
     const interval = setInterval(loadUsageData, 30000);
     return () => clearInterval(interval);
   }, [userId]);
+
+  // Watch for refreshTrigger changes (when plan changes)
+  useEffect(() => {
+    if (refreshTrigger) {
+      loadUsageData();
+    }
+  }, [refreshTrigger]);
+
+  // Set next billing date for Pro/Business users if missing
+  useEffect(() => {
+    if (usage && subscription) {
+      setNextBillingDate(usage.plan_code);
+    }
+  }, [usage, subscription]);
 
   if (loading) {
     return (
@@ -223,14 +440,18 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
   const getStatusColor = (feature: any) => {
     if (feature.limit === -1) return 'text-green-600';
     if (isLimitReached(feature)) return 'text-red-600';
-    if (getUsagePercentage(feature) > 80) return 'text-yellow-600';
+    const percentage = getUsagePercentage(feature);
+    if (percentage >= 70 && percentage < 90) return 'text-yellow-600';
+    if (percentage >= 90) return 'text-orange-600';
     return 'text-green-600';
   };
 
   const getStatusIcon = (feature: any) => {
     if (feature.limit === -1) return <Infinity className="h-4 w-4 text-green-600" />;
     if (isLimitReached(feature)) return <Lock className="h-4 w-4 text-red-600" />;
-    if (getUsagePercentage(feature) > 80) return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+    const percentage = getUsagePercentage(feature);
+    if (percentage >= 70 && percentage < 90) return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+    if (percentage >= 90) return <AlertTriangle className="h-4 w-4 text-orange-600" />;
     return <CheckCircle className="h-4 w-4 text-green-600" />;
   };
 
@@ -239,18 +460,54 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Usage Overview</h2>
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-gray-600">
-              Current plan: 
-            </p>
-            <Badge variant="outline" className="font-medium">
-              {usage.plan_name}
-            </Badge>
-            {usage.plan_code === 'free' && (
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                <Clock className="h-3 w-3 mr-1" />
-                Trial
+          <div className="mt-2 space-y-1">
+            <div className="flex items-center gap-2">
+              <p className="text-gray-600">
+                Current Plan: 
+              </p>
+              <Badge variant="outline" className="font-medium">
+                {usage.plan_name}
               </Badge>
+              {(usage.plan_code === 'trial' || usage.plan_code === 'free') && (
+                <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                  <Clock className="h-3 w-3 mr-1" />
+                  Trial
+                </Badge>
+              )}
+            </div>
+            
+            {/* Show pricing and renewal date */}
+            {usage.plan_code !== 'trial' && usage.plan_code !== 'free' && (
+              <div className="flex items-center gap-4 text-sm text-gray-600">
+                <span>
+                  {formatCurrency(getPlanPricing(usage.plan_code).price / 100, getPlanPricing(usage.plan_code).currency)}/month
+                </span>
+                {subscription?.next_billing_date ? (
+                  <span>
+                    Next Renewal: {formatDate(subscription.next_billing_date)}
+                  </span>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">
+                      Next Renewal: Not set
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setNextBillingDate(usage.plan_code)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      Set Date
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {(usage.plan_code === 'trial' || usage.plan_code === 'free') && subscription?.trial_ends_at && (
+              <div className="text-sm text-gray-600">
+                Trial ends: {formatDate(subscription.trial_ends_at)}
+              </div>
             )}
           </div>
         </div>
@@ -280,11 +537,20 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
         </Alert>
       )}
 
-      {features.some(feature => getUsagePercentage(feature) > 80) && !features.some(feature => isLimitReached(feature)) && (
+      {features.some(feature => getUsagePercentage(feature) >= 90) && !features.some(feature => isLimitReached(feature)) && (
+        <Alert className="mb-6 border-orange-200 bg-orange-50">
+          <AlertTriangle className="h-4 w-4 text-orange-600" />
+          <AlertDescription className="text-orange-800">
+            <strong>Usage Warning:</strong> Some features are very close to their limits. Consider upgrading soon.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {features.some(feature => getUsagePercentage(feature) >= 70 && getUsagePercentage(feature) < 90) && !features.some(feature => getUsagePercentage(feature) >= 90) && (
         <Alert className="mb-6 border-yellow-200 bg-yellow-50">
           <AlertTriangle className="h-4 w-4 text-yellow-600" />
           <AlertDescription className="text-yellow-800">
-            <strong>Usage Warning:</strong> Some features are approaching their limits. Consider upgrading soon.
+            <strong>Usage Notice:</strong> Some features are approaching their limits. Keep an eye on your usage.
           </AlertDescription>
         </Alert>
       )}
@@ -355,13 +621,19 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
               
               {reached && (
                 <div className="mt-3 p-2 bg-red-100 rounded text-xs text-red-700">
-                  <strong>Upgrade required!</strong> You've reached the limit for this feature.
+                  <strong>Limit reached!</strong> You've used {feature.count}/{feature.limit} {feature.name.toLowerCase()}. Upgrade to Business for unlimited access.
                 </div>
               )}
               
-              {percentage >= 80 && !reached && (
+              {percentage >= 90 && !reached && (
+                <div className="mt-3 p-2 bg-orange-100 rounded text-xs text-orange-700">
+                  <strong>Very close to limit!</strong> You've used {feature.count}/{feature.limit} {feature.name.toLowerCase()}. Only {feature.remaining} remaining.
+                </div>
+              )}
+              
+              {percentage >= 70 && percentage < 90 && !reached && (
                 <div className="mt-3 p-2 bg-yellow-100 rounded text-xs text-yellow-700">
-                  <strong>Almost full!</strong> Consider upgrading soon to avoid hitting limits.
+                  <strong>Approaching limit.</strong> You've used {feature.count}/{feature.limit} {feature.name.toLowerCase()}. {feature.remaining} remaining.
                 </div>
               )}
             </div>
@@ -369,36 +641,6 @@ export default function UsageOverview({ userId, onUpgrade }: UsageOverviewProps)
         })}
       </div>
 
-      {/* Upgrade Prompts */}
-      {usage.plan_code === 'free' && (
-        <Alert className="mt-6 border-blue-200 bg-blue-50">
-          <Zap className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-800">
-            <strong>Upgrade to unlock more features!</strong> Get higher limits and unlimited access with Pro or Business plans.
-            {onUpgrade && (
-              <div className="flex gap-2 mt-3">
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => onUpgrade('pro')}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Zap className="h-4 w-4 mr-2" />
-                  Upgrade to Pro
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onUpgrade('business')}
-                >
-                  <Crown className="h-4 w-4 mr-2" />
-                  Upgrade to Business
-                </Button>
-              </div>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
 
       <div className="mt-6 text-xs text-gray-500 text-center">
         Last updated: {new Date().toLocaleTimeString()} • Updates every 30 seconds

@@ -71,6 +71,8 @@ const Feedback = () => {
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
   const [showTagInput, setShowTagInput] = useState<string | null>(null);
   const [newTag, setNewTag] = useState('');
+  const [selectedFeedbacks, setSelectedFeedbacks] = useState<Set<string>>(new Set());
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Load project ID and feedbacks
   const loadProjectAndFeedbacks = useCallback(async () => {
@@ -348,6 +350,72 @@ const Feedback = () => {
     });
   };
 
+  // Bulk action functions
+  const handleSelectAll = () => {
+    const filteredFeedbacks = getFilteredFeedbacks();
+    if (selectedFeedbacks.size === filteredFeedbacks.length) {
+      setSelectedFeedbacks(new Set());
+    } else {
+      setSelectedFeedbacks(new Set(filteredFeedbacks.map(f => f.id)));
+    }
+  };
+
+  const handleSelectFeedback = (feedbackId: string) => {
+    const newSelected = new Set(selectedFeedbacks);
+    if (newSelected.has(feedbackId)) {
+      newSelected.delete(feedbackId);
+    } else {
+      newSelected.add(feedbackId);
+    }
+    setSelectedFeedbacks(newSelected);
+  };
+
+  const handleBulkMarkAsReviewed = async () => {
+    if (selectedFeedbacks.size === 0) return;
+    
+    setBulkActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from('feedbacks')
+        .update({ status: 'reviewed' })
+        .in('id', Array.from(selectedFeedbacks));
+
+      if (error) throw error;
+
+      toast.success(`Marked ${selectedFeedbacks.size} feedback as reviewed`);
+      setSelectedFeedbacks(new Set());
+      await loadProjectAndFeedbacks();
+    } catch (error) {
+      console.error('Error marking feedback as reviewed:', error);
+      toast.error('Failed to mark feedback as reviewed');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkMarkAsResolved = async () => {
+    if (selectedFeedbacks.size === 0) return;
+    
+    setBulkActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from('feedbacks')
+        .update({ status: 'resolved' })
+        .in('id', Array.from(selectedFeedbacks));
+
+      if (error) throw error;
+
+      toast.success(`Marked ${selectedFeedbacks.size} feedback as resolved`);
+      setSelectedFeedbacks(new Set());
+      await loadProjectAndFeedbacks();
+    } catch (error) {
+      console.error('Error marking feedback as resolved:', error);
+      toast.error('Failed to mark feedback as resolved');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
   // Get status badge variant
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -549,6 +617,71 @@ const Feedback = () => {
         </CardContent>
       </Card>
 
+      {/* Bulk Selection Bar */}
+      {filteredFeedbacks.length > 0 && (
+        <Card className="rounded-xl shadow-lg border-2 border-green-100 bg-green-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedFeedbacks.size === filteredFeedbacks.length && filteredFeedbacks.length > 0}
+                    onChange={handleSelectAll}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    {selectedFeedbacks.size === filteredFeedbacks.length && filteredFeedbacks.length > 0
+                      ? 'Deselect All'
+                      : 'Select All'
+                    }
+                  </span>
+                </div>
+                {selectedFeedbacks.size > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-600">
+                      {selectedFeedbacks.size} selected
+                    </span>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleBulkMarkAsReviewed}
+                        disabled={bulkActionLoading}
+                        className="bg-white hover:bg-gray-50"
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        Mark Reviewed
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleBulkMarkAsResolved}
+                        disabled={bulkActionLoading}
+                        className="bg-white hover:bg-gray-50"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Mark Resolved
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {selectedFeedbacks.size > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelectedFeedbacks(new Set())}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  Clear Selection
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Results Summary */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-gray-600">
@@ -565,17 +698,25 @@ const Feedback = () => {
       {filteredFeedbacks.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {filteredFeedbacks.map((feedback) => (
-            <Card key={feedback.id} className="rounded-xl shadow-lg hover:shadow-xl transition-shadow">
+            <Card key={feedback.id} className={`rounded-xl shadow-lg hover:shadow-xl transition-shadow ${selectedFeedbacks.has(feedback.id) ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Badge variant={getStatusBadgeVariant(feedback.status)}>
-                      {getStatusIcon(feedback.status)}
-                      <span className="ml-1 capitalize">{feedback.status}</span>
-                    </Badge>
-                    <Badge variant={getSentimentBadgeVariant(feedback.sentiment || 'neutral')}>
-                      {feedback.sentiment || 'neutral'}
-                    </Badge>
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedFeedbacks.has(feedback.id)}
+                      onChange={() => handleSelectFeedback(feedback.id)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={getStatusBadgeVariant(feedback.status)}>
+                        {getStatusIcon(feedback.status)}
+                        <span className="ml-1 capitalize">{feedback.status}</span>
+                      </Badge>
+                      <Badge variant={getSentimentBadgeVariant(feedback.sentiment || 'neutral')}>
+                        {feedback.sentiment || 'neutral'}
+                      </Badge>
+                    </div>
                   </div>
                   <div className="flex items-center space-x-1 text-sm text-gray-500">
                     <Clock className="h-4 w-4" />
