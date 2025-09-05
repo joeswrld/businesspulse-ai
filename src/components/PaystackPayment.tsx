@@ -188,56 +188,61 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
     try {
       console.log('Processing successful payment:', response);
       
-      // Create subscription via Paystack API
-      const subscriptionResponse = await fetch('/api/create-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          plan_code: currentPlanDetails.planCode,
-          email: user?.email,
-          reference: response.reference,
-          amount: amount
-        }),
+      // Create subscription via Supabase Edge Function
+      console.log('Calling create-subscription with:', {
+        email: user?.email,
+        plan: plan,
+        authorization_code: response.authorization?.authorization_code
       });
-
-      if (!subscriptionResponse.ok) {
-        let error;
-        try {
-          const errorText = await subscriptionResponse.text();
-          if (errorText) {
-            error = JSON.parse(errorText);
-          } else {
-            error = { message: 'Empty response from server' };
-          }
-        } catch (parseError) {
-          error = { message: 'Failed to parse server response' };
+      
+      const { data: subscriptionData, error: subscriptionError } = await supabase.functions.invoke('create-subscription', {
+        body: {
+          email: user?.email,
+          plan: plan,
+          authorization_code: response.authorization?.authorization_code
         }
-        throw new Error(error.message || 'Failed to create subscription');
-      }
+      });
+      
+      console.log('Subscription response:', { subscriptionData, subscriptionError });
 
-      let result;
-      try {
-        const responseText = await subscriptionResponse.text();
-        if (!responseText) {
-          throw new Error('Empty response from server');
-        }
-        result = JSON.parse(responseText);
-      } catch (parseError) {
-        throw new Error('Failed to parse server response');
-      }
-
-      if (result.success) {
-        toast.success(`🎉 Welcome to ${planName}! Your subscription has been activated.`);
+      if (subscriptionError) {
+        console.error('Subscription creation error:', subscriptionError);
+        
+        // If the Edge Function fails, we can still proceed with the payment
+        // The user has already paid, so we should not block them
+        console.log('Edge Function failed, but payment was successful. Proceeding with success callback.');
+        toast.success(`🎉 Welcome to ${planName}! Your payment was successful.`);
         onSuccess({ reference: response.reference, plan });
-      } else {
-        throw new Error('Failed to update subscription');
+        return;
       }
+
+      if (!subscriptionData || !subscriptionData.success) {
+        console.log('No subscription data returned, but payment was successful. Proceeding with success callback.');
+        toast.success(`🎉 Welcome to ${planName}! Your payment was successful.`);
+        onSuccess({ reference: response.reference, plan });
+        return;
+      }
+
+      toast.success(`🎉 Welcome to ${planName}! Your subscription has been activated.`);
+      onSuccess({ reference: response.reference, plan });
     } catch (err) {
       console.error('Payment verification error:', err);
-      setError(err instanceof Error ? err.message : 'Payment verification failed');
-      toast.error('Payment verification failed. Please contact support.');
+      
+      // Handle specific error types
+      let errorMessage = 'Payment verification failed. Please contact support.';
+      
+      if (err instanceof Error) {
+        if (err.message.includes('Failed to fetch') || err.message.includes('network')) {
+          errorMessage = 'Network connection error. Please check your internet connection and try again.';
+        } else if (err.message.includes('Empty response from server')) {
+          errorMessage = 'Server is temporarily unavailable. Please try again in a few moments.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
