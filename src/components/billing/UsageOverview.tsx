@@ -79,6 +79,7 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
         if (!error && data) {
           billingProfile = data;
           currentPlan = data.plan || 'free';
+          console.log('Billing profile data:', data); // Debug log
         } else {
           console.warn('Billing profile not found, attempting to create one:', error);
           
@@ -260,6 +261,53 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
     return names[planCode as keyof typeof names] || 'Free Trial';
   };
 
+  // Function to set next billing date for Pro/Business users if missing
+  const setNextBillingDate = async (planCode: string) => {
+    if ((planCode === 'pro' || planCode === 'business') && subscription && !subscription.next_billing_date) {
+      try {
+        // Try to get the last transaction to calculate billing date from subscription start
+        const { data: transactions } = await supabase
+          .from('transactions')
+          .select('created_at')
+          .eq('user_id', userId)
+          .eq('status', 'success')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        let nextBilling: Date;
+        
+        if (transactions && transactions.length > 0) {
+          // Calculate from last successful payment + 30 days
+          const lastPayment = new Date(transactions[0].created_at);
+          nextBilling = new Date(lastPayment);
+          nextBilling.setDate(nextBilling.getDate() + 30);
+        } else {
+          // Fallback: 30 days from now
+          nextBilling = new Date();
+          nextBilling.setDate(nextBilling.getDate() + 30);
+        }
+        
+        const { error } = await supabase
+          .from('billing_profiles')
+          .update({ next_billing_date: nextBilling.toISOString() })
+          .eq('id', userId);
+
+        if (!error) {
+          console.log('Next billing date set successfully:', nextBilling.toISOString());
+          toast.success('Next billing date set successfully');
+          // Refresh the data to show the updated date
+          await loadUsageData();
+        } else {
+          console.error('Error setting next billing date:', error);
+          toast.error('Failed to set next billing date');
+        }
+      } catch (error) {
+        console.error('Error in setNextBillingDate:', error);
+        toast.error('Failed to set next billing date');
+      }
+    }
+  };
+
   useEffect(() => {
     loadUsageData();
     
@@ -274,6 +322,13 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
       loadUsageData();
     }
   }, [refreshTrigger]);
+
+  // Set next billing date for Pro/Business users if missing
+  useEffect(() => {
+    if (usage && subscription) {
+      setNextBillingDate(usage.plan_code);
+    }
+  }, [usage, subscription]);
 
   if (loading) {
     return (
@@ -427,10 +482,24 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
                 <span>
                   {formatCurrency(getPlanPricing(usage.plan_code).price / 100, getPlanPricing(usage.plan_code).currency)}/month
                 </span>
-                {subscription?.next_billing_date && (
+                {subscription?.next_billing_date ? (
                   <span>
                     Next Renewal: {formatDate(subscription.next_billing_date)}
                   </span>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">
+                      Next Renewal: Not set
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setNextBillingDate(usage.plan_code)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      Set Date
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
