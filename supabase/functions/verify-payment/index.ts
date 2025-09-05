@@ -68,8 +68,46 @@ serve(async (req) => {
       )
     }
 
-    // Create Supabase client
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    // Get authorization header
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      console.error('Missing authorization header')
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Create Supabase client with authorization header
+    const supabase = createClient(
+      supabaseUrl,
+      supabaseServiceKey,
+      { 
+        global: { 
+          headers: { 
+            Authorization: authHeader 
+          } 
+        } 
+      }
+    )
+
+    // Validate the user by getting user info
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      console.error('User validation error:', userError)
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    console.log(`Authenticated user: ${user.id}`)
 
     // Verify payment with Paystack
     console.log(`Verifying payment reference: ${reference}`)
@@ -151,28 +189,26 @@ serve(async (req) => {
       )
     }
 
-    // Get user by email
-    console.log(`Looking up user by email: ${email}`)
-    const { data: user, error: userError } = await supabase.auth.admin.getUserByEmail(email)
+    // Use the authenticated user (we already validated them above)
+    console.log(`Using authenticated user: ${user.id}`)
     
-    if (userError || !user) {
-      console.error('User lookup error:', userError)
+    // Verify the email matches (additional security check)
+    if (user.email !== email) {
+      console.error(`Email mismatch: authenticated user email ${user.email} does not match request email ${email}`)
       return new Response(
-        JSON.stringify({ error: 'User not found' }),
+        JSON.stringify({ error: 'Email mismatch' }),
         { 
-          status: 404, 
+          status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       )
     }
 
-    console.log(`User found: ${user.user.id}`)
-
     // Create or update billing profile
     const { error: billingError } = await supabase
       .from('billing_profiles')
       .upsert({
-        id: user.user.id,
+        id: user.id,
         plan: plan,
         trial_ends_at: null,
         next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
@@ -201,7 +237,7 @@ serve(async (req) => {
     const { error: transactionError } = await supabase
       .from('transactions')
       .insert({
-        user_id: user.user.id,
+        user_id: user.id,
         amount: amount,
         currency: 'NGN',
         status: 'success',
@@ -227,7 +263,7 @@ serve(async (req) => {
     const { error: subscriptionError } = await supabase
       .from('user_subscriptions')
       .upsert({
-        user_id: user.user.id,
+        user_id: user.id,
         plan_code: plan === 'pro' ? 'PLN_4z2wpgmw41w2k7r' : 'PLN_esryg99ztsy9xc8',
         plan_name: plan === 'pro' ? 'Pro Plan' : 'Business Plan',
         status: 'active',
@@ -255,7 +291,7 @@ serve(async (req) => {
     console.log('User subscription updated successfully')
 
     // Log successful upgrade
-    console.log(`User ${user.user.id} upgraded to ${plan} plan successfully`)
+    console.log(`User ${user.id} upgraded to ${plan} plan successfully`)
 
     // Return success response
     return new Response(
@@ -263,7 +299,7 @@ serve(async (req) => {
         success: true,
         message: 'Subscription activated successfully',
         data: {
-          user_id: user.user.id,
+          user_id: user.id,
           plan: plan,
           reference: reference,
           amount: amount,
