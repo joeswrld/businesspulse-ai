@@ -67,10 +67,13 @@ const Feedback = () => {
     loading, 
     error, 
     realtimeStatus, 
+    reconnectAttempts,
+    maxReconnectAttempts,
     loadFeedbacks, 
     updateFeedbackStatus, 
     addTagToFeedback, 
-    removeTagFromFeedback 
+    removeTagFromFeedback,
+    forceReconnect
   } = useRealtimeFeedback();
   
   // Local state for UI
@@ -281,12 +284,28 @@ const Feedback = () => {
             Manage and respond to user feedback in real-time
           </p>
           <div className="flex items-center space-x-4 mt-3">
-            <div className="flex items-center space-x-1 text-sm text-gray-500">
+            <div className="flex items-center space-x-2 text-sm text-gray-500">
               <div className={`w-2 h-2 rounded-full ${
                 realtimeStatus === 'connected' ? 'bg-green-500' : 
                 realtimeStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
               }`}></div>
               <span className="capitalize">{realtimeStatus}</span>
+              {realtimeStatus === 'error' && reconnectAttempts > 0 && (
+                <span className="text-xs text-red-500">
+                  (Retrying {reconnectAttempts}/{maxReconnectAttempts})
+                </span>
+              )}
+              {realtimeStatus === 'error' && reconnectAttempts >= maxReconnectAttempts && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={forceReconnect}
+                  className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700"
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Reconnect
+                </Button>
+              )}
             </div>
             <FeedbackBadgeGroup counts={counts} />
           </div>
