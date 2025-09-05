@@ -117,7 +117,7 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
         currentPlan = 'trial';
       }
 
-      // Fetch usage counters with error handling
+      // Fetch usage counters with monthly reset logic
       let usageCounters = {
         feedback_count: 0,
         insights_count: 0,
@@ -126,14 +126,19 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
       };
 
       try {
+        // Use the RPC function that handles monthly reset automatically
         const { data, error } = await supabase
-          .from('usage_counters')
-          .select('feedback_count, insights_count, analytics_count, reports_count')
-          .eq('user_id', userId)
-          .single();
+          .rpc('ensure_current_month_usage', { user_uuid: userId });
 
-        if (!error && data) {
-          usageCounters = data;
+        if (!error && data && data.length > 0) {
+          const usageData = data[0];
+          usageCounters = {
+            feedback_count: usageData.feedback_count || 0,
+            insights_count: usageData.insights_count || 0,
+            analytics_count: usageData.analytics_count || 0,
+            reports_count: usageData.reports_count || 0
+          };
+          console.log('Usage counters loaded with monthly reset:', usageData);
         } else {
           console.warn('Usage counters not found, using defaults:', error);
         }
