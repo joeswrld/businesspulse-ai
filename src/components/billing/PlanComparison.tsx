@@ -6,8 +6,8 @@ import { Check, X, Crown, Zap, Star, Sparkles, ArrowRight, Infinity } from 'luci
 import { getPlanLimits, getPlanPricing } from '@/hooks/useBillingSystem';
 
 interface PlanComparisonProps {
-  currentPlan: 'trial' | 'pro' | 'business';
-  onUpgrade: (plan: 'pro' | 'business') => void;
+  currentPlan: 'trial' | 'business';
+  onUpgrade: (plan: 'business') => void;
   showUpgradeButtons?: boolean;
 }
 
@@ -39,40 +39,17 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
       comingSoon: false
     },
     {
-      id: 'pro',
-      name: 'Pro Plan',
-      planCode: 'PLN_4z2wpgmw41w2k7r',
-      description: 'Advanced features for growing businesses',
-      price: 3500000, // ₦35,000 in kobo
-      currency: 'NGN',
-      period: '30 days',
-      features: [
-        { name: 'Feedback Collection', limit: 300, unit: 'responses' },
-        { name: 'AI Insights', limit: 50, unit: 'insights' },
-        { name: 'Advanced Analytics', limit: 100, unit: 'reports' },
-        { name: 'Reports', limit: 20, unit: 'reports' },
-        { name: 'Team Members', limit: 5, unit: 'members' },
-        { name: 'Export Formats', limit: ['CSV', 'PDF', 'Excel'], unit: 'formats' },
-        { name: 'Support', limit: ['Email', 'Chat'], unit: 'channels' },
-        { name: 'Data Retention', limit: '12 months', unit: 'retention' },
-        { name: 'Priority Support', limit: false, unit: 'feature' },
-        { name: 'API Access', limit: false, unit: 'feature' }
-      ],
-      popular: true,
-      comingSoon: false
-    },
-    {
       id: 'business',
       name: 'Business Plan',
       planCode: 'PLN_esryg99ztsy9xc8',
-      description: 'Enterprise features for large organizations',
+      description: 'Complete solution for businesses of all sizes',
       price: 5300000, // ₦53,000 in kobo
       currency: 'NGN',
       period: '30 days',
       features: [
         { name: 'Feedback Collection', limit: -1, unit: 'unlimited' },
         { name: 'AI Insights', limit: -1, unit: 'unlimited' },
-        { name: 'Enterprise Analytics', limit: -1, unit: 'unlimited' },
+        { name: 'Advanced Analytics', limit: -1, unit: 'unlimited' },
         { name: 'Reports', limit: -1, unit: 'unlimited' },
         { name: 'Team Members', limit: -1, unit: 'unlimited' },
         { name: 'Export Formats', limit: ['CSV', 'PDF', 'Excel', 'API'], unit: 'formats' },
@@ -83,7 +60,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
         { name: 'Predictive Analytics', limit: true, unit: 'feature' },
         { name: 'Custom Integrations', limit: true, unit: 'feature' }
       ],
-      popular: false,
+      popular: true,
       comingSoon: false
     }
   ];

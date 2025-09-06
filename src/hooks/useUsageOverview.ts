@@ -10,7 +10,7 @@ export interface UsageData {
 }
 
 export interface SubscriptionData {
-  plan_type: 'trial' | 'pro' | 'business';
+  plan_type: 'trial' | 'business';
   renewal_date: string | null;
   trial_start: string | null;
   trial_end: string | null;
@@ -54,12 +54,6 @@ const PLAN_LIMITS = {
     insights: 10,
     analytics: 10,
     reports: 5,
-  },
-  pro: {
-    feedback: 300,
-    insights: 50,
-    analytics: 100,
-    reports: 20,
   },
   business: {
     feedback: -1, // Unlimited

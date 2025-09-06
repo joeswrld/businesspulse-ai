@@ -54,7 +54,7 @@ import PlanComparison from '@/components/billing/PlanComparison';
 import UsageOverview from '@/components/billing/UsageOverview';
 import UsageOverviewDebug from '@/components/billing/UsageOverviewDebug';
 
-type UpgradePlan = 'pro' | 'business' | null;
+type UpgradePlan = 'business' | null;
 
 // Helper function to calculate subscription end date
 const calculateSubscriptionEndDate = (billingProfile: any, currentPlan: string) => {
@@ -253,8 +253,6 @@ NoteX Team
       } else {
         statusLabel = ` - ${trialDaysLeft} days left`;
       }
-    } else if (currentPlan === 'pro') {
-      color = 'bg-green-50 text-green-700 border-green-200';
     } else if (currentPlan === 'business') {
       color = 'bg-amber-50 text-amber-700 border-amber-200';
     }
@@ -395,12 +393,9 @@ NoteX Team
           <Alert className="mb-6 border-red-200 bg-red-50">
             <AlertTriangle className="h-4 w-4 text-red-600" />
             <AlertDescription className="text-red-800">
-              <strong>Trial Expired!</strong> Your free trial has ended. Upgrade to Pro or Business to continue using advanced features.
+              <strong>Trial Expired!</strong> Your free trial has ended. Upgrade to Business to continue using advanced features.
               <div className="mt-3 flex gap-2">
-                <Button size="sm" onClick={() => handleUpgradeClick('pro')} className="bg-red-600 hover:bg-red-700">
-                  Upgrade to Pro
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => handleUpgradeClick('business')} className="border-red-300 text-red-700 hover:bg-red-50">
+                <Button size="sm" onClick={() => handleUpgradeClick('business')} className="bg-red-600 hover:bg-red-700">
                   Upgrade to Business
                 </Button>
               </div>
@@ -523,26 +518,16 @@ NoteX Team
             <div className="mt-8 pt-6 border-t border-gray-200">
               <div className="flex flex-col sm:flex-row flex-wrap gap-3">
                 {currentPlan === 'trial' && !isTrialExpired && (
-                  <>
-                    <Button 
-                      onClick={() => handleUpgradeClick('pro')} 
-                      className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200"
-                    >
-                      <Zap className="h-5 w-5 mr-2" />
-                      Upgrade to Pro
-                    </Button>
-                    <Button 
-                      onClick={() => handleUpgradeClick('business')} 
-                      variant="outline"
-                      className="border-2 border-purple-200 text-purple-700 hover:bg-purple-50 px-6 py-3 rounded-lg font-medium transition-all duration-200"
-                    >
-                      <Crown className="h-5 w-5 mr-2" />
-                      Upgrade to Business
-                    </Button>
-                  </>
+                  <Button 
+                    onClick={() => handleUpgradeClick('business')} 
+                    className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white px-6 py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200"
+                  >
+                    <Crown className="h-5 w-5 mr-2" />
+                    Upgrade to Business
+                  </Button>
                 )}
                 
-                {(isSubscriptionActive || currentPlan === 'pro' || currentPlan === 'business') && (
+                {(isSubscriptionActive || currentPlan === 'business') && (
                   <Button 
                     variant="outline" 
                     onClick={handleCancelSubscription} 
@@ -554,16 +539,6 @@ NoteX Team
                   </Button>
                 )}
                 
-                {currentPlan === 'pro' && (
-                  <Button 
-                    onClick={() => handleUpgradeClick('business')} 
-                    variant="outline"
-                    className="border-2 border-purple-200 text-purple-700 hover:bg-purple-50 px-6 py-3 rounded-lg font-medium transition-all duration-200"
-                  >
-                    <Crown className="h-5 w-5 mr-2" />
-                    Upgrade to Business
-                  </Button>
-                )}
               </div>
             </div>
           </CardContent>
@@ -679,11 +654,11 @@ NoteX Team
             <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
               <PaystackPayment
                 plan={upgradePlanModal}
-                planName={upgradePlanModal === 'pro' ? 'Pro' : 'Business'}
+                planName="Business"
                 planPrice={getPlanPrice(upgradePlanModal)}
                 onSuccess={async ({ reference, plan: paidPlan }) => {
                   try {
-                    toast.success(`🎉 Welcome to ${upgradePlanModal === 'pro' ? 'Pro' : 'Business'}! Your subscription has been activated.`);
+                    toast.success(`🎉 Welcome to Business! Your subscription has been activated.`);
                     setUpgradePlanModal(null);
                     await refreshData();
                     triggerUsageRefresh();

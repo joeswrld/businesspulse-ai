@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 
 interface UsageOverviewProps {
   userId: string;
-  onUpgrade?: (plan: 'pro' | 'business') => void;
+  onUpgrade?: (plan: 'business') => void;
   refreshTrigger?: number;
 }
 
@@ -60,7 +60,6 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
   const getPlanPricing = (planType: string) => {
     const pricing = {
       'trial': { price: 0, currency: 'NGN', period: '8 days' },
-      'pro': { price: 3500000, currency: 'NGN', period: '30 days' }, // ₦35,000 in kobo
       'business': { price: 5300000, currency: 'NGN', period: '30 days' } // ₦53,000 in kobo
     };
     return pricing[planType as keyof typeof pricing] || pricing.trial;
@@ -69,7 +68,6 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
   const getPlanDisplayName = (planType: string) => {
     const names = {
       'trial': 'Free Trial',
-      'pro': 'Pro Plan',
       'business': 'Business Plan'
     };
     return names[planType as keyof typeof names] || 'Free Trial';
@@ -137,19 +135,12 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Trial Expired</h2>
           <p className="text-gray-600 mb-6 max-w-md mx-auto">
-            Your free trial has expired or you've reached your limits. Upgrade to Pro or Business to continue using advanced features.
+            Your free trial has expired or you've reached your limits. Upgrade to Business to continue using advanced features.
           </p>
           <div className="flex gap-3 justify-center">
             <Button
-              onClick={() => onUpgrade?.('pro')}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Zap className="h-4 w-4 mr-2" />
-              Upgrade to Pro
-            </Button>
-            <Button
               onClick={() => onUpgrade?.('business')}
-              variant="outline"
+              className="bg-amber-600 hover:bg-amber-700"
             >
               <Crown className="h-4 w-4 mr-2" />
               Upgrade to Business

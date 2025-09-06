@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 // Types
 export interface BillingProfile {
   id: string;
-  plan: 'trial' | 'pro' | 'business';
+  plan: 'trial' | 'business';
   trial_ends_at: string | null;
   next_billing_date: string | null;
   subscription_status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
@@ -64,7 +64,7 @@ export interface BillingSystemState {
   refreshing: boolean;
   
   // Computed values
-  currentPlan: 'trial' | 'pro' | 'business';
+  currentPlan: 'trial' | 'business';
   trialDaysLeft: number;
   isTrialExpired: boolean;
   isSubscriptionActive: boolean;
@@ -80,7 +80,7 @@ export interface BillingSystemState {
   // Actions
   refreshData: () => Promise<void>;
   cancelSubscription: () => Promise<void>;
-  upgradePlan: (plan: 'pro' | 'business') => Promise<void>;
+  upgradePlan: (plan: 'business') => Promise<void>;
 }
 
 // Plan limits configuration - Real-world SaaS limits
@@ -94,16 +94,6 @@ const PLAN_LIMITS: Record<string, UsageLimits> = {
     export: ['CSV'],
     support: ['Email'],
     retention: '8 days'
-  },
-  pro: {
-    feedback: 300,
-    analytics: 100,
-    reports: 20,
-    insights: 50,
-    teams: 5,
-    export: ['CSV', 'PDF', 'Excel'],
-    support: ['Email', 'Chat'],
-    retention: '12 months'
   },
   business: {
     feedback: -1, // unlimited
@@ -120,7 +110,6 @@ const PLAN_LIMITS: Record<string, UsageLimits> = {
 // Plan pricing (amounts in kobo - smallest currency unit for Paystack)
 const PLAN_PRICING = {
   trial: { price: 0, currency: 'NGN', period: '8 days' },
-  pro: { price: 3500000, currency: 'NGN', period: '30 days' }, // ₦35,000 in kobo
   business: { price: 5300000, currency: 'NGN', period: '30 days' } // ₦53,000 in kobo
 };
 
@@ -626,7 +615,7 @@ export function useBillingSystem(): BillingSystemState {
     }
   }, [user, billingProfile, refreshData]);
 
-  const upgradePlan = useCallback(async (plan: 'pro' | 'business') => {
+  const upgradePlan = useCallback(async (plan: 'business') => {
     // This will be handled by the PaystackPayment component
     return Promise.resolve();
     }, []);
