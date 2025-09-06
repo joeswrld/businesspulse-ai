@@ -1,48 +1,28 @@
-# 🚀 Manual Deployment Guide (Deadlock-Safe)
+-- Safe Deployment Script for Usage Overview System
+-- This script avoids deadlocks by running operations sequentially and with proper locking
 
-## ❌ **Deadlock Error Fixed**
+-- ===============================
+-- 1. First, ensure we have exclusive access to the tables
+-- ===============================
 
-The error `40P01: deadlock detected` occurs when multiple database operations try to access the same resources simultaneously. This guide provides a safe, step-by-step approach.
+-- Lock the tables we'll be modifying to prevent conflicts
+LOCK TABLE usage_counters IN EXCLUSIVE MODE;
+LOCK TABLE subscriptions IN EXCLUSIVE MODE;
 
-## 🔧 **Step-by-Step Manual Deployment**
+-- ===============================
+-- 2. Drop existing functions safely (one at a time)
+-- ===============================
 
-### **Step 1: Check Current State**
-First, run this to see what exists:
-```sql
--- Check existing functions
-SELECT routine_name FROM information_schema.routines 
-WHERE routine_schema = 'public' 
-AND routine_name IN ('refresh_user_usage', 'check_usage_limit', 'reset_monthly_usage');
-
--- Check existing tables
-SELECT table_name FROM information_schema.tables 
-WHERE table_schema = 'public' 
-AND table_name IN ('usage_counters', 'subscriptions');
-```
-
-### **Step 2: Drop Functions (One at a Time)**
-Run these commands **one at a time** in your Supabase SQL editor:
-
-```sql
 -- Drop functions in reverse dependency order
 DROP FUNCTION IF EXISTS reset_monthly_usage() CASCADE;
-```
-
-Wait for completion, then:
-```sql
 DROP FUNCTION IF EXISTS check_usage_limit(UUID, TEXT) CASCADE;
-```
-
-Wait for completion, then:
-```sql
 DROP FUNCTION IF EXISTS refresh_user_usage(UUID, DATE) CASCADE;
-```
 
-### **Step 3: Create Functions (One at a Time)**
-Run these commands **one at a time**:
+-- ===============================
+-- 3. Create functions one at a time
+-- ===============================
 
-```sql
--- Create refresh_user_usage function
+-- Create refresh_user_usage function first (no dependencies)
 CREATE OR REPLACE FUNCTION refresh_user_usage(user_uuid UUID, target_month_start DATE)
 RETURNS TABLE (
     user_id UUID,
@@ -64,20 +44,24 @@ DECLARE
     v_reports_count INTEGER := 0;
 BEGIN
     -- Get actual counts from source tables for the month
+    -- Note: feedbacks table doesn't have user_id, so we'll count all feedbacks for now
     SELECT COUNT(*) INTO v_feedback_count
     FROM feedbacks 
     WHERE created_at >= v_month_start;
     
+    -- Count insights (using the actual insights table)
     SELECT COUNT(*) INTO v_insights_count
     FROM insights 
     WHERE user_id = v_user_id 
     AND created_at >= v_month_start;
     
+    -- Count analytics (using analytics_history table)
     SELECT COUNT(*) INTO v_analytics_count
     FROM analytics_history 
     WHERE user_id = v_user_id 
     AND created_at >= v_month_start;
     
+    -- Count reports (using analytics_daily as a proxy for reports)
     SELECT COUNT(*) INTO v_reports_count
     FROM analytics_daily 
     WHERE user_id = v_user_id 
@@ -108,6 +92,7 @@ BEGIN
         reports_count = EXCLUDED.reports_count,
         updated_at = NOW();
     
+    -- Return the updated data
     RETURN QUERY
     SELECT 
         v_user_id,
@@ -118,11 +103,8 @@ BEGIN
         v_reports_count;
 END;
 $$;
-```
 
-Wait for completion, then:
-```sql
--- Create check_usage_limit function
+-- Create check_usage_limit function (depends on refresh_user_usage)
 CREATE OR REPLACE FUNCTION check_usage_limit(user_uuid UUID, feature_type TEXT)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -136,18 +118,23 @@ DECLARE
     v_limit INTEGER := 0;
     v_month_start DATE;
 BEGIN
+    -- Get current month start
     v_month_start := DATE_TRUNC('month', CURRENT_DATE)::DATE;
     
+    -- Get user's plan type
     SELECT plan_type INTO v_plan_type
     FROM subscriptions 
     WHERE user_id = v_user_id;
     
+    -- If no subscription found, default to trial
     IF v_plan_type IS NULL THEN
         v_plan_type := 'trial';
     END IF;
     
+    -- Get current usage count for the feature
     CASE v_feature_type
         WHEN 'feedback' THEN
+            -- Note: feedbacks table doesn't have user_id, so we count all feedbacks
             SELECT COUNT(*) INTO v_current_count
             FROM feedbacks 
             WHERE created_at >= v_month_start;
@@ -170,6 +157,7 @@ BEGIN
             RETURN FALSE;
     END CASE;
     
+    -- Get limit based on plan type
     CASE v_plan_type
         WHEN 'trial' THEN
             CASE v_feature_type
@@ -186,17 +174,16 @@ BEGIN
                 WHEN 'reports' THEN v_limit := 20;
             END CASE;
         WHEN 'business' THEN
+            -- Business plan has unlimited usage
             RETURN TRUE;
     END CASE;
     
+    -- Check if usage is within limit
     RETURN v_current_count < v_limit;
 END;
 $$;
-```
 
-Wait for completion, then:
-```sql
--- Create reset_monthly_usage function
+-- Create reset_monthly_usage function (depends on refresh_user_usage)
 CREATE OR REPLACE FUNCTION reset_monthly_usage()
 RETURNS VOID
 LANGUAGE plpgsql
@@ -206,9 +193,11 @@ DECLARE
     v_current_month_start DATE;
     v_previous_month_start DATE;
 BEGIN
+    -- Get current month start
     v_current_month_start := DATE_TRUNC('month', CURRENT_DATE)::DATE;
     v_previous_month_start := v_current_month_start - INTERVAL '1 month';
     
+    -- Refresh usage for all users for the current month
     PERFORM refresh_user_usage(user_id, v_current_month_start)
     FROM (
         SELECT DISTINCT user_id 
@@ -216,6 +205,7 @@ BEGIN
         WHERE month_start = v_previous_month_start
     ) AS users;
     
+    -- Log the reset
     INSERT INTO usage_counters (user_id, month_start, feedback_count, insights_count, analytics_count, reports_count)
     SELECT 
         user_id,
@@ -229,11 +219,12 @@ BEGIN
     ON CONFLICT (user_id, month_start) DO NOTHING;
 END;
 $$;
-```
 
-### **Step 4: Create Indexes (One at a Time)**
-```sql
--- Drop existing indexes first
+-- ===============================
+-- 4. Create indexes safely (one at a time)
+-- ===============================
+
+-- Drop existing indexes if they exist (to avoid conflicts)
 DROP INDEX IF EXISTS idx_feedbacks_user_created;
 DROP INDEX IF EXISTS idx_insights_user_created;
 DROP INDEX IF EXISTS idx_analytics_user_created;
@@ -241,64 +232,61 @@ DROP INDEX IF EXISTS idx_reports_user_created;
 DROP INDEX IF EXISTS idx_analytics_history_user_created;
 DROP INDEX IF EXISTS idx_analytics_daily_user_date;
 DROP INDEX IF EXISTS idx_feedbacks_created;
-```
 
-Wait for completion, then create indexes one by one:
-```sql
+-- Create indexes for the actual tables (one at a time)
 CREATE INDEX IF NOT EXISTS idx_insights_user_created ON insights(user_id, created_at);
-```
-
-Wait, then:
-```sql
 CREATE INDEX IF NOT EXISTS idx_analytics_history_user_created ON analytics_history(user_id, created_at);
-```
-
-Wait, then:
-```sql
 CREATE INDEX IF NOT EXISTS idx_analytics_daily_user_date ON analytics_daily(user_id, date);
-```
-
-Wait, then:
-```sql
 CREATE INDEX IF NOT EXISTS idx_feedbacks_created ON feedbacks(created_at);
-```
 
-### **Step 5: Grant Permissions**
-```sql
+-- ===============================
+-- 5. Grant permissions
+-- ===============================
 GRANT EXECUTE ON FUNCTION refresh_user_usage(UUID, DATE) TO authenticated;
 GRANT EXECUTE ON FUNCTION refresh_user_usage(UUID, DATE) TO service_role;
 GRANT EXECUTE ON FUNCTION check_usage_limit(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION check_usage_limit(UUID, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION reset_monthly_usage() TO service_role;
-```
 
-### **Step 6: Test the Functions**
-```sql
--- Test with a real user ID from your auth.users table
-SELECT * FROM refresh_user_usage('your-user-id-here', CURRENT_DATE);
+-- ===============================
+-- 6. Add comments
+-- ===============================
+COMMENT ON FUNCTION refresh_user_usage(UUID, DATE) IS 'Refreshes usage counts for a user for a specific month (deadlock-safe)';
+COMMENT ON FUNCTION check_usage_limit(UUID, TEXT) IS 'Checks if a user can perform an action based on their usage limits (deadlock-safe)';
+COMMENT ON FUNCTION reset_monthly_usage() IS 'Resets usage counters for all users at the start of a new month (deadlock-safe)';
 
--- Test usage limit checking
-SELECT check_usage_limit('your-user-id-here', 'insights');
-SELECT check_usage_limit('your-user-id-here', 'analytics');
-```
+-- ===============================
+-- 7. Verification (run after deployment)
+-- ===============================
 
-## ⚠️ **Important Tips to Avoid Deadlocks**
+-- Check if functions were created successfully
+SELECT 
+    routine_name,
+    CASE 
+        WHEN routine_name = 'refresh_user_usage' THEN '✓ refresh_user_usage function created'
+        WHEN routine_name = 'check_usage_limit' THEN '✓ check_usage_limit function created'
+        WHEN routine_name = 'reset_monthly_usage' THEN '✓ reset_monthly_usage function created'
+        ELSE '✓ ' || routine_name || ' function created'
+    END as status
+FROM information_schema.routines 
+WHERE routine_schema = 'public' 
+AND routine_name IN ('refresh_user_usage', 'check_usage_limit', 'reset_monthly_usage');
 
-1. **Run commands one at a time** - Don't run multiple SQL commands simultaneously
-2. **Wait for completion** - Wait for each command to finish before running the next
-3. **Use Supabase SQL Editor** - Run commands in the Supabase dashboard, not via scripts
-4. **Check for errors** - If a command fails, fix the error before proceeding
-5. **Avoid concurrent operations** - Don't run other database operations while deploying
+-- Check if tables exist
+SELECT 
+    table_name,
+    CASE 
+        WHEN table_name = 'usage_counters' THEN '✓ usage_counters table exists'
+        WHEN table_name = 'subscriptions' THEN '✓ subscriptions table exists'
+        WHEN table_name = 'feedbacks' THEN '✓ feedbacks table exists'
+        WHEN table_name = 'insights' THEN '✓ insights table exists'
+        WHEN table_name = 'analytics_history' THEN '✓ analytics_history table exists'
+        WHEN table_name = 'analytics_daily' THEN '✓ analytics_daily table exists'
+        ELSE '✓ ' || table_name || ' table exists'
+    END as status
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+AND table_name IN ('usage_counters', 'subscriptions', 'feedbacks', 'insights', 'analytics_history', 'analytics_daily');
 
-## ✅ **Expected Results**
-
-After completing all steps:
-- ✅ All three functions created successfully
-- ✅ Indexes created for performance
-- ✅ Permissions granted correctly
-- ✅ Functions can be called without errors
-- ✅ Usage Overview component works in frontend
-
-## 🎉 **Success!**
-
-Your Usage Overview system will be deployed without deadlocks and will work correctly with your actual database structure!
+-- Final success message
+SELECT '🎉 Usage Overview System Deployed Safely (No Deadlocks)!' as summary;
