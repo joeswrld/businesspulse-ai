@@ -302,14 +302,22 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     // If loading, give access by default (don't lock out during loading)
     if (trialStatus.loading) return true;
     
-    // User has access if they have an active Business plan OR are on an active trial
-    const hasBusinessPlan = trialStatus.isActive && trialStatus.plan === 'business';
-    const hasActiveTrial = trialStatus.plan === 'free_trial' && trialStatus.daysLeft > 0 && !trialStatus.trialExpired;
-    
     // For new users or when there's an error, give access by default
     if (trialStatus.error) return true;
     
-    return hasBusinessPlan || hasActiveTrial;
+    // User has access if they have an active Business plan
+    const hasBusinessPlan = trialStatus.isActive && trialStatus.plan === 'business';
+    if (hasBusinessPlan) return true;
+    
+    // User has access if they are on an active trial (8 days)
+    const hasActiveTrial = trialStatus.plan === 'free_trial' && trialStatus.daysLeft > 0 && !trialStatus.trialExpired;
+    if (hasActiveTrial) return true;
+    
+    // For new users without trial data, give them 8 days by default
+    if (!trialStatus.trialEnd && trialStatus.plan === 'free_trial') return true;
+    
+    // If we can't determine status, give access by default (don't lock out)
+    return true;
   };
 
   // Check if trial is expired
@@ -317,17 +325,29 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     // If loading or error, don't expire trial (give benefit of doubt)
     if (trialStatus.loading || trialStatus.error) return false;
     
+    // Business plan users never have expired trials
+    if (trialStatus.isActive && trialStatus.plan === 'business') return false;
+    
+    // For new users without trial data, don't expire (give them 8 days)
+    if (!trialStatus.trialEnd && trialStatus.plan === 'free_trial') return false;
+    
     // Trial is expired if:
-    // 1. trialExpired is true, OR
-    // 2. User is on free_trial but daysLeft <= 0, OR  
-    // 3. User is on free_trial but trial_end has passed
-    if (trialStatus.trialExpired) return true;
-    if (trialStatus.plan === 'free_trial' && trialStatus.daysLeft <= 0) return true;
-    if (trialStatus.plan === 'free_trial' && trialStatus.trialEnd) {
+    // 1. trialExpired is explicitly true, AND
+    // 2. User is on free_trial, AND
+    // 3. User is not active
+    if (trialStatus.trialExpired && trialStatus.plan === 'free_trial' && !trialStatus.isActive) {
+      // Double-check by looking at days left
+      if (trialStatus.daysLeft > 0) return false;
+      return true;
+    }
+    
+    // If user is on free_trial but daysLeft <= 0, check trial_end
+    if (trialStatus.plan === 'free_trial' && trialStatus.daysLeft <= 0 && trialStatus.trialEnd) {
       const trialEndDate = new Date(trialStatus.trialEnd);
       const now = new Date();
       return trialEndDate <= now;
     }
+    
     return false;
   };
 
@@ -352,11 +372,11 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       // Give new users immediate access while loading
       setTrialStatus(prev => ({
         ...prev,
-        hasAccess: true,
+        hasAccess: true, // Always give access by default
         plan: 'free_trial',
         isActive: false,
-        trialExpired: false,
-        daysLeft: 8,
+        trialExpired: false, // Never expire by default
+        daysLeft: 8, // Give 8 days by default
         trialEnd: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
         loading: true,
         error: null,

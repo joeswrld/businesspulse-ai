@@ -55,6 +55,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     ? hasBusinessPlan 
     : checkAccess();
 
+  // Business plan users always have access
+  if (hasBusinessPlan) {
+    return <>{children}</>;
+  }
+
   // If no access and not on billing page, show trial gate
   if (!hasAccess && location.pathname !== '/billing') {
     return (
