@@ -117,7 +117,7 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
         currentPlan = 'trial';
       }
 
-      // Fetch usage counters with monthly reset logic
+      // Fetch usage counters from the actual database tables
       let usageCounters = {
         feedback_count: 0,
         insights_count: 0,
@@ -126,21 +126,54 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
       };
 
       try {
-        // Use the RPC function that handles monthly reset automatically
-        const { data, error } = await supabase
-          .rpc('ensure_current_month_usage', { user_uuid: userId });
+        // First try to get from usage_counters table (if it exists with the right schema)
+        const { data: usageData, error: usageError } = await supabase
+          .from('usage_counters')
+          .select('feedback_count, insights_count, analytics_count, reports_count')
+          .eq('user_id', userId)
+          .single();
 
-        if (!error && data && data.length > 0) {
-          const usageData = data[0];
+        if (!usageError && usageData) {
           usageCounters = {
             feedback_count: usageData.feedback_count || 0,
             insights_count: usageData.insights_count || 0,
             analytics_count: usageData.analytics_count || 0,
             reports_count: usageData.reports_count || 0
           };
-          console.log('Usage counters loaded with monthly reset:', usageData);
+          console.log('Usage counters loaded from table:', usageData);
         } else {
-          console.warn('Usage counters not found, using defaults:', error);
+          // Fallback: Try to refresh usage data using the RPC function
+          console.log('Usage counters table not found or empty, refreshing usage data');
+          
+          try {
+            const { error: refreshError } = await supabase
+              .rpc('refresh_user_usage', { user_uuid: userId });
+            
+            if (!refreshError) {
+              // Try to fetch again after refresh
+              const { data: refreshedData, error: retryError } = await supabase
+                .from('usage_counters')
+                .select('feedback_count, insights_count, analytics_count, reports_count')
+                .eq('user_id', userId)
+                .single();
+              
+              if (!retryError && refreshedData) {
+                usageCounters = {
+                  feedback_count: refreshedData.feedback_count || 0,
+                  insights_count: refreshedData.insights_count || 0,
+                  analytics_count: refreshedData.analytics_count || 0,
+                  reports_count: refreshedData.reports_count || 0
+                };
+                console.log('Usage counters refreshed and loaded:', usageCounters);
+              } else {
+                console.warn('Failed to load refreshed usage data, using defaults');
+              }
+            } else {
+              console.warn('Failed to refresh usage data:', refreshError);
+            }
+          } catch (refreshError) {
+            console.warn('Error refreshing usage data:', refreshError);
+          }
         }
       } catch (countersError) {
         console.warn('Error fetching usage counters, using defaults:', countersError);
@@ -169,6 +202,20 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
 
       setUsage(usageSummary);
       setSubscription(billingProfile);
+      
+      // Debug logging
+      console.log('Usage Overview Data Loaded:', {
+        currentPlan,
+        usageCounters,
+        planLimits,
+        usageSummary,
+        billingProfile: billingProfile ? {
+          id: billingProfile.id,
+          plan: billingProfile.plan,
+          subscription_status: billingProfile.subscription_status,
+          trial_ends_at: billingProfile.trial_ends_at
+        } : null
+      });
       
       // Check if trial has expired
       if ((currentPlan === 'trial' || currentPlan === 'free') && billingProfile?.trial_ends_at) {
@@ -209,6 +256,22 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
   const refreshUsage = async () => {
     try {
       setRefreshing(true);
+      
+      // First try to refresh usage data in the database
+      try {
+        const { error: refreshError } = await supabase
+          .rpc('refresh_user_usage', { user_uuid: userId });
+        
+        if (refreshError) {
+          console.warn('Failed to refresh usage data in database:', refreshError);
+        } else {
+          console.log('Usage data refreshed in database successfully');
+        }
+      } catch (refreshError) {
+        console.warn('Error calling refresh function:', refreshError);
+      }
+      
+      // Then reload the component data
       await loadUsageData();
       toast.success('Usage data refreshed');
     } catch (error) {
