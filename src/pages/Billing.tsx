@@ -309,8 +309,8 @@ NoteX Team
               <Skeleton className="h-10 w-32" />
             </div>
             
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3].map((i) => (
+            <div className="grid gap-6 md:grid-cols-2">
+              {[1, 2].map((i) => (
                 <Card key={i} className="border-0 shadow-sm">
                   <CardHeader className="pb-4">
                     <Skeleton className="h-6 w-32 mb-2" />
@@ -450,7 +450,7 @@ NoteX Team
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Plan Price */}
               <div className="text-center p-6 bg-gray-50 rounded-xl border border-gray-200">
                 <div className="flex items-center justify-center mb-3">
