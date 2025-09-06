@@ -42,13 +42,21 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
+  // Special handling for billing page - always allow access
+  if (location.pathname === '/billing') {
+    return <>{children}</>;
+  }
+
+  // Check if user has Business plan (active subscription)
+  const hasBusinessPlan = trialStatus.isActive && trialStatus.plan === 'business';
+  
   // Check access based on requirements
   const hasAccess = requireActiveSubscription 
-    ? trialStatus.isActive 
+    ? hasBusinessPlan 
     : checkAccess();
 
-  // If no access, show trial gate
-  if (!hasAccess) {
+  // If no access and not on billing page, show trial gate
+  if (!hasAccess && location.pathname !== '/billing') {
     return (
       <TrialGate>
         {children}
@@ -56,8 +64,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // If trial expired and no active subscription, redirect to billing
-  if (isTrialExpired() && !trialStatus.isActive) {
+  // If trial expired and no Business plan, redirect to billing (except if already on billing)
+  if (isTrialExpired() && !hasBusinessPlan && location.pathname !== '/billing') {
     return <Navigate to={fallbackPath} replace />;
   }
 

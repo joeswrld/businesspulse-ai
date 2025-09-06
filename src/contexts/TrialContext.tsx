@@ -162,12 +162,27 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Check if user has access
   const checkAccess = (): boolean => {
-    return trialStatus.hasAccess && !trialStatus.loading;
+    // User has access if they have an active Business plan OR are on an active trial
+    const hasBusinessPlan = trialStatus.isActive && trialStatus.plan === 'business';
+    const hasActiveTrial = trialStatus.plan === 'free_trial' && trialStatus.daysLeft > 0 && !trialStatus.trialExpired;
+    
+    return (hasBusinessPlan || hasActiveTrial) && !trialStatus.loading;
   };
 
   // Check if trial is expired
   const isTrialExpired = (): boolean => {
-    return trialStatus.trialExpired || (!trialStatus.isActive && trialStatus.plan === 'free_trial' && trialStatus.daysLeft <= 0);
+    // Trial is expired if:
+    // 1. trialExpired is true, OR
+    // 2. User is on free_trial but daysLeft <= 0, OR  
+    // 3. User is on free_trial but trial_end has passed
+    if (trialStatus.trialExpired) return true;
+    if (trialStatus.plan === 'free_trial' && trialStatus.daysLeft <= 0) return true;
+    if (trialStatus.plan === 'free_trial' && trialStatus.trialEnd) {
+      const trialEndDate = new Date(trialStatus.trialEnd);
+      const now = new Date();
+      return trialEndDate <= now;
+    }
+    return false;
   };
 
   // Get days left in trial

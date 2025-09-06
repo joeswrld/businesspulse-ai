@@ -243,7 +243,7 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="/billing" element={
-              <ProtectedRoute>
+              <ProtectedRoute requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Billing />
