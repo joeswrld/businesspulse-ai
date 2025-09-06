@@ -106,26 +106,25 @@ export const useUsageOverview = (userId: string) => {
       supabase
         .from('feedbacks')
         .select('id', { count: 'exact' })
-        .eq('user_id', userId)
-        .gte('created_at', monthStart),
+        .gte('timestamp', monthStart),
       
       supabase
-        .from('insights_simple')
+        .from('insights')
         .select('id', { count: 'exact' })
         .eq('user_id', userId)
         .gte('created_at', monthStart),
       
       supabase
-        .from('analytics')
+        .from('analytics_history')
         .select('id', { count: 'exact' })
         .eq('user_id', userId)
         .gte('created_at', monthStart),
       
       supabase
-        .from('reports')
+        .from('analytics_daily')
         .select('id', { count: 'exact' })
         .eq('user_id', userId)
-        .gte('created_at', monthStart),
+        .gte('date', monthStart),
     ]);
 
     return {
