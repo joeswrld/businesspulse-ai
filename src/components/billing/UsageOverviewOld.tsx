@@ -24,7 +24,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface UsageSummary {
-  user_id: string;
   plan_code: string;
   plan_name: string;
   feedback_count: number;
@@ -39,7 +38,6 @@ interface UsageSummary {
   insights_remaining: number;
   analytics_remaining: number;
   reports_remaining: number;
-  month_start: string;
 }
 
 interface SubscriptionDetails {
@@ -53,10 +51,10 @@ interface SubscriptionDetails {
 interface UsageOverviewProps {
   userId: string;
   onUpgrade?: (plan: 'pro' | 'business') => void;
-  refreshTrigger?: number;
+  refreshTrigger?: number; // Add this to trigger refresh when plan changes
 }
 
-export default function UsageOverviewNew({ userId, onUpgrade, refreshTrigger }: UsageOverviewProps) {
+export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: UsageOverviewProps) {
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,94 +65,188 @@ export default function UsageOverviewNew({ userId, onUpgrade, refreshTrigger }: 
     try {
       setLoading(true);
       
-      // Use the new comprehensive usage summary function
-      const { data: usageSummaryData, error: summaryError } = await supabase
-        .rpc('get_user_usage_summary', { p_user_id: userId });
-
-      if (summaryError) {
-        console.warn('Error fetching usage summary:', summaryError);
-        throw summaryError;
-      }
-
-      if (!usageSummaryData || usageSummaryData.length === 0) {
-        console.warn('No usage summary data returned');
-        throw new Error('No usage data available');
-      }
-
-      const summary = usageSummaryData[0];
+      // Try to fetch billing profile with minimal columns first
+      let billingProfile = null;
+      let currentPlan = 'free'; // Default fallback
       
-      // Create usage summary from the RPC function result
-      const usageSummary: UsageSummary = {
-        user_id: summary.user_id,
-        plan_code: summary.plan_code || 'free',
-        plan_name: summary.plan_name || 'Free Trial',
-        feedback_count: summary.feedback_count || 0,
-        insights_count: summary.insights_count || 0,
-        analytics_count: summary.analytics_count || 0,
-        reports_count: summary.reports_count || 0,
-        feedback_limit: summary.feedback_limit || 50,
-        insights_limit: summary.insights_limit || 10,
-        analytics_limit: summary.analytics_limit || 10,
-        reports_limit: summary.reports_limit || 5,
-        feedback_remaining: summary.feedback_remaining || 50,
-        insights_remaining: summary.insights_remaining || 10,
-        analytics_remaining: summary.analytics_remaining || 10,
-        reports_remaining: summary.reports_remaining || 5,
-        month_start: summary.month_start
-      };
-
-      setUsage(usageSummary);
-      
-      // Try to get billing profile for subscription details
       try {
-        const { data: billingProfile, error: billingError } = await supabase
+        const { data, error } = await supabase
           .from('billing_profiles')
           .select('*')
           .eq('id', userId)
           .single();
 
-        if (!billingError && billingProfile) {
-          setSubscription(billingProfile);
+        if (!error && data) {
+          billingProfile = data;
+          currentPlan = data.plan || 'free';
+          console.log('Billing profile data:', data); // Debug log
+        } else {
+          console.warn('Billing profile not found, attempting to create one:', error);
           
-          // Check if trial has expired
-          if ((usageSummary.plan_code === 'trial' || usageSummary.plan_code === 'free') && billingProfile?.trial_ends_at) {
-            const trialEnd = new Date(billingProfile.trial_ends_at);
-            const now = new Date();
-            setTrialExpired(now > trialEnd);
+          // Try to create a billing profile using the RPC function
+          try {
+            const { data: createResult, error: createError } = await supabase
+              .rpc('create_user_billing_profile', { user_uuid: userId });
+            
+            if (!createError && createResult) {
+              console.log('Billing profile created successfully');
+              // Try to fetch the newly created profile
+              const { data: newProfile } = await supabase
+                .from('billing_profiles')
+                .select('*')
+                .eq('id', userId)
+                .single();
+              
+              if (newProfile) {
+                billingProfile = newProfile;
+                currentPlan = newProfile.plan || 'trial';
+              } else {
+                currentPlan = 'trial';
+              }
+            } else {
+              console.warn('Failed to create billing profile:', createError);
+              currentPlan = 'trial';
+            }
+          } catch (createError) {
+            console.warn('Error creating billing profile:', createError);
+            currentPlan = 'trial';
           }
         }
       } catch (billingError) {
-        console.warn('Error fetching billing profile:', billingError);
-        setSubscription(null);
+        console.warn('Error fetching billing profile, using default plan:', billingError);
+        currentPlan = 'trial';
       }
+
+      // Try to get usage summary using the RPC function
+      let usageCounters = {
+        feedback_count: 0,
+        insights_count: 0,
+        analytics_count: 0,
+        reports_count: 0
+      };
+
+      try {
+        // First try to get usage summary from RPC function
+        const { data: usageSummaryData, error: summaryError } = await supabase
+          .rpc('get_user_usage_summary', { p_user_id: userId });
+
+        if (!summaryError && usageSummaryData && usageSummaryData.length > 0) {
+          const summary = usageSummaryData[0];
+          usageCounters = {
+            feedback_count: summary.feedback_count || 0,
+            insights_count: summary.insights_count || 0,
+            analytics_count: summary.analytics_count || 0,
+            reports_count: summary.reports_count || 0
+          };
+          console.log('Usage summary loaded from RPC:', summary);
+        } else {
+          console.log('RPC function failed, trying direct table access');
+          
+          // Fallback: Try to get from usage_counters table directly
+          const { data: usageData, error: usageError } = await supabase
+            .from('usage_counters')
+            .select('feedback_count, insights_count, analytics_count, reports_count')
+            .eq('user_id', userId)
+            .single();
+
+          if (!usageError && usageData) {
+            usageCounters = {
+              feedback_count: usageData.feedback_count || 0,
+              insights_count: usageData.insights_count || 0,
+              analytics_count: usageData.analytics_count || 0,
+              reports_count: usageData.reports_count || 0
+            };
+            console.log('Usage counters loaded from table:', usageData);
+          } else {
+            console.log('Creating usage counter record for user');
+            // Create a usage counter record if none exists
+            const { error: insertError } = await supabase
+              .from('usage_counters')
+              .insert({
+                user_id: userId,
+                feedback_count: 0,
+                insights_count: 0,
+                analytics_count: 0,
+                reports_count: 0,
+                month_start: new Date().toISOString().split('T')[0]
+              });
+
+            if (insertError) {
+              console.warn('Failed to create usage counter record:', insertError);
+            } else {
+              console.log('Created new usage counter record');
+            }
+          }
+        }
+      } catch (countersError) {
+        console.warn('Error fetching usage data, using defaults:', countersError);
+      }
+
+      // Get plan limits based on the current plan
+      const planLimits = getPlanLimits(currentPlan);
+
+      // Create usage summary with correct plan data
+      const usageSummary = {
+        plan_code: currentPlan,
+        plan_name: getPlanDisplayName(currentPlan),
+        feedback_count: usageCounters.feedback_count || 0,
+        insights_count: usageCounters.insights_count || 0,
+        analytics_count: usageCounters.analytics_count || 0,
+        reports_count: usageCounters.reports_count || 0,
+        feedback_limit: planLimits.feedback,
+        insights_limit: planLimits.insights,
+        analytics_limit: planLimits.analytics,
+        reports_limit: planLimits.reports,
+        feedback_remaining: Math.max(0, planLimits.feedback - (usageCounters.feedback_count || 0)),
+        insights_remaining: Math.max(0, planLimits.insights - (usageCounters.insights_count || 0)),
+        analytics_remaining: Math.max(0, planLimits.analytics - (usageCounters.analytics_count || 0)),
+        reports_remaining: Math.max(0, planLimits.reports - (usageCounters.reports_count || 0))
+      };
+
+      setUsage(usageSummary);
+      setSubscription(billingProfile);
       
       // Debug logging
       console.log('Usage Overview Data Loaded:', {
+        currentPlan,
+        usageCounters,
+        planLimits,
         usageSummary,
-        summary
+        billingProfile: billingProfile ? {
+          id: billingProfile.id,
+          plan: billingProfile.plan,
+          subscription_status: billingProfile.subscription_status,
+          trial_ends_at: billingProfile.trial_ends_at
+        } : null
       });
       
+      // Check if trial has expired
+      if ((currentPlan === 'trial' || currentPlan === 'free') && billingProfile?.trial_ends_at) {
+        const trialEnd = new Date(billingProfile.trial_ends_at);
+        const now = new Date();
+        setTrialExpired(now > trialEnd);
+      }
     } catch (error) {
       console.error('Error in loadUsageData:', error);
+      // Don't show error toast for now, just log it
+      console.warn('Using fallback data due to error');
       
       // Set fallback data
-      const fallbackUsage: UsageSummary = {
-        user_id: userId,
-        plan_code: 'free',
+      const fallbackUsage = {
+        plan_code: 'trial',
         plan_name: 'Free Trial',
         feedback_count: 0,
         insights_count: 0,
         analytics_count: 0,
         reports_count: 0,
         feedback_limit: 50,
-        insights_limit: 10,
-        analytics_limit: 10,
-        reports_limit: 5,
+        insights_limit: 5,
+        analytics_limit: 5,
+        reports_limit: 2,
         feedback_remaining: 50,
-        insights_remaining: 10,
-        analytics_remaining: 10,
-        reports_remaining: 5,
-        month_start: new Date().toISOString().split('T')[0]
+        insights_remaining: 5,
+        analytics_remaining: 5,
+        reports_remaining: 2
       };
       
       setUsage(fallbackUsage);
@@ -168,14 +260,18 @@ export default function UsageOverviewNew({ userId, onUpgrade, refreshTrigger }: 
     try {
       setRefreshing(true);
       
-      // Call the refresh_usage function to ensure data is up to date
-      const { data: refreshData, error: refreshError } = await supabase
-        .rpc('refresh_usage', { user_uuid: userId });
-      
-      if (refreshError) {
-        console.warn('Failed to refresh usage data in database:', refreshError);
-      } else {
-        console.log('Usage data refreshed successfully:', refreshData);
+      // First try to refresh usage data in the database using the RPC function
+      try {
+        const { data: refreshData, error: refreshError } = await supabase
+          .rpc('get_user_usage_summary', { p_user_id: userId });
+        
+        if (refreshError) {
+          console.warn('Failed to refresh usage data in database:', refreshError);
+        } else {
+          console.log('Usage data refreshed successfully:', refreshData);
+        }
+      } catch (refreshError) {
+        console.warn('Error calling refresh function:', refreshError);
       }
       
       // Then reload the component data
@@ -183,6 +279,7 @@ export default function UsageOverviewNew({ userId, onUpgrade, refreshTrigger }: 
       toast.success('Usage data refreshed');
     } catch (error) {
       console.error('Error refreshing usage:', error);
+      // Don't show error toast, just log it
       console.warn('Refresh failed, but component will continue with existing data');
     } finally {
       setRefreshing(false);
@@ -213,6 +310,26 @@ export default function UsageOverviewNew({ userId, onUpgrade, refreshTrigger }: 
       'business': { price: 5300000, currency: 'NGN', period: '30 days' } // ₦53,000 in kobo
     };
     return pricing[planCode as keyof typeof pricing] || pricing.free;
+  };
+
+  const getPlanLimits = (planCode: string) => {
+    const limits = {
+      'trial': { feedback: 50, insights: 5, analytics: 5, reports: 2 },
+      'free': { feedback: 50, insights: 5, analytics: 5, reports: 2 },
+      'pro': { feedback: 300, insights: 50, analytics: 100, reports: 20 },
+      'business': { feedback: -1, insights: -1, analytics: -1, reports: -1 } // unlimited
+    };
+    return limits[planCode as keyof typeof limits] || limits.trial;
+  };
+
+  const getPlanDisplayName = (planCode: string) => {
+    const names = {
+      'trial': 'Free Trial',
+      'free': 'Free Trial',
+      'pro': 'Pro Plan',
+      'business': 'Business Plan'
+    };
+    return names[planCode as keyof typeof names] || 'Free Trial';
   };
 
   // Function to set next billing date for Pro/Business users if missing
@@ -594,6 +711,7 @@ export default function UsageOverviewNew({ userId, onUpgrade, refreshTrigger }: 
           );
         })}
       </div>
+
 
       <div className="mt-6 text-xs text-gray-500 text-center">
         Last updated: {new Date().toLocaleTimeString()} • Updates every 30 seconds
