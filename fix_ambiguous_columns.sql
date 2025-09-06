@@ -1,39 +1,13 @@
--- Final Fix for Usage Overview System
--- This version uses only tables that definitely exist and handles missing columns
+-- Quick Fix for Ambiguous Column References
+-- This fixes the "column reference user_id is ambiguous" error
 
--- ===============================
--- 1. First, let's see what we're working with
--- ===============================
+-- Drop and recreate functions with table aliases to avoid ambiguity
 
--- Check what tables exist
-SELECT 
-    table_name,
-    CASE 
-        WHEN table_name = 'usage_counters' THEN '✓ usage_counters exists'
-        WHEN table_name = 'subscriptions' THEN '✓ subscriptions exists'
-        WHEN table_name = 'feedbacks' THEN '✓ feedbacks exists'
-        WHEN table_name = 'analytics_history' THEN '✓ analytics_history exists'
-        WHEN table_name = 'analytics_events' THEN '✓ analytics_events exists'
-        ELSE '? ' || table_name || ' exists'
-    END as status
-FROM information_schema.tables 
-WHERE table_schema = 'public' 
-AND table_name IN ('usage_counters', 'subscriptions', 'feedbacks', 'analytics_history', 'analytics_events')
-ORDER BY table_name;
-
--- ===============================
--- 2. Drop existing functions safely
--- ===============================
-
-DROP FUNCTION IF EXISTS reset_monthly_usage() CASCADE;
-DROP FUNCTION IF EXISTS check_usage_limit(UUID, TEXT) CASCADE;
+-- Drop existing functions
 DROP FUNCTION IF EXISTS refresh_user_usage(UUID, DATE) CASCADE;
+DROP FUNCTION IF EXISTS check_usage_limit(UUID, TEXT) CASCADE;
 
--- ===============================
--- 3. Create functions using only existing tables
--- ===============================
-
--- Create refresh_user_usage function (using only tables that exist)
+-- Create refresh_user_usage function with table aliases
 CREATE OR REPLACE FUNCTION refresh_user_usage(user_uuid UUID, target_month_start DATE)
 RETURNS TABLE (
     user_id UUID,
@@ -56,8 +30,8 @@ DECLARE
 BEGIN
     -- Get feedback count (using timestamp column)
     SELECT COUNT(*) INTO v_feedback_count
-    FROM feedbacks 
-    WHERE timestamp >= v_month_start;
+    FROM feedbacks f
+    WHERE f.timestamp >= v_month_start;
     
     -- Get analytics count (using analytics_history table)
     SELECT COUNT(*) INTO v_analytics_count
@@ -66,7 +40,6 @@ BEGIN
     AND ah.created_at >= v_month_start;
     
     -- For insights and reports, we'll use analytics_events as a proxy
-    -- since the specific tables don't exist
     SELECT COUNT(*) INTO v_insights_count
     FROM analytics_events ae
     WHERE ae.user_id = v_user_id 
@@ -116,7 +89,7 @@ BEGIN
 END;
 $$;
 
--- Create check_usage_limit function
+-- Create check_usage_limit function with table aliases
 CREATE OR REPLACE FUNCTION check_usage_limit(user_uuid UUID, feature_type TEXT)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -134,9 +107,9 @@ BEGIN
     v_month_start := DATE_TRUNC('month', CURRENT_DATE)::DATE;
     
     -- Get user's plan type
-    SELECT plan_type INTO v_plan_type
-    FROM subscriptions 
-    WHERE user_id = v_user_id;
+    SELECT s.plan_type INTO v_plan_type
+    FROM subscriptions s
+    WHERE s.user_id = v_user_id;
     
     -- If no subscription found, default to trial
     IF v_plan_type IS NULL THEN
@@ -199,83 +172,13 @@ BEGIN
 END;
 $$;
 
--- Create reset_monthly_usage function
-CREATE OR REPLACE FUNCTION reset_monthly_usage()
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    v_current_month_start DATE;
-    v_previous_month_start DATE;
-BEGIN
-    -- Get current month start
-    v_current_month_start := DATE_TRUNC('month', CURRENT_DATE)::DATE;
-    v_previous_month_start := v_current_month_start - INTERVAL '1 month';
-    
-    -- Refresh usage for all users for the current month
-    PERFORM refresh_user_usage(user_id, v_current_month_start)
-    FROM (
-        SELECT DISTINCT user_id 
-        FROM usage_counters 
-        WHERE month_start = v_previous_month_start
-    ) AS users;
-    
-    -- Log the reset
-    INSERT INTO usage_counters (user_id, month_start, feedback_count, insights_count, analytics_count, reports_count)
-    SELECT 
-        user_id,
-        v_current_month_start,
-        0, 0, 0, 0
-    FROM (
-        SELECT DISTINCT user_id 
-        FROM usage_counters 
-        WHERE month_start = v_previous_month_start
-    ) AS users
-    ON CONFLICT (user_id, month_start) DO NOTHING;
-END;
-$$;
-
--- ===============================
--- 4. Create indexes for existing tables
--- ===============================
-
--- Drop existing indexes if they exist
-DROP INDEX IF EXISTS idx_feedbacks_created;
-DROP INDEX IF EXISTS idx_analytics_history_user_created;
-DROP INDEX IF EXISTS idx_analytics_events_user_created;
-
--- Create indexes for the actual tables
-CREATE INDEX IF NOT EXISTS idx_feedbacks_created ON feedbacks(timestamp);
-CREATE INDEX IF NOT EXISTS idx_analytics_history_user_created ON analytics_history(user_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_analytics_events_user_created ON analytics_events(user_id, created_at);
-
--- ===============================
--- 5. Grant permissions
--- ===============================
+-- Grant permissions
 GRANT EXECUTE ON FUNCTION refresh_user_usage(UUID, DATE) TO authenticated;
 GRANT EXECUTE ON FUNCTION refresh_user_usage(UUID, DATE) TO service_role;
 GRANT EXECUTE ON FUNCTION check_usage_limit(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION check_usage_limit(UUID, TEXT) TO service_role;
-GRANT EXECUTE ON FUNCTION reset_monthly_usage() TO service_role;
 
--- ===============================
--- 6. Get a real user ID for testing
--- ===============================
-
--- Get a sample user ID from auth.users
-SELECT 
-    id as user_id,
-    email,
-    'Use this ID for testing: ' || id as test_instruction
-FROM auth.users 
-LIMIT 1;
-
--- ===============================
--- 7. Test the functions with a real user ID
--- ===============================
-
--- Test refresh_user_usage (replace with actual user ID from above)
+-- Test the functions
 DO $$
 DECLARE
     test_user_id UUID;
@@ -287,27 +190,14 @@ BEGIN
         -- Test the function
         PERFORM refresh_user_usage(test_user_id, CURRENT_DATE);
         RAISE NOTICE '✓ refresh_user_usage function works with user ID: %', test_user_id;
+        
+        -- Test usage limits
+        PERFORM check_usage_limit(test_user_id, 'insights');
+        RAISE NOTICE '✓ check_usage_limit function works';
     ELSE
         RAISE NOTICE '⚠ No users found in auth.users table';
     END IF;
 END $$;
 
--- ===============================
--- 8. Verification
--- ===============================
-
--- Check if functions were created successfully
-SELECT 
-    routine_name,
-    CASE 
-        WHEN routine_name = 'refresh_user_usage' THEN '✓ refresh_user_usage function created'
-        WHEN routine_name = 'check_usage_limit' THEN '✓ check_usage_limit function created'
-        WHEN routine_name = 'reset_monthly_usage' THEN '✓ reset_monthly_usage function created'
-        ELSE '✓ ' || routine_name || ' function created'
-    END as status
-FROM information_schema.routines 
-WHERE routine_schema = 'public' 
-AND routine_name IN ('refresh_user_usage', 'check_usage_limit', 'reset_monthly_usage');
-
 -- Final success message
-SELECT '🎉 Usage Overview System Fixed with Existing Tables!' as summary;
+SELECT '🎉 Ambiguous Column References Fixed!' as summary;
