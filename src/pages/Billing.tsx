@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBillingSystem, getPlanLimits, formatCurrency, formatDate, getPlanDisplayName, getPlanPrice, getPlanPricing } from '@/hooks/useBillingSystem';
+import { useTrial } from '@/contexts/TrialContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -124,6 +125,7 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
 
 const BillingPage: React.FC = () => {
   const { user } = useAuth();
+  const { trialStatus, refreshTrialStatus } = useTrial();
   const {
     billingProfile,
     transactions,
@@ -639,6 +641,7 @@ NoteX Team
                     toast.success(`🎉 Welcome to Business! Your subscription has been activated.`);
                     setUpgradePlanModal(null);
                     await refreshData();
+                    await refreshTrialStatus();
                   } catch (e: any) {
                     toast.error(e?.message || 'Failed to activate subscription');
                   }
