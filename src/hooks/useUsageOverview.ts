@@ -140,7 +140,7 @@ export const useUsageOverview = (userId: string) => {
     try {
       const { error } = await supabase.rpc('refresh_user_usage', {
         user_uuid: userId,
-        month_start: monthStart,
+        target_month_start: monthStart,
       });
 
       if (error) {

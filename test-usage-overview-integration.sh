@@ -146,6 +146,13 @@ else
     exit 1
 fi
 
+if grep -q "target_month_start" supabase/migrations/20250122000001_create_usage_overview_system.sql; then
+    echo "   ✓ Parameter name conflict fixed (target_month_start)"
+else
+    echo "   ❌ Parameter name conflict not fixed"
+    exit 1
+fi
+
 if grep -q "check_usage_limit" supabase/migrations/20250122000001_create_usage_overview_system.sql; then
     echo "   ✓ check_usage_limit function created"
 else

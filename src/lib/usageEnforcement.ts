@@ -179,7 +179,7 @@ export async function refreshUserUsage(userId: string): Promise<boolean> {
 
     const { error } = await supabase.rpc('refresh_user_usage', {
       user_uuid: userId,
-      month_start: currentMonthStart.toISOString().split('T')[0]
+      target_month_start: currentMonthStart.toISOString().split('T')[0]
     });
 
     if (error) {

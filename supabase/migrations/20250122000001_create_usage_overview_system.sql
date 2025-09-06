@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 -- ===============================
 -- 3. Create refresh_user_usage function
 -- ===============================
-CREATE OR REPLACE FUNCTION refresh_user_usage(user_uuid UUID, month_start DATE)
+CREATE OR REPLACE FUNCTION refresh_user_usage(user_uuid UUID, target_month_start DATE)
 RETURNS TABLE (
     user_id UUID,
     month_start DATE,
@@ -50,7 +50,7 @@ SECURITY DEFINER
 AS $$
 DECLARE
     v_user_id UUID := user_uuid;
-    v_month_start DATE := month_start;
+    v_month_start DATE := target_month_start;
     v_feedback_count INTEGER := 0;
     v_insights_count INTEGER := 0;
     v_analytics_count INTEGER := 0;
