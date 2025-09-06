@@ -29,12 +29,64 @@ export function useUsageEnforcement() {
     if (!user) return;
 
     try {
+      // First try RPC function
       const { data, error } = await supabase.rpc('get_user_usage_summary', {
         p_user_id: user.id
       });
 
       if (error) {
-        console.error('Error loading usage data:', error);
+        console.error('Error loading usage data from RPC:', error);
+        
+        // Fallback: try to get data directly from tables
+        try {
+          const { data: usageData, error: usageError } = await supabase
+            .from('usage_counters')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+
+          if (!usageError && usageData) {
+            // Create usage summary from usage counters data
+            const { data: billingData } = await supabase
+              .from('billing_profiles')
+              .select('plan')
+              .eq('id', user.id)
+              .single();
+
+            const plan = billingData?.plan || 'free';
+            const planLimits = getPlanLimits(plan);
+
+            setUsageData({
+              plan_code: plan,
+              plan_name: getPlanDisplayName(plan),
+              feedback_count: usageData.feedback_count || 0,
+              insights_count: usageData.insights_count || 0,
+              analytics_count: usageData.analytics_count || 0,
+              reports_count: usageData.reports_count || 0,
+              feedback_limit: planLimits.feedback,
+              insights_limit: planLimits.insights,
+              analytics_limit: planLimits.analytics,
+              reports_limit: planLimits.reports,
+              feedback_remaining: Math.max(0, planLimits.feedback - (usageData.feedback_count || 0)),
+              insights_remaining: Math.max(0, planLimits.insights - (usageData.insights_count || 0)),
+              analytics_remaining: Math.max(0, planLimits.analytics - (usageData.analytics_count || 0)),
+              reports_remaining: Math.max(0, planLimits.reports - (usageData.reports_count || 0))
+            });
+          } else {
+            console.warn('No usage data found, creating default');
+            // Create default usage record
+            await supabase.from('usage_counters').insert({
+              user_id: user.id,
+              feedback_count: 0,
+              insights_count: 0,
+              analytics_count: 0,
+              reports_count: 0,
+              month_start: new Date().toISOString().split('T')[0]
+            });
+          }
+        } catch (fallbackError) {
+          console.error('Fallback data loading failed:', fallbackError);
+        }
         return;
       }
       
@@ -47,6 +99,27 @@ export function useUsageEnforcement() {
       setLoading(false);
     }
   }, [user]);
+
+  // Helper functions
+  const getPlanLimits = (planCode: string) => {
+    const limits = {
+      'trial': { feedback: 50, insights: 5, analytics: 5, reports: 2 },
+      'free': { feedback: 50, insights: 5, analytics: 5, reports: 2 },
+      'pro': { feedback: 300, insights: 50, analytics: 100, reports: 20 },
+      'business': { feedback: -1, insights: -1, analytics: -1, reports: -1 }
+    };
+    return limits[planCode as keyof typeof limits] || limits.trial;
+  };
+
+  const getPlanDisplayName = (planCode: string) => {
+    const names = {
+      'trial': 'Free Trial',
+      'free': 'Free Trial',
+      'pro': 'Pro Plan',
+      'business': 'Business Plan'
+    };
+    return names[planCode as keyof typeof names] || 'Free Trial';
+  };
 
   useEffect(() => {
     loadUsageData();

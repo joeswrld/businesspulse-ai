@@ -117,7 +117,7 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
         currentPlan = 'trial';
       }
 
-      // Fetch usage counters from the actual database tables
+      // Try to get usage summary using the RPC function
       let usageCounters = {
         feedback_count: 0,
         insights_count: 0,
@@ -126,57 +126,60 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
       };
 
       try {
-        // First try to get from usage_counters table (if it exists with the right schema)
-        const { data: usageData, error: usageError } = await supabase
-          .from('usage_counters')
-          .select('feedback_count, insights_count, analytics_count, reports_count')
-          .eq('user_id', userId)
-          .single();
+        // First try to get usage summary from RPC function
+        const { data: usageSummaryData, error: summaryError } = await supabase
+          .rpc('get_user_usage_summary', { p_user_id: userId });
 
-        if (!usageError && usageData) {
+        if (!summaryError && usageSummaryData && usageSummaryData.length > 0) {
+          const summary = usageSummaryData[0];
           usageCounters = {
-            feedback_count: usageData.feedback_count || 0,
-            insights_count: usageData.insights_count || 0,
-            analytics_count: usageData.analytics_count || 0,
-            reports_count: usageData.reports_count || 0
+            feedback_count: summary.feedback_count || 0,
+            insights_count: summary.insights_count || 0,
+            analytics_count: summary.analytics_count || 0,
+            reports_count: summary.reports_count || 0
           };
-          console.log('Usage counters loaded from table:', usageData);
+          console.log('Usage summary loaded from RPC:', summary);
         } else {
-          // Fallback: Try to refresh usage data using the RPC function
-          console.log('Usage counters table not found or empty, refreshing usage data');
+          console.log('RPC function failed, trying direct table access');
           
-          try {
-            const { error: refreshError } = await supabase
-              .rpc('ensure_current_month_usage', { user_uuid: userId });
-            
-            if (!refreshError) {
-              // Try to fetch again after refresh
-              const { data: refreshedData, error: retryError } = await supabase
-                .from('usage_counters')
-                .select('feedback_count, insights_count, analytics_count, reports_count')
-                .eq('user_id', userId)
-                .single();
-              
-              if (!retryError && refreshedData) {
-                usageCounters = {
-                  feedback_count: refreshedData.feedback_count || 0,
-                  insights_count: refreshedData.insights_count || 0,
-                  analytics_count: refreshedData.analytics_count || 0,
-                  reports_count: refreshedData.reports_count || 0
-                };
-                console.log('Usage counters refreshed and loaded:', usageCounters);
-              } else {
-                console.warn('Failed to load refreshed usage data, using defaults');
-              }
+          // Fallback: Try to get from usage_counters table directly
+          const { data: usageData, error: usageError } = await supabase
+            .from('usage_counters')
+            .select('feedback_count, insights_count, analytics_count, reports_count')
+            .eq('user_id', userId)
+            .single();
+
+          if (!usageError && usageData) {
+            usageCounters = {
+              feedback_count: usageData.feedback_count || 0,
+              insights_count: usageData.insights_count || 0,
+              analytics_count: usageData.analytics_count || 0,
+              reports_count: usageData.reports_count || 0
+            };
+            console.log('Usage counters loaded from table:', usageData);
+          } else {
+            console.log('Creating usage counter record for user');
+            // Create a usage counter record if none exists
+            const { error: insertError } = await supabase
+              .from('usage_counters')
+              .insert({
+                user_id: userId,
+                feedback_count: 0,
+                insights_count: 0,
+                analytics_count: 0,
+                reports_count: 0,
+                month_start: new Date().toISOString().split('T')[0]
+              });
+
+            if (insertError) {
+              console.warn('Failed to create usage counter record:', insertError);
             } else {
-              console.warn('Failed to refresh usage data:', refreshError);
+              console.log('Created new usage counter record');
             }
-          } catch (refreshError) {
-            console.warn('Error refreshing usage data:', refreshError);
           }
         }
       } catch (countersError) {
-        console.warn('Error fetching usage counters, using defaults:', countersError);
+        console.warn('Error fetching usage data, using defaults:', countersError);
       }
 
       // Get plan limits based on the current plan
@@ -257,15 +260,15 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
     try {
       setRefreshing(true);
       
-      // First try to refresh usage data in the database
+      // First try to refresh usage data in the database using the RPC function
       try {
-        const { error: refreshError } = await supabase
-          .rpc('ensure_current_month_usage', { user_uuid: userId });
+        const { data: refreshData, error: refreshError } = await supabase
+          .rpc('get_user_usage_summary', { p_user_id: userId });
         
         if (refreshError) {
           console.warn('Failed to refresh usage data in database:', refreshError);
         } else {
-          console.log('Usage data refreshed in database successfully');
+          console.log('Usage data refreshed successfully:', refreshData);
         }
       } catch (refreshError) {
         console.warn('Error calling refresh function:', refreshError);
