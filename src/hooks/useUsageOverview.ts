@@ -81,6 +81,8 @@ export const useUsageOverview = (userId: string) => {
   };
 
   const fetchSubscription = async (): Promise<SubscriptionData> => {
+    console.log('Fetching subscription for user:', userId);
+    
     const { data: subscription, error } = await supabase
       .from('subscriptions')
       .select('plan_type, renewal_date, trial_start, trial_end, is_active')
@@ -89,15 +91,35 @@ export const useUsageOverview = (userId: string) => {
 
     if (error) {
       console.warn('No subscription found, using trial defaults:', error);
-      return {
-        plan_type: 'trial',
+      console.log('Creating default trial subscription for user:', userId);
+      
+      // Try to create a default subscription
+      const defaultSubscription = {
+        plan_type: 'trial' as const,
         renewal_date: null,
         trial_start: new Date().toISOString(),
         trial_end: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
         is_active: true,
       };
+      
+      // Attempt to insert the default subscription
+      const { error: insertError } = await supabase
+        .from('subscriptions')
+        .insert({
+          user_id: userId,
+          ...defaultSubscription
+        });
+      
+      if (insertError) {
+        console.warn('Failed to create default subscription:', insertError);
+      } else {
+        console.log('✓ Created default trial subscription');
+      }
+      
+      return defaultSubscription;
     }
 
+    console.log('✓ Found subscription:', subscription);
     return subscription;
   };
 
@@ -207,11 +229,17 @@ export const useUsageOverview = (userId: string) => {
   };
 
   const loadData = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      console.log('No userId provided to useUsageOverview');
+      return;
+    }
 
     try {
       setError(null);
+      console.log('Loading usage overview data for user:', userId);
+      
       const monthStart = getCurrentMonthStart();
+      console.log('Current month start:', monthStart);
       
       // Refresh usage counters first
       await refreshUsageCounters(monthStart);
@@ -222,7 +250,11 @@ export const useUsageOverview = (userId: string) => {
         fetchUsageData(monthStart),
       ]);
 
+      console.log('Fetched data:', { subscription, usage });
+
       const usageData = calculateUsageData(subscription, usage, monthStart);
+      console.log('Calculated usage data:', usageData);
+      
       setData(usageData);
     } catch (err) {
       console.error('Error loading usage overview data:', err);

@@ -52,6 +52,7 @@ import {
 import PaystackPayment from '@/components/PaystackPayment';
 import PlanComparison from '@/components/billing/PlanComparison';
 import UsageOverview from '@/components/billing/UsageOverview';
+import UsageOverviewDebug from '@/components/billing/UsageOverviewDebug';
 
 type UpgradePlan = 'pro' | 'business' | null;
 
@@ -575,6 +576,11 @@ NoteX Team
             onUpgrade={(plan) => handleUpgradeClick(plan)}
             refreshTrigger={usageRefreshTrigger}
           />
+        </div>
+
+        {/* Debug Component - Remove this after fixing */}
+        <div className="mb-8">
+          <UsageOverviewDebug userId={user?.id || ''} />
         </div>
 
         {/* Plan Comparison */}
