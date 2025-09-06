@@ -457,6 +457,31 @@ NoteX Team
               <RefreshCw className="h-3 w-3 mr-1" />
               Log Details
             </Button>
+            <Button 
+              onClick={() => {
+                if (!user?.id) return;
+                
+                // Force set Business plan
+                const businessKey = `business_${user.id}`;
+                const businessData = {
+                  isActive: true,
+                  upgraded: new Date().toISOString(),
+                  plan: 'business',
+                  fixed: true
+                };
+                localStorage.setItem(businessKey, JSON.stringify(businessData));
+                
+                // Force refresh
+                refreshTrialStatus();
+                toast.success('Business plan status fixed!');
+              }}
+              size="sm" 
+              variant="default"
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Crown className="h-3 w-3 mr-1" />
+              Fix Business Status
+            </Button>
           </div>
         </div>
 

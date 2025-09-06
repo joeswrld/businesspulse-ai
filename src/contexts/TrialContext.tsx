@@ -407,6 +407,34 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Load trial status on mount and when user changes
   useEffect(() => {
     if (user) {
+      // Check localStorage first for Business plan users
+      const businessKey = `business_${user.id}`;
+      const businessData = localStorage.getItem(businessKey);
+      
+      if (businessData) {
+        const business = JSON.parse(businessData);
+        if (business.isActive) {
+          // User has Business plan in localStorage
+          const upgradeDate = new Date(business.upgraded || business.created || new Date());
+          const now = new Date();
+          const daysSinceUpgrade = Math.floor((now.getTime() - upgradeDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          setTrialStatus({
+            hasAccess: true,
+            plan: 'business',
+            isActive: true,
+            trialExpired: false,
+            daysLeft: daysSinceUpgrade,
+            trialEnd: upgradeDate.toISOString(),
+            loading: false,
+            error: null,
+          });
+          
+          console.log('✅ Business plan user detected from localStorage');
+          return;
+        }
+      }
+      
       // Give new users immediate access while loading
       setTrialStatus(prev => ({
         ...prev,
