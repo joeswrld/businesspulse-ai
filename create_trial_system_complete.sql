@@ -1,11 +1,10 @@
--- Migration: Create Free Trial and Subscription Gating System
--- This migration sets up the complete trial tracking and access control system
+-- Complete Trial System Setup
+-- This script creates the entire trial system from scratch
 
 -- ===============================
--- 1. Create user profiles table if it doesn't exist
+-- 1. Create user_profiles table
 -- ===============================
 
--- Create user_profiles table if it doesn't exist
 CREATE TABLE IF NOT EXISTS user_profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -21,47 +20,42 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     trial_expired BOOLEAN DEFAULT FALSE
 );
 
--- Add trial tracking columns if they don't exist (for existing tables)
-DO $$
-BEGIN
-    -- Add trial_start column if it doesn't exist
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'user_profiles' AND column_name = 'trial_start') THEN
-        ALTER TABLE user_profiles ADD COLUMN trial_start TIMESTAMPTZ;
-    END IF;
-    
-    -- Add trial_end column if it doesn't exist
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'user_profiles' AND column_name = 'trial_end') THEN
-        ALTER TABLE user_profiles ADD COLUMN trial_end TIMESTAMPTZ;
-    END IF;
-    
-    -- Add plan column if it doesn't exist
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'user_profiles' AND column_name = 'plan') THEN
-        ALTER TABLE user_profiles ADD COLUMN plan VARCHAR(20) DEFAULT 'free_trial';
-    END IF;
-    
-    -- Add is_active column if it doesn't exist
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'user_profiles' AND column_name = 'is_active') THEN
-        ALTER TABLE user_profiles ADD COLUMN is_active BOOLEAN DEFAULT FALSE;
-    END IF;
-    
-    -- Add trial_expired column if it doesn't exist
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'user_profiles' AND column_name = 'trial_expired') THEN
-        ALTER TABLE user_profiles ADD COLUMN trial_expired BOOLEAN DEFAULT FALSE;
-    END IF;
-END $$;
+-- ===============================
+-- 2. Add indexes for performance
+-- ===============================
 
--- Add indexes for performance
+CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_profiles_plan ON user_profiles(plan);
 CREATE INDEX IF NOT EXISTS idx_user_profiles_is_active ON user_profiles(is_active);
 CREATE INDEX IF NOT EXISTS idx_user_profiles_trial_end ON user_profiles(trial_end);
 
 -- ===============================
--- 2. Create trial management functions
+-- 3. Enable RLS
+-- ===============================
+
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+
+-- ===============================
+-- 4. Create RLS policies
+-- ===============================
+
+-- Policy: Users can view their own profile
+DROP POLICY IF EXISTS "Users can view their own profile" ON user_profiles;
+CREATE POLICY "Users can view their own profile" ON user_profiles
+    FOR SELECT USING (auth.uid() = user_id);
+
+-- Policy: Users can update their own profile
+DROP POLICY IF EXISTS "Users can update their own profile" ON user_profiles;
+CREATE POLICY "Users can update their own profile" ON user_profiles
+    FOR UPDATE USING (auth.uid() = user_id);
+
+-- Policy: System can insert profiles
+DROP POLICY IF EXISTS "System can insert profiles" ON user_profiles;
+CREATE POLICY "System can insert profiles" ON user_profiles
+    FOR INSERT WITH CHECK (true);
+
+-- ===============================
+-- 5. Create trial management functions
 -- ===============================
 
 -- Function to initialize trial for new users
@@ -235,32 +229,6 @@ BEGIN
 END;
 $$;
 
--- ===============================
--- 3. Create RLS policies for access control
--- ===============================
-
--- Enable RLS on user_profiles if not already enabled
-ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
-
--- Policy: Users can only see their own profile
-DROP POLICY IF EXISTS "Users can view their own profile" ON user_profiles;
-CREATE POLICY "Users can view their own profile" ON user_profiles
-    FOR SELECT USING (auth.uid() = user_id);
-
--- Policy: Users can update their own profile
-DROP POLICY IF EXISTS "Users can update their own profile" ON user_profiles;
-CREATE POLICY "Users can update their own profile" ON user_profiles
-    FOR UPDATE USING (auth.uid() = user_id);
-
--- Policy: System can insert profiles (for trial initialization)
-DROP POLICY IF EXISTS "System can insert profiles" ON user_profiles;
-CREATE POLICY "System can insert profiles" ON user_profiles
-    FOR INSERT WITH CHECK (true);
-
--- ===============================
--- 4. Create access control for other tables
--- ===============================
-
 -- Function to check if user can access feedback features
 CREATE OR REPLACE FUNCTION can_access_feedback(user_uuid UUID)
 RETURNS BOOLEAN
@@ -294,23 +262,6 @@ END;
 $$;
 
 -- ===============================
--- 5. Grant permissions
--- ===============================
-
--- Grant execute permissions on functions
-GRANT EXECUTE ON FUNCTION initialize_user_trial(UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION initialize_user_trial(UUID) TO service_role;
-GRANT EXECUTE ON FUNCTION check_user_access(UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION check_user_access(UUID) TO service_role;
-GRANT EXECUTE ON FUNCTION upgrade_user_to_business(UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION upgrade_user_to_business(UUID) TO service_role;
-GRANT EXECUTE ON FUNCTION expire_trials() TO service_role;
-GRANT EXECUTE ON FUNCTION can_access_feedback(UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION can_access_feedback(UUID) TO service_role;
-GRANT EXECUTE ON FUNCTION can_access_analytics(UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION can_access_analytics(UUID) TO service_role;
-
--- ===============================
 -- 6. Create triggers for automatic trial initialization
 -- ===============================
 
@@ -335,7 +286,24 @@ CREATE TRIGGER on_auth_user_created
     EXECUTE FUNCTION handle_new_user();
 
 -- ===============================
--- 7. Test the system
+-- 7. Grant permissions
+-- ===============================
+
+-- Grant execute permissions on functions
+GRANT EXECUTE ON FUNCTION initialize_user_trial(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION initialize_user_trial(UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION check_user_access(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION check_user_access(UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION upgrade_user_to_business(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION upgrade_user_to_business(UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION expire_trials() TO service_role;
+GRANT EXECUTE ON FUNCTION can_access_feedback(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION can_access_feedback(UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION can_access_analytics(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION can_access_analytics(UUID) TO service_role;
+
+-- ===============================
+-- 8. Test the system
 -- ===============================
 
 -- Test function to verify trial system works
@@ -371,5 +339,28 @@ BEGIN
     END IF;
 END $$;
 
+-- ===============================
+-- 9. Final verification
+-- ===============================
+
+-- Show table structure
+SELECT 
+    column_name,
+    data_type,
+    is_nullable,
+    column_default
+FROM information_schema.columns 
+WHERE table_name = 'user_profiles' 
+ORDER BY ordinal_position;
+
+-- Show function signatures
+SELECT 
+    routine_name,
+    routine_type,
+    '✓ ' || routine_name || ' function created' as status
+FROM information_schema.routines 
+WHERE routine_schema = 'public' 
+AND routine_name IN ('initialize_user_trial', 'check_user_access', 'upgrade_user_to_business', 'expire_trials', 'can_access_feedback', 'can_access_analytics');
+
 -- Final success message
-SELECT '🎉 Free Trial and Subscription Gating System Created Successfully!' as summary;
+SELECT '🎉 Complete Trial System Created Successfully!' as summary;
