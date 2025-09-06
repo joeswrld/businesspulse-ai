@@ -50,7 +50,6 @@ import {
   HelpCircle
 } from 'lucide-react';
 import PaystackPayment from '@/components/PaystackPayment';
-import UsageOverview from '@/components/billing/UsageOverview';
 import PlanComparison from '@/components/billing/PlanComparison';
 
 type UpgradePlan = 'pro' | 'business' | null;
@@ -139,8 +138,6 @@ const BillingPage: React.FC = () => {
     nextBillingDate,
     isInGracePeriod,
     gracePeriodDaysLeft,
-    usagePercentages,
-    isLimitReached,
     refreshData,
     cancelSubscription,
     upgradePlan
@@ -150,7 +147,6 @@ const BillingPage: React.FC = () => {
   const [cancelling, setCancelling] = useState(false);
   const [upgradePlanModal, setUpgradePlanModal] = useState<UpgradePlan>(null);
   const [showConfigError, setShowConfigError] = useState(false);
-  const [usageRefreshTrigger, setUsageRefreshTrigger] = useState(0);
 
   // Handle subscription cancellation
   const handleCancelSubscription = async () => {
@@ -186,10 +182,6 @@ const BillingPage: React.FC = () => {
     setUpgradePlanModal(plan);
   };
 
-  // Trigger usage refresh when plan changes
-  const triggerUsageRefresh = () => {
-    setUsageRefreshTrigger(prev => prev + 1);
-  };
 
   // Download transaction receipt
   const downloadReceipt = (transaction: any) => {
@@ -569,14 +561,6 @@ NoteX Team
           </CardContent>
         </Card>
 
-        {/* Usage Overview */}
-        <div className="mb-8">
-          <UsageOverview 
-            userId={user?.id || ''}
-            onUpgrade={(plan) => handleUpgradeClick(plan)}
-            refreshTrigger={usageRefreshTrigger}
-          />
-        </div>
 
         {/* Plan Comparison */}
         <div className="mb-8">
@@ -681,7 +665,6 @@ NoteX Team
                     toast.success(`🎉 Welcome to ${upgradePlanModal === 'pro' ? 'Pro' : 'Business'}! Your subscription has been activated.`);
                     setUpgradePlanModal(null);
                     await refreshData();
-                    triggerUsageRefresh();
                   } catch (e: any) {
                     toast.error(e?.message || 'Failed to activate subscription');
                   }

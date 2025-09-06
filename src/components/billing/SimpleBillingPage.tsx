@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
@@ -12,7 +11,6 @@ import {
   Star,
   Crown,
   ArrowUpRight,
-  BarChart3,
   Settings,
   Download,
   MessageSquare,
@@ -102,43 +100,6 @@ const SimpleBillingPage: React.FC = () => {
     }
   ];
 
-  const usageData = [
-    {
-      name: 'Feedback Collection',
-      usage: 0,
-      limit: 300,
-      status: 'Good',
-      description: 'Customer feedback submissions'
-    },
-    {
-      name: 'AI Insights',
-      usage: 0,
-      limit: 50,
-      status: 'Good',
-      description: 'AI-powered business insights'
-    },
-    {
-      name: 'Analytics Reports',
-      usage: 0,
-      limit: 100,
-      status: 'Good',
-      description: 'Data analytics and reports'
-    },
-    {
-      name: 'Detailed Reports',
-      usage: 0,
-      limit: 20,
-      status: 'Good',
-      description: 'Comprehensive business reports'
-    },
-    {
-      name: 'Team Members',
-      usage: 0,
-      limit: 5,
-      status: 'Good',
-      description: 'Team collaboration features'
-    }
-  ];
 
   const transactionHistory = [
     {
@@ -369,44 +330,6 @@ const SimpleBillingPage: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Usage Overview */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <BarChart3 className="h-5 w-5" />
-                Usage Overview
-              </CardTitle>
-              <p className="text-muted-foreground">Track your current usage against your business plan limits</p>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {usageData.map((item, index) => (
-                  <div key={index} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium">{item.name}</h4>
-                        <p className="text-sm text-muted-foreground">{item.description}</p>
-                      </div>
-                      <Badge variant="secondary" className="bg-green-100 text-green-800">
-                        {item.status}
-                      </Badge>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Usage: {item.usage} / {item.limit}</span>
-                        <span>{item.limit - item.usage} remaining</span>
-                      </div>
-                      <Progress value={(item.usage / item.limit) * 100} className="h-2" />
-                      <p className="text-xs text-muted-foreground text-right">
-                        {Math.round((item.usage / item.limit) * 100)}%
-                      </p>
-                    </div>
-                    {index < usageData.length - 1 && <Separator />}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Usage Tips */}
           <Card className="bg-gradient-to-r from-green-50 to-blue-50">
