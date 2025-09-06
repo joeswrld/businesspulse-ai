@@ -53,7 +53,7 @@ const FeedbackUsageDisplay: React.FC<FeedbackUsageDisplayProps> = ({ onUpgrade }
               Failed to load usage information: {error}
             </AlertDescription>
           </Alert>
-        </Card>
+        </CardContent>
       </Card>
     );
   }

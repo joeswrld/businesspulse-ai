@@ -39,7 +39,6 @@ export function FeedbackFormWithUsageEnforcement() {
     setLoading(true);
 
     try {
-
       // Check usage before allowing feedback submission
       const canSubmit = await enforceUsageLimitWithCounters(
         user.id, 
@@ -52,15 +51,6 @@ export function FeedbackFormWithUsageEnforcement() {
       if (!canSubmit) {
         setLoading(false);
         return;
-
-      // First check if user can use the feature
-      const canUse = await enforceUsageLimit(feature as any, feature as any);
-
-      if (canUse) {
-        // Track usage
-        await trackUsage(feature as any);
-        console.log(`${feature} usage tracked successfully`);
-
       }
 
       // If we can submit, proceed with feedback creation
