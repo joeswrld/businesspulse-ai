@@ -109,9 +109,10 @@ export const useUsageOverview = (userId: string) => {
         .gte('timestamp', monthStart),
       
       supabase
-        .from('insights')
+        .from('analytics_events')
         .select('id', { count: 'exact' })
         .eq('user_id', userId)
+        .eq('event_type', 'insight')
         .gte('created_at', monthStart),
       
       supabase
@@ -121,10 +122,11 @@ export const useUsageOverview = (userId: string) => {
         .gte('created_at', monthStart),
       
       supabase
-        .from('analytics_daily')
+        .from('analytics_events')
         .select('id', { count: 'exact' })
         .eq('user_id', userId)
-        .gte('date', monthStart),
+        .eq('event_type', 'report')
+        .gte('created_at', monthStart),
     ]);
 
     return {
