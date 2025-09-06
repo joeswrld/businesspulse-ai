@@ -88,7 +88,7 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
             const { data: createResult, error: createError } = await supabase
               .rpc('create_user_billing_profile', { user_uuid: userId });
             
-            if (!createError && createResult?.success) {
+            if (!createError && createResult) {
               console.log('Billing profile created successfully');
               // Try to fetch the newly created profile
               const { data: newProfile } = await supabase
@@ -147,7 +147,7 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
           
           try {
             const { error: refreshError } = await supabase
-              .rpc('refresh_user_usage', { user_uuid: userId });
+              .rpc('ensure_current_month_usage', { user_uuid: userId });
             
             if (!refreshError) {
               // Try to fetch again after refresh
@@ -260,7 +260,7 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
       // First try to refresh usage data in the database
       try {
         const { error: refreshError } = await supabase
-          .rpc('refresh_user_usage', { user_uuid: userId });
+          .rpc('ensure_current_month_usage', { user_uuid: userId });
         
         if (refreshError) {
           console.warn('Failed to refresh usage data in database:', refreshError);

@@ -423,8 +423,8 @@ export async function getUsageSummaryWithCounters(
  */
 export async function refreshUsageCounters(userId: string): Promise<boolean> {
   try {
-    const { error } = await supabase.rpc('refresh_usage_for_user', {
-      p_user_id: userId
+    const { error } = await supabase.rpc('ensure_current_month_usage', {
+      user_uuid: userId
     });
 
     if (error) {

@@ -518,7 +518,7 @@ export function useBillingSystem(): BillingSystemState {
           const { data: createResult, error: createError } = await supabase
             .rpc('create_user_billing_profile', { user_uuid: user.id });
           
-          if (createError || !createResult?.success) {
+          if (createError || !createResult) {
             console.warn('Failed to create billing profile:', createError);
             // Create a minimal profile locally
             profileToUse = {
@@ -540,7 +540,7 @@ export function useBillingSystem(): BillingSystemState {
               .single();
             
             if (newProfile) {
-              profileToUse = newProfile;
+              profileToUse = newProfile as any;
             }
           }
         } catch (error) {

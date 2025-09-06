@@ -54,7 +54,7 @@ export const useFeedbackWebhook = () => {
                 'Authorization': `Bearer ${session.data.session.access_token}`,
               },
               body: JSON.stringify({
-                feedback_id: feedbackData.id,
+                feedback_id: feedbackData.feedback_id,
                 user_id: feedbackData.user_id,
                 project_id: feedbackData.project_id,
                 message: feedbackData.message,

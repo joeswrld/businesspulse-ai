@@ -595,7 +595,7 @@ export default function Dashboard() {
               <Button onClick={() => {
                 setError(null);
                 setLoading(true);
-                loadDashboardData();
+                window.location.reload();
               }}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Try Again

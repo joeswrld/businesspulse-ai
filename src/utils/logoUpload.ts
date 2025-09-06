@@ -121,8 +121,8 @@ export const uploadLogo = async (options: UploadLogoOptions): Promise<UploadLogo
       console.error('❌ Upload error details:', {
         error: uploadError,
         message: uploadError.message,
-        statusCode: uploadError.statusCode,
-        errorCode: uploadError.error
+        statusCode: (uploadError as any).statusCode,
+        errorCode: (uploadError as any).error
       });
 
       // Provide specific error messages based on the error

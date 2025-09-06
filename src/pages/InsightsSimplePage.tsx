@@ -75,7 +75,7 @@ interface GeminiAnalysis {
 
 const InsightsSimplePage: React.FC = () => {
   const { user } = useAuth();
-  const { checkUsage, enforceLimit } = useUsageEnforcement();
+  const { checkUsage, enforceUsage } = useUsageEnforcement();
   const { trackUsage } = useUsageTracking();
   
   // Use real-time feedback hook
@@ -171,7 +171,7 @@ const InsightsSimplePage: React.FC = () => {
     try {
       const canProceed = await checkUsage('insights');
       if (!canProceed) {
-        const shouldUpgrade = await enforceLimit('insights');
+        const shouldUpgrade = await enforceUsage('insights');
         if (!shouldUpgrade) {
           return;
         }
