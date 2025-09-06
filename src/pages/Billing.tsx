@@ -126,13 +126,6 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
 const BillingPage: React.FC = () => {
   const { user } = useAuth();
   const { trialStatus, refreshTrialStatus, upgradeToBusiness } = useTrial();
-  
-  // Force refresh trial status
-  const forceRefreshTrial = async () => {
-    console.log('Force refreshing trial status...');
-    await refreshTrialStatus();
-    console.log('Trial status after force refresh:', trialStatus);
-  };
   const {
     billingProfile,
     transactions,
@@ -421,69 +414,6 @@ NoteX Team
           </Alert>
         )}
 
-        {/* Debug Trial Status */}
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Debug: Trial Status</h3>
-          <div className="text-xs text-gray-600 space-y-1">
-            <div>Has Access: {trialStatus.hasAccess ? '✅' : '❌'}</div>
-            <div>Plan: <span className="font-mono bg-gray-200 px-1 rounded">{trialStatus.plan}</span></div>
-            <div>Is Active: {trialStatus.isActive ? '✅' : '❌'}</div>
-            <div>Trial Expired: {trialStatus.trialExpired ? '✅' : '❌'}</div>
-            <div>Days Left: <span className="font-mono bg-gray-200 px-1 rounded">{trialStatus.daysLeft}</span> {trialStatus.plan === 'business' ? '(since upgrade)' : '(trial remaining)'}</div>
-            <div>Loading: {trialStatus.loading ? '✅' : '❌'}</div>
-            <div>Error: <span className="font-mono bg-gray-200 px-1 rounded">{trialStatus.error || 'None'}</span></div>
-            <div>Trial End: <span className="font-mono bg-gray-200 px-1 rounded">{trialStatus.trialEnd || 'None'}</span></div>
-            <div>User ID: <span className="font-mono bg-gray-200 px-1 rounded">{user?.id?.slice(0, 8)}...</span></div>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <Button 
-              onClick={forceRefreshTrial} 
-              size="sm" 
-              variant="outline"
-            >
-              <RefreshCw className="h-3 w-3 mr-1" />
-              Refresh Trial Status
-            </Button>
-            <Button 
-              onClick={() => {
-                console.log('Full trial status:', trialStatus);
-                console.log('User ID:', user?.id);
-                console.log('LocalStorage business:', localStorage.getItem(`business_${user?.id}`));
-                console.log('LocalStorage trial:', localStorage.getItem(`trial_${user?.id}`));
-              }}
-              size="sm" 
-              variant="outline"
-            >
-              <RefreshCw className="h-3 w-3 mr-1" />
-              Log Details
-            </Button>
-            <Button 
-              onClick={() => {
-                if (!user?.id) return;
-                
-                // Force set Business plan
-                const businessKey = `business_${user.id}`;
-                const businessData = {
-                  isActive: true,
-                  upgraded: new Date().toISOString(),
-                  plan: 'business',
-                  fixed: true
-                };
-                localStorage.setItem(businessKey, JSON.stringify(businessData));
-                
-                // Force refresh
-                refreshTrialStatus();
-                toast.success('Business plan status fixed!');
-              }}
-              size="sm" 
-              variant="default"
-              className="bg-green-600 hover:bg-green-700"
-            >
-              <Crown className="h-3 w-3 mr-1" />
-              Fix Business Status
-            </Button>
-          </div>
-        </div>
 
         {/* Current Plan Overview */}
         <Card className="mb-8 border-0 shadow-sm">
@@ -713,26 +643,11 @@ NoteX Team
                     toast.success(`🎉 Welcome to Business! Your subscription has been activated.`);
                     setUpgradePlanModal(null);
                     
-                    // Force upgrade to business immediately
+                    // Upgrade to business immediately
                     await upgradeToBusiness();
-                    
-                    // Force refresh trial status immediately
-                    await refreshTrialStatus();
                     
                     // Refresh billing data
                     await refreshData();
-                    
-                    // Wait a moment for state to update
-                    setTimeout(async () => {
-                      await refreshTrialStatus();
-                      console.log('Trial status after upgrade (delayed):', {
-                        hasAccess: trialStatus.hasAccess,
-                        plan: trialStatus.plan,
-                        isActive: trialStatus.isActive,
-                        trialExpired: trialStatus.trialExpired,
-                        daysLeft: trialStatus.daysLeft
-                      });
-                    }, 1000);
                     
                     console.log('Upgrade completed successfully');
                   } catch (e: any) {
