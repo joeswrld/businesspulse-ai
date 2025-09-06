@@ -65,12 +65,17 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (businessData) {
       const business = JSON.parse(businessData);
       if (business.isActive) {
+        // Calculate days since upgrade for business users
+        const upgradeDate = new Date(business.upgraded || business.created || new Date());
+        const now = new Date();
+        const daysSinceUpgrade = Math.floor((now.getTime() - upgradeDate.getTime()) / (1000 * 60 * 60 * 24));
+        
         return {
           hasAccess: true,
           plan: 'business',
           isActive: true,
           trialExpired: false,
-          daysLeft: 999, // Unlimited
+          daysLeft: daysSinceUpgrade, // Days since upgrade
           trialEnd: null,
           loading: false,
           error: null,
@@ -89,7 +94,7 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return {
         hasAccess: trialEnd > now,
         plan: 'free_trial',
-        isActive: false,
+        isActive: true, // Trial is active
         trialExpired: trialEnd <= now,
         daysLeft,
         trialEnd: trial.trialEnd,
@@ -110,7 +115,7 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return {
       hasAccess: true,
       plan: 'free_trial',
-      isActive: false,
+      isActive: true, // New trial is active
       trialExpired: false,
       daysLeft: 8,
       trialEnd: trialEnd.toISOString(),
@@ -158,12 +163,25 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       }
 
       const result = data[0];
+      
+      // Calculate days left based on plan type
+      let daysLeft = 0;
+      if (result.plan === 'business' && result.is_active) {
+        // For business users, show days since upgrade
+        const upgradeDate = new Date(result.trial_end || new Date()); // Use trial_end as upgrade date for business
+        const now = new Date();
+        daysLeft = Math.floor((now.getTime() - upgradeDate.getTime()) / (1000 * 60 * 60 * 24));
+      } else if (result.plan === 'free_trial') {
+        // For trial users, show days remaining
+        daysLeft = result.days_left || 0;
+      }
+      
       return {
         hasAccess: result.has_access,
         plan: result.plan,
-        isActive: result.is_active,
+        isActive: result.is_active || (result.plan === 'free_trial' && result.days_left > 0), // Trial is active if days left
         trialExpired: result.trial_expired,
-        daysLeft: result.days_left || 0,
+        daysLeft: daysLeft,
         trialEnd: result.trial_end,
         loading: false,
         error: null,
@@ -356,11 +374,31 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return Math.max(0, trialStatus.daysLeft);
   };
 
+  // Check for failed payments
+  const checkForFailedPayment = (): boolean => {
+    // Check if user has business plan in localStorage but not in database
+    if (!user) return false;
+    
+    const businessKey = `business_${user.id}`;
+    const businessData = localStorage.getItem(businessKey);
+    
+    if (businessData) {
+      const business = JSON.parse(businessData);
+      if (business.isActive && trialStatus.plan === 'free_trial' && !trialStatus.isActive) {
+        return true; // Likely failed payment
+      }
+    }
+    
+    return false;
+  };
+
   // Get trial message for UI
   const getTrialMessage = (): string => {
     if (trialStatus.loading) return 'Loading...';
     if (trialStatus.error) return 'Error loading trial status';
-    if (trialStatus.isActive) return 'You have an active Business subscription';
+    if (checkForFailedPayment()) return 'Payment verification in progress. Please wait...';
+    if (trialStatus.isActive && trialStatus.plan === 'business') return 'You have an active Business subscription';
+    if (trialStatus.isActive && trialStatus.plan === 'free_trial') return `Your free trial ends in ${getDaysLeft()} days`;
     if (isTrialExpired()) return 'Your free trial has expired. Upgrade to Business to continue.';
     if (trialStatus.plan === 'free_trial') return `Your free trial ends in ${getDaysLeft()} days`;
     return 'Unknown trial status';
@@ -374,7 +412,7 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         ...prev,
         hasAccess: true, // Always give access by default
         plan: 'free_trial',
-        isActive: false,
+        isActive: true, // Trial is active
         trialExpired: false, // Never expire by default
         daysLeft: 8, // Give 8 days by default
         trialEnd: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),

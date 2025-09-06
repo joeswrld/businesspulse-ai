@@ -426,22 +426,38 @@ NoteX Team
           <h3 className="text-sm font-medium text-gray-700 mb-2">Debug: Trial Status</h3>
           <div className="text-xs text-gray-600 space-y-1">
             <div>Has Access: {trialStatus.hasAccess ? '✅' : '❌'}</div>
-            <div>Plan: {trialStatus.plan}</div>
+            <div>Plan: <span className="font-mono bg-gray-200 px-1 rounded">{trialStatus.plan}</span></div>
             <div>Is Active: {trialStatus.isActive ? '✅' : '❌'}</div>
             <div>Trial Expired: {trialStatus.trialExpired ? '✅' : '❌'}</div>
-            <div>Days Left: {trialStatus.daysLeft}</div>
+            <div>Days Left: <span className="font-mono bg-gray-200 px-1 rounded">{trialStatus.daysLeft}</span> {trialStatus.plan === 'business' ? '(since upgrade)' : '(trial remaining)'}</div>
             <div>Loading: {trialStatus.loading ? '✅' : '❌'}</div>
-            <div>Error: {trialStatus.error || 'None'}</div>
+            <div>Error: <span className="font-mono bg-gray-200 px-1 rounded">{trialStatus.error || 'None'}</span></div>
+            <div>Trial End: <span className="font-mono bg-gray-200 px-1 rounded">{trialStatus.trialEnd || 'None'}</span></div>
+            <div>User ID: <span className="font-mono bg-gray-200 px-1 rounded">{user?.id?.slice(0, 8)}...</span></div>
           </div>
-          <Button 
-            onClick={forceRefreshTrial} 
-            size="sm" 
-            variant="outline" 
-            className="mt-2"
-          >
-            <RefreshCw className="h-3 w-3 mr-1" />
-            Refresh Trial Status
-          </Button>
+          <div className="mt-3 flex gap-2">
+            <Button 
+              onClick={forceRefreshTrial} 
+              size="sm" 
+              variant="outline"
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Refresh Trial Status
+            </Button>
+            <Button 
+              onClick={() => {
+                console.log('Full trial status:', trialStatus);
+                console.log('User ID:', user?.id);
+                console.log('LocalStorage business:', localStorage.getItem(`business_${user?.id}`));
+                console.log('LocalStorage trial:', localStorage.getItem(`trial_${user?.id}`));
+              }}
+              size="sm" 
+              variant="outline"
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Log Details
+            </Button>
+          </div>
         </div>
 
         {/* Current Plan Overview */}
