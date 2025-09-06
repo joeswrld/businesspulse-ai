@@ -1,8 +1,8 @@
--- Complete Trial System Setup
--- This script creates the entire trial system from scratch
+-- Complete Fix for Trial System
+-- This script fixes all issues and creates the complete trial system
 
 -- ===============================
--- 1. Create user_profiles table
+-- 1. Create user_profiles table with unique constraint
 -- ===============================
 
 CREATE TABLE IF NOT EXISTS user_profiles (
@@ -21,7 +21,82 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 );
 
 -- ===============================
--- 2. Add indexes for performance
+-- 2. Add unique constraint if table already exists without it
+-- ===============================
+
+DO $$
+BEGIN
+    -- Check if unique constraint already exists
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE table_name = 'user_profiles' 
+        AND constraint_type = 'UNIQUE' 
+        AND constraint_name LIKE '%user_id%'
+    ) THEN
+        -- Add unique constraint
+        ALTER TABLE user_profiles ADD CONSTRAINT user_profiles_user_id_unique UNIQUE (user_id);
+        RAISE NOTICE '✓ Added unique constraint to user_profiles.user_id';
+    ELSE
+        RAISE NOTICE '✓ Unique constraint already exists on user_profiles.user_id';
+    END IF;
+END $$;
+
+-- ===============================
+-- 3. Add missing columns if they don't exist
+-- ===============================
+
+-- Add trial_start column if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'user_profiles' AND column_name = 'trial_start') THEN
+        ALTER TABLE user_profiles ADD COLUMN trial_start TIMESTAMPTZ;
+        RAISE NOTICE '✓ Added trial_start column';
+    END IF;
+END $$;
+
+-- Add trial_end column if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'user_profiles' AND column_name = 'trial_end') THEN
+        ALTER TABLE user_profiles ADD COLUMN trial_end TIMESTAMPTZ;
+        RAISE NOTICE '✓ Added trial_end column';
+    END IF;
+END $$;
+
+-- Add plan column if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'user_profiles' AND column_name = 'plan') THEN
+        ALTER TABLE user_profiles ADD COLUMN plan VARCHAR(20) DEFAULT 'free_trial';
+        RAISE NOTICE '✓ Added plan column';
+    END IF;
+END $$;
+
+-- Add is_active column if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'user_profiles' AND column_name = 'is_active') THEN
+        ALTER TABLE user_profiles ADD COLUMN is_active BOOLEAN DEFAULT FALSE;
+        RAISE NOTICE '✓ Added is_active column';
+    END IF;
+END $$;
+
+-- Add trial_expired column if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'user_profiles' AND column_name = 'trial_expired') THEN
+        ALTER TABLE user_profiles ADD COLUMN trial_expired BOOLEAN DEFAULT FALSE;
+        RAISE NOTICE '✓ Added trial_expired column';
+    END IF;
+END $$;
+
+-- ===============================
+-- 4. Add indexes for performance
 -- ===============================
 
 CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
@@ -30,13 +105,13 @@ CREATE INDEX IF NOT EXISTS idx_user_profiles_is_active ON user_profiles(is_activ
 CREATE INDEX IF NOT EXISTS idx_user_profiles_trial_end ON user_profiles(trial_end);
 
 -- ===============================
--- 3. Enable RLS
+-- 5. Enable RLS
 -- ===============================
 
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
 -- ===============================
--- 4. Create RLS policies
+-- 6. Create RLS policies
 -- ===============================
 
 -- Policy: Users can view their own profile
@@ -55,7 +130,7 @@ CREATE POLICY "System can insert profiles" ON user_profiles
     FOR INSERT WITH CHECK (true);
 
 -- ===============================
--- 5. Create trial management functions
+-- 7. Create trial management functions
 -- ===============================
 
 -- Function to initialize trial for new users
@@ -262,7 +337,7 @@ END;
 $$;
 
 -- ===============================
--- 6. Create triggers for automatic trial initialization
+-- 8. Create triggers for automatic trial initialization
 -- ===============================
 
 -- Function to handle new user signup
@@ -286,7 +361,7 @@ CREATE TRIGGER on_auth_user_created
     EXECUTE FUNCTION handle_new_user();
 
 -- ===============================
--- 7. Grant permissions
+-- 9. Grant permissions
 -- ===============================
 
 -- Grant execute permissions on functions
@@ -303,7 +378,7 @@ GRANT EXECUTE ON FUNCTION can_access_analytics(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION can_access_analytics(UUID) TO service_role;
 
 -- ===============================
--- 8. Test the system
+-- 10. Test the system
 -- ===============================
 
 -- Test function to verify trial system works
@@ -340,7 +415,7 @@ BEGIN
 END $$;
 
 -- ===============================
--- 9. Final verification
+-- 11. Final verification
 -- ===============================
 
 -- Show table structure
@@ -353,6 +428,17 @@ FROM information_schema.columns
 WHERE table_name = 'user_profiles' 
 ORDER BY ordinal_position;
 
+-- Show constraints
+SELECT 
+    constraint_name,
+    constraint_type,
+    column_name
+FROM information_schema.table_constraints tc
+JOIN information_schema.key_column_usage kcu 
+    ON tc.constraint_name = kcu.constraint_name
+WHERE tc.table_name = 'user_profiles'
+ORDER BY tc.constraint_name;
+
 -- Show function signatures
 SELECT 
     routine_name,
@@ -363,4 +449,4 @@ WHERE routine_schema = 'public'
 AND routine_name IN ('initialize_user_trial', 'check_user_access', 'upgrade_user_to_business', 'expire_trials', 'can_access_feedback', 'can_access_analytics');
 
 -- Final success message
-SELECT '🎉 Complete Trial System Created Successfully!' as summary;
+SELECT '🎉 Complete Trial System Fixed and Created Successfully!' as summary;
