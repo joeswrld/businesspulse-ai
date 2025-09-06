@@ -216,6 +216,8 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const upgradeToBusiness = async (): Promise<void> => {
     if (!user) return;
 
+    console.log('Starting upgrade to business...');
+
     try {
       // Try database upgrade first
       const { error } = await supabase.rpc('upgrade_user_to_business', {
@@ -242,12 +244,32 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           error: null,
         }));
         
+        console.log('Upgraded to business (fallback)');
         toast.success('🎉 Welcome to Business! Your subscription has been activated.');
         return;
       }
 
-      // Refresh trial status after upgrade
-      await refreshTrialStatus();
+      console.log('Database upgrade successful, updating state...');
+      
+      // Update trial status immediately after successful database upgrade
+      setTrialStatus(prev => ({
+        ...prev,
+        hasAccess: true,
+        plan: 'business',
+        isActive: true,
+        trialExpired: false,
+        loading: false,
+        error: null,
+      }));
+
+      // Also update localStorage as backup
+      const businessKey = `business_${user.id}`;
+      localStorage.setItem(businessKey, JSON.stringify({
+        isActive: true,
+        upgraded: new Date().toISOString(),
+      }));
+
+      console.log('State updated to business plan');
       toast.success('🎉 Welcome to Business! Your subscription has been activated.');
     } catch (error) {
       console.error('Error in upgradeToBusiness:', error);
@@ -270,6 +292,7 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         error: null,
       }));
       
+      console.log('Upgraded to business (error fallback)');
       toast.success('🎉 Welcome to Business! Your subscription has been activated.');
     }
   };

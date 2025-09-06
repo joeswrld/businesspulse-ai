@@ -125,7 +125,14 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
 
 const BillingPage: React.FC = () => {
   const { user } = useAuth();
-  const { trialStatus, refreshTrialStatus } = useTrial();
+  const { trialStatus, refreshTrialStatus, upgradeToBusiness } = useTrial();
+  
+  // Force refresh trial status
+  const forceRefreshTrial = async () => {
+    console.log('Force refreshing trial status...');
+    await refreshTrialStatus();
+    console.log('Trial status after force refresh:', trialStatus);
+  };
   const {
     billingProfile,
     transactions,
@@ -414,6 +421,29 @@ NoteX Team
           </Alert>
         )}
 
+        {/* Debug Trial Status */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <h3 className="text-sm font-medium text-gray-700 mb-2">Debug: Trial Status</h3>
+          <div className="text-xs text-gray-600 space-y-1">
+            <div>Has Access: {trialStatus.hasAccess ? '✅' : '❌'}</div>
+            <div>Plan: {trialStatus.plan}</div>
+            <div>Is Active: {trialStatus.isActive ? '✅' : '❌'}</div>
+            <div>Trial Expired: {trialStatus.trialExpired ? '✅' : '❌'}</div>
+            <div>Days Left: {trialStatus.daysLeft}</div>
+            <div>Loading: {trialStatus.loading ? '✅' : '❌'}</div>
+            <div>Error: {trialStatus.error || 'None'}</div>
+          </div>
+          <Button 
+            onClick={forceRefreshTrial} 
+            size="sm" 
+            variant="outline" 
+            className="mt-2"
+          >
+            <RefreshCw className="h-3 w-3 mr-1" />
+            Refresh Trial Status
+          </Button>
+        </div>
+
         {/* Current Plan Overview */}
         <Card className="mb-8 border-0 shadow-sm">
           <CardHeader className="pb-6">
@@ -638,10 +668,32 @@ NoteX Team
                 planPrice={getPlanPrice(upgradePlanModal)}
                 onSuccess={async ({ reference, plan: paidPlan }) => {
                   try {
+                    console.log('Payment successful, upgrading to business...');
                     toast.success(`🎉 Welcome to Business! Your subscription has been activated.`);
                     setUpgradePlanModal(null);
-                    await refreshData();
+                    
+                    // Force upgrade to business immediately
+                    await upgradeToBusiness();
+                    
+                    // Force refresh trial status immediately
                     await refreshTrialStatus();
+                    
+                    // Refresh billing data
+                    await refreshData();
+                    
+                    // Wait a moment for state to update
+                    setTimeout(async () => {
+                      await refreshTrialStatus();
+                      console.log('Trial status after upgrade (delayed):', {
+                        hasAccess: trialStatus.hasAccess,
+                        plan: trialStatus.plan,
+                        isActive: trialStatus.isActive,
+                        trialExpired: trialStatus.trialExpired,
+                        daysLeft: trialStatus.daysLeft
+                      });
+                    }, 1000);
+                    
+                    console.log('Upgrade completed successfully');
                   } catch (e: any) {
                     toast.error(e?.message || 'Failed to activate subscription');
                   }
