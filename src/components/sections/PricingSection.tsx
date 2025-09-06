@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Star, Zap, Crown } from "lucide-react";
+import { Check, Zap, Crown } from "lucide-react";
 
 const PricingSection = () => {
   const plans = [
@@ -21,57 +21,35 @@ const PricingSection = () => {
         "Reports → Up to 2 basic reports",
         "Team Members → Coming Soon",
         "Export Data → CSV format",
-        "Data Retention → 30 days",
+        "Data Retention → 8 days",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "hero" as const,
       popular: false
-    },
-    {
-      name: "Pro",
-      price: "₦35,000",
-      period: "/month",
-      description: "For growing businesses and startups",
-      icon: Star,
-      badge: "Most Popular",
-      badgeVariant: "default" as const,
-      features: [
-        "Feedback Collection → Up to 300 responses/month",
-        "AI Insights Generation → Up to 50 insights/month",
-        "Advanced Analytics → Comprehensive sentiment dashboard",
-        "Reports → Up to 20 reports/month",
-        "Team Members → Coming Soon",
-        "Export Data → CSV, PDF, Excel formats",
-        "Automated Alerts →Teams(Coming Soon), Email, ",
-        "Advanced Analytics → Trend detection",
-        "Data Retention → 12 months",
-      ],
-      buttonText: "Start Free Trial",
-      buttonVariant: "hero" as const,
-      popular: true
     },
     {
       name: "Business",
       price: "₦53,000",
       period: "/month",
-      description: "For enterprises and large teams",
+      description: "Complete solution for businesses of all sizes",
       icon: Crown,
-      badge: "Enterprise",
-      badgeVariant: "secondary" as const,
+      badge: "Most Popular",
+      badgeVariant: "default" as const,
       features: [
         "Feedback Collection → Unlimited responses",
         "AI Insights Generation → Unlimited insights",
-        "Enterprise Analytics → Advanced sentiment & trend analysis",
+        "Advanced Analytics → Comprehensive sentiment & trend analysis",
         "Reports → Unlimited reports with advanced analytics",
         "Team Members → Coming Soon",
-        "Everything in Pro",
+        "Export Data → CSV, PDF, Excel, API formats",
+        "Priority Support → Email, Chat, Phone",
         "Predictive Analytics → AI-powered trend projection",
-        "Compliance → GDPR, SOC2, HIPAA ready",
+        "API Access → Full integration capabilities",
         "Data Retention → Unlimited",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "premium" as const,
-      popular: false
+      popular: true
     }
   ];
 
@@ -88,12 +66,12 @@ const PricingSection = () => {
             <span className="gradient-text">Business Growth</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            Start with our 8-day free trial to experience AI-powered feedback insights, sentiment analysis, and comprehensive reporting. Choose a plan that scales with your business needs - from individual creators to enterprise teams.
+            Start with our 8-day free trial to experience AI-powered feedback insights, sentiment analysis, and comprehensive reporting. Then upgrade to Business for unlimited access to all features.
           </p>
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
           {plans.map((plan, index) => (
             <Card
               key={index}
@@ -174,7 +152,6 @@ const PricingSection = () => {
                   <tr className="border-b border-border">
                     <th className="text-left py-3 px-4 font-semibold">Features</th>
                     <th className="text-center py-3 px-4 font-semibold">Free Trial</th>
-                    <th className="text-center py-3 px-4 font-semibold">Pro</th>
                     <th className="text-center py-3 px-4 font-semibold">Business</th>
                   </tr>
                 </thead>
@@ -182,32 +159,37 @@ const PricingSection = () => {
                   <tr>
                     <td className="py-3 px-4 font-medium">Feedback Responses</td>
                     <td className="text-center py-3 px-4">50</td>
-                    <td className="text-center py-3 px-4">300/month</td>
                     <td className="text-center py-3 px-4">Unlimited</td>
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-medium">AI Insights</td>
                     <td className="text-center py-3 px-4">5</td>
-                    <td className="text-center py-3 px-4">50/month</td>
                     <td className="text-center py-3 px-4">Unlimited</td>
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-medium">Team Members</td>
                     <td className="text-center py-3 px-4">Coming Soon</td>
                     <td className="text-center py-3 px-4">Coming Soon</td>
-                    <td className="text-center py-3 px-4">Coming Soon</td>
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-medium">Reports</td>
                     <td className="text-center py-3 px-4">2</td>
-                    <td className="text-center py-3 px-4">20/month</td>
                     <td className="text-center py-3 px-4">Unlimited</td>
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-medium">Data Retention</td>
-                    <td className="text-center py-3 px-4">30 days</td>
-                    <td className="text-center py-3 px-4">12 months</td>
+                    <td className="text-center py-3 px-4">8 days</td>
                     <td className="text-center py-3 px-4">Unlimited</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-medium">Export Formats</td>
+                    <td className="text-center py-3 px-4">CSV</td>
+                    <td className="text-center py-3 px-4">CSV, PDF, Excel, API</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-4 font-medium">Support</td>
+                    <td className="text-center py-3 px-4">Email</td>
+                    <td className="text-center py-3 px-4">Email, Chat, Phone</td>
                   </tr>
                   
                 </tbody>
