@@ -1,9 +1,11 @@
--- Create usage overview system for NoteX platform
--- This migration creates the necessary tables and functions for usage tracking
+-- Complete Usage Overview System Deployment
+-- This script handles all potential conflicts and creates the complete system
 
 -- ===============================
--- 1. Create usage_counters table
+-- 1. Create tables (with IF NOT EXISTS)
 -- ===============================
+
+-- Create usage_counters table
 CREATE TABLE IF NOT EXISTS usage_counters (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -17,9 +19,7 @@ CREATE TABLE IF NOT EXISTS usage_counters (
     UNIQUE(user_id, month_start)
 );
 
--- ===============================
--- 2. Create subscriptions table
--- ===============================
+-- Create subscriptions table
 CREATE TABLE IF NOT EXISTS subscriptions (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -34,8 +34,15 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 );
 
 -- ===============================
--- 3. Create refresh_user_usage function
+-- 2. Drop and recreate functions (to avoid conflicts)
 -- ===============================
+
+-- Drop existing functions if they exist
+DROP FUNCTION IF EXISTS refresh_user_usage(UUID, DATE);
+DROP FUNCTION IF EXISTS check_usage_limit(UUID, TEXT);
+DROP FUNCTION IF EXISTS reset_monthly_usage();
+
+-- Create refresh_user_usage function
 CREATE OR REPLACE FUNCTION refresh_user_usage(user_uuid UUID, target_month_start DATE)
 RETURNS TABLE (
     user_id UUID,
@@ -114,9 +121,7 @@ BEGIN
 END;
 $$;
 
--- ===============================
--- 4. Create check_usage_limit function
--- ===============================
+-- Create check_usage_limit function
 CREATE OR REPLACE FUNCTION check_usage_limit(user_uuid UUID, feature_type TEXT)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
@@ -195,9 +200,7 @@ BEGIN
 END;
 $$;
 
--- ===============================
--- 5. Create monthly reset function
--- ===============================
+-- Create reset_monthly_usage function
 CREATE OR REPLACE FUNCTION reset_monthly_usage()
 RETURNS VOID
 LANGUAGE plpgsql
@@ -236,7 +239,7 @@ END;
 $$;
 
 -- ===============================
--- 6. Create RLS policies
+-- 3. Enable RLS and create policies
 -- ===============================
 
 -- Enable RLS on tables
@@ -272,7 +275,7 @@ CREATE POLICY "Users can update their own subscriptions" ON subscriptions
     FOR UPDATE USING (auth.uid() = user_id);
 
 -- ===============================
--- 7. Create indexes for performance
+-- 4. Create indexes for performance
 -- ===============================
 CREATE INDEX IF NOT EXISTS idx_usage_counters_user_month ON usage_counters(user_id, month_start);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);
@@ -282,7 +285,7 @@ CREATE INDEX IF NOT EXISTS idx_analytics_user_created ON analytics(user_id, crea
 CREATE INDEX IF NOT EXISTS idx_reports_user_created ON reports(user_id, created_at);
 
 -- ===============================
--- 8. Grant permissions
+-- 5. Grant permissions
 -- ===============================
 GRANT EXECUTE ON FUNCTION refresh_user_usage(UUID, DATE) TO authenticated;
 GRANT EXECUTE ON FUNCTION refresh_user_usage(UUID, DATE) TO service_role;
@@ -291,7 +294,7 @@ GRANT EXECUTE ON FUNCTION check_usage_limit(UUID, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION reset_monthly_usage() TO service_role;
 
 -- ===============================
--- 9. Add comments
+-- 6. Add comments
 -- ===============================
 COMMENT ON TABLE usage_counters IS 'Tracks monthly usage counts for each user';
 COMMENT ON TABLE subscriptions IS 'Stores user subscription information';
@@ -300,7 +303,7 @@ COMMENT ON FUNCTION check_usage_limit(UUID, TEXT) IS 'Checks if a user can perfo
 COMMENT ON FUNCTION reset_monthly_usage() IS 'Resets usage counters for all users at the start of a new month';
 
 -- ===============================
--- 10. Create trigger for automatic monthly reset
+-- 7. Create trigger for automatic monthly reset
 -- ===============================
 CREATE OR REPLACE FUNCTION trigger_monthly_reset()
 RETURNS TRIGGER
@@ -321,9 +324,56 @@ CREATE TABLE IF NOT EXISTS monthly_reset_trigger (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create trigger
+-- Drop existing trigger if it exists
 DROP TRIGGER IF EXISTS monthly_reset_trigger ON monthly_reset_trigger;
+
+-- Create trigger
 CREATE TRIGGER monthly_reset_trigger
     AFTER INSERT ON monthly_reset_trigger
     FOR EACH ROW
     EXECUTE FUNCTION trigger_monthly_reset();
+
+-- ===============================
+-- 8. Verification
+-- ===============================
+
+-- Check tables exist
+SELECT 
+    table_name,
+    CASE 
+        WHEN table_name = 'usage_counters' THEN '✓ usage_counters table created'
+        WHEN table_name = 'subscriptions' THEN '✓ subscriptions table created'
+        ELSE '✓ ' || table_name || ' table created'
+    END as status
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+AND table_name IN ('usage_counters', 'subscriptions');
+
+-- Check functions exist
+SELECT 
+    routine_name,
+    CASE 
+        WHEN routine_name = 'refresh_user_usage' THEN '✓ refresh_user_usage function created'
+        WHEN routine_name = 'check_usage_limit' THEN '✓ check_usage_limit function created'
+        WHEN routine_name = 'reset_monthly_usage' THEN '✓ reset_monthly_usage function created'
+        ELSE '✓ ' || routine_name || ' function created'
+    END as status
+FROM information_schema.routines 
+WHERE routine_schema = 'public' 
+AND routine_name IN ('refresh_user_usage', 'check_usage_limit', 'reset_monthly_usage');
+
+-- Check policies exist
+SELECT 
+    tablename,
+    policyname,
+    CASE 
+        WHEN policyname LIKE '%usage_counters%' THEN '✓ RLS policy created for usage_counters'
+        WHEN policyname LIKE '%subscriptions%' THEN '✓ RLS policy created for subscriptions'
+        ELSE '✓ RLS policy created: ' || policyname
+    END as status
+FROM pg_policies 
+WHERE schemaname = 'public' 
+AND tablename IN ('usage_counters', 'subscriptions');
+
+-- Final success message
+SELECT '🎉 Usage Overview System Successfully Deployed!' as summary;
