@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 // import { verifyPaystackPayment, simplePaymentVerification } from '@/utils/paystackVerification';
 
 interface PaystackPaymentProps {
-  plan: 'pro' | 'business';
+  plan: 'business';
   planName: string;
   planPrice: string;
   onSuccess: (data: { reference: string; plan: string }) => void;
@@ -73,7 +73,6 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
 
   // Plan pricing in kobo (smallest currency unit)
   const planPricing = {
-    pro: 3500000, // ₦35,000 in kobo
     business: 5300000 // ₦53,000 in kobo
   };
 
@@ -82,19 +81,6 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
 
   // Plan details with actual Paystack plan codes
   const planDetails = {
-    pro: {
-      name: 'Pro Plan',
-      planCode: 'PLN_4z2wpgmw41w2k7r',
-      duration: '30 days',
-      features: [
-        '300 feedback submissions (6x increase)',
-        '50 AI insights (10x increase)',
-        '100 analytics reports (20x increase)',
-        'PDF & Excel export formats',
-        'Email + Chat support',
-        '12 months data retention'
-      ]
-    },
     business: {
       name: 'Business Plan',
       planCode: 'PLN_esryg99ztsy9xc8',
@@ -111,7 +97,7 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
   };
 
   // Safe access to plan details
-  const currentPlanDetails = planDetails[plan] || planDetails.pro;
+  const currentPlanDetails = planDetails[plan];
 
   useEffect(() => {
     // Check if Paystack is already loaded

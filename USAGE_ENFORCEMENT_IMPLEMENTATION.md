@@ -8,7 +8,7 @@ The new system consists of:
 
 1. **`usage_counters` table** - Tracks actual row counts from source tables
 2. **RPC functions** - For checking, enforcing, and refreshing usage
-3. **`UsageOverview` component** - Shows live usage vs plan limits
+3. **Billing components** - Shows subscription management and plan comparison
 4. **Updated hooks** - Integration with existing billing system
 
 ## Database Schema
@@ -62,25 +62,20 @@ Returns comprehensive usage summary with:
 
 ## Frontend Components
 
-### UsageOverview Component
+### Billing Components
 
-The new `UsageOverview` component shows:
-- Real-time usage counts from source tables
-- Plan limits and remaining usage
-- Visual progress bars and status indicators
-- Upgrade prompts for free users
-- Manual refresh capability
+The billing system includes:
+- Subscription management and plan comparison
+- Transaction history and receipts
+- Plan upgrade and cancellation options
+- Professional UI with responsive design
 
-**Location**: `src/components/billing/UsageOverview.tsx`
+**Location**: `src/pages/Billing.tsx` and `src/components/billing/`
 
 **Usage**:
 ```tsx
-import UsageOverview from '@/components/billing/UsageOverview';
-
-<UsageOverview 
-  userId={user?.id || ''}
-  onUpgrade={(plan) => handleUpgradeClick(plan)}
-/>
+// The billing page is accessible via routing
+// No additional imports needed
 ```
 
 ## Integration with Existing System
@@ -145,9 +140,9 @@ The system:
 4. Returns `true`/`false` based on limits
 
 ### 3. UI Updates
-- `UsageOverview` component shows live usage
-- Progress bars indicate usage levels
-- Upgrade prompts appear when limits are reached
+- Billing page shows subscription management
+- Plan comparison displays available options
+- Upgrade prompts appear for plan changes
 - Real-time refresh capability
 
 ## Plan Limits
@@ -198,7 +193,7 @@ The system automatically:
 1. Create a new user (should get free trial limits)
 2. Try to exceed limits (should see upgrade prompts)
 3. Upgrade plan (should see new limits)
-4. Check usage overview (should show real-time data)
+4. Check billing page (should show subscription management)
 
 ### RPC Function Testing
 

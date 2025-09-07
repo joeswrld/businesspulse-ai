@@ -1,31 +1,68 @@
-import { useAuth } from "@/contexts/AuthContext";
-import { Navigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import React from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNoteXTrial } from '@/contexts/NoteXTrialContext';
+import TrialGate from './TrialGate';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  requireActiveSubscription?: boolean;
+  fallbackPath?: string;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, loading } = useAuth();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
+  children, 
+  requireActiveSubscription = false,
+  fallbackPath = '/billing'
+}) => {
+  const { user, loading: authLoading } = useAuth();
+  const { trialStatus, checkAccess, isTrialExpired } = useNoteXTrial();
+  const location = useLocation();
 
-  if (loading) {
+  // Show loading while auth is loading
+  if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
+  // Redirect to login if not authenticated
   if (!user) {
-    console.log("No user found, redirecting to auth");
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  console.log("User authenticated:", user.email);
+  // Special handling for billing page - always allow access
+  if (location.pathname === '/billing') {
+    return <>{children}</>;
+  }
+
+  // If trial is loading, give access by default (don't lock out during loading)
+  if (trialStatus.loading) {
+    return <>{children}</>;
+  }
+
+  // Business plan users always have access
+  if (trialStatus.plan === 'business' && trialStatus.isActive) {
+    return <>{children}</>;
+  }
+
+  // Check if user has access based on requirements
+  const hasAccess = requireActiveSubscription 
+    ? (trialStatus.plan === 'business' && trialStatus.isActive)
+    : checkAccess();
+
+  // If no access, show trial gate
+  if (!hasAccess) {
+    return (
+      <TrialGate>
+        {children}
+      </TrialGate>
+    );
+  }
+
+  // User has access, render children
   return <>{children}</>;
 };
 
