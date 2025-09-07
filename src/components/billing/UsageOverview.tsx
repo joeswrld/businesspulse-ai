@@ -46,8 +46,13 @@ interface SubscriptionDetails {
   next_billing_date: string | null;
   trial_ends_at: string | null;
   subscription_status: string;
-  plan_price: number | null;
-  plan_currency: string | null;
+  plan_price?: number | null;
+  plan_currency?: string | null;
+  id?: string;
+  created_at?: string;
+  paystack_customer_id?: string;
+  paystack_subscription_id?: string;
+  plan?: string;
 }
 
 interface UsageOverviewProps {
@@ -168,9 +173,9 @@ export default function UsageOverviewNew({ userId, onUpgrade, refreshTrigger }: 
     try {
       setRefreshing(true);
       
-      // Call the refresh_usage function to ensure data is up to date
+      // Call the refresh function to ensure data is up to date
       const { data: refreshData, error: refreshError } = await supabase
-        .rpc('refresh_usage', { user_uuid: userId });
+        .rpc('refresh_user_usage', { user_uuid: userId, target_month_start: new Date().toISOString().split('T')[0] });
       
       if (refreshError) {
         console.warn('Failed to refresh usage data in database:', refreshError);

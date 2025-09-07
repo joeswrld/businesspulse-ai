@@ -206,6 +206,22 @@ async function handleSubscriptionCreate(supabase: any, data: any) {
       return
     }
 
+    // Update user plan status in profiles table
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({
+        plan: planTier === 'business' ? 'business' : 'pro',
+        is_active: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId);
+
+    if (profileError) {
+      console.error('Error updating user profile plan:', profileError);
+    } else {
+      console.log(`✅ User plan updated to ${planTier} for user:`, userId);
+    }
+
     // Reset usage counters for new plan (monthly window)
     const { error: usageError } = await supabase
       .from('usage_counters')
@@ -274,6 +290,22 @@ async function handleSubscriptionDisable(supabase: any, data: any) {
 
     if (updateError) {
       console.error('Error updating subscription for disable:', updateError)
+      return
+    }
+
+    // Update user plan status in profiles table
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({
+        is_active: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', subscription.user_id);
+
+    if (profileError) {
+      console.error('Error updating user profile status:', profileError);
+    } else {
+      console.log('✅ User profile deactivated for user:', subscription.user_id);
     }
 
     console.log('Successfully processed subscription.disable for user:', subscription.user_id)
