@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FeedbackBadgeGroup } from '@/components/ui/FeedbackBadge';
 import { useRealtimeFeedback } from '@/hooks/useRealtimeFeedback';
+import ProtectedPage from '@/components/ProtectedPage';
 import { toast } from 'sonner';
 // import { checkAndSetupDatabase } from '@/utils/databaseCheck';
 import { 
@@ -611,7 +612,8 @@ export default function Dashboard() {
   const planInfo = getPlanInfo();
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <ProtectedPage>
+      <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -1052,6 +1054,7 @@ export default function Dashboard() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </ProtectedPage>
   );
 }

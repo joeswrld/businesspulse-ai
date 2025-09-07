@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -56,17 +56,22 @@ export function useUsageEnforcement(): UseUsageEnforcementReturn {
 
     try {
       const { data, error: limitsError } = await supabase
-        .rpc('check_usage_limit', { user_uuid: user.id });
+        .rpc('can_use_feature', { user_uuid: user.id, feature_name: 'feedback' });
 
       if (limitsError) {
         throw limitsError;
       }
 
-      if (!data || data.length === 0) {
+      if (data === null || data === undefined) {
         throw new Error('No usage limits data returned');
       }
 
-      const usageLimits = data[0] as UsageLimits;
+      const usageLimits: UsageLimits = {
+        can_submit_feedback: data,
+        can_use_ai_insights: data,
+        can_generate_analytics: data,
+        can_generate_reports: data
+      };
       setLimits(usageLimits);
       return usageLimits;
 
@@ -93,9 +98,9 @@ export function useUsageEnforcement(): UseUsageEnforcementReturn {
 
     try {
       const { data, error: incrementError } = await supabase
-        .rpc('increment_usage_counter', { 
-          p_user_id: user.id, 
-          p_action: action 
+        .rpc('increment_usage_with_check', { 
+          user_uuid: user.id, 
+          feature_name: action 
         });
 
       if (incrementError) {

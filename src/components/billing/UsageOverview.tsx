@@ -25,6 +25,41 @@ import {
 import { useUsageOverview } from '@/hooks/useUsageOverview';
 import { toast } from 'sonner';
 
+
+
+interface UsageSummary {
+  user_id: string;
+  plan_code: string;
+  plan_name: string;
+  feedback_count: number;
+  insights_count: number;
+  analytics_count: number;
+  reports_count: number;
+  feedback_limit: number;
+  insights_limit: number;
+  analytics_limit: number;
+  reports_limit: number;
+  feedback_remaining: number;
+  insights_remaining: number;
+  analytics_remaining: number;
+  reports_remaining: number;
+  month_start: string;
+}
+
+interface SubscriptionDetails {
+  next_billing_date: string | null;
+  trial_ends_at: string | null;
+  subscription_status: string;
+  plan_price?: number | null;
+  plan_currency?: string | null;
+  id?: string;
+  created_at?: string;
+  paystack_customer_id?: string;
+  paystack_subscription_id?: string;
+  plan?: string;
+}
+
+
 interface UsageOverviewProps {
   userId: string;
   onUpgrade?: (plan: 'business') => void;
@@ -34,10 +69,35 @@ interface UsageOverviewProps {
 export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: UsageOverviewProps) {
   const { data, loading, refreshing, error, refresh } = useUsageOverview(userId);
 
+
   // Trigger refresh when refreshTrigger changes
   React.useEffect(() => {
     if (refreshTrigger) {
       refresh();
+
+  const refreshUsage = async () => {
+    try {
+      setRefreshing(true);
+      
+      // Call the refresh function to ensure data is up to date
+      const { data: refreshData, error: refreshError } = await supabase
+        .rpc('refresh_user_usage', { user_uuid: userId, target_month_start: new Date().toISOString().split('T')[0] });
+      
+      if (refreshError) {
+        console.warn('Failed to refresh usage data in database:', refreshError);
+      } else {
+        console.log('Usage data refreshed successfully:', refreshData);
+      }
+      
+      // Then reload the component data
+      await loadUsageData();
+      toast.success('Usage data refreshed');
+    } catch (error) {
+      console.error('Error refreshing usage:', error);
+      console.warn('Refresh failed, but component will continue with existing data');
+    } finally {
+      setRefreshing(false);
+
     }
   }, [refreshTrigger, refresh]);
 
