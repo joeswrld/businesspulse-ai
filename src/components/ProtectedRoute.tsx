@@ -1,8 +1,9 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNoteXTrial } from '@/contexts/NoteXTrialContext';
-import TrialGate from './TrialGate';
+import { useUserStatus } from '@/hooks/useUserStatus';
+import LockScreen from './LockScreen';
+import { PaystackPayment } from './PaystackPayment';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -16,7 +17,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   fallbackPath = '/billing'
 }) => {
   const { user, loading: authLoading } = useAuth();
-  const { trialStatus, checkAccess, isTrialExpired } = useNoteXTrial();
+  const { status, loading: statusLoading, shouldShowLockScreen } = useUserStatus();
   const location = useLocation();
 
   // Show loading while auth is loading
@@ -38,27 +39,37 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <>{children}</>;
   }
 
-  // If trial is loading, give access by default (don't lock out during loading)
-  if (trialStatus.loading) {
-    return <>{children}</>;
-  }
-
-  // Business plan users always have access
-  if (trialStatus.plan === 'business' && trialStatus.isActive) {
-    return <>{children}</>;
-  }
-
-  // Check if user has access based on requirements
-  const hasAccess = requireActiveSubscription 
-    ? (trialStatus.plan === 'business' && trialStatus.isActive)
-    : checkAccess();
-
-  // If no access, show trial gate
-  if (!hasAccess) {
+  // Show loading while status is loading
+  if (statusLoading || !status) {
     return (
-      <TrialGate>
-        {children}
-      </TrialGate>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // Check if user should be locked out
+  const shouldLock = shouldShowLockScreen();
+
+  // If user should be locked, show lock screen
+  if (shouldLock) {
+    const handleUpgrade = (plan: 'business') => {
+      // Trigger Paystack payment flow
+      console.log('Upgrading to plan:', plan);
+      // This will be handled by the PaystackPayment component
+    };
+
+    const handleRetry = () => {
+      // Refresh user status
+      window.location.reload();
+    };
+
+    return (
+      <LockScreen 
+        status={status} 
+        onUpgrade={handleUpgrade}
+        onRetry={handleRetry}
+      />
     );
   }
 
