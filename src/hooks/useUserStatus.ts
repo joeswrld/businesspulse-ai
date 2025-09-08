@@ -30,7 +30,7 @@ export async function fetchUserStatus(userId: string): Promise<UserStatus> {
   }
   
   console.log('✅ User status fetched successfully:', data);
-  return data as unknown as UserStatus;
+  return data as UserStatus;
 }
 
 export function useUserStatus() {
