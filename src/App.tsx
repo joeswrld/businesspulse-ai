@@ -26,7 +26,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const DataUpload = lazy(() => import("./pages/DataUpload"));
 
 
-const InsightsSimplePage = lazy(() => import("./pages/InsightsSimplePage"));
+const Insights = lazy(() => import("./pages/Insights"));
 
 
 
@@ -194,11 +194,11 @@ const App = () => (
                 </Suspense>
               </ProtectedRoute>
             } />
-            <Route path="/insights-simple" element={
+            <Route path="/insights" element={
               <ProtectedRoute>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
-                    <InsightsSimplePage />
+                    <Insights />
                   </DashboardLayout>
                 </Suspense>
               </ProtectedRoute>
@@ -232,13 +232,13 @@ const App = () => (
               </ProtectedRoute>
             } />
             <Route path="/teams" element={
-              <ProtectedRoute>
+                <ProtectedRoute>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Teams />
                   </DashboardLayout>
                 </Suspense>
-              </ProtectedRoute>
+                </ProtectedRoute>
             } />
             <Route path="/billing" element={
               <ProtectedRoute>

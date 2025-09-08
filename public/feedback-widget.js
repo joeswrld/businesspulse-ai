@@ -93,7 +93,7 @@
         Share your thoughts with us
       </h3>
       <p style="margin: 0; color: #6b7280; font-size: 14px;">
-        We'd love to hear your feedback to improve our service ❤️.
+        We'd love to hear your feedback to improve our service at NoteX ❤️.
       </p>
     </div>
 

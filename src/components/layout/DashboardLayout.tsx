@@ -128,10 +128,10 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const navigation = [
     { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
     { name: "Collect Feedback", href: "/feedback", icon: MessageSquare, notificationCount: feedbackNewCount }, 
-    { name: "AI Insights", href: "/insights-simple", icon: Brain },
+    { name: "AI Insights", href: "/insights", icon: Brain },
     { name: "Reports & Analytics", href: "/reports", icon: FileText },
     { name: "Business Metrics", href: "/analytics", icon: BarChart3 },
-    { name: "Team Collaboration", href: "/teams", icon: Users, comingSoon: true },
+    { name: "Team Collaboration", href: "/teams", icon: Users,  },
     { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
     { name: "Widget Settings", href: "/feedback-settings", icon: SlidersHorizontal },
     { name: "Account Settings", href: "/settings", icon: Settings },
@@ -173,7 +173,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white/50 backdrop-blur-sm">
             <Link to="/dashboard" className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
-                <img src="/favicon.ico" alt="FeedbackFlow" className="h-6 w-6" />
+                <img src="/favicon.ico" alt="NoteX" className="h-6 w-6" />
               </div>
               {!sidebarCollapsed && (
                 <div className="transition-opacity duration-300">
@@ -341,19 +341,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           {/* User Menu */}
           <div className="p-3 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
             <div className="space-y-1">
-              <Link
-                to="/settings"
-                className={cn(
-                  "flex items-center space-x-3 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 transition-all duration-200 group",
-                  sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2.5"
-                )}
-                title={sidebarCollapsed ? "Settings" : undefined}
-              >
-                <div className="p-1 rounded-lg bg-slate-100 group-hover:bg-slate-200 transition-colors">
-                  <Settings className="h-4 w-4 text-slate-600" />
-                </div>
-                {!sidebarCollapsed && <span className="flex-1">Settings</span>}
-              </Link>
+             
               
               <button
                 onClick={handleSignOut}

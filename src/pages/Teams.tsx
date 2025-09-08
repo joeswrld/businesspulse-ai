@@ -133,7 +133,7 @@ const Teams: React.FC = () => {
           <div className="flex items-center justify-center space-x-4">
             <Badge variant="outline" className="bg-white">
               <Rocket className="h-3 w-3 mr-1" />
-              Q1 2024
+              Q1 2026
             </Badge>
             <Badge variant="outline" className="bg-white">
               <Users className="h-3 w-3 mr-1" />
@@ -154,7 +154,7 @@ const Teams: React.FC = () => {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Built-in chat, video calls, and screen sharing for seamless team collaboration.
+              Built-in chat for seamless team collaboration.
             </p>
           </CardContent>
         </Card>
@@ -196,7 +196,7 @@ const Teams: React.FC = () => {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Connect with teams worldwide with multi-language support and timezone management.
+              Connect with teams worldwide with  timezone management.
             </p>
           </CardContent>
         </Card>

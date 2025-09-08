@@ -73,7 +73,7 @@ interface GeminiAnalysis {
   };
 }
 
-const InsightsSimplePage: React.FC = () => {
+const Insights: React.FC = () => {
   const { user } = useAuth();
   const { checkUsage, enforceLimit } = useUsageEnforcement();
   const { trackUsage } = useUsageTracking();
@@ -777,4 +777,4 @@ const InsightsSimplePage: React.FC = () => {
   );
 };
 
-export default InsightsSimplePage;
+export default Insights;

@@ -41,7 +41,7 @@ const ThankYouPage = () => {
                 className="w-full"
               >
                 <Home className="h-4 w-4 mr-2" />
-                Go to Homepage
+                Visit NoteX
               </Button>
               
               <Button

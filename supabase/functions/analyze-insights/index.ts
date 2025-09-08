@@ -178,7 +178,7 @@ Analysis type: ${fileType === 'feedback-analysis' ? 'User Feedback Analysis' : '
 Please provide a detailed analysis in the following JSON format:
 
 {
-  "summary": "A comprehensive 2-3 paragraph summary of the key findings and insights from the user feedback. Focus on patterns, pain points, satisfaction levels, and opportunities for improvement.",
+  "summary": "A comprehensive 2-10 paragraph summary of the key findings and insights from the user feedback. Focus on patterns, pain points, satisfaction levels, and opportunities for improvement.",
   "key_themes": ["Theme 1", "Theme 2", "Theme 3", "Theme 4", "Theme 5"],
   "suggested_actions": ["Action 1", "Action 2", "Action 3", "Action 4", "Action 5"],
   "trends": ["Trend 1", "Trend 2", "Trend 3", "Trend 4"],

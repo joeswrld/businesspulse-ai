@@ -415,7 +415,7 @@ const QRFeedbackPage = () => {
               {/* Feedback Text */}
               <div className="space-y-3">
                 <Label htmlFor="feedback" className="text-base font-semibold text-gray-800">
-                  Additional Comments <span className="text-red-500">*</span>
+                   Comments <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                   id="feedback"

@@ -469,7 +469,7 @@ const AuthPage = () => {
                     <Input
                       id="companyName"
                       type="text"
-                      placeholder="Acme Corporation"
+                      placeholder="NoteX Corporation"
                       value={formData.companyName}
                       onChange={(e) => handleInputChange("companyName", e.target.value)}
                     />
