@@ -72,7 +72,49 @@ const Testimonials = () => {
       industry: "Mobile",
       content: "The real-time feedback widget is perfect for our mobile app. Users can give feedback instantly, and we get insights immediately. Game changer!",
       rating: 5,
-    }
+    },
+    {
+      name: "Tunde Balogun",
+      role: "CEO",
+      industry: "E-commerce",
+      content: "Since integrating Notex, order management and feedback tracking are seamless.",
+      rating: 4,
+    },
+    {
+      name: "Ngozi Uche",
+      role: "Operations Director",
+      industry: "Enterprise",
+      content: "Notex scales with our enterprise needs. Reliable and robust.",
+      rating: 4,
+    },
+    {
+      name: "Emeka Ibe",
+      role: "Marketing Strategist",
+      industry: "Marketing",
+      content: "Our campaigns are more organized thanks to Notex. Love the insights!",
+      rating: 5,
+    },
+    {
+      name: "Ifeoma Eze",
+      role: "UX Designer",
+      industry: "Design",
+      content: "Notex helps our design team stay on point. Collaboration is effortless.",
+      rating: 4,
+    },
+    {
+      name: "Bayo Adeyemi",
+      role: "Customer Success Lead",
+      industry: "Service",
+      content: "Client feedback is now actionable and timely with Notex. Highly recommend.",
+      rating: 5,
+    },
+    {
+      name: "Funke Adebayo",
+      role: "Mobile App Developer",
+      industry: "Mobile",
+      content: "Notex integrates perfectly with our app workflow. Smooth experience.",
+      rating: 4,
+    },
   ];
 
   const industries = [
