@@ -16,15 +16,20 @@ export interface UserStatus {
 }
 
 export async function fetchUserStatus(userId: string): Promise<UserStatus> {
+  console.log('🚀 Calling get_user_status RPC for user:', userId);
+  
   const { data, error } = await supabase.rpc('get_user_status', { 
     user_uuid: userId 
   });
   
+  console.log('📡 RPC Response:', { data, error });
+  
   if (error) {
-    console.error('Error fetching user status:', error);
+    console.error('❌ Error fetching user status:', error);
     throw new Error(error.message);
   }
   
+  console.log('✅ User status fetched successfully:', data);
   return data as unknown as UserStatus;
 }
 
@@ -52,7 +57,8 @@ export function useUserStatus() {
       console.error('Error refreshing user status:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
       
-      // Fallback status for new users
+  // Fallback status for new users
+      console.log('⚠️ Error fetching user status, using fallback');
       const fallbackStatus: UserStatus = {
         plan: 'free_trial',
         trial_start: new Date().toISOString(),

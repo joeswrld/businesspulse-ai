@@ -109,6 +109,7 @@ interface AIInsight {
 }
 
 export default function Dashboard() {
+  console.log('📱 Dashboard component rendering...');
   const { user } = useAuth();
   
   // Use real-time feedback hook

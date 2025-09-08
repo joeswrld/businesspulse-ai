@@ -15,8 +15,12 @@ export default function ProtectedPage({ children, fallback }: ProtectedPageProps
   const { status, loading, shouldShowLockScreen, refreshStatus } = useUserStatus();
   const navigate = useNavigate();
 
+  console.log('🛡️ ProtectedPage rendering for user:', user?.email);
+  console.log('🛡️ ProtectedPage status:', { status, loading });
+
   // If not authenticated, redirect to login
   if (!user) {
+    console.log('🚫 No user, redirecting to auth');
     navigate('/auth');
     return null;
   }
