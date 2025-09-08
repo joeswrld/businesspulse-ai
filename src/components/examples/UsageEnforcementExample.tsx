@@ -16,11 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  enforceUsageLimitWithCounters,
-  checkUsageWithCounters,
-  getUsageSummaryWithCounters 
-} from '@/lib/usageEnforcement';
+import { useUsageEnforcementSystem } from '@/hooks/useUsageEnforcementSystem';
 
 /**
  * Example of how to integrate usage enforcement into feedback submission
@@ -30,6 +26,11 @@ export function FeedbackFormWithUsageEnforcement() {
   const [feedback, setFeedback] = useState('');
   const [loading, setLoading] = useState(false);
   const [usageInfo, setUsageInfo] = useState<any>(null);
+  const { 
+    submitWithUsageTracking, 
+    getCurrentUsage, 
+    enforceUsageWithFeedback 
+  } = useUsageEnforcementSystem();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,42 +40,28 @@ export function FeedbackFormWithUsageEnforcement() {
     setLoading(true);
 
     try {
-
-      // Check usage before allowing feedback submission
-      const canSubmit = await enforceUsageLimitWithCounters(
-        user.id, 
+      // Submit with automatic usage tracking
+      const result = await submitWithUsageTracking(
         'feedback',
+        async () => {
+          // Simulate feedback submission
+          console.log('Feedback submitted:', feedback);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return { success: true, id: 'feedback-123' };
+        },
         () => {
           console.log('Feedback limit reached - user needs to upgrade');
         }
       );
 
-      if (!canSubmit) {
-        setLoading(false);
-        return;
-
-      // First check if user can use the feature
-      const canUse = await enforceUsageLimit(feature as any, feature as any);
-
-      if (canUse) {
-        // Track usage
-        await trackUsage(feature as any);
-        console.log(`${feature} usage tracked successfully`);
-
+      if (result) {
+        // Refresh usage info to show updated counts
+        const updatedUsage = await getCurrentUsage();
+        setUsageInfo(updatedUsage);
+        
+        setFeedback('');
+        toast.success('Feedback submitted successfully!');
       }
-
-      // If we can submit, proceed with feedback creation
-      console.log('Feedback submitted:', feedback);
-      
-      // Simulate feedback creation
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Refresh usage info to show updated counts
-      const updatedUsage = await getUsageSummaryWithCounters(user.id);
-      setUsageInfo(updatedUsage);
-      
-      setFeedback('');
-      toast.success('Feedback submitted successfully!');
       
     } catch (error) {
       console.error('Error submitting feedback:', error);
@@ -88,7 +75,7 @@ export function FeedbackFormWithUsageEnforcement() {
     if (!user) return;
     
     try {
-      const usage = await getUsageSummaryWithCounters(user.id);
+      const usage = await getCurrentUsage();
       setUsageInfo(usage);
       toast.success('Usage info refreshed');
     } catch (error) {
@@ -116,23 +103,19 @@ export function FeedbackFormWithUsageEnforcement() {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-gray-600">Plan:</span>
-                <Badge variant="outline" className="ml-2">{usageInfo.plan_name}</Badge>
+                <Badge variant="outline" className="ml-2">
+                  {usageInfo.billing_profiles?.plan || 'free'}
+                </Badge>
               </div>
               <div>
                 <span className="text-gray-600">Feedback:</span>
                 <span className="ml-2 font-medium">
-                  {usageInfo.feedback_count} / {usageInfo.feedback_limit === -1 ? '∞' : usageInfo.feedback_limit}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-600">Remaining:</span>
-                <span className="ml-2 font-medium">
-                  {usageInfo.feedback_remaining === -1 ? '∞' : usageInfo.feedback_remaining}
+                  {usageInfo.feedback_count} / {usageInfo.feedback_disabled ? 'Disabled' : '∞'}
                 </span>
               </div>
               <div>
                 <span className="text-gray-600">Status:</span>
-                {usageInfo.feedback_count < usageInfo.feedback_limit || usageInfo.feedback_limit === -1 ? (
+                {!usageInfo.feedback_disabled ? (
                   <Badge variant="default" className="ml-2">
                     <Unlock className="h-3 w-3 mr-1" />
                     Available

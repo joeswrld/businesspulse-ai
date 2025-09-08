@@ -6,8 +6,8 @@ import { Check, X, Crown, Zap, Star, Sparkles, ArrowRight, Infinity } from 'luci
 import { getPlanLimits, getPlanPricing } from '@/hooks/useBillingSystem';
 
 interface PlanComparisonProps {
-  currentPlan: 'trial' | 'pro' | 'business';
-  onUpgrade: (plan: 'pro' | 'business') => void;
+  currentPlan: 'trial' | 'business';
+  onUpgrade: (plan: 'business') => void;
   showUpgradeButtons?: boolean;
 }
 
@@ -39,40 +39,17 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
       comingSoon: false
     },
     {
-      id: 'pro',
-      name: 'Pro Plan',
-      planCode: 'PLN_4z2wpgmw41w2k7r',
-      description: 'Advanced features for growing businesses',
-      price: 3500000, // ₦35,000 in kobo
-      currency: 'NGN',
-      period: '30 days',
-      features: [
-        { name: 'Feedback Collection', limit: 300, unit: 'responses' },
-        { name: 'AI Insights', limit: 50, unit: 'insights' },
-        { name: 'Advanced Analytics', limit: 100, unit: 'reports' },
-        { name: 'Reports', limit: 20, unit: 'reports' },
-        { name: 'Team Members', limit: 5, unit: 'members' },
-        { name: 'Export Formats', limit: ['CSV', 'PDF', 'Excel'], unit: 'formats' },
-        { name: 'Support', limit: ['Email', 'Chat'], unit: 'channels' },
-        { name: 'Data Retention', limit: '12 months', unit: 'retention' },
-        { name: 'Priority Support', limit: false, unit: 'feature' },
-        { name: 'API Access', limit: false, unit: 'feature' }
-      ],
-      popular: true,
-      comingSoon: false
-    },
-    {
       id: 'business',
       name: 'Business Plan',
       planCode: 'PLN_esryg99ztsy9xc8',
-      description: 'Enterprise features for large organizations',
+      description: 'Complete solution for businesses of all sizes',
       price: 5300000, // ₦53,000 in kobo
       currency: 'NGN',
       period: '30 days',
       features: [
         { name: 'Feedback Collection', limit: -1, unit: 'unlimited' },
         { name: 'AI Insights', limit: -1, unit: 'unlimited' },
-        { name: 'Enterprise Analytics', limit: -1, unit: 'unlimited' },
+        { name: 'Advanced Analytics', limit: -1, unit: 'unlimited' },
         { name: 'Reports', limit: -1, unit: 'unlimited' },
         { name: 'Team Members', limit: -1, unit: 'unlimited' },
         { name: 'Export Formats', limit: ['CSV', 'PDF', 'Excel', 'API'], unit: 'formats' },
@@ -83,7 +60,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
         { name: 'Predictive Analytics', limit: true, unit: 'feature' },
         { name: 'Custom Integrations', limit: true, unit: 'feature' }
       ],
-      popular: false,
+      popular: true,
       comingSoon: false
     }
   ];
@@ -126,28 +103,29 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
           <h2 className="text-3xl font-bold text-gray-900">Choose Your Plan</h2>
         </div>
         <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-          Start with a free trial, then choose the plan that fits your business needs
+          Start with a free trial, then upgrade to Business for unlimited access to all features
         </p>
       </div>
 
-      <div className="grid gap-8 md:grid-cols-3 max-w-7xl mx-auto">
+      <div className="grid gap-6 lg:gap-8 md:grid-cols-2 max-w-6xl mx-auto px-4">
         {plans.map((plan) => {
           const isCurrentPlan = plan.id === currentPlan;
-          const isUpgradeable = currentPlan === 'trial' && plan.id === 'pro';
-          const isDowngradeable = currentPlan === 'business' && plan.id === 'pro';
+          const isUpgradeable = currentPlan === 'trial' && plan.id === 'business';
           
           return (
             <Card 
               key={plan.id} 
               className={`relative overflow-hidden transition-all duration-300 hover:shadow-xl ${
-                plan.popular ? 'ring-2 ring-blue-500 shadow-lg scale-105' : 'shadow-md hover:shadow-lg'
+                plan.popular ? 'ring-2 ring-amber-500 shadow-lg scale-105' : 'shadow-md hover:shadow-lg'
               } ${
-                isCurrentPlan ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100' : 'bg-white'
+                isCurrentPlan ? 'border-amber-500 bg-gradient-to-br from-amber-50 to-amber-100' : 'bg-white'
+              } ${
+                plan.id === 'business' ? 'border-2 border-amber-200' : 'border border-gray-200'
               }`}
             >
               {plan.popular && (
                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 z-10">
-                  <Badge className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 text-sm font-medium shadow-lg">
+                  <Badge className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-4 py-2 text-sm font-medium shadow-lg">
                     <Star className="h-4 w-4 mr-2" />
                     Most Popular
                   </Badge>
@@ -168,11 +146,6 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
                   {plan.id === 'business' && (
                     <div className="p-3 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl">
                       <Crown className="h-6 w-6 text-white" />
-                    </div>
-                  )}
-                  {plan.id === 'pro' && (
-                    <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
-                      <Zap className="h-6 w-6 text-white" />
                     </div>
                   )}
                   {plan.id === 'trial' && (
@@ -230,44 +203,27 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
                       </Button>
                     ) : isUpgradeable ? (
                       <Button 
-                        onClick={() => onUpgrade('pro')} 
-                        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+                        onClick={() => onUpgrade('business')} 
+                        className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white py-3 rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200"
                       >
-                        <Zap className="h-5 w-5 mr-2" />
-                        Upgrade to Pro
+                        <Crown className="h-5 w-5 mr-2" />
+                        Upgrade to Business
                         <ArrowRight className="h-4 w-4 ml-2" />
                       </Button>
-                    ) : isDowngradeable ? (
+                    ) : plan.id === 'trial' && currentPlan === 'business' ? (
                       <Button 
                         variant="outline" 
-                        className="w-full border-2 border-blue-200 text-blue-700 hover:bg-blue-50 py-3 rounded-lg font-medium transition-all duration-200"
-                        onClick={() => onUpgrade('pro')}
+                        className="w-full border-2 border-gray-200 text-gray-500 cursor-not-allowed py-3 rounded-lg font-medium"
+                        disabled
                       >
-                        Downgrade to Pro
-                      </Button>
-                    ) : plan.id === 'business' && currentPlan === 'trial' ? (
-                      <Button 
-                        onClick={() => onUpgrade('business')} 
-                        className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white py-3 rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-                      >
-                        <Crown className="h-5 w-5 mr-2" />
-                        Upgrade to Business
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    ) : plan.id === 'business' && currentPlan === 'pro' ? (
-                      <Button 
-                        onClick={() => onUpgrade('business')} 
-                        className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white py-3 rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-                      >
-                        <Crown className="h-5 w-5 mr-2" />
-                        Upgrade to Business
-                        <ArrowRight className="h-4 w-4 ml-2" />
+                        <X className="h-5 w-5 mr-2" />
+                        Cannot Downgrade
                       </Button>
                     ) : (
                       <Button 
                         variant="outline" 
                         className="w-full border-2 border-gray-200 text-gray-700 hover:bg-gray-50 py-3 rounded-lg font-medium transition-all duration-200"
-                        onClick={() => onUpgrade(plan.id as 'pro' | 'business')}
+                        onClick={() => onUpgrade(plan.id as 'business')}
                       >
                         Choose Plan
                         <ArrowRight className="h-4 w-4 ml-2" />
@@ -303,7 +259,6 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
                 <tr className="border-b-2 border-gray-200">
                   <th className="text-left py-4 px-6 font-semibold text-gray-900">Feature</th>
                   <th className="text-center py-4 px-6 font-semibold text-gray-900">Free Trial</th>
-                  <th className="text-center py-4 px-6 font-semibold text-gray-900">Pro Plan</th>
                   <th className="text-center py-4 px-6 font-semibold text-gray-900">Business Plan</th>
                 </tr>
               </thead>

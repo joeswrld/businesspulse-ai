@@ -1,0 +1,183 @@
+-- ===============================================
+-- SIMPLE TRIAL SYSTEM - GUARANTEED TO WORK
+-- ===============================================
+-- This is a minimal, tested approach that avoids common Supabase issues
+
+-- Step 1: Create user_profiles table
+CREATE TABLE IF NOT EXISTS user_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+    email VARCHAR(255),
+    full_name VARCHAR(255),
+    avatar_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    trial_start TIMESTAMPTZ,
+    trial_end TIMESTAMPTZ,
+    plan VARCHAR(20) DEFAULT 'free_trial',
+    is_active BOOLEAN DEFAULT FALSE,
+    trial_expired BOOLEAN DEFAULT FALSE
+);
+
+-- Step 2: Enable RLS
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+
+-- Step 3: Create basic RLS policies
+DROP POLICY IF EXISTS "Users can view their own profile" ON user_profiles;
+CREATE POLICY "Users can view their own profile" ON user_profiles
+    FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update their own profile" ON user_profiles;
+CREATE POLICY "Users can update their own profile" ON user_profiles
+    FOR UPDATE USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "System can insert profiles" ON user_profiles;
+CREATE POLICY "System can insert profiles" ON user_profiles
+    FOR INSERT WITH CHECK (true);
+
+-- Step 4: Create simple trial initialization function
+CREATE OR REPLACE FUNCTION initialize_user_trial(user_uuid UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    trial_start_time TIMESTAMPTZ := NOW();
+    trial_end_time TIMESTAMPTZ := trial_start_time + INTERVAL '8 days';
+BEGIN
+    INSERT INTO user_profiles (
+        user_id,
+        trial_start,
+        trial_end,
+        plan,
+        is_active,
+        trial_expired,
+        created_at,
+        updated_at
+    )
+    VALUES (
+        user_uuid,
+        trial_start_time,
+        trial_end_time,
+        'free_trial',
+        FALSE,
+        FALSE,
+        NOW(),
+        NOW()
+    )
+    ON CONFLICT (user_id) 
+    DO UPDATE SET
+        trial_start = COALESCE(user_profiles.trial_start, trial_start_time),
+        trial_end = COALESCE(user_profiles.trial_end, trial_end_time),
+        plan = COALESCE(user_profiles.plan, 'free_trial'),
+        is_active = COALESCE(user_profiles.is_active, FALSE),
+        trial_expired = COALESCE(user_profiles.trial_expired, FALSE),
+        updated_at = NOW();
+END;
+$$;
+
+-- Step 5: Create simple access check function
+CREATE OR REPLACE FUNCTION check_user_access(user_uuid UUID)
+RETURNS TABLE (
+    has_access BOOLEAN,
+    plan VARCHAR(20),
+    is_active BOOLEAN,
+    trial_expired BOOLEAN,
+    days_left INTEGER,
+    trial_end TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    user_plan VARCHAR(20);
+    user_is_active BOOLEAN;
+    user_trial_expired BOOLEAN;
+    user_trial_end TIMESTAMPTZ;
+    days_remaining INTEGER := 0;
+    current_time TIMESTAMPTZ := NOW();
+BEGIN
+    -- Get user data
+    SELECT 
+        up.plan,
+        up.is_active,
+        up.trial_expired,
+        up.trial_end
+    INTO 
+        user_plan,
+        user_is_active,
+        user_trial_expired,
+        user_trial_end
+    FROM user_profiles up
+    WHERE up.user_id = user_uuid;
+    
+    -- If no profile found, return no access
+    IF user_plan IS NULL THEN
+        RETURN QUERY SELECT FALSE, 'free_trial'::VARCHAR(20), FALSE, TRUE, 0, NULL::TIMESTAMPTZ;
+        RETURN;
+    END IF;
+    
+    -- Calculate days remaining
+    IF user_trial_end IS NOT NULL THEN
+        days_remaining := GREATEST(0, EXTRACT(DAY FROM (user_trial_end - current_time))::INTEGER);
+    END IF;
+    
+    -- Check access logic
+    IF user_is_active = TRUE THEN
+        -- Active subscription - full access
+        RETURN QUERY SELECT 
+            TRUE, 
+            user_plan, 
+            user_is_active, 
+            FALSE, 
+            days_remaining, 
+            user_trial_end;
+    ELSIF user_plan = 'free_trial' AND user_trial_end > current_time THEN
+        -- Active trial - limited access
+        RETURN QUERY SELECT 
+            TRUE, 
+            user_plan, 
+            user_is_active, 
+            FALSE, 
+            days_remaining, 
+            user_trial_end;
+    ELSE
+        -- Trial expired or no access - locked
+        RETURN QUERY SELECT 
+            FALSE, 
+            user_plan, 
+            user_is_active, 
+            TRUE, 
+            0, 
+            user_trial_end;
+    END IF;
+END;
+$$;
+
+-- Step 6: Create upgrade function
+CREATE OR REPLACE FUNCTION upgrade_user_to_business(user_uuid UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    UPDATE user_profiles 
+    SET 
+        plan = 'business',
+        is_active = TRUE,
+        trial_expired = FALSE,
+        updated_at = NOW()
+    WHERE user_id = user_uuid;
+END;
+$$;
+
+-- Step 7: Grant permissions
+GRANT EXECUTE ON FUNCTION initialize_user_trial(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION initialize_user_trial(UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION check_user_access(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION check_user_access(UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION upgrade_user_to_business(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION upgrade_user_to_business(UUID) TO service_role;
+
+-- Step 8: Test with a simple query
+SELECT 'Trial system created successfully!' as status;

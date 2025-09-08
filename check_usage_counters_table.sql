@@ -1,0 +1,18 @@
+-- Check the actual structure of usage_counters table
+SELECT 
+    column_name,
+    data_type,
+    is_nullable,
+    column_default
+FROM information_schema.columns 
+WHERE table_schema = 'public' 
+AND table_name = 'usage_counters'
+ORDER BY ordinal_position;
+
+-- Check if the table exists at all
+SELECT 
+    table_name,
+    table_type
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+AND table_name = 'usage_counters';

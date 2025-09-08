@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { NoteXTrialProvider } from "@/contexts/NoteXTrialContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -74,7 +75,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
+                <NoteXTrialProvider>
+            <Routes>
             {/* Public routes */}
             <Route path="/" element={
               <Suspense fallback={<LoadingSpinner />}>
@@ -241,7 +243,7 @@ const App = () => (
                 </ProtectedRoute>
             } />
             <Route path="/billing" element={
-              <ProtectedRoute>
+              <ProtectedRoute requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Billing />
@@ -299,6 +301,7 @@ const App = () => (
               </Suspense>
             } />
           </Routes>
+          </NoteXTrialProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

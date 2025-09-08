@@ -90,7 +90,7 @@ const Testimonials = () => {
   const filteredTestimonials = testimonials.filter(testimonial => {
     const matchesIndustry = selectedIndustry === "all" || testimonial.industry === selectedIndustry;
     const matchesSearch = testimonial.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         testimonial.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         testimonial.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          testimonial.content.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesIndustry && matchesSearch;
   });
@@ -201,7 +201,7 @@ const Testimonials = () => {
                     <div>
                       <div className="font-semibold text-sm">{testimonial.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {testimonial.role}  {testimonial.company}
+                        {testimonial.role}
                       </div>
                       <Badge variant="secondary" className="text-xs mt-1">
                         {testimonial.industry}

@@ -1,181 +1,304 @@
-# 🚀 Manual Production Deployment Guide
+# 🚀 Manual Deployment Guide (Deadlock-Safe)
 
-## ✅ **Build Status: SUCCESS!**
+## ❌ **Deadlock Error Fixed**
 
-Your application has been successfully built for production! Here's how to complete the deployment:
+The error `40P01: deadlock detected` occurs when multiple database operations try to access the same resources simultaneously. This guide provides a safe, step-by-step approach.
 
-## 📦 **What's Ready:**
+## 🔧 **Step-by-Step Manual Deployment**
 
-### **✅ Frontend Build Complete**
-- **Build Location**: `dist/` folder
-- **Build Size**: Optimized and compressed
-- **Status**: Ready for deployment
-
-### **✅ Application Features**
-- ✅ File upload system (8 formats)
-- ✅ AI analysis with Gemini integration
-- ✅ History management
-- ✅ Usage tracking
-- ✅ Error handling with fallbacks
-- ✅ Debug mode
-- ✅ Responsive design
-
-## 🚀 **Deployment Steps:**
-
-### **Step 1: Deploy Frontend (Choose One)**
-
-#### **Option A: Vercel (Recommended)**
-```bash
-# Install Vercel CLI
-npm install -g vercel
-
-# Deploy to production
-vercel --prod
-```
-
-#### **Option B: Netlify**
-```bash
-# Install Netlify CLI
-npm install -g netlify-cli
-
-# Deploy
-netlify deploy --prod --dir=dist
-```
-
-#### **Option C: Any Static Hosting**
-- Upload the `dist/` folder contents to your hosting provider
-- Configure your domain to point to the hosting
-
-### **Step 2: Set Up Environment Variables**
-
-#### **In Your Hosting Platform (Vercel/Netlify/etc.):**
-```
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
-```
-
-### **Step 3: Deploy Edge Function**
-
-#### **Option A: Supabase Dashboard (Easiest)**
-1. Go to your Supabase project dashboard
-2. Navigate to Edge Functions
-3. Create new function: `analyze-insights`
-4. Copy the code from `supabase/functions/analyze-insights/index.ts`
-5. Set environment variables:
-   ```
-   GEMINI_API_KEY=your_gemini_key_here
-   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
-   ```
-
-#### **Option B: Supabase CLI (If Available)**
-```bash
-# Install Supabase CLI (if not already installed)
-# Try: npm install -g supabase
-# Or: brew install supabase/tap/supabase
-
-# Link project
-supabase link --project-ref YOUR_PROJECT_REF
-
-# Deploy function
-supabase functions deploy analyze-insights
-```
-
-### **Step 4: Run Database Migration**
-
-#### **In Supabase SQL Editor:**
+### **Step 1: Check Current State**
+First, run this to see what exists:
 ```sql
--- Copy and paste the entire content of:
--- create_insights_results_table_fixed.sql
+-- Check existing functions
+SELECT routine_name FROM information_schema.routines 
+WHERE routine_schema = 'public' 
+AND routine_name IN ('refresh_user_usage', 'check_usage_limit', 'reset_monthly_usage');
 
--- Then verify:
-SELECT test_insights_results_table();
+-- Check existing tables
+SELECT table_name FROM information_schema.tables 
+WHERE table_schema = 'public' 
+AND table_name IN ('usage_counters', 'subscriptions');
 ```
 
-Expected output: `SUCCESS: insights_results table is properly configured`
+### **Step 2: Drop Functions (One at a Time)**
+Run these commands **one at a time** in your Supabase SQL editor:
 
-### **Step 5: Get API Keys**
-
-#### **Gemini AI Key:**
-1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Create a new API key
-3. Copy the key
-
-#### **Supabase Keys:**
-1. Go to your Supabase project dashboard
-2. Settings → API
-3. Copy:
-   - `anon` key (for frontend)
-   - `service_role` key (for Edge Function)
-
-## 🎯 **Quick Test After Deployment:**
-
-### **1. Test File Upload**
-Create a test CSV file:
-```csv
-name,age,city,department
-John,25,New York,Engineering
-Jane,30,Los Angeles,Marketing
-Bob,35,Chicago,Sales
+```sql
+-- Drop functions in reverse dependency order
+DROP FUNCTION IF EXISTS reset_monthly_usage() CASCADE;
 ```
 
-### **2. Test the Flow**
-1. ✅ Upload the CSV file
-2. ✅ Watch progress bars complete
-3. ✅ See AI analysis results (real or demo)
-4. ✅ Check history tab
-5. ✅ Test download functionality
+Wait for completion, then:
+```sql
+DROP FUNCTION IF EXISTS check_usage_limit(UUID, TEXT) CASCADE;
+```
 
-## 🚨 **Troubleshooting:**
+Wait for completion, then:
+```sql
+DROP FUNCTION IF EXISTS refresh_user_usage(UUID, DATE) CASCADE;
+```
 
-### **If Edge Function Fails:**
-- ✅ **No problem!** The app has a fallback to demo analysis
-- ✅ Users can still upload files and get analysis results
-- ✅ The system gracefully degrades
+### **Step 3: Create Functions (One at a Time)**
+Run these commands **one at a time**:
 
-### **If Database Migration Fails:**
-- ✅ **No problem!** The app will still work
-- ✅ Analysis results just won't be saved to history
-- ✅ Users can still analyze files
+```sql
+-- Create refresh_user_usage function
+CREATE OR REPLACE FUNCTION refresh_user_usage(user_uuid UUID, target_month_start DATE)
+RETURNS TABLE (
+    user_id UUID,
+    month_start DATE,
+    feedback_count INTEGER,
+    insights_count INTEGER,
+    analytics_count INTEGER,
+    reports_count INTEGER
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_user_id UUID := user_uuid;
+    v_month_start DATE := target_month_start;
+    v_feedback_count INTEGER := 0;
+    v_insights_count INTEGER := 0;
+    v_analytics_count INTEGER := 0;
+    v_reports_count INTEGER := 0;
+BEGIN
+    -- Get actual counts from source tables for the month
+    SELECT COUNT(*) INTO v_feedback_count
+    FROM feedbacks 
+    WHERE created_at >= v_month_start;
+    
+    SELECT COUNT(*) INTO v_insights_count
+    FROM insights 
+    WHERE user_id = v_user_id 
+    AND created_at >= v_month_start;
+    
+    SELECT COUNT(*) INTO v_analytics_count
+    FROM analytics_history 
+    WHERE user_id = v_user_id 
+    AND created_at >= v_month_start;
+    
+    SELECT COUNT(*) INTO v_reports_count
+    FROM analytics_daily 
+    WHERE user_id = v_user_id 
+    AND date >= v_month_start;
+    
+    -- Insert or update usage counter
+    INSERT INTO usage_counters (
+        user_id, 
+        month_start, 
+        feedback_count, 
+        insights_count, 
+        analytics_count, 
+        reports_count
+    )
+    VALUES (
+        v_user_id, 
+        v_month_start, 
+        v_feedback_count, 
+        v_insights_count, 
+        v_analytics_count, 
+        v_reports_count
+    )
+    ON CONFLICT (user_id, month_start) 
+    DO UPDATE SET
+        feedback_count = EXCLUDED.feedback_count,
+        insights_count = EXCLUDED.insights_count,
+        analytics_count = EXCLUDED.analytics_count,
+        reports_count = EXCLUDED.reports_count,
+        updated_at = NOW();
+    
+    RETURN QUERY
+    SELECT 
+        v_user_id,
+        v_month_start,
+        v_feedback_count,
+        v_insights_count,
+        v_analytics_count,
+        v_reports_count;
+END;
+$$;
+```
 
-### **If Environment Variables Missing:**
-- ✅ **No problem!** The app will show appropriate error messages
-- ✅ Debug mode will help identify issues
+Wait for completion, then:
+```sql
+-- Create check_usage_limit function
+CREATE OR REPLACE FUNCTION check_usage_limit(user_uuid UUID, feature_type TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_user_id UUID := user_uuid;
+    v_feature_type TEXT := feature_type;
+    v_plan_type TEXT;
+    v_current_count INTEGER := 0;
+    v_limit INTEGER := 0;
+    v_month_start DATE;
+BEGIN
+    v_month_start := DATE_TRUNC('month', CURRENT_DATE)::DATE;
+    
+    SELECT plan_type INTO v_plan_type
+    FROM subscriptions 
+    WHERE user_id = v_user_id;
+    
+    IF v_plan_type IS NULL THEN
+        v_plan_type := 'trial';
+    END IF;
+    
+    CASE v_feature_type
+        WHEN 'feedback' THEN
+            SELECT COUNT(*) INTO v_current_count
+            FROM feedbacks 
+            WHERE created_at >= v_month_start;
+        WHEN 'insights' THEN
+            SELECT COUNT(*) INTO v_current_count
+            FROM insights 
+            WHERE user_id = v_user_id 
+            AND created_at >= v_month_start;
+        WHEN 'analytics' THEN
+            SELECT COUNT(*) INTO v_current_count
+            FROM analytics_history 
+            WHERE user_id = v_user_id 
+            AND created_at >= v_month_start;
+        WHEN 'reports' THEN
+            SELECT COUNT(*) INTO v_current_count
+            FROM analytics_daily 
+            WHERE user_id = v_user_id 
+            AND date >= v_month_start;
+        ELSE
+            RETURN FALSE;
+    END CASE;
+    
+    CASE v_plan_type
+        WHEN 'trial' THEN
+            CASE v_feature_type
+                WHEN 'feedback' THEN v_limit := 50;
+                WHEN 'insights' THEN v_limit := 10;
+                WHEN 'analytics' THEN v_limit := 10;
+                WHEN 'reports' THEN v_limit := 5;
+            END CASE;
+        WHEN 'pro' THEN
+            CASE v_feature_type
+                WHEN 'feedback' THEN v_limit := 300;
+                WHEN 'insights' THEN v_limit := 50;
+                WHEN 'analytics' THEN v_limit := 100;
+                WHEN 'reports' THEN v_limit := 20;
+            END CASE;
+        WHEN 'business' THEN
+            RETURN TRUE;
+    END CASE;
+    
+    RETURN v_current_count < v_limit;
+END;
+$$;
+```
 
-## 🎉 **You're Live!**
+Wait for completion, then:
+```sql
+-- Create reset_monthly_usage function
+CREATE OR REPLACE FUNCTION reset_monthly_usage()
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_current_month_start DATE;
+    v_previous_month_start DATE;
+BEGIN
+    v_current_month_start := DATE_TRUNC('month', CURRENT_DATE)::DATE;
+    v_previous_month_start := v_current_month_start - INTERVAL '1 month';
+    
+    PERFORM refresh_user_usage(user_id, v_current_month_start)
+    FROM (
+        SELECT DISTINCT user_id 
+        FROM usage_counters 
+        WHERE month_start = v_previous_month_start
+    ) AS users;
+    
+    INSERT INTO usage_counters (user_id, month_start, feedback_count, insights_count, analytics_count, reports_count)
+    SELECT 
+        user_id,
+        v_current_month_start,
+        0, 0, 0, 0
+    FROM (
+        SELECT DISTINCT user_id 
+        FROM usage_counters 
+        WHERE month_start = v_previous_month_start
+    ) AS users
+    ON CONFLICT (user_id, month_start) DO NOTHING;
+END;
+$$;
+```
 
-Once you've completed the deployment:
+### **Step 4: Create Indexes (One at a Time)**
+```sql
+-- Drop existing indexes first
+DROP INDEX IF EXISTS idx_feedbacks_user_created;
+DROP INDEX IF EXISTS idx_insights_user_created;
+DROP INDEX IF EXISTS idx_analytics_user_created;
+DROP INDEX IF EXISTS idx_reports_user_created;
+DROP INDEX IF EXISTS idx_analytics_history_user_created;
+DROP INDEX IF EXISTS idx_analytics_daily_user_date;
+DROP INDEX IF EXISTS idx_feedbacks_created;
+```
 
-1. **Test everything** with the test CSV file
-2. **Monitor for 24 hours** for any issues
-3. **Collect user feedback** and iterate
-4. **Scale as needed** based on usage
+Wait for completion, then create indexes one by one:
+```sql
+CREATE INDEX IF NOT EXISTS idx_insights_user_created ON insights(user_id, created_at);
+```
 
-## 📞 **Need Help?**
+Wait, then:
+```sql
+CREATE INDEX IF NOT EXISTS idx_analytics_history_user_created ON analytics_history(user_id, created_at);
+```
 
-### **Built-in Debug Tools:**
-- Click "Debug" button in the app
-- Check browser console (F12)
-- Look for error messages
+Wait, then:
+```sql
+CREATE INDEX IF NOT EXISTS idx_analytics_daily_user_date ON analytics_daily(user_id, date);
+```
 
-### **Documentation:**
-- `FILE_UPLOAD_TROUBLESHOOTING.md` - Detailed troubleshooting
-- `INSIGHTS_SIMPLE_SETUP.md` - Complete setup guide
-- `QUICK_START_PRODUCTION.md` - Quick reference
+Wait, then:
+```sql
+CREATE INDEX IF NOT EXISTS idx_feedbacks_created ON feedbacks(created_at);
+```
 
-## 🎯 **Production Checklist:**
+### **Step 5: Grant Permissions**
+```sql
+GRANT EXECUTE ON FUNCTION refresh_user_usage(UUID, DATE) TO authenticated;
+GRANT EXECUTE ON FUNCTION refresh_user_usage(UUID, DATE) TO service_role;
+GRANT EXECUTE ON FUNCTION check_usage_limit(UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION check_usage_limit(UUID, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION reset_monthly_usage() TO service_role;
+```
 
-### **✅ Completed:**
-- [x] Application built successfully
-- [x] All features implemented
-- [x] Error handling in place
-- [x] Fallback systems ready
-- [x] Documentation complete
+### **Step 6: Test the Functions**
+```sql
+-- Test with a real user ID from your auth.users table
+SELECT * FROM refresh_user_usage('your-user-id-here', CURRENT_DATE);
 
-### **🔄 To Complete:**
-- [ ] Deploy frontend to hosting
-- [ ] Set environment variables
-- [ ] Deploy Edge Function
-- [ ] Run database migration
-- [ ] Test with real data
+-- Test usage limit checking
+SELECT check_usage_limit('your-user-id-here', 'insights');
+SELECT check_usage_limit('your-user-id-here', 'analytics');
+```
 
-**Your AI-powered file analysis system is ready to go live! 🚀**
+## ⚠️ **Important Tips to Avoid Deadlocks**
+
+1. **Run commands one at a time** - Don't run multiple SQL commands simultaneously
+2. **Wait for completion** - Wait for each command to finish before running the next
+3. **Use Supabase SQL Editor** - Run commands in the Supabase dashboard, not via scripts
+4. **Check for errors** - If a command fails, fix the error before proceeding
+5. **Avoid concurrent operations** - Don't run other database operations while deploying
+
+## ✅ **Expected Results**
+
+After completing all steps:
+- ✅ All three functions created successfully
+- ✅ Indexes created for performance
+- ✅ Permissions granted correctly
+- ✅ Functions can be called without errors
+- ✅ Usage Overview component works in frontend
+
+## 🎉 **Success!**
+
+Your Usage Overview system will be deployed without deadlocks and will work correctly with your actual database structure!

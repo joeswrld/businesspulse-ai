@@ -303,6 +303,27 @@ export type Database = {
         }
         Relationships: []
       }
+      email_links: {
+        Row: {
+          created_at: string | null
+          id: string
+          link: string
+          project_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          link: string
+          project_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          link?: string
+          project_id?: string
+        }
+        Relationships: []
+      }
       feedback: {
         Row: {
           category: string | null
@@ -392,15 +413,20 @@ export type Database = {
       feedback_settings: {
         Row: {
           brand_color: string | null
+          business_logo: string | null
+          business_name: string | null
           button_text: string | null
           created_at: string | null
+          custom_fields: Json | null
           id: string
           notify_email: string | null
           project_id: string | null
           project_id_locked: boolean | null
           redirect_url: string | null
+          show_contact_info: boolean | null
           show_email: boolean | null
           show_name: boolean | null
+          show_rating: boolean | null
           theme: string | null
           title: string | null
           updated_at: string | null
@@ -408,15 +434,20 @@ export type Database = {
         }
         Insert: {
           brand_color?: string | null
+          business_logo?: string | null
+          business_name?: string | null
           button_text?: string | null
           created_at?: string | null
+          custom_fields?: Json | null
           id?: string
           notify_email?: string | null
           project_id?: string | null
           project_id_locked?: boolean | null
           redirect_url?: string | null
+          show_contact_info?: boolean | null
           show_email?: boolean | null
           show_name?: boolean | null
+          show_rating?: boolean | null
           theme?: string | null
           title?: string | null
           updated_at?: string | null
@@ -424,15 +455,20 @@ export type Database = {
         }
         Update: {
           brand_color?: string | null
+          business_logo?: string | null
+          business_name?: string | null
           button_text?: string | null
           created_at?: string | null
+          custom_fields?: Json | null
           id?: string
           notify_email?: string | null
           project_id?: string | null
           project_id_locked?: boolean | null
           redirect_url?: string | null
+          show_contact_info?: boolean | null
           show_email?: boolean | null
           show_name?: boolean | null
+          show_rating?: boolean | null
           theme?: string | null
           title?: string | null
           updated_at?: string | null
@@ -449,6 +485,7 @@ export type Database = {
           project_id: string | null
           status: string | null
           timestamp: string | null
+          user_id: string | null
         }
         Insert: {
           email?: string | null
@@ -458,6 +495,7 @@ export type Database = {
           project_id?: string | null
           status?: string | null
           timestamp?: string | null
+          user_id?: string | null
         }
         Update: {
           email?: string | null
@@ -467,6 +505,7 @@ export type Database = {
           project_id?: string | null
           status?: string | null
           timestamp?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -680,6 +719,33 @@ export type Database = {
         }
         Relationships: []
       }
+      plans: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: string
+          limits: Json
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id?: string
+          limits: Json
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: string
+          limits?: Json
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           authorization_code: string | null
@@ -692,12 +758,15 @@ export type Database = {
           full_name: string | null
           id: string
           industry: string | null
+          is_active: boolean | null
           last_name: string | null
           onboarding_completed: boolean | null
           phone: string | null
+          plan: string | null
           preferences: Json | null
           role: string | null
           trial_end: string | null
+          trial_start: string | null
           updated_at: string
           user_id: string | null
         }
@@ -712,12 +781,15 @@ export type Database = {
           full_name?: string | null
           id?: string
           industry?: string | null
+          is_active?: boolean | null
           last_name?: string | null
           onboarding_completed?: boolean | null
           phone?: string | null
+          plan?: string | null
           preferences?: Json | null
           role?: string | null
           trial_end?: string | null
+          trial_start?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -732,14 +804,38 @@ export type Database = {
           full_name?: string | null
           id?: string
           industry?: string | null
+          is_active?: boolean | null
           last_name?: string | null
           onboarding_completed?: boolean | null
           phone?: string | null
+          plan?: string | null
           preferences?: Json | null
           role?: string | null
           trial_end?: string | null
+          trial_start?: string | null
           updated_at?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      qr_links: {
+        Row: {
+          created_at: string | null
+          id: string
+          link: string
+          project_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          link: string
+          project_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          link?: string
+          project_id?: string
         }
         Relationships: []
       }
@@ -1082,6 +1178,42 @@ export type Database = {
         }
         Relationships: []
       }
+      usage_counters: {
+        Row: {
+          analytics_count: number | null
+          created_at: string | null
+          feedback_count: number
+          id: string
+          insights_count: number | null
+          month_start: string
+          reports_count: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          analytics_count?: number | null
+          created_at?: string | null
+          feedback_count?: number
+          id?: string
+          insights_count?: number | null
+          month_start: string
+          reports_count?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          analytics_count?: number | null
+          created_at?: string | null
+          feedback_count?: number
+          id?: string
+          insights_count?: number | null
+          month_start?: string
+          reports_count?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       usage_tracking: {
         Row: {
           analytics_count: number | null
@@ -1181,6 +1313,51 @@ export type Database = {
         }
         Relationships: []
       }
+      user_profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          id: string
+          is_active: boolean | null
+          plan: string | null
+          trial_end: string | null
+          trial_expired: boolean | null
+          trial_start: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          plan?: string | null
+          trial_end?: string | null
+          trial_expired?: boolean | null
+          trial_start?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          plan?: string | null
+          trial_end?: string | null
+          trial_expired?: boolean | null
+          trial_start?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_subscriptions: {
         Row: {
           cancel_at_period_end: boolean | null
@@ -1220,6 +1397,27 @@ export type Database = {
           status?: string
           updated_at?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      whatsapp_links: {
+        Row: {
+          created_at: string | null
+          id: string
+          link: string
+          project_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          link: string
+          project_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          link?: string
+          project_id?: string
         }
         Relationships: []
       }
@@ -1277,6 +1475,10 @@ export type Database = {
         Args: { feature_name: string; user_uuid: string }
         Returns: boolean
       }
+      check_and_consume_usage: {
+        Args: { p_kind: string; p_user_id: string }
+        Returns: boolean
+      }
       check_project_id_availability: {
         Args: { current_user_id: string; project_id_param: string }
         Returns: {
@@ -1284,6 +1486,21 @@ export type Database = {
           message: string
           taken_by_email: string
           taken_by_user_id: string
+        }[]
+      }
+      check_usage_limit: {
+        Args: { feature_type: string; user_uuid: string }
+        Returns: boolean
+      }
+      check_user_access: {
+        Args: { user_uuid: string }
+        Returns: {
+          days_left: number
+          has_access: boolean
+          is_active: boolean
+          plan: string
+          trial_end: string
+          trial_expired: boolean
         }[]
       }
       clean_expired_invitations: {
@@ -1321,6 +1538,10 @@ export type Database = {
           user_id: string
         }
       }
+      create_user_billing_profile: {
+        Args: { user_uuid: string }
+        Returns: Json
+      }
       delete_insights_result: {
         Args: { p_result_id: string; p_user_id: string }
         Returns: boolean
@@ -1329,9 +1550,26 @@ export type Database = {
         Args: { message_text: string }
         Returns: boolean
       }
+      enforce_usage_limits: {
+        Args: { user_uuid?: string }
+        Returns: undefined
+      }
       ensure_all_tables_for_user: {
         Args: { user_id_param: string }
         Returns: undefined
+      }
+      ensure_current_month_usage: {
+        Args: { user_uuid: string }
+        Returns: {
+          analytics_count: number
+          created_at: string
+          feedback_count: number
+          insights_count: number
+          month_start: string
+          reports_count: number
+          updated_at: string
+          user_id: string
+        }[]
       }
       ensure_user_feedback_settings: {
         Args: { user_id_param: string }
@@ -1349,6 +1587,10 @@ export type Database = {
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_plan_limits: {
+        Args: { plan_code: string }
+        Returns: Json
       }
       get_team_invitation_stats: {
         Args: { team_uuid: string }
@@ -1379,6 +1621,81 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: string
       }
+      get_user_status: {
+        Args: { user_uuid: string }
+        Returns: Json
+      }
+      get_user_usage_summary: {
+        Args: { p_user_id: string }
+        Returns: {
+          analytics_count: number
+          analytics_limit: number
+          analytics_remaining: number
+          feedback_count: number
+          feedback_limit: number
+          feedback_remaining: number
+          insights_count: number
+          insights_limit: number
+          insights_remaining: number
+          month_start: string
+          plan_code: string
+          plan_name: string
+          reports_count: number
+          reports_limit: number
+          reports_remaining: number
+          user_id: string
+        }[]
+      }
+      get_user_usage_with_monthly_reset: {
+        Args: { user_uuid: string }
+        Returns: {
+          analytics_count: number
+          created_at: string
+          feedback_count: number
+          insights_count: number
+          is_reset: boolean
+          month_start: string
+          reports_count: number
+          updated_at: string
+          user_id: string
+        }[]
+      }
+      increment_usage_with_check: {
+        Args: { feature_name: string; user_uuid: string }
+        Returns: Json
+      }
+      initialize_user_trial: {
+        Args: { user_uuid: string }
+        Returns: undefined
+      }
+      refresh_usage_for_user: {
+        Args: { user_uuid: string }
+        Returns: {
+          ai_insights_count: number
+          analytics_reports_count: number
+          created_at: string
+          detailed_reports_count: number
+          feedback_count: number
+          month_start: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
+      refresh_user_usage: {
+        Args: { target_month_start: string; user_uuid: string }
+        Returns: {
+          analytics_count: number
+          feedback_count: number
+          insights_count: number
+          month_start: string
+          reports_count: number
+          user_id: string
+        }[]
+      }
+      reset_monthly_usage: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       safe_create_user_profile: {
         Args: { user_id_param: string }
         Returns: undefined
@@ -1390,6 +1707,19 @@ export type Database = {
       test_insights_results_table: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      update_user_plan_after_payment: {
+        Args: {
+          new_plan: string
+          paystack_customer_id?: string
+          paystack_subscription_id?: string
+          user_uuid: string
+        }
+        Returns: Json
+      }
+      upgrade_user_to_business: {
+        Args: { user_uuid: string }
+        Returns: undefined
       }
       upsert_user_subscription: {
         Args: {

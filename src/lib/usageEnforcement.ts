@@ -1,501 +1,291 @@
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
-// Types
-export type PlanType = 'free' | 'pro' | 'business' | 'enterprise';
-export type FeatureType = 'feedback' | 'analytics' | 'reports' | 'insights' | 'teams';
+export type PlanType = 'free_trial' | 'business';
 
 export interface UsageLimits {
-  feedback: number;
-  analytics: number;
-  reports: number;
-  insights: number;
-  teams: number;
+  feedbackCount: number;
+  insightsCount: number;
+  analyticsCount: number;
+  reportsCount: number;
 }
 
-export interface UsageData {
-  id: string;
-  user_id: string;
-  feedback_count: number;
-  analytics_count: number;
-  reports_count: number;
-  insights_count: number;
-  teams_count: number;
-  created_at: string;
-  updated_at: string;
+export interface EnforcementResult {
+  allowed: boolean;
+  reason?: string;
+  upgradeRequired?: boolean;
 }
 
-export interface Subscription {
-  id: string;
-  user_id: string;
-  status: 'active' | 'trialing' | 'cancelled' | 'past_due';
-  plan_id: string;
-  current_period_start: string;
-  current_period_end: string;
-  trial_start?: string;
-  trial_end?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface UsageCheckResult {
-  canUse: boolean;
-  currentUsage: number;
-  limit: number;
-  plan: PlanType;
-  feature: FeatureType;
-  isUnlimited: boolean;
-  remaining: number;
-}
-
-// Plan limits configuration
-export const PLAN_LIMITS: Record<PlanType, UsageLimits> = {
-  free: {
-    feedback: 50,
-    analytics: 5,
-    reports: 2,
-    insights: 5,
-    teams: 1
-  },
-  pro: {
-    feedback: 300,
-    analytics: 100,
-    reports: 20,
-    insights: 50,
-    teams: 5
+const PLAN_LIMITS: Record<PlanType, UsageLimits> = {
+  free_trial: {
+    feedbackCount: 50,
+    insightsCount: 10,
+    analyticsCount: 5,
+    reportsCount: 2,
   },
   business: {
-    feedback: -1, // unlimited
-    analytics: -1,
-    reports: -1,
-    insights: -1,
-    teams: -1
+    feedbackCount: -1, // Unlimited
+    insightsCount: -1,
+    analyticsCount: -1,
+    reportsCount: -1,
   },
-  enterprise: {
-    feedback: -1, // unlimited
-    analytics: -1,
-    reports: -1,
-    insights: -1,
-    teams: -1
-  }
-};
-
-// Plan upgrade paths
-export const UPGRADE_PATHS: Record<PlanType, PlanType[]> = {
-  free: ['pro', 'business'],
-  pro: ['business'],
-  business: ['enterprise'],
-  enterprise: []
-};
-
-// Plan display names
-export const PLAN_NAMES: Record<PlanType, string> = {
-  free: 'Free Trial',
-  pro: 'Pro Plan',
-  business: 'Business Plan',
-  enterprise: 'Enterprise Plan'
-};
-
-// Plan pricing (for upgrade prompts)
-export const PLAN_PRICING: Record<PlanType, string> = {
-  free: 'Free',
-  pro: '$29/month',
-  business: '$99/month',
-  enterprise: 'Contact Sales'
 };
 
 /**
- * Determine user's plan from subscription data
+ * Check if a user can perform a specific action based on their plan and current usage
  */
-export function getUserPlan(subscription: Subscription | null): PlanType {
-  if (!subscription) return 'free';
-  
-  const planName = (subscription as any).plan_name?.toLowerCase() || (subscription as any).plan_type?.toLowerCase() || '';
-  
-  if (planName.includes('enterprise')) return 'enterprise';
-  if (planName.includes('business')) return 'business';
-  if (planName.includes('pro') || planName.includes('premium')) return 'pro';
-  
-  return 'free';
-}
-
-/**
- * Check if user can use a specific feature
- */
-export function checkUsage(
-  feature: FeatureType,
-  currentUsage: number,
-  plan: PlanType
-): UsageCheckResult {
-  const limit = PLAN_LIMITS[plan][feature];
-  const isUnlimited = limit === -1;
-  const canUse = isUnlimited || currentUsage < limit;
-  const remaining = isUnlimited ? -1 : Math.max(0, limit - currentUsage);
-
-  return {
-    canUse,
-    currentUsage,
-    limit,
-    plan,
-    feature,
-    isUnlimited,
-    remaining
-  };
-}
-
-/**
- * Get usage data for a user
- */
-export async function getUserUsage(userId: string): Promise<UsageData | null> {
+export async function checkUsageLimit(userId: string, action: keyof UsageLimits): Promise<EnforcementResult> {
   try {
-    const { data, error } = await (supabase as any)
-      .from('usage_tracking')
-      .select('*')
+    // Use profiles table for plan information
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('plan, is_active, trial_end')
       .eq('user_id', userId)
       .single();
 
-    if (error) {
-      console.error('Error fetching usage data:', error);
-      return null;
+    const planType = (profile?.plan || 'free_trial') as PlanType;
+    
+    // Check if user has active business plan
+    if (planType === 'business' && profile?.is_active) {
+      return { allowed: true };
     }
 
-    return data as any;
-  } catch (error) {
-    console.error('Error in getUserUsage:', error);
-    return null;
-  }
-}
-
-/**
- * Get subscription data for a user
- */
-export async function getUserSubscription(userId: string): Promise<Subscription | null> {
-  try {
-    const { data, error } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching subscription:', error);
-      return null;
-    }
-
-    return data as any;
-  } catch (error) {
-    console.error('Error in getUserSubscription:', error);
-    return null;
-  }
-}
-
-/**
- * Check if user can use a feature (with data fetching)
- */
-export async function checkFeatureUsage(
-  userId: string,
-  feature: FeatureType
-): Promise<UsageCheckResult | null> {
-  try {
-    const [usage, subscription] = await Promise.all([
-      getUserUsage(userId),
-      getUserSubscription(userId)
-    ]);
-
-    if (!usage) {
-      console.error('No usage data found for user:', userId);
-      return null;
-    }
-
-    const plan = getUserPlan(subscription);
-    const currentUsage = usage[`${feature}_count` as keyof UsageData] as number;
-
-    return checkUsage(feature, currentUsage, plan);
-  } catch (error) {
-    console.error('Error in checkFeatureUsage:', error);
-    return null;
-  }
-}
-
-/**
- * Format usage display string
- */
-export function formatUsageDisplay(
-  currentUsage: number,
-  limit: number,
-  plan: PlanType,
-  feature: FeatureType
-): string {
-  const featureName = feature.charAt(0).toUpperCase() + feature.slice(1);
-  
-  if (limit === -1) {
-    return `${featureName}: ${currentUsage} (Unlimited - ${PLAN_NAMES[plan]})`;
-  }
-  
-  return `${featureName}: ${currentUsage} / ${limit} (${PLAN_NAMES[plan]})`;
-}
-
-/**
- * Get upgrade options for current plan
- */
-export function getUpgradeOptions(currentPlan: PlanType): PlanType[] {
-  return UPGRADE_PATHS[currentPlan] || [];
-}
-
-/**
- * Show upgrade prompt
- */
-export function showUpgradePrompt(
-  feature: FeatureType,
-  currentPlan: PlanType,
-  currentUsage: number,
-  limit: number
-): void {
-  const upgradeOptions = getUpgradeOptions(currentPlan);
-  
-  if (upgradeOptions.length === 0) {
-    toast.error('Limit Reached', {
-      description: `You have reached your ${feature} limit (${currentUsage}/${limit}). Contact support for assistance.`
-    });
-    return;
-  }
-
-  const nextPlan = upgradeOptions[0];
-  const nextPlanLimit = PLAN_LIMITS[nextPlan][feature];
-  const nextPlanLimitText = nextPlanLimit === -1 ? 'Unlimited' : nextPlanLimit.toString();
-
-  toast.error('Limit Reached', {
-    description: `You have reached your ${feature} limit (${currentUsage}/${limit}). Upgrade to ${PLAN_NAMES[nextPlan]} for ${nextPlanLimitText} ${feature}.`,
-    action: {
-      label: 'Upgrade Now',
-      onClick: () => {
-        // Navigate to billing page or upgrade flow
-        window.location.href = '/billing';
+    // Check if trial is expired
+    if (planType === 'free_trial' && profile?.trial_end) {
+      const isExpired = new Date() > new Date(profile.trial_end);
+      if (isExpired) {
+        return {
+          allowed: false,
+          reason: 'Trial expired. Upgrade to Business to continue.',
+          upgradeRequired: true
+        };
       }
     }
-  });
-}
-
-/**
- * Enforce usage limit with UI feedback
- */
-export async function enforceUsageLimit(
-  userId: string,
-  feature: FeatureType,
-  onLimitReached?: () => void
-): Promise<boolean> {
-  try {
-    const result = await checkFeatureUsage(userId, feature);
     
-    if (!result) {
-      toast.error('Error', {
-        description: 'Unable to check usage limits. Please try again.'
-      });
-      return false;
+    // Get plan limits
+    const limits = PLAN_LIMITS[planType];
+    const limit = limits[action];
+    
+    // If unlimited (-1), allow
+    if (limit === -1) {
+      return { allowed: true };
     }
-
-    if (!result.canUse) {
-      showUpgradePrompt(feature, result.plan, result.currentUsage, result.limit);
-      onLimitReached?.();
-      return false;
+    
+    // Get current usage
+    const currentUsage = await getCurrentUsage(userId, action);
+    
+    if (currentUsage >= limit) {
+      return {
+        allowed: false,
+        reason: `${action} limit reached (${limit}). Upgrade to Business for unlimited access.`,
+        upgradeRequired: true
+      };
     }
-
-    return true;
+    
+    return { allowed: true };
   } catch (error) {
-    console.error('Error in enforceUsageLimit:', error);
-    toast.error('Error', {
-      description: 'Unable to check usage limits. Please try again.'
-    });
-    return false;
-  }
-}
-
-/**
- * Get usage summary for all features
- */
-export async function getUsageSummary(userId: string): Promise<{
-  usage: UsageData | null;
-  subscription: Subscription | null;
-  plan: PlanType;
-  limits: UsageLimits;
-  checks: Record<FeatureType, UsageCheckResult>;
-}> {
-  try {
-    const [usage, subscription] = await Promise.all([
-      getUserUsage(userId),
-      getUserSubscription(userId)
-    ]);
-
-    const plan = getUserPlan(subscription);
-    const limits = PLAN_LIMITS[plan];
-
-    const checks: Record<FeatureType, UsageCheckResult> = {
-      feedback: checkUsage('feedback', usage?.feedback_count || 0, plan),
-      analytics: checkUsage('analytics', usage?.analytics_count || 0, plan),
-      reports: checkUsage('reports', usage?.reports_count || 0, plan),
-      insights: checkUsage('insights', usage?.insights_count || 0, plan),
-      teams: checkUsage('teams', usage?.teams_count || 0, plan)
-    };
-
+    console.error('Error checking usage limit:', error);
     return {
-      usage,
-      subscription,
-      plan,
-      limits,
-      checks
+      allowed: false,
+      reason: 'Error checking usage limits',
+      upgradeRequired: false
+    };
+  }
+}
+
+/**
+ * Check if trial has expired for a user
+ */
+export async function isTrialExpired(userId: string): Promise<boolean> {
+  try {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('plan, trial_end, is_active')
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !profile) {
+      // If no profile found, assume trial expired
+      return true;
+    }
+
+    // Business users with active subscription are never expired
+    if (profile.plan === 'business' && profile.is_active) {
+      return false;
+    }
+
+    // Check trial expiration for free trial users
+    if (profile.plan === 'free_trial' && profile.trial_end) {
+      return new Date() > new Date(profile.trial_end);
+    }
+
+    // Default to expired if no trial end date
+    return true;
+  } catch (error) {
+    console.error('Error checking trial status:', error);
+    return true; // Assume expired on error
+  }
+}
+
+/**
+ * Get user's current plan type
+ */
+export async function getUserPlanType(userId: string): Promise<PlanType> {
+  try {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('plan')
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !profile) {
+      return 'free_trial';
+    }
+
+    return (profile.plan || 'free_trial') as PlanType;
+  } catch (error) {
+    console.error('Error getting user plan type:', error);
+    return 'free_trial';
+  }
+}
+
+/**
+ * Get current usage count for a specific action
+ */
+async function getCurrentUsage(userId: string, action: keyof UsageLimits): Promise<number> {
+  try {
+    const currentMonth = new Date().toISOString().slice(0, 7) + '-01'; // YYYY-MM-01
+    
+    const { data: usage, error } = await supabase
+      .from('usage_counters')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('month_start', currentMonth)
+      .single();
+    
+    if (error || !usage) {
+      return 0;
+    }
+    
+    switch (action) {
+      case 'feedbackCount':
+        return usage.feedback_count || 0;
+      case 'insightsCount':
+        return usage.insights_count || 0;
+      case 'analyticsCount':
+        return usage.analytics_count || 0;
+      case 'reportsCount':
+        return usage.reports_count || 0;
+      default:
+        return 0;
+    }
+  } catch (error) {
+    console.error('Error getting current usage:', error);
+    return 0;
+  }
+}
+
+/**
+ * Increment usage counter for a specific action
+ */
+export async function incrementUsage(userId: string, action: keyof UsageLimits): Promise<void> {
+  try {
+    const currentMonth = new Date().toISOString().slice(0, 7) + '-01'; // YYYY-MM-01
+    
+    // First ensure the usage counter exists
+    const { error: upsertError } = await supabase
+      .from('usage_counters')
+      .upsert({
+        user_id: userId,
+        month_start: currentMonth,
+        feedback_count: 0,
+        insights_count: 0,
+        analytics_count: 0,
+        reports_count: 0,
+      }, { 
+        onConflict: 'user_id,month_start',
+        ignoreDuplicates: true 
+      });
+    
+    if (upsertError) {
+      console.warn('Error ensuring usage counter exists:', upsertError);
+    }
+    
+    // Then increment the specific counter
+    let updateField: string;
+    switch (action) {
+      case 'feedbackCount':
+        updateField = 'feedback_count';
+        break;
+      case 'insightsCount':
+        updateField = 'insights_count';
+        break;
+      case 'analyticsCount':
+        updateField = 'analytics_count';
+        break;
+      case 'reportsCount':
+        updateField = 'reports_count';
+        break;
+      default:
+        return;
+    }
+    
+    // Get current count and increment by 1
+    const { data: current, error: fetchError } = await supabase
+      .from('usage_counters')
+      .select(updateField)
+      .eq('user_id', userId)
+      .eq('month_start', currentMonth)
+      .single();
+    
+    if (fetchError) {
+      console.warn('Error fetching current usage:', fetchError);
+      return;
+    }
+    
+    const newValue = (current?.[updateField] || 0) + 1;
+    
+    const { error } = await supabase
+      .from('usage_counters')
+      .update({ [updateField]: newValue })
+      .eq('user_id', userId)
+      .eq('month_start', currentMonth);
+    
+    if (error) {
+      console.error(`Error incrementing ${action}:`, error);
+    }
+  } catch (error) {
+    console.error('Error incrementing usage:', error);
+  }
+}
+
+/**
+ * Get usage summary for a user
+ */
+export async function getUsageSummary(userId: string): Promise<UsageLimits & { planType: PlanType }> {
+  try {
+    const planType = await getUserPlanType(userId);
+    const currentUsage = await Promise.all([
+      getCurrentUsage(userId, 'feedbackCount'),
+      getCurrentUsage(userId, 'insightsCount'),
+      getCurrentUsage(userId, 'analyticsCount'),
+      getCurrentUsage(userId, 'reportsCount'),
+    ]);
+    
+    return {
+      feedbackCount: currentUsage[0],
+      insightsCount: currentUsage[1],
+      analyticsCount: currentUsage[2],
+      reportsCount: currentUsage[3],
+      planType,
     };
   } catch (error) {
-    console.error('Error in getUsageSummary:', error);
-    throw error;
-  }
-}
-
-/**
- * Check if user needs to upgrade
- */
-export function needsUpgrade(checks: Record<FeatureType, UsageCheckResult>): boolean {
-  return Object.values(checks).some(check => !check.canUse);
-}
-
-/**
- * Get features that need upgrade
- */
-export function getFeaturesNeedingUpgrade(checks: Record<FeatureType, UsageCheckResult>): FeatureType[] {
-  return Object.entries(checks)
-    .filter(([_, check]) => !check.canUse)
-    .map(([feature, _]) => feature as FeatureType);
-}
-
-// ============================================================================
-// NEW USAGE ENFORCEMENT SYSTEM USING usage_counters TABLE
-// ============================================================================
-
-/**
- * Check if user can use a specific feature using the new usage_counters system
- */
-export async function checkUsageWithCounters(
-  userId: string,
-  feature: FeatureType
-): Promise<boolean> {
-  try {
-    const { data, error } = await supabase.rpc('check_and_consume_usage', {
-      p_user_id: userId,
-      p_kind: feature
-    });
-
-    if (error) {
-      console.error('Error checking usage with counters:', error);
-      return false;
-    }
-
-    return data as boolean;
-  } catch (error) {
-    console.error('Error in checkUsageWithCounters:', error);
-    return false;
-  }
-}
-
-/**
- * Get usage summary using the new usage_counters system
- */
-export async function getUsageSummaryWithCounters(
-  userId: string
-): Promise<any> {
-  try {
-    const { data, error } = await supabase.rpc('get_user_usage_summary', {
-      p_user_id: userId
-    });
-
-    if (error) {
-      console.error('Error getting usage summary with counters:', error);
-      return null;
-    }
-
-    return data && data.length > 0 ? data[0] : null;
-  } catch (error) {
-    console.error('Error in getUsageSummaryWithCounters:', error);
-    return null;
-  }
-}
-
-/**
- * Refresh usage counters for a user
- */
-export async function refreshUsageCounters(userId: string): Promise<boolean> {
-  try {
-    const { error } = await supabase.rpc('refresh_usage_for_user', {
-      p_user_id: userId
-    });
-
-    if (error) {
-      console.error('Error refreshing usage counters:', error);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error in refreshUsageCounters:', error);
-    return false;
-  }
-}
-
-/**
- * Enforce usage limit using the new counters system
- */
-export async function enforceUsageLimitWithCounters(
-  userId: string,
-  feature: FeatureType,
-  onLimitReached?: () => void
-): Promise<boolean> {
-  try {
-    const canUse = await checkUsageWithCounters(userId, feature);
-    
-    if (!canUse) {
-      // Get usage summary to show detailed info
-      const summary = await getUsageSummaryWithCounters(userId);
-      
-      if (summary) {
-        const featureCount = summary[`${feature}_count`];
-        const featureLimit = summary[`${feature}_limit`];
-        const featureName = feature.charAt(0).toUpperCase() + feature.slice(1);
-        
-        if (featureLimit === -1) {
-          toast.error('Limit Reached', {
-            description: `You have reached your ${featureName} limit (${featureCount}). Contact support for assistance.`
-          });
-        } else {
-          toast.error('Limit Reached', {
-            description: `You have reached your ${featureName} limit (${featureCount}/${featureLimit}). Upgrade your plan for higher limits.`,
-            action: {
-              label: 'Upgrade Now',
-              onClick: () => {
-                window.location.href = '/billing';
-              }
-            }
-          });
-        }
-      } else {
-        toast.error('Limit Reached', {
-          description: `You have reached your ${feature} limit. Upgrade your plan for higher limits.`,
-          action: {
-            label: 'Upgrade Now',
-            onClick: () => {
-              window.location.href = '/billing';
-            }
-          }
-        });
-      }
-      
-      onLimitReached?.();
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error in enforceUsageLimitWithCounters:', error);
-    toast.error('Error', {
-      description: 'Unable to check usage limits. Please try again.'
-    });
-    return false;
+    console.error('Error getting usage summary:', error);
+    return {
+      feedbackCount: 0,
+      insightsCount: 0,
+      analyticsCount: 0,
+      reportsCount: 0,
+      planType: 'free_trial',
+    };
   }
 }

@@ -86,7 +86,7 @@ const LogoUploadExample: React.FC = () => {
 
       {/* Upload Button */}
       <Button 
-        onClick={() => document.querySelector('input[type="file"]')?.click()}
+        onClick={() => (document.querySelector('input[type="file"]') as HTMLInputElement)?.click()}
         disabled={uploading}
       >
         {uploading ? 'Uploading...' : 'Select Logo File'}
