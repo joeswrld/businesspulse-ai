@@ -44,7 +44,9 @@ export function useUserStatus() {
     try {
       setLoading(true);
       setError(null);
+      console.log('🔍 Fetching user status for:', user.id);
       const userStatus = await fetchUserStatus(user.id);
+      console.log('📊 User status received:', userStatus);
       setStatus(userStatus);
     } catch (err) {
       console.error('Error refreshing user status:', err);
@@ -75,23 +77,38 @@ export function useUserStatus() {
 
   // Check if user should be locked out
   const shouldShowLockScreen = useCallback(() => {
-    if (!status) return false;
+    if (!status) {
+      console.log('🔒 No status available, not locking');
+      return false;
+    }
+    
+    console.log('🔍 Checking lock status:', {
+      plan: status.plan,
+      is_active: status.is_active,
+      is_trial_expired: status.is_trial_expired,
+      should_show_lock: status.should_show_lock,
+      trial_days_remaining: status.trial_days_remaining
+    });
     
     // Business users with active subscription should never be locked
     if (status.plan === 'business' && status.is_active) {
+      console.log('✅ Business user with active subscription - no lock');
       return false;
     }
     
     // Free trial users should be locked if trial expired
     if (status.plan === 'free_trial' && status.is_trial_expired) {
+      console.log('🔒 Free trial user with expired trial - locking');
       return true;
     }
     
     // Business users with inactive subscription should be locked
     if (status.plan === 'business' && !status.is_active) {
+      console.log('🔒 Business user with inactive subscription - locking');
       return true;
     }
     
+    console.log('🎯 Using server-side should_show_lock decision:', status.should_show_lock);
     return status.should_show_lock;
   }, [status]);
 
