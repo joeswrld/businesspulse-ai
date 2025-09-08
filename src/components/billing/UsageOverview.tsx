@@ -74,30 +74,6 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
   React.useEffect(() => {
     if (refreshTrigger) {
       refresh();
-
-  const refreshUsage = async () => {
-    try {
-      setRefreshing(true);
-      
-      // Call the refresh function to ensure data is up to date
-      const { data: refreshData, error: refreshError } = await supabase
-        .rpc('refresh_user_usage', { user_uuid: userId, target_month_start: new Date().toISOString().split('T')[0] });
-      
-      if (refreshError) {
-        console.warn('Failed to refresh usage data in database:', refreshError);
-      } else {
-        console.log('Usage data refreshed successfully:', refreshData);
-      }
-      
-      // Then reload the component data
-      await loadUsageData();
-      toast.success('Usage data refreshed');
-    } catch (error) {
-      console.error('Error refreshing usage:', error);
-      console.warn('Refresh failed, but component will continue with existing data');
-    } finally {
-      setRefreshing(false);
-
     }
   }, [refreshTrigger, refresh]);
 

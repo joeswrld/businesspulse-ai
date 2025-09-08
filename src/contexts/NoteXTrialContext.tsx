@@ -161,11 +161,11 @@ export const NoteXTrialProvider: React.FC<{ children: ReactNode }> = ({ children
 
       const status = {
         hasAccess: result.has_access,
-        plan: result.plan,
+        plan: (result.plan || 'free_trial') as "free_trial" | "business",
         isActive: result.is_active || (result.plan === 'free_trial' && daysLeft > 0),
         trialExpired: result.trial_expired || (result.plan === 'free_trial' && daysLeft <= 0),
         daysLeft: daysLeft,
-        trialStart: result.trial_start,
+        trialStart: result.trial_start || new Date().toISOString(),
         trialEnd: result.trial_end,
         loading: false,
         error: null,

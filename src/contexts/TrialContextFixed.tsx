@@ -197,7 +197,7 @@ export const TrialProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       
       const status = {
         hasAccess: result.has_access,
-        plan: result.plan,
+        plan: (result.plan || 'free_trial') as "free_trial" | "business",
         isActive: result.is_active || (result.plan === 'free_trial' && result.days_left > 0),
         trialExpired: result.trial_expired,
         daysLeft: daysLeft,

@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface UserStatus {
-  plan: string;
+  plan: "free_trial" | "business";
   trial_start: string;
   trial_end: string;
   is_active: boolean;
