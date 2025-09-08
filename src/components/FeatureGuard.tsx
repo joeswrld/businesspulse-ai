@@ -9,14 +9,14 @@ import {
   Crown,
   Loader2 
 } from 'lucide-react';
-import { checkFeatureAccess, isTrialExpired, FeatureType } from '@/lib/usageEnforcement';
+import { checkUsageLimit, isTrialExpired, PlanType } from '@/lib/usageEnforcement';
 
 interface FeatureGuardProps {
   userId: string;
-  featureType: FeatureType;
+  featureType: keyof import('@/lib/usageEnforcement').UsageLimits;
   children: React.ReactNode;
   fallback?: React.ReactNode;
-  onUpgrade?: (plan: 'pro' | 'business') => void;
+  onUpgrade?: (plan: 'business') => void;
 }
 
 export default function FeatureGuard({ 
@@ -41,7 +41,7 @@ export default function FeatureGuard({
 
       try {
         setIsLoading(true);
-        const result = await checkFeatureAccess(userId, featureType);
+        const result = await checkUsageLimit(userId, featureType);
         
         setIsAllowed(result.allowed);
         setReason(result.reason || '');
@@ -85,17 +85,8 @@ export default function FeatureGuard({
                 <div className="mt-4 flex gap-2">
                   <Button
                     size="sm"
-                    onClick={() => onUpgrade('pro')}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Zap className="h-4 w-4 mr-2" />
-                    Upgrade to Pro
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
                     onClick={() => onUpgrade('business')}
-                    className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                    className="bg-purple-600 hover:bg-purple-700"
                   >
                     <Crown className="h-4 w-4 mr-2" />
                     Upgrade to Business
@@ -115,7 +106,7 @@ export default function FeatureGuard({
 /**
  * Hook for checking feature access in components
  */
-export function useFeatureAccess(userId: string, featureType: FeatureType) {
+export function useFeatureAccess(userId: string, featureType: keyof import('@/lib/usageEnforcement').UsageLimits) {
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [reason, setReason] = useState<string>('');
@@ -131,7 +122,7 @@ export function useFeatureAccess(userId: string, featureType: FeatureType) {
 
       try {
         setIsLoading(true);
-        const result = await checkFeatureAccess(userId, featureType);
+        const result = await checkUsageLimit(userId, featureType);
         
         setIsAllowed(result.allowed);
         setReason(result.reason || '');
@@ -154,7 +145,7 @@ export function useFeatureAccess(userId: string, featureType: FeatureType) {
     
     try {
       setIsLoading(true);
-      const result = await checkFeatureAccess(userId, featureType);
+      const result = await checkUsageLimit(userId, featureType);
       
       setIsAllowed(result.allowed);
       setReason(result.reason || '');

@@ -77,44 +77,56 @@ export const useUsageOverview = (userId: string) => {
   const fetchSubscription = async (): Promise<SubscriptionData> => {
     console.log('Fetching subscription for user:', userId);
     
-    const { data: subscription, error } = await supabase
-      .from('subscriptions')
-      .select('plan_type, renewal_date, trial_start, trial_end, is_active')
-      .eq('user_id', userId)
-      .single();
+      // Use profiles table instead of subscriptions for trial data
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('plan, trial_start, trial_end, is_active')
+        .eq('user_id', userId)
+        .single();
 
-    if (error) {
-      console.warn('No subscription found, using trial defaults:', error);
-      console.log('Creating default trial subscription for user:', userId);
-      
-      // Try to create a default subscription
-      const defaultSubscription = {
-        plan_type: 'trial' as const,
-        renewal_date: null,
-        trial_start: new Date().toISOString(),
-        trial_end: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
-        is_active: true,
-      };
-      
-      // Attempt to insert the default subscription
-      const { error: insertError } = await supabase
-        .from('subscriptions')
-        .insert({
-          user_id: userId,
-          ...defaultSubscription
-        });
-      
-      if (insertError) {
-        console.warn('Failed to create default subscription:', insertError);
-      } else {
-        console.log('✓ Created default trial subscription');
+      if (profileError) {
+        console.warn('No profile found, creating defaults:', profileError);
+        
+        // Create default profile with 8-day trial
+        const trialEnd = new Date(Date.now() + 8 * 24 * 60 * 60 * 1000);
+        const defaultProfile = {
+          plan: 'free_trial' as const,
+          trial_start: new Date().toISOString(),
+          trial_end: trialEnd.toISOString(),
+          is_active: true,
+        };
+        
+        // Attempt to create profile (will be handled by trigger)
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: userId,
+            ...defaultProfile
+          });
+        
+        if (insertError) {
+          console.warn('Failed to create default profile:', insertError);
+        } else {
+          console.log('✓ Created default trial profile');
+        }
+        
+        return {
+          plan_type: 'trial' as const,
+          renewal_date: null,
+          trial_start: defaultProfile.trial_start,
+          trial_end: defaultProfile.trial_end,
+          is_active: defaultProfile.is_active,
+        };
       }
-      
-      return defaultSubscription;
-    }
 
-    console.log('✓ Found subscription:', subscription);
-    return subscription;
+      console.log('✓ Found profile:', profile);
+      return {
+        plan_type: profile.plan === 'business' ? 'business' as const : 'trial' as const,
+        renewal_date: null,
+        trial_start: profile.trial_start,
+        trial_end: profile.trial_end,
+        is_active: profile.is_active,
+      };
   };
 
   const fetchUsageData = async (monthStart: string): Promise<UsageData> => {

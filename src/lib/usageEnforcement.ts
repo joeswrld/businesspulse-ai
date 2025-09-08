@@ -1,96 +1,125 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type FeatureType = 'feedback' | 'insights' | 'analytics' | 'reports';
+export type PlanType = 'free_trial' | 'business';
 
-export interface UsageEnforcementResult {
+export interface UsageLimits {
+  feedbackCount: number;
+  insightsCount: number;
+  analyticsCount: number;
+  reportsCount: number;
+}
+
+export interface EnforcementResult {
   allowed: boolean;
   reason?: string;
   upgradeRequired?: boolean;
 }
 
+const PLAN_LIMITS: Record<PlanType, UsageLimits> = {
+  free_trial: {
+    feedbackCount: 50,
+    insightsCount: 10,
+    analyticsCount: 5,
+    reportsCount: 2,
+  },
+  business: {
+    feedbackCount: -1, // Unlimited
+    insightsCount: -1,
+    analyticsCount: -1,
+    reportsCount: -1,
+  },
+};
+
 /**
- * Check if a user can perform a specific action based on their usage limits
+ * Check if a user can perform a specific action based on their plan and current usage
  */
-export async function checkFeatureAccess(
-  userId: string, 
-  featureType: FeatureType
-): Promise<UsageEnforcementResult> {
+export async function checkUsageLimit(userId: string, action: keyof UsageLimits): Promise<EnforcementResult> {
   try {
-    const { data, error } = await supabase.rpc('check_usage_limit', {
-      user_uuid: userId,
-      feature_type: featureType
-    });
-
-    if (error) {
-      console.error('Error checking usage limit:', error);
-      return {
-        allowed: false,
-        reason: 'Unable to verify usage limits',
-        upgradeRequired: true
-      };
-    }
-
-    if (data === true) {
-      return { allowed: true };
-    }
-
-    // Get user's plan to determine the appropriate message
-    const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select('plan_type')
+    // Use profiles table for plan information
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('plan, is_active, trial_end')
       .eq('user_id', userId)
       .single();
 
-    const planType = subscription?.plan_type || 'trial';
+    const planType = (profile?.plan || 'free_trial') as PlanType;
     
-    if (planType === 'trial') {
+    // Check if user has active business plan
+    if (planType === 'business' && profile?.is_active) {
+      return { allowed: true };
+    }
+
+    // Check if trial is expired
+    if (planType === 'free_trial' && profile?.trial_end) {
+      const isExpired = new Date() > new Date(profile.trial_end);
+      if (isExpired) {
+        return {
+          allowed: false,
+          reason: 'Trial expired. Upgrade to Business to continue.',
+          upgradeRequired: true
+        };
+      }
+    }
+    
+    // Get plan limits
+    const limits = PLAN_LIMITS[planType];
+    const limit = limits[action];
+    
+    // If unlimited (-1), allow
+    if (limit === -1) {
+      return { allowed: true };
+    }
+    
+    // Get current usage
+    const currentUsage = await getCurrentUsage(userId, action);
+    
+    if (currentUsage >= limit) {
       return {
         allowed: false,
-        reason: 'Trial expired or limit reached. Upgrade to Pro or Business to continue.',
-        upgradeRequired: true
-      };
-    } else {
-      return {
-        allowed: false,
-        reason: 'Usage limit reached. Upgrade to Business for unlimited access.',
+        reason: `${action} limit reached (${limit}). Upgrade to Business for unlimited access.`,
         upgradeRequired: true
       };
     }
+    
+    return { allowed: true };
   } catch (error) {
-    console.error('Error in checkFeatureAccess:', error);
+    console.error('Error checking usage limit:', error);
     return {
       allowed: false,
-      reason: 'Unable to verify usage limits',
-      upgradeRequired: true
+      reason: 'Error checking usage limits',
+      upgradeRequired: false
     };
   }
 }
 
 /**
- * Check if a user's trial has expired
+ * Check if trial has expired for a user
  */
 export async function isTrialExpired(userId: string): Promise<boolean> {
   try {
-    const { data: subscription, error } = await supabase
-      .from('subscriptions')
-      .select('plan_type, trial_end')
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('plan, trial_end, is_active')
       .eq('user_id', userId)
       .single();
 
-    if (error || !subscription) {
-      // If no subscription found, assume trial expired
+    if (error || !profile) {
+      // If no profile found, assume trial expired
       return true;
     }
 
-    if (subscription.plan_type !== 'trial') {
+    // Business users with active subscription are never expired
+    if (profile.plan === 'business' && profile.is_active) {
       return false;
     }
 
-    if (!subscription.trial_end) {
-      return true;
+    // Check trial expiration for free trial users
+    if (profile.plan === 'free_trial' && profile.trial_end) {
+      return new Date() > new Date(profile.trial_end);
     }
 
-    return new Date() > new Date(subscription.trial_end);
+    // Default to expired if no trial end date
+    return true;
   } catch (error) {
     console.error('Error checking trial status:', error);
     return true; // Assume expired on error
@@ -100,124 +129,163 @@ export async function isTrialExpired(userId: string): Promise<boolean> {
 /**
  * Get user's current plan type
  */
-export async function getUserPlanType(userId: string): Promise<'trial' | 'pro' | 'business'> {
+export async function getUserPlanType(userId: string): Promise<PlanType> {
   try {
-    const { data: subscription, error } = await supabase
-      .from('subscriptions')
-      .select('plan_type')
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('plan')
       .eq('user_id', userId)
       .single();
 
-    if (error || !subscription) {
-      return 'trial';
+    if (error || !profile) {
+      return 'free_trial';
     }
 
-    return subscription.plan_type as 'trial' | 'pro' | 'business';
+    return (profile.plan || 'free_trial') as PlanType;
   } catch (error) {
     console.error('Error getting user plan type:', error);
-    return 'trial';
+    return 'free_trial';
   }
 }
 
 /**
- * Create or update user subscription
+ * Get current usage count for a specific action
  */
-export async function createOrUpdateSubscription(
-  userId: string,
-  planType: 'trial' | 'pro' | 'business',
-  renewalDate?: string,
-  trialEnd?: string
-): Promise<boolean> {
+async function getCurrentUsage(userId: string, action: keyof UsageLimits): Promise<number> {
   try {
-    const subscriptionData: any = {
-      user_id: userId,
-      plan_type: planType,
-      is_active: true,
-      updated_at: new Date().toISOString()
-    };
-
-    if (renewalDate) {
-      subscriptionData.renewal_date = renewalDate;
+    const currentMonth = new Date().toISOString().slice(0, 7) + '-01'; // YYYY-MM-01
+    
+    const { data: usage, error } = await supabase
+      .from('usage_counters')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('month_start', currentMonth)
+      .single();
+    
+    if (error || !usage) {
+      return 0;
     }
-
-    if (trialEnd) {
-      subscriptionData.trial_end = trialEnd;
+    
+    switch (action) {
+      case 'feedbackCount':
+        return usage.feedback_count || 0;
+      case 'insightsCount':
+        return usage.insights_count || 0;
+      case 'analyticsCount':
+        return usage.analytics_count || 0;
+      case 'reportsCount':
+        return usage.reports_count || 0;
+      default:
+        return 0;
     }
+  } catch (error) {
+    console.error('Error getting current usage:', error);
+    return 0;
+  }
+}
 
-    if (planType === 'trial') {
-      subscriptionData.trial_start = new Date().toISOString();
-      subscriptionData.trial_end = new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString();
-    }
-
-    const { error } = await supabase
-      .from('subscriptions')
-      .upsert(subscriptionData, { 
-        onConflict: 'user_id',
-        ignoreDuplicates: false 
+/**
+ * Increment usage counter for a specific action
+ */
+export async function incrementUsage(userId: string, action: keyof UsageLimits): Promise<void> {
+  try {
+    const currentMonth = new Date().toISOString().slice(0, 7) + '-01'; // YYYY-MM-01
+    
+    // First ensure the usage counter exists
+    const { error: upsertError } = await supabase
+      .from('usage_counters')
+      .upsert({
+        user_id: userId,
+        month_start: currentMonth,
+        feedback_count: 0,
+        insights_count: 0,
+        analytics_count: 0,
+        reports_count: 0,
+      }, { 
+        onConflict: 'user_id,month_start',
+        ignoreDuplicates: true 
       });
-
-    if (error) {
-      console.error('Error creating/updating subscription:', error);
-      return false;
+    
+    if (upsertError) {
+      console.warn('Error ensuring usage counter exists:', upsertError);
     }
-
-    return true;
+    
+    // Then increment the specific counter
+    let updateField: string;
+    switch (action) {
+      case 'feedbackCount':
+        updateField = 'feedback_count';
+        break;
+      case 'insightsCount':
+        updateField = 'insights_count';
+        break;
+      case 'analyticsCount':
+        updateField = 'analytics_count';
+        break;
+      case 'reportsCount':
+        updateField = 'reports_count';
+        break;
+      default:
+        return;
+    }
+    
+    // Get current count and increment by 1
+    const { data: current, error: fetchError } = await supabase
+      .from('usage_counters')
+      .select(updateField)
+      .eq('user_id', userId)
+      .eq('month_start', currentMonth)
+      .single();
+    
+    if (fetchError) {
+      console.warn('Error fetching current usage:', fetchError);
+      return;
+    }
+    
+    const newValue = (current?.[updateField] || 0) + 1;
+    
+    const { error } = await supabase
+      .from('usage_counters')
+      .update({ [updateField]: newValue })
+      .eq('user_id', userId)
+      .eq('month_start', currentMonth);
+    
+    if (error) {
+      console.error(`Error incrementing ${action}:`, error);
+    }
   } catch (error) {
-    console.error('Error in createOrUpdateSubscription:', error);
-    return false;
+    console.error('Error incrementing usage:', error);
   }
 }
 
 /**
- * Refresh user usage data for the current month
+ * Get usage summary for a user
  */
-export async function refreshUserUsage(userId: string): Promise<boolean> {
+export async function getUsageSummary(userId: string): Promise<UsageLimits & { planType: PlanType }> {
   try {
-    const currentMonthStart = new Date();
-    currentMonthStart.setDate(1);
-    currentMonthStart.setHours(0, 0, 0, 0);
-
-    const { error } = await supabase.rpc('refresh_user_usage', {
-      user_uuid: userId,
-      target_month_start: currentMonthStart.toISOString().split('T')[0]
-    });
-
-    if (error) {
-      console.error('Error refreshing user usage:', error);
-      return false;
-    }
-
-    return true;
+    const planType = await getUserPlanType(userId);
+    const currentUsage = await Promise.all([
+      getCurrentUsage(userId, 'feedbackCount'),
+      getCurrentUsage(userId, 'insightsCount'),
+      getCurrentUsage(userId, 'analyticsCount'),
+      getCurrentUsage(userId, 'reportsCount'),
+    ]);
+    
+    return {
+      feedbackCount: currentUsage[0],
+      insightsCount: currentUsage[1],
+      analyticsCount: currentUsage[2],
+      reportsCount: currentUsage[3],
+      planType,
+    };
   } catch (error) {
-    console.error('Error in refreshUserUsage:', error);
-    return false;
+    console.error('Error getting usage summary:', error);
+    return {
+      feedbackCount: 0,
+      insightsCount: 0,
+      analyticsCount: 0,
+      reportsCount: 0,
+      planType: 'free_trial',
+    };
   }
-}
-
-/**
- * Hook for feature access checking with React
- */
-export function useFeatureAccess(userId: string) {
-  const checkAccess = async (featureType: FeatureType) => {
-    return await checkFeatureAccess(userId, featureType);
-  };
-
-  const checkTrialStatus = async () => {
-    return await isTrialExpired(userId);
-  };
-
-  const getPlanType = async () => {
-    return await getUserPlanType(userId);
-  };
-
-  const refreshUsage = async () => {
-    return await refreshUserUsage(userId);
-  };
-
-  return {
-    checkAccess,
-    checkTrialStatus,
-    getPlanType,
-    refreshUsage
-  };
 }

@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 // import { verifyPaystackPayment, simplePaymentVerification } from '@/utils/paystackVerification';
 
 interface PaystackPaymentProps {
-  plan: 'business';
+  plan: 'business' | 'pro';
   planName: string;
   planPrice: string;
   onSuccess: (data: { reference: string; plan: string }) => void;

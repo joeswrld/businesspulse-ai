@@ -392,7 +392,6 @@ export function useBillingSystem(): BillingSystemState {
       
       return (
         subscriptionStatus === 'active' || 
-        currentPlan === 'pro' || 
         currentPlan === 'business'
       );
     } catch (error) {
@@ -591,8 +590,7 @@ export function useBillingSystem(): BillingSystemState {
           .insert({
             user_id: profileToUse.id,
             plan_code: profileToUse.plan || 'trial',
-            plan_name: profileToUse.plan === 'pro' ? 'Pro Plan' : 
-                      profileToUse.plan === 'business' ? 'Business Plan' : 'Free Trial',
+            plan_name: profileToUse.plan === 'business' ? 'Business Plan' : 'Free Trial',
             status: 'cancelled',
             cancel_at_period_end: true,
             canceled_at: new Date().toISOString(),
