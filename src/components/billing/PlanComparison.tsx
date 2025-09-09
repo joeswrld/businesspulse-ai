@@ -55,9 +55,10 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
         { name: 'Export Formats', limit: ['CSV', 'PDF', 'Excel'], unit: 'formats' },
         { name: 'Support', limit: ['Email'], unit: 'channels' },
         { name: 'Data Retention', limit: 'Unlimited', unit: 'retention' },
-        { name: 'Priority Support', limit: true, unit: 'feature' 
-        { name: 'Predictive Analytics', limit: true, unit: 'feature' 
+        { name: 'Priority Support', limit: true, unit: 'feature' },
+        { name: 'Predictive Analytics', limit: true, unit: 'feature' },
       ],
+  
       popular: true,
       comingSoon: false
     }
