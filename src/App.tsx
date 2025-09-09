@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NoteXTrialProvider } from "@/contexts/NoteXTrialContext";
+import { AuthFlowGuard } from "@/components/AuthFlowGuard";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -189,93 +190,113 @@ const App = () => (
             {/* Protected routes */}
             <Route path="/dashboard" element={
               <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <Dashboard />
-                  </DashboardLayout>
-                </Suspense>
+                <AuthFlowGuard>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <DashboardLayout>
+                      <Dashboard />
+                    </DashboardLayout>
+                  </Suspense>
+                </AuthFlowGuard>
               </ProtectedRoute>
             } />
             <Route path="/insights" element={
               <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <Insights />
-                  </DashboardLayout>
-                </Suspense>
+                <AuthFlowGuard>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <DashboardLayout>
+                      <Insights />
+                    </DashboardLayout>
+                  </Suspense>
+                </AuthFlowGuard>
               </ProtectedRoute>
             } />
 
             <Route path="/reports" element={
               <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <Reports />
-                  </DashboardLayout>
-                </Suspense>
+                <AuthFlowGuard>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <DashboardLayout>
+                      <Reports />
+                    </DashboardLayout>
+                  </Suspense>
+                </AuthFlowGuard>
               </ProtectedRoute>
             } />
             <Route path="/analytics" element={
               <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <Analytics />
-                  </DashboardLayout>
-                </Suspense>
+                <AuthFlowGuard>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <DashboardLayout>
+                      <Analytics />
+                    </DashboardLayout>
+                  </Suspense>
+                </AuthFlowGuard>
               </ProtectedRoute>
             } />
             <Route path="/settings" element={
               <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <Settings />
-                  </DashboardLayout>
-                </Suspense>
+                <AuthFlowGuard>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <DashboardLayout>
+                      <Settings />
+                    </DashboardLayout>
+                  </Suspense>
+                </AuthFlowGuard>
               </ProtectedRoute>
             } />
             <Route path="/teams" element={
                 <ProtectedRoute>
+                <AuthFlowGuard>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Teams />
                   </DashboardLayout>
                 </Suspense>
+                </AuthFlowGuard>
                 </ProtectedRoute>
             } />
             <Route path="/billing" element={
               <ProtectedRoute requireActiveSubscription={false}>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <Billing />
-                  </DashboardLayout>
-                </Suspense>
+                <AuthFlowGuard>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <DashboardLayout>
+                      <Billing />
+                    </DashboardLayout>
+                  </Suspense>
+                </AuthFlowGuard>
               </ProtectedRoute>
             } />
             <Route path="/feedback" element={
               <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <Feedback />
-                  </DashboardLayout>
-                </Suspense>
+                <AuthFlowGuard>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <DashboardLayout>
+                      <Feedback />
+                    </DashboardLayout>
+                  </Suspense>
+                </AuthFlowGuard>
               </ProtectedRoute>
             } />
             <Route path="/feedback-settings" element={
               <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <FeedbackSettings />
-                  </DashboardLayout>
-                </Suspense>
+                <AuthFlowGuard>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <DashboardLayout>
+                      <FeedbackSettings />
+                    </DashboardLayout>
+                  </Suspense>
+                </AuthFlowGuard>
               </ProtectedRoute>
             } />
             <Route path="/realtime-test" element={
               <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <RealtimeTest />
-                  </DashboardLayout>
-                </Suspense>
+                <AuthFlowGuard>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <DashboardLayout>
+                      <RealtimeTest />
+                    </DashboardLayout>
+                  </Suspense>
+                </AuthFlowGuard>
               </ProtectedRoute>
             } />
             {/* <Route path="/teams/invite/:token" element={
@@ -286,11 +307,13 @@ const App = () => (
 
             <Route path="/profile" element={
               <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <Profile />
-                  </DashboardLayout>
-                </Suspense>
+                <AuthFlowGuard>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <DashboardLayout>
+                      <Profile />
+                    </DashboardLayout>
+                  </Suspense>
+                </AuthFlowGuard>
               </ProtectedRoute>
             } />
             

@@ -35,56 +35,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [seededSettingsFor, setSeededSettingsFor] = useState<string | null>(null);
-
-  // Helper function to ensure user profile exists (non-blocking)
-  const ensureUserProfile = async (user: any) => {
-    try {
-      if (seededSettingsFor === user.id) return;
-
-      console.log("🔧 Ensuring user profile exists for:", user.email);
-
-      // Check if profile exists
-      const { data: existing } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .limit(1);
-
-      if (!existing || existing.length === 0) {
-        console.log("🔧 Profile not found, creating...");
-        
-        // Create profile using our safe function
-        const { data: profileResult, error: profileError } = await supabase.rpc('create_user_profile_safe', {
-          user_uuid: user.id,
-          user_email: user.email,
-          first_name: user.user_metadata?.first_name || null,
-          last_name: user.user_metadata?.last_name || null,
-          company_name: user.user_metadata?.company_name || null
-        });
-
-        if (profileError) {
-          console.error("❌ Profile creation failed:", profileError);
-        } else {
-          console.log("✅ Profile created successfully:", profileResult);
-        }
-      } else {
-        console.log("✅ Profile already exists");
-      }
-      
-      setSeededSettingsFor(user.id);
-    } catch (e) {
-      console.warn('Non-fatal: could not ensure user profile:', e);
-    }
-  };
-
 
   useEffect(() => {
     let mounted = true;
 
     console.log("🔐 AuthProvider: Initializing authentication...");
 
-    // Set up auth state listener FIRST
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("🔐 Auth state changed:", event, session?.user?.email);
@@ -103,18 +60,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.log("🔄 Token refreshed");
           }
         }
-
-        // Defer profile creation to avoid blocking auth flow
-        if (session?.user?.id && !seededSettingsFor) {
-          // Defer this operation to avoid blocking the auth state change
-          setTimeout(() => {
-            ensureUserProfile(session.user);
-          }, 1000);
-        }
       }
     );
 
-    // THEN check for existing session
+    // Check for existing session
     const getInitialSession = async () => {
       try {
         console.log("🔐 Checking for existing session...");
