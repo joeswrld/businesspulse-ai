@@ -21,8 +21,56 @@ interface UnifiedPlatformLockProps {
 export default function UnifiedPlatformLock({ children, fallbackComponent }: UnifiedPlatformLockProps) {
   const { trialStatus, checkAccess, getTrialMessage, isTrialExpired, getLockReason } = useUnifiedTrial();
 
-  // Check if platform should be locked
-  const shouldLock = !checkAccess();
+  // Check if platform should be locked with more robust logic
+  const shouldLock = (() => {
+    // If loading, don't lock (give benefit of doubt)
+    if (trialStatus.loading) {
+      console.log('⏳ Loading state - not locking platform');
+      return false;
+    }
+
+    // If there's an error, don't lock (allow access)
+    if (trialStatus.error) {
+      console.log('⚠️ Error state - not locking platform');
+      return false;
+    }
+
+    // Business plan users with active subscription - never lock
+    if (trialStatus.plan === 'business' && trialStatus.subscriptionActive) {
+      console.log('✅ Business user with active subscription - not locking');
+      return false;
+    }
+
+    // Trial users - check if trial is expired
+    if (trialStatus.plan === 'free_trial') {
+      // If trial has never started (new user), don't lock
+      if (!trialStatus.trialStart) {
+        console.log('🆕 New user without trial start - not locking');
+        return false;
+      }
+
+      // If trial is expired, lock
+      if (trialStatus.trialExpired || trialStatus.daysLeft <= 0) {
+        console.log('🔒 Trial expired - locking platform');
+        return true;
+      }
+
+      // Trial is active, don't lock
+      console.log('✅ Active trial - not locking');
+      return false;
+    }
+
+    // Business plan users with inactive subscription - lock
+    if (trialStatus.plan === 'business' && !trialStatus.subscriptionActive) {
+      console.log('🔒 Business user with inactive subscription - locking platform');
+      return true;
+    }
+
+    // Default: don't lock (for edge cases)
+    console.log('✅ Default case - not locking');
+    return false;
+  })();
+
   const lockReason = getLockReason();
 
   console.log('🔒 UnifiedPlatformLock check:', {
@@ -32,7 +80,9 @@ export default function UnifiedPlatformLock({ children, fallbackComponent }: Uni
     subscriptionActive: trialStatus.subscriptionActive,
     trialExpired: trialStatus.trialExpired,
     daysLeft: trialStatus.daysLeft,
-    hasAccess: trialStatus.hasAccess
+    hasAccess: trialStatus.hasAccess,
+    loading: trialStatus.loading,
+    error: trialStatus.error
   });
 
   // If platform should not be locked, render children

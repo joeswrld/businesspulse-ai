@@ -249,20 +249,7 @@ serve(async (req) => {
 
     const { error: billingError } = await supabase
       .from('billing_profiles')
-
       .upsert(billingProfileData, {
-
-      .upsert({
-        id: user.id,
-        plan: plan,
-        trial_ends_at: null,
-        next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
-        subscription_status: 'active',
-        paystack_customer_id: transaction.customer?.customer_code || null,
-        paystack_subscription_id: transaction.subscription?.subscription_code || null,
-        created_at: new Date().toISOString()
-      }, {
-
         onConflict: 'id'
       })
 
@@ -298,18 +285,7 @@ serve(async (req) => {
 
     const { error: transactionError } = await supabase
       .from('transactions')
-
       .insert(transactionData)
-
-      .insert({
-        user_id: user.id,
-        amount: amount,
-        currency: 'NGN',
-        status: 'success',
-        description: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan Subscription`,
-        paystack_reference: reference,
-        created_at: new Date().toISOString()
-      })
 
 
     if (transactionError) {
@@ -347,22 +323,7 @@ serve(async (req) => {
 
     const { error: subscriptionError } = await supabase
       .from('user_subscriptions')
-
       .upsert(subscriptionData, {
-
-      .upsert({
-        user_id: user.id,
-        plan_code: plan === 'pro' ? 'PLN_4z2wpgmw41w2k7r' : 'PLN_esryg99ztsy9xc8',
-        plan_name: plan === 'pro' ? 'Pro Plan' : 'Business Plan',
-        status: 'active',
-        current_period_start: new Date().toISOString(),
-        current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        cancel_at_period_end: false,
-        canceled_at: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }, {
-
         onConflict: 'user_id'
       })
 
@@ -404,21 +365,7 @@ serve(async (req) => {
     console.log('Payment verification successful:', successResponse);
 
     return new Response(
-
       JSON.stringify(successResponse),
-
-      JSON.stringify({
-        success: true,
-        message: 'Subscription activated successfully',
-        data: {
-          user_id: user.id,
-          plan: plan,
-          reference: reference,
-          amount: amount,
-          paystack_transaction_id: transaction.id
-        }
-      }),
-
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

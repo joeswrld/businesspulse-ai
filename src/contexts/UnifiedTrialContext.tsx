@@ -49,7 +49,7 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
     error: null,
   });
 
-  // Initialize trial for new user (8 days)
+  // Initialize trial for new user (8 days from signup)
   const initializeTrial = async (): Promise<UnifiedTrialStatus> => {
     if (!user) {
       return {
@@ -67,6 +67,68 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
       };
     }
 
+    // Check if user already has trial data in localStorage
+    const existingTrialData = localStorage.getItem(`unified_trial_${user.id}`);
+    if (existingTrialData) {
+      try {
+        const parsed = JSON.parse(existingTrialData);
+        // If trial already exists, don't reinitialize
+        if (parsed.trialStart && parsed.plan === 'free_trial') {
+          console.log('🔄 Using existing trial data from localStorage');
+          return {
+            ...parsed,
+            loading: false,
+            error: null,
+          };
+        }
+      } catch (error) {
+        console.warn('Error parsing existing trial data:', error);
+      }
+    }
+
+    // Check if user has trial data in database
+    try {
+      const { data: existingData, error: dbError } = await supabase
+        .from('billing_profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (existingData && !dbError) {
+        console.log('🔄 Using existing trial data from database');
+        const now = new Date();
+        const trialStart = existingData.trial_start || existingData.created_at;
+        const trialEnd = existingData.trial_ends_at || existingData.trial_end;
+        
+        if (trialStart && trialEnd) {
+          const trialStartDate = new Date(trialStart);
+          const trialEndDate = new Date(trialEnd);
+          const daysLeft = Math.max(0, Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+          
+          const status = {
+            hasAccess: daysLeft > 0,
+            plan: 'free_trial' as const,
+            isActive: daysLeft > 0,
+            subscriptionActive: false,
+            trialExpired: daysLeft <= 0,
+            daysLeft,
+            trialStart,
+            trialEnd,
+            subscriptionExpiryDate: null,
+            loading: false,
+            error: null,
+          };
+
+          // Update localStorage
+          localStorage.setItem(`unified_trial_${user.id}`, JSON.stringify(status));
+          return status;
+        }
+      }
+    } catch (error) {
+      console.warn('Error checking existing trial data:', error);
+    }
+
+    // Create new trial - 8 days from now
     const now = new Date();
     const trialStart = now.toISOString();
     const trialEnd = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString(); // 8 days
@@ -95,7 +157,7 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
     // Store in localStorage as backup
     const trialData = {
       plan: 'free_trial',
-      isActive: false,
+      isActive: true,
       subscriptionActive: false,
       trialStart,
       trialEnd,
@@ -109,7 +171,7 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
     return {
       hasAccess: true, // New users should have access
       plan: 'free_trial',
-      isActive: false,
+      isActive: true,
       subscriptionActive: false,
       trialExpired: false,
       daysLeft: 8,
@@ -174,11 +236,11 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
       // Calculate days left
       let daysLeft = 0;
       if (result.plan === 'business' && result.subscription_active) {
-        // Business users - show days since upgrade
-        const upgradeDate = new Date(result.trial_end || new Date());
-        daysLeft = Math.floor((now.getTime() - upgradeDate.getTime()) / (1000 * 60 * 60 * 24));
+        // Business users - show days since upgrade (countdown from when they paid)
+        const upgradeDate = new Date(result.trial_end || result.created_at || new Date());
+        daysLeft = Math.max(0, Math.floor((now.getTime() - upgradeDate.getTime()) / (1000 * 60 * 60 * 24)));
       } else if (result.plan === 'free_trial' && result.trial_end) {
-        // Trial users - show days remaining
+        // Trial users - show days remaining (countdown to trial end)
         const trialEndDate = new Date(result.trial_end);
         daysLeft = Math.max(0, Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
       }
@@ -262,15 +324,16 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
       }
 
       // Update localStorage
+      const now = new Date();
       const businessData = {
         plan: 'business',
         isActive: true,
         subscriptionActive: true,
         trialExpired: false,
-        daysLeft: 0,
-        trialStart: new Date().toISOString(),
-        trialEnd: new Date().toISOString(),
-        subscriptionExpiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
+        daysLeft: 0, // Business users start countdown from 0
+        trialStart: now.toISOString(), // Business plan start date
+        trialEnd: now.toISOString(), // Business plan start date (same as trialStart for business)
+        subscriptionExpiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
       };
       
       localStorage.setItem(`unified_trial_${user.id}`, JSON.stringify(businessData));
@@ -283,10 +346,10 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
         isActive: true,
         subscriptionActive: true,
         trialExpired: false,
-        daysLeft: 0,
-        trialStart: new Date().toISOString(),
-        trialEnd: new Date().toISOString(),
-        subscriptionExpiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        daysLeft: 0, // Business users start countdown from 0
+        trialStart: now.toISOString(), // Business plan start date
+        trialEnd: now.toISOString(), // Business plan start date
+        subscriptionExpiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         loading: false,
         error: null,
       }));
@@ -308,6 +371,12 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
       return true;
     }
 
+    // If there's an error, give access (don't lock out due to errors)
+    if (trialStatus.error) {
+      console.log('⚠️ Error state - allowing access');
+      return true;
+    }
+
     // Business plan users with active subscription ALWAYS have access
     if (trialStatus.plan === 'business' && trialStatus.subscriptionActive) {
       console.log('✅ Business user with active subscription - allowing access');
@@ -315,15 +384,24 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
 
     // Trial users have access if trial is active and not expired
-    if (trialStatus.plan === 'free_trial' && !trialStatus.trialExpired && trialStatus.daysLeft > 0) {
-      console.log('✅ Trial user with active trial - allowing access');
-      return true;
-    }
+    if (trialStatus.plan === 'free_trial') {
+      // New users (never used trial before) should not be locked
+      if (!trialStatus.trialStart) {
+        console.log('✅ New user without trial start - allowing access');
+        return true;
+      }
 
-    // New users (never used trial before) should not be locked
-    if (trialStatus.plan === 'free_trial' && !trialStatus.trialStart) {
-      console.log('✅ New user - allowing access');
-      return true;
+      // If trial is active and not expired, allow access
+      if (!trialStatus.trialExpired && trialStatus.daysLeft > 0) {
+        console.log('✅ Trial user with active trial - allowing access');
+        return true;
+      }
+
+      // If trial is expired, lock
+      if (trialStatus.trialExpired || trialStatus.daysLeft <= 0) {
+        console.log('🔒 Trial user with expired trial - locking platform');
+        return false;
+      }
     }
 
     // Business plan users with inactive subscription should be locked
@@ -332,13 +410,7 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
       return false;
     }
 
-    // Trial users with expired trial should be locked
-    if (trialStatus.plan === 'free_trial' && trialStatus.trialExpired) {
-      console.log('🔒 Trial user with expired trial - locking platform');
-      return false;
-    }
-
-    // Default: allow access (for new users or edge cases)
+    // Default: allow access (for edge cases)
     console.log('✅ Default access granted');
     return true;
   };
@@ -374,13 +446,38 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   // Get trial message for UI
   const getTrialMessage = (): string => {
-    if (trialStatus.loading) return 'Loading trial status...';
-    if (trialStatus.error) return 'Error loading trial status';
-    if (trialStatus.plan === 'business' && trialStatus.subscriptionActive) return 'You have an active Business subscription';
-    if (trialStatus.plan === 'free_trial' && !trialStatus.trialExpired) return `Your free trial ends in ${getDaysLeft()} days`;
-    if (isTrialExpired()) return 'Your free trial has expired. Upgrade to Business to continue using NoteX.';
-    if (trialStatus.plan === 'business' && !trialStatus.subscriptionActive) return 'Your Business subscription is inactive. Please contact support.';
-    return 'Trial status unknown';
+    if (trialStatus.loading) return 'Loading plan status...';
+    if (trialStatus.error) return 'Error loading plan status';
+    
+    if (trialStatus.plan === 'business' && trialStatus.subscriptionActive) {
+      const daysSinceUpgrade = getDaysLeft();
+      if (daysSinceUpgrade === 0) {
+        return 'Welcome to Business! Your subscription is active.';
+      } else {
+        return `Business Plan - Active for ${daysSinceUpgrade} days`;
+      }
+    }
+    
+    if (trialStatus.plan === 'free_trial' && !trialStatus.trialExpired) {
+      const daysLeft = getDaysLeft();
+      if (daysLeft === 8) {
+        return 'Welcome! Your 8-day free trial has started.';
+      } else if (daysLeft > 0) {
+        return `Free Trial - ${daysLeft} days remaining`;
+      } else {
+        return 'Your free trial has ended.';
+      }
+    }
+    
+    if (isTrialExpired()) {
+      return 'Your free trial has expired. Upgrade to Business to continue using NoteX.';
+    }
+    
+    if (trialStatus.plan === 'business' && !trialStatus.subscriptionActive) {
+      return 'Your Business subscription is inactive. Please contact support.';
+    }
+    
+    return 'Plan status unknown';
   };
 
   // Load trial status on mount and when user changes
