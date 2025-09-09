@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FeedbackBadgeGroup } from '@/components/ui/FeedbackBadge';
 import { useRealtimeFeedback } from '@/hooks/useRealtimeFeedback';
+import PlanStatusDisplay from '@/components/PlanStatusDisplay';
 import { toast } from 'sonner';
 // import { checkAndSetupDatabase } from '@/utils/databaseCheck';
 import { 
@@ -780,28 +781,27 @@ export default function Dashboard() {
         <Card className="rounded-xl shadow-lg border-2 border-blue-200 bg-blue-50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Plan Status</CardTitle>
-            {planInfo.planName === 'Business' ? (
-              <Crown className="h-4 w-4 text-yellow-600" />
-            ) : (
-              <CreditCard className="h-4 w-4 text-blue-600" />
-            )}
+            <PlanStatusDisplay variant="compact" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold text-blue-900">
-              {planInfo.planName}
+            <div className="text-lg font-bold text-blue-900 mb-2">
+              {trialStatus.plan === 'business' ? 'Business Plan' : 'Free Trial'}
             </div>
-            {planInfo.isTrial && planInfo.daysLeft > 0 && (
-              <p className="text-xs text-blue-700 mt-1">
-                {planInfo.daysLeft} days left
-              </p>
-            )}
+            <div className="text-sm text-blue-700 mb-3">
+              {trialStatus.plan === 'business' 
+                ? `Active for ${trialStatus.daysLeft} days`
+                : trialStatus.daysLeft > 0 
+                  ? `${trialStatus.daysLeft} days remaining`
+                  : 'Trial expired'
+              }
+            </div>
             <Button 
               size="sm" 
-              className="mt-2 w-full text-xs"
+              className="w-full text-xs"
               asChild
             >
-              <a href={planInfo.upgradeLink}>
-                {planInfo.upgradeText}
+              <a href="/billing">
+                {trialStatus.plan === 'business' ? 'Manage Plan' : 'Upgrade Now'}
               </a>
             </Button>
           </CardContent>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBillingSystem, getPlanLimits, formatCurrency, formatDate, getPlanDisplayName, getPlanPrice, getPlanPricing } from '@/hooks/useBillingSystem';
 import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
+import PlanStatusDisplay from '@/components/PlanStatusDisplay';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -125,7 +126,7 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
 
 const BillingPage: React.FC = () => {
   const { user } = useAuth();
-  const { trialStatus, refreshTrialStatus, upgradeToBusiness } = useUnifiedTrial();
+  const { trialStatus, refreshTrialStatus, upgradeToBusiness, getDaysLeft, isTrialExpired } = useUnifiedTrial();
   const {
     billingProfile,
     transactions,
@@ -133,8 +134,6 @@ const BillingPage: React.FC = () => {
     error,
     refreshing,
     currentPlan,
-    trialDaysLeft,
-    isTrialExpired,
     isSubscriptionActive,
     isPaymentPastDue,
     nextBillingDate,
@@ -233,21 +232,27 @@ NoteX Team
     }
   };
 
-  // Get current plan display info
+  // Get current plan display info using unified trial system
   const getCurrentPlanDisplay = () => {
-    const planName = getPlanDisplayName(currentPlan);
+    const planName = trialStatus.plan === 'business' ? 'Business Plan' : 'Free Trial';
     let color = 'bg-gray-50 text-gray-700 border-gray-200';
     let statusLabel = '';
 
-    if (currentPlan === 'trial') {
+    if (trialStatus.plan === 'free_trial') {
       color = 'bg-blue-50 text-blue-700 border-blue-200';
-      if (isTrialExpired) {
+      if (isTrialExpired()) {
         statusLabel = ' - Expired';
       } else {
-        statusLabel = ` - ${trialDaysLeft} days left`;
+        statusLabel = ` - ${getDaysLeft()} days left`;
       }
-    } else if (currentPlan === 'business') {
-      color = 'bg-amber-50 text-amber-700 border-amber-200';
+    } else if (trialStatus.plan === 'business') {
+      color = 'bg-green-50 text-green-700 border-green-200';
+      if (trialStatus.subscriptionActive) {
+        statusLabel = ` - Active for ${getDaysLeft()} days`;
+      } else {
+        statusLabel = ' - Inactive';
+        color = 'bg-orange-50 text-orange-700 border-orange-200';
+      }
     }
 
     if (isPaymentPastDue) {
@@ -382,7 +387,7 @@ NoteX Team
         </div>
 
         {/* Critical Alerts */}
-        {isTrialExpired && (
+        {isTrialExpired() && (
           <Alert className="mb-6 border-red-200 bg-red-50">
             <AlertTriangle className="h-4 w-4 text-red-600" />
             <AlertDescription className="text-red-800">
@@ -457,31 +462,23 @@ NoteX Team
               </div>
               
               {/* Trial Days or Next Billing */}
-              {currentPlan === 'trial' && !isTrialExpired && (
+              {trialStatus.plan === 'free_trial' && !isTrialExpired() && (
                 <div className="text-center p-6 bg-blue-50 rounded-xl border border-blue-200">
                   <div className="flex items-center justify-center mb-3">
                     <Timer className="h-6 w-6 text-blue-600" />
                   </div>
-                  <div className="text-3xl font-bold text-blue-900 mb-2">{trialDaysLeft}</div>
+                  <div className="text-3xl font-bold text-blue-900 mb-2">{getDaysLeft()}</div>
                   <div className="text-sm text-blue-600">trial days left</div>
                 </div>
               )}
               
-              {subscriptionEndDate && currentPlan !== 'trial' && (
+              {trialStatus.plan === 'business' && trialStatus.subscriptionActive && (
                 <div className="text-center p-6 bg-green-50 rounded-xl border border-green-200">
                   <div className="flex items-center justify-center mb-3">
                     <CalendarDays className="h-6 w-6 text-green-600" />
                   </div>
-                  <div className="text-xl font-bold text-green-900 mb-2">
-                    {subscriptionEndDate.toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </div>
-                  <div className="text-sm text-green-600">
-                    {isPaymentPastDue ? 'Payment Due' : 'Next Billing'}
-                  </div>
+                  <div className="text-3xl font-bold text-green-900 mb-2">{getDaysLeft()}</div>
+                  <div className="text-sm text-green-600">days active</div>
                 </div>
               )}
 
@@ -511,7 +508,7 @@ NoteX Team
             {/* Action Buttons */}
             <div className="mt-8 pt-6 border-t border-gray-200">
               <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-                {currentPlan === 'trial' && !isTrialExpired && (
+                {trialStatus.plan === 'free_trial' && !isTrialExpired() && (
                   <Button 
                     onClick={() => handleUpgradeClick('business')} 
                     className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white px-6 py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200"
@@ -521,7 +518,7 @@ NoteX Team
                   </Button>
                 )}
                 
-                {(isSubscriptionActive || currentPlan === 'business') && (
+                {trialStatus.plan === 'business' && trialStatus.subscriptionActive && (
                   <Button 
                     variant="outline" 
                     onClick={handleCancelSubscription} 
