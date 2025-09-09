@@ -98,7 +98,7 @@ const AuthPage = () => {
 
         toast({
           title: "Account created!",
-          description: "Please check your email to verify your account before signing in.",
+          description: "Please check your email to verify your account before signing in. Your 8-day free trial will begin after verification.",
         });
       }
     } catch (error: any) {

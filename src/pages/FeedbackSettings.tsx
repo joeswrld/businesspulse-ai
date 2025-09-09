@@ -25,8 +25,10 @@ import {
 } from "lucide-react";
 import QRCodeFeedbackSection from "@/components/feedback/QRCodeFeedbackSection";
 import EmailSignatureFeedbackSection from "@/components/feedback/EmailSignatureFeedbackSection";
+import WidgetSettingsLock from "@/components/WidgetSettingsLock";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNoteXTrial } from "@/contexts/NoteXTrialContext";
 import { supabase } from "@/integrations/supabase/client";
 import LogoUpload from "@/components/LogoUpload";
 
@@ -985,16 +987,21 @@ const FeedbackSettings = () => {
         
 
         {/* Widget Customization */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Palette className="h-5 w-5" />
-              <span>Widget Customization</span>
-            </CardTitle>
-            <CardDescription>
-              Customize the appearance and behavior of your feedback widget.
-            </CardDescription>
-          </CardHeader>
+        <WidgetSettingsLock 
+          widgetType="feedback"
+          title="Widget Customization"
+          description="Customize the appearance and behavior of your feedback widget"
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Palette className="h-5 w-5" />
+                <span>Widget Customization</span>
+              </CardTitle>
+              <CardDescription>
+                Customize the appearance and behavior of your feedback widget.
+              </CardDescription>
+            </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="widgetTitle" className="text-sm font-medium">
@@ -1084,6 +1091,7 @@ const FeedbackSettings = () => {
             </div>
           </CardContent>
         </Card>
+        </WidgetSettingsLock>
 
         {/* Business Branding */}
         <Card>
@@ -1325,16 +1333,21 @@ const FeedbackSettings = () => {
         </div>
 
         {/* Embed Code */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Code className="h-5 w-5" />
-              <span>Embed Code</span>
-            </CardTitle>
-            <CardDescription>
-              Copy and paste this code into your website to display the feedback widget.
-            </CardDescription>
-          </CardHeader>
+        <WidgetSettingsLock 
+          widgetType="embed"
+          title="Embed Code"
+          description="Copy and paste this code into your website to display the feedback widget"
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Code className="h-5 w-5" />
+                <span>Embed Code</span>
+              </CardTitle>
+              <CardDescription>
+                Copy and paste this code into your website to display the feedback widget.
+              </CardDescription>
+            </CardHeader>
           <CardContent className="space-y-4">
             {settings?.project_id && settings.project_id.trim() !== '' ? (
               <>
@@ -1366,15 +1379,28 @@ const FeedbackSettings = () => {
             )}
           </CardContent>
         </Card>
+        </WidgetSettingsLock>
 
         {/* QR Code Feedback */}
         {settings?.project_id && settings.project_id.trim() !== '' && (
-          <QRCodeFeedbackSection projectId={settings.project_id} />
+          <WidgetSettingsLock 
+            widgetType="qr"
+            title="QR Code Feedback"
+            description="Generate QR codes for easy feedback collection"
+          >
+            <QRCodeFeedbackSection projectId={settings.project_id} />
+          </WidgetSettingsLock>
         )}
 
         {/* Email Signature Feedback */}
         {settings?.project_id && settings.project_id.trim() !== '' && (
-          <EmailSignatureFeedbackSection projectId={settings.project_id} />
+          <WidgetSettingsLock 
+            widgetType="email"
+            title="Email Signature Feedback"
+            description="Add feedback links to your email signatures"
+          >
+            <EmailSignatureFeedbackSection projectId={settings.project_id} />
+          </WidgetSettingsLock>
         )}
 
       </div>

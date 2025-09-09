@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNoteXTrial } from '@/contexts/NoteXTrialContext';
+import { usePlatformAccess } from '@/hooks/usePlatformAccess';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -111,6 +113,8 @@ interface AIInsight {
 export default function Dashboard() {
   console.log('📱 Dashboard component rendering...');
   const { user } = useAuth();
+  const { trialStatus } = useNoteXTrial();
+  const platformAccess = usePlatformAccess();
   
   // Use real-time feedback hook
   const { 
@@ -644,6 +648,30 @@ export default function Dashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Trial Status Banner */}
+      {platformAccess.upgradeRequired && (
+        <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                <Crown className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-orange-900">Upgrade Required</h3>
+                <p className="text-sm text-orange-700">{platformAccess.trialMessage}</p>
+              </div>
+            </div>
+            <Button
+              onClick={() => window.location.href = '/billing'}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              <Crown className="h-4 w-4 mr-2" />
+              Upgrade Now
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Filters Bar */}
       <Card className="rounded-xl shadow-lg">

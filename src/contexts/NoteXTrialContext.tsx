@@ -260,24 +260,46 @@ export const NoteXTrialProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
-  // Check if user has access
+  // Check if user has access - Updated platform locking logic
   const checkAccess = (): boolean => {
-    // Business plan users always have access
-    if (trialStatus.plan === 'business' && trialStatus.isActive) {
-      return true;
-    }
-    
-    // Trial users have access if trial is active and not expired
-    if (trialStatus.plan === 'free_trial' && trialStatus.isActive && !trialStatus.trialExpired) {
-      return true;
-    }
-    
     // If loading, give access by default (don't lock out during loading)
     if (trialStatus.loading) {
       return true;
     }
-    
-    return false;
+
+    // Business plan users with active subscription always have access
+    if (trialStatus.plan === 'business' && trialStatus.isActive) {
+      console.log('✅ Business user with active subscription - allowing access');
+      return true;
+    }
+
+    // Trial users have access if trial is active and not expired
+    if (trialStatus.plan === 'free_trial' && trialStatus.isActive && !trialStatus.trialExpired) {
+      console.log('✅ Trial user with active trial - allowing access');
+      return true;
+    }
+
+    // New users (never used trial before) should not be locked
+    if (trialStatus.plan === 'free_trial' && !trialStatus.trialStart) {
+      console.log('✅ New user - allowing access');
+      return true;
+    }
+
+    // Business plan users with inactive subscription should be locked
+    if (trialStatus.plan === 'business' && !trialStatus.isActive) {
+      console.log('🔒 Business user with inactive subscription - locking platform');
+      return false;
+    }
+
+    // Trial users with expired trial should be locked
+    if (trialStatus.plan === 'free_trial' && trialStatus.trialExpired) {
+      console.log('🔒 Trial user with expired trial - locking platform');
+      return false;
+    }
+
+    // Default: allow access (for new users or edge cases)
+    console.log('✅ Default access granted');
+    return true;
   };
 
   // Check if trial is expired
@@ -303,12 +325,13 @@ export const NoteXTrialProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // Get trial message for UI
   const getTrialMessage = (): string => {
-    if (trialStatus.loading) return 'Loading...';
+    if (trialStatus.loading) return 'Loading trial status...';
     if (trialStatus.error) return 'Error loading trial status';
     if (trialStatus.plan === 'business' && trialStatus.isActive) return 'You have an active Business subscription';
     if (trialStatus.plan === 'free_trial' && trialStatus.isActive) return `Your free trial ends in ${getDaysLeft()} days`;
-    if (isTrialExpired()) return 'Your free trial has expired. Upgrade to the Business Plan to continue using NoteX.';
-    return 'Unknown trial status';
+    if (isTrialExpired()) return 'Your free trial has expired. Upgrade to Business to continue using NoteX.';
+    if (trialStatus.plan === 'business' && !trialStatus.isActive) return 'Your Business subscription is inactive. Please contact support.';
+    return 'Trial status unknown';
   };
 
   // Load trial status on mount and when user changes
