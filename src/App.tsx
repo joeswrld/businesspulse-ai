@@ -4,9 +4,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { NoteXTrialProvider } from "@/contexts/NoteXTrialContext";
+import { UnifiedTrialProvider } from "@/contexts/UnifiedTrialContext";
 import { AuthFlowGuard } from "@/components/AuthFlowGuard";
-import ProtectedRoute from "@/components/ProtectedRoute";
+import UnifiedProtectedRoute from "@/components/UnifiedProtectedRoute";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { lazy, Suspense } from "react";
@@ -68,7 +68,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-                <NoteXTrialProvider>
+          <UnifiedTrialProvider>
             <Routes>
             {/* Public routes */}
             <Route path="/" element={
@@ -181,7 +181,7 @@ const App = () => (
             
             {/* Protected routes */}
             <Route path="/dashboard" element={
-              <ProtectedRoute>
+              <UnifiedProtectedRoute>
                 <AuthFlowGuard>
                   <Suspense fallback={<LoadingSpinner />}>
                     <DashboardLayout>
@@ -189,10 +189,10 @@ const App = () => (
                     </DashboardLayout>
                   </Suspense>
                 </AuthFlowGuard>
-              </ProtectedRoute>
+              </UnifiedProtectedRoute>
             } />
             <Route path="/insights" element={
-              <ProtectedRoute>
+              <UnifiedProtectedRoute>
                 <AuthFlowGuard>
                   <Suspense fallback={<LoadingSpinner />}>
                     <DashboardLayout>
@@ -200,11 +200,11 @@ const App = () => (
                     </DashboardLayout>
                   </Suspense>
                 </AuthFlowGuard>
-              </ProtectedRoute>
+              </UnifiedProtectedRoute>
             } />
 
             <Route path="/reports" element={
-              <ProtectedRoute>
+              <UnifiedProtectedRoute>
                 <AuthFlowGuard>
                   <Suspense fallback={<LoadingSpinner />}>
                     <DashboardLayout>
@@ -212,10 +212,10 @@ const App = () => (
                     </DashboardLayout>
                   </Suspense>
                 </AuthFlowGuard>
-              </ProtectedRoute>
+              </UnifiedProtectedRoute>
             } />
             <Route path="/analytics" element={
-              <ProtectedRoute>
+              <UnifiedProtectedRoute>
                 <AuthFlowGuard>
                   <Suspense fallback={<LoadingSpinner />}>
                     <DashboardLayout>
@@ -223,10 +223,10 @@ const App = () => (
                     </DashboardLayout>
                   </Suspense>
                 </AuthFlowGuard>
-              </ProtectedRoute>
+              </UnifiedProtectedRoute>
             } />
             <Route path="/settings" element={
-              <ProtectedRoute>
+              <UnifiedProtectedRoute>
                 <AuthFlowGuard>
                   <Suspense fallback={<LoadingSpinner />}>
                     <DashboardLayout>
@@ -234,10 +234,10 @@ const App = () => (
                     </DashboardLayout>
                   </Suspense>
                 </AuthFlowGuard>
-              </ProtectedRoute>
+              </UnifiedProtectedRoute>
             } />
             <Route path="/teams" element={
-                <ProtectedRoute>
+                <UnifiedProtectedRoute>
                 <AuthFlowGuard>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
@@ -245,10 +245,10 @@ const App = () => (
                   </DashboardLayout>
                 </Suspense>
                 </AuthFlowGuard>
-                </ProtectedRoute>
+                </UnifiedProtectedRoute>
             } />
             <Route path="/billing" element={
-              <ProtectedRoute requireActiveSubscription={false}>
+              <UnifiedProtectedRoute requireActiveSubscription={false}>
                 <AuthFlowGuard>
                   <Suspense fallback={<LoadingSpinner />}>
                     <DashboardLayout>
@@ -256,10 +256,10 @@ const App = () => (
                     </DashboardLayout>
                   </Suspense>
                 </AuthFlowGuard>
-              </ProtectedRoute>
+              </UnifiedProtectedRoute>
             } />
             <Route path="/feedback" element={
-              <ProtectedRoute>
+              <UnifiedProtectedRoute>
                 <AuthFlowGuard>
                   <Suspense fallback={<LoadingSpinner />}>
                     <DashboardLayout>
@@ -267,10 +267,10 @@ const App = () => (
                     </DashboardLayout>
                   </Suspense>
                 </AuthFlowGuard>
-              </ProtectedRoute>
+              </UnifiedProtectedRoute>
             } />
             <Route path="/feedback-settings" element={
-              <ProtectedRoute>
+              <UnifiedProtectedRoute>
                 <AuthFlowGuard>
                   <Suspense fallback={<LoadingSpinner />}>
                     <DashboardLayout>
@@ -278,7 +278,7 @@ const App = () => (
                     </DashboardLayout>
                   </Suspense>
                 </AuthFlowGuard>
-              </ProtectedRoute>
+              </UnifiedProtectedRoute>
             } />
             {/* <Route path="/teams/invite/:token" element={
               <Suspense fallback={<LoadingSpinner />}>
@@ -287,7 +287,7 @@ const App = () => (
             } /> */}
 
             <Route path="/profile" element={
-              <ProtectedRoute>
+              <UnifiedProtectedRoute>
                 <AuthFlowGuard>
                   <Suspense fallback={<LoadingSpinner />}>
                     <DashboardLayout>
@@ -295,7 +295,7 @@ const App = () => (
                     </DashboardLayout>
                   </Suspense>
                 </AuthFlowGuard>
-              </ProtectedRoute>
+              </UnifiedProtectedRoute>
             } />
             
             {/* Catch-all route */}
@@ -305,7 +305,7 @@ const App = () => (
               </Suspense>
             } />
           </Routes>
-          </NoteXTrialProvider>
+          </UnifiedTrialProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
