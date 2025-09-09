@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Clock, Crown, AlertTriangle } from 'lucide-react';
-import { useNoteXTrial } from '@/contexts/NoteXTrialContext';
+import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 import { useNavigate } from 'react-router-dom';
 
 interface NoteXTrialCountdownProps {
@@ -15,7 +15,7 @@ const NoteXTrialCountdown: React.FC<NoteXTrialCountdownProps> = ({
   variant = 'card',
   showUpgradeButton = true 
 }) => {
-  const { trialStatus, getDaysLeft, isTrialExpired } = useNoteXTrial();
+  const { trialStatus, getDaysLeft, isTrialExpired } = useUnifiedTrial();
   const navigate = useNavigate();
 
   const daysLeft = getDaysLeft();

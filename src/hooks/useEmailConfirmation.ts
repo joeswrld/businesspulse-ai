@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserStatus } from '@/hooks/useUserStatus';
+import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -12,7 +12,7 @@ export interface EmailConfirmationStatus {
 
 export const useEmailConfirmation = () => {
   const { user } = useAuth();
-  const { status: userStatus, refreshStatus } = useUserStatus();
+  const { trialStatus, refreshTrialStatus } = useUnifiedTrial();
   const [status, setStatus] = useState<EmailConfirmationStatus>({
     isConfirmed: false,
     isLoading: true,
@@ -30,18 +30,17 @@ export const useEmailConfirmation = () => {
       return;
     }
 
-    // Check both Supabase auth and our database
+    // Check Supabase auth email confirmation
     const authConfirmed = !!user.email_confirmed_at;
-    const dbConfirmed = userStatus?.email_confirmed ?? true; // Default to true for backward compatibility
     
-    const isConfirmed = authConfirmed && dbConfirmed;
+    const isConfirmed = authConfirmed;
     
     setStatus({
       isConfirmed,
       isLoading: false,
       error: null,
     });
-  }, [user, userStatus]);
+  }, [user]);
 
   // Resend confirmation email
   const resendConfirmationEmail = useCallback(async () => {
@@ -87,8 +86,8 @@ export const useEmailConfirmation = () => {
         throw error;
       }
 
-      // Refresh user status from database
-      await refreshStatus();
+      // Refresh trial status from database
+      await refreshTrialStatus();
       
       // Re-check confirmation status
       checkEmailConfirmation();
@@ -100,7 +99,7 @@ export const useEmailConfirmation = () => {
         isLoading: false,
       }));
     }
-  }, [refreshStatus, checkEmailConfirmation]);
+  }, [refreshTrialStatus, checkEmailConfirmation]);
 
   // Check status when user or userStatus changes
   useEffect(() => {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBillingSystem, getPlanLimits, formatCurrency, formatDate, getPlanDisplayName, getPlanPrice, getPlanPricing } from '@/hooks/useBillingSystem';
-import { useNoteXTrial } from '@/contexts/NoteXTrialContext';
+import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -125,7 +125,7 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
 
 const BillingPage: React.FC = () => {
   const { user } = useAuth();
-  const { trialStatus, refreshTrialStatus, upgradeToBusiness } = useNoteXTrial();
+  const { trialStatus, refreshTrialStatus, upgradeToBusiness } = useUnifiedTrial();
   const {
     billingProfile,
     transactions,

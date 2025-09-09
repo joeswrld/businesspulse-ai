@@ -28,7 +28,7 @@ import EmailSignatureFeedbackSection from "@/components/feedback/EmailSignatureF
 import WidgetSettingsLock from "@/components/WidgetSettingsLock";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNoteXTrial } from "@/contexts/NoteXTrialContext";
+import { useUnifiedTrial } from "@/contexts/UnifiedTrialContext";
 import { supabase } from "@/integrations/supabase/client";
 import LogoUpload from "@/components/LogoUpload";
 
