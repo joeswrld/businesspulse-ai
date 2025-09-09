@@ -12,8 +12,6 @@ import { FeedbackBadgeGroup } from '@/components/ui/FeedbackBadge';
 import { useRealtimeFeedback } from '@/hooks/useRealtimeFeedback';
 
 import PlanStatusDisplay from '@/components/PlanStatusDisplay';
-=======
-
 import { toast } from 'sonner';
 // import { checkAndSetupDatabase } from '@/utils/databaseCheck';
 import { 
