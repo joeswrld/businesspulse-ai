@@ -1542,6 +1542,16 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: Json
       }
+      create_user_profile_safe: {
+        Args: {
+          company_name?: string
+          first_name?: string
+          last_name?: string
+          user_email: string
+          user_uuid: string
+        }
+        Returns: Json
+      }
       delete_insights_result: {
         Args: { p_result_id: string; p_user_id: string }
         Returns: boolean

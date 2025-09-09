@@ -260,7 +260,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
-              const isComingSoon = item.comingSoon;
+              const isComingSoon = false;
               
               return (
                 <div key={item.name} className="relative">

@@ -3,7 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserStatus } from '@/hooks/useUserStatus';
 import LockScreen from './LockScreen';
-import { PaystackPayment } from './PaystackPayment';
+import PaystackPayment from './PaystackPayment';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;

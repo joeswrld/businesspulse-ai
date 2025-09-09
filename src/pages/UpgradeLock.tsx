@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserStatus } from '@/hooks/useUserStatus';
 import LockScreen from '@/components/LockScreen';
-import { PaystackPayment } from '@/components/PaystackPayment';
+import PaystackPayment from '@/components/PaystackPayment';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -84,8 +84,10 @@ const UpgradeLock: React.FC = () => {
           
           <PaystackPayment
             plan="business"
-            onSuccess={handlePaymentSuccess}
-            onError={handlePaymentError}
+            planName="Business Plan"
+            planPrice="₦53,000"
+            onSuccess={() => handlePaymentSuccess()}
+            onCancel={() => setShowPayment(false)}
           />
           
           <Button
