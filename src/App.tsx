@@ -25,13 +25,7 @@ const LoadingSpinner = () => (
 const Index = lazy(() => import("./pages/Index"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-const DataUpload = lazy(() => import("./pages/DataUpload"));
-
-
 const Insights = lazy(() => import("./pages/Insights"));
-
-
-
 const Reports = lazy(() => import("./pages/Reports"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -39,9 +33,7 @@ const Teams = lazy(() => import("./pages/Teams"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Feedback = lazy(() => import("./pages/Feedback"));
 const Billing = lazy(() => import("./pages/Billing"));
-
 const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
-const RealtimeTest = lazy(() => import("./pages/RealtimeTest"));
 
 // Feedback form pages
 const QRFeedbackPage = lazy(() => import("./pages/feedback/qr/[project_id]"));
@@ -283,17 +275,6 @@ const App = () => (
                   <Suspense fallback={<LoadingSpinner />}>
                     <DashboardLayout>
                       <FeedbackSettings />
-                    </DashboardLayout>
-                  </Suspense>
-                </AuthFlowGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/realtime-test" element={
-              <ProtectedRoute>
-                <AuthFlowGuard>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <DashboardLayout>
-                      <RealtimeTest />
                     </DashboardLayout>
                   </Suspense>
                 </AuthFlowGuard>

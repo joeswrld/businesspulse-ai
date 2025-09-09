@@ -455,16 +455,22 @@ const Settings = () => {
     }
   };
 
-  // Delete account
+  // Delete account - Safe implementation
   const handleDeleteAccount = async () => {
     if (!user) return;
 
     setDeletingAccount(true);
     try {
+      console.log('🗑️ Starting account deletion process for:', user.email);
+      
+      // Call the unified auth flow delete function
       await deleteAccount();
+      
+      console.log('✅ Account deletion completed successfully');
       // User will be redirected to auth page by the unified auth flow
     } catch (error) {
-      console.error('Error deleting account:', error);
+      console.error('❌ Error deleting account:', error);
+      toast.error('Failed to delete account. Please contact support if this issue persists.');
       // Error handling is done in the unified auth flow
     } finally {
       setDeletingAccount(false);
