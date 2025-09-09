@@ -12,7 +12,7 @@ import {
   Sparkles,
   ArrowRight
 } from 'lucide-react';
-import { useNoteXTrial } from '@/contexts/NoteXTrialContext';
+import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 import { useNavigate } from 'react-router-dom';
 
 interface TrialGateProps {
@@ -28,7 +28,7 @@ const TrialGate: React.FC<TrialGateProps> = ({
   showUpgradeButton = true,
   feature 
 }) => {
-  const { checkAccess, isTrialExpired, getTrialMessage, getDaysLeft, trialStatus } = useNoteXTrial();
+  const { checkAccess, isTrialExpired, getTrialMessage, getDaysLeft, trialStatus } = useUnifiedTrial();
   const navigate = useNavigate();
 
   // If user has access, render children

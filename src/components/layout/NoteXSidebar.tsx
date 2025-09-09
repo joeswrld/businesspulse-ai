@@ -14,7 +14,7 @@ import {
   QrCode,
   Mail
 } from 'lucide-react';
-import { useNoteXTrial } from '@/contexts/NoteXTrialContext';
+import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 import NoteXTrialCountdown from '@/components/NoteXTrialCountdown';
 
 interface SidebarItem {
@@ -27,7 +27,7 @@ interface SidebarItem {
 
 const NoteXSidebar: React.FC = () => {
   const location = useLocation();
-  const { checkAccess, isTrialExpired, trialStatus } = useNoteXTrial();
+  const { checkAccess, isTrialExpired, trialStatus } = useUnifiedTrial();
 
   const sidebarItems: SidebarItem[] = [
     {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNoteXTrial } from '@/contexts/NoteXTrialContext';
+import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 import PlatformLock from './PlatformLock';
 
 interface ProtectedRouteProps {
@@ -16,7 +16,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   fallbackPath = '/billing'
 }) => {
   const { user, loading: authLoading } = useAuth();
-  const { trialStatus, checkAccess } = useNoteXTrial();
+  const { trialStatus, checkAccess } = useUnifiedTrial();
   const location = useLocation();
 
   // Show loading while auth is loading

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useNoteXTrial } from '@/contexts/NoteXTrialContext';
+import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 
 export interface PlatformAccess {
   hasAccess: boolean;
@@ -16,7 +16,7 @@ export interface PlatformAccess {
 }
 
 export function usePlatformAccess(): PlatformAccess {
-  const { trialStatus, checkAccess, isTrialExpired, getTrialMessage } = useNoteXTrial();
+  const { trialStatus, checkAccess, isTrialExpired, getTrialMessage } = useUnifiedTrial();
 
   return useMemo(() => {
     const hasAccess = checkAccess();

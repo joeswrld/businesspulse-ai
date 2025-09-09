@@ -11,7 +11,7 @@ import {
   Zap,
   RefreshCw
 } from 'lucide-react';
-import { useNoteXTrial } from '@/contexts/NoteXTrialContext';
+import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 
 interface PlatformLockProps {
   children: React.ReactNode;
@@ -19,7 +19,7 @@ interface PlatformLockProps {
 }
 
 export default function PlatformLock({ children, fallbackComponent }: PlatformLockProps) {
-  const { trialStatus, checkAccess, getTrialMessage, isTrialExpired } = useNoteXTrial();
+  const { trialStatus, checkAccess, getTrialMessage, isTrialExpired } = useUnifiedTrial();
 
   // Check if platform should be locked
   const shouldLock = !checkAccess();

@@ -13,7 +13,7 @@ import {
   Zap,
   ExternalLink
 } from 'lucide-react';
-import { useNoteXTrial } from '@/contexts/NoteXTrialContext';
+import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 
 interface WidgetSettingsLockProps {
   children: React.ReactNode;
@@ -28,7 +28,7 @@ export default function WidgetSettingsLock({
   title, 
   description 
 }: WidgetSettingsLockProps) {
-  const { trialStatus, checkAccess, isTrialExpired, getTrialMessage } = useNoteXTrial();
+  const { trialStatus, checkAccess, isTrialExpired, getTrialMessage } = useUnifiedTrial();
 
   // Check if widget should be disabled
   const shouldDisable = !checkAccess() || isTrialExpired();
