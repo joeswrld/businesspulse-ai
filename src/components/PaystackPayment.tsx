@@ -326,8 +326,11 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
       };
 
       // Validate configuration before sending to Paystack
-      if (!import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY === 'pk_test_...' || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY.includes('your_actual_paystack')) {
-        throw new Error('Paystack public key not configured. Please add your actual Paystack key to the .env.local file. See PAYSTACK_KEY_FIX.md for instructions.');
+      if (!import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 
+          import.meta.env.VITE_PAYSTACK_PUBLIC_KEY === 'pk_test_...' || 
+          import.meta.env.VITE_PAYSTACK_PUBLIC_KEY.includes('your_actual_paystack') ||
+          import.meta.env.VITE_PAYSTACK_PUBLIC_KEY.includes('your_paystack_public_key_here')) {
+        throw new Error('Paystack public key not configured. Please add your actual Paystack key to the .env file. See PAYSTACK_PAYMENT_FIX.md for instructions.');
       }
 
       if (!userEmail || userEmail === 'user@example.com') {
@@ -442,8 +445,10 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
                     </p>
                     <ol className="text-sm text-red-700 space-y-1 mb-3">
                       <li>1. Get your Paystack key from <a href="https://dashboard.paystack.com/settings/developers" target="_blank" rel="noopener noreferrer" className="underline">Paystack Dashboard</a></li>
-                      <li>2. Update the <code className="bg-red-100 px-1 rounded">VITE_PAYSTACK_PUBLIC_KEY</code> in your <code className="bg-red-100 px-1 rounded">.env.local</code> file</li>
-                      <li>3. Restart your development server</li>
+                      <li>2. Update the <code className="bg-red-100 px-1 rounded">VITE_PAYSTACK_PUBLIC_KEY</code> in your <code className="bg-red-100 px-1 rounded">.env</code> file</li>
+                      <li>3. Also update <code className="bg-red-100 px-1 rounded">supabase/functions/.env</code> with your secret key</li>
+                      <li>4. Deploy the Edge Function: <code className="bg-red-100 px-1 rounded">supabase functions deploy verify-payment</code></li>
+                      <li>5. Restart your development server</li>
                     </ol>
                     <div className="text-xs text-red-600">
                       <strong>Current key:</strong> {import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'Not set'}
