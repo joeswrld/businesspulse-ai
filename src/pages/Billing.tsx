@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useBillingSystem, getPlanLimits, formatCurrency, formatDate, getPlanDisplayName, getPlanPrice, getPlanPricing } from '@/hooks/useBillingSystem';
+import { 
+  useBillingSystem, 
+  getPlanLimits, 
+  formatCurrency, 
+  formatDate, 
+  getPlanDisplayName, 
+  getPlanPrice, 
+  getPlanPricing 
+} from '@/hooks/useBillingSystem';
 import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 
 import PlanStatusDisplay from '@/components/PlanStatusDisplay';
-=======
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -58,6 +64,7 @@ import PaystackPayment from '@/components/PaystackPayment';
 import PlanComparison from '@/components/billing/PlanComparison';
 
 type UpgradePlan = 'business' | null;
+
 
 // Helper function to calculate subscription end date
 const calculateSubscriptionEndDate = (billingProfile: any, currentPlan: string) => {
