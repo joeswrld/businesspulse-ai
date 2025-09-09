@@ -139,8 +139,6 @@ const BillingPage: React.FC = () => {
 
   const { trialStatus, refreshTrialStatus, upgradeToBusiness, getDaysLeft, isTrialExpired } = useUnifiedTrial();
 
-  const { trialStatus, refreshTrialStatus, upgradeToBusiness } = useUnifiedTrial();
-
   const {
     billingProfile,
     transactions,
