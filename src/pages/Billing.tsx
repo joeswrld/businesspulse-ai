@@ -4,8 +4,6 @@ import { useBillingSystem, getPlanLimits, formatCurrency, formatDate, getPlanDis
 import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 
 import PlanStatusDisplay from '@/components/PlanStatusDisplay';
-=======
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -131,8 +129,6 @@ const BillingPage: React.FC = () => {
   const { user } = useAuth();
 
   const { trialStatus, refreshTrialStatus, upgradeToBusiness, getDaysLeft, isTrialExpired } = useUnifiedTrial();
-
-  const { trialStatus, refreshTrialStatus, upgradeToBusiness } = useUnifiedTrial();
 
   const {
     billingProfile,
