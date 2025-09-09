@@ -96,46 +96,10 @@ const AuthPage = () => {
 
         console.log("✅ Sign up successful:", data.user?.email);
 
-        // Create user profile immediately after successful signup
-        if (data.user) {
-          console.log("🔧 Creating user profile...");
-          
-          try {
-            const { data: profileResult, error: profileError } = await supabase.rpc('create_user_profile_safe', {
-              user_uuid: data.user.id,
-              user_email: data.user.email,
-              first_name: formData.firstName || null,
-              last_name: formData.lastName || null,
-              company_name: formData.companyName || null
-            });
-
-            if (profileError) {
-              console.error("❌ Profile creation failed:", profileError);
-              toast({
-                title: "Warning",
-                description: "Account created but profile setup incomplete. Please contact support if you experience issues.",
-                variant: "destructive",
-              });
-            } else {
-              console.log("✅ Profile created successfully:", profileResult);
-              toast({
-                title: "Account created!",
-                description: "Your account and profile have been set up successfully. Please check your email to verify your account.",
-              });
-            }
-          } catch (profileError) {
-            console.error("❌ Profile creation error:", profileError);
-            toast({
-              title: "Account created!",
-              description: "Please check your email to verify your account. Your profile will be set up when you first sign in.",
-            });
-          }
-        } else {
-          toast({
-            title: "Account created!",
-            description: "Please check your email to verify your account.",
-          });
-        }
+        toast({
+          title: "Account created!",
+          description: "Please check your email to verify your account before signing in.",
+        });
       }
     } catch (error: any) {
       console.error("❌ Authentication error:", error);
