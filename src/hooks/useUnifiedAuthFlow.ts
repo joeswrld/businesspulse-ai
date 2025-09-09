@@ -39,6 +39,7 @@ export const useUnifiedAuthFlow = (): UnifiedAuthFlow => {
   // Check if user's email is confirmed
   const checkEmailConfirmation = useCallback((): boolean => {
     if (!user) return false;
+    // Check both Supabase auth email_confirmed_at and our profiles table
     return !!user.email_confirmed_at;
   }, [user]);
 

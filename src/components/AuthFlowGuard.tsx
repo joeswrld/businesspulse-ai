@@ -1,6 +1,7 @@
 import React from 'react';
 import { useUnifiedAuthFlow } from '@/hooks/useUnifiedAuthFlow';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEmailConfirmation } from '@/hooks/useEmailConfirmation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, Mail, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
@@ -13,6 +14,7 @@ interface AuthFlowGuardProps {
 export const AuthFlowGuard: React.FC<AuthFlowGuardProps> = ({ children }) => {
   const { user } = useAuth();
   const { status, initializeUserFlow, refreshStatus } = useUnifiedAuthFlow();
+  const { isConfirmed: isEmailConfirmed, isLoading: emailLoading, resendConfirmationEmail, refreshConfirmationStatus } = useEmailConfirmation();
 
   // Don't render guard if no user
   if (!user) {
@@ -20,7 +22,7 @@ export const AuthFlowGuard: React.FC<AuthFlowGuardProps> = ({ children }) => {
   }
 
   // Show loading state
-  if (status.loading) {
+  if (status.loading || emailLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -32,7 +34,7 @@ export const AuthFlowGuard: React.FC<AuthFlowGuardProps> = ({ children }) => {
   }
 
   // Show email confirmation required
-  if (!status.isEmailConfirmed) {
+  if (!isEmailConfirmed) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
@@ -58,16 +60,14 @@ export const AuthFlowGuard: React.FC<AuthFlowGuardProps> = ({ children }) => {
             <div className="flex space-x-3">
               <Button
                 variant="outline"
-                onClick={refreshStatus}
+                onClick={refreshConfirmationStatus}
                 className="flex-1"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Check Again
               </Button>
               <Button
-                onClick={() => {
-                  toast.info('Please check your email for the verification link');
-                }}
+                onClick={resendConfirmationEmail}
                 className="flex-1"
               >
                 <Mail className="h-4 w-4 mr-2" />
