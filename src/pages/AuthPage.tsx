@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Zap, Eye, EyeOff, ArrowLeft, Loader2, Mail, CheckCircle, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { useHCaptcha } from "@/hooks/useHCaptcha";
+import { verifyHCaptchaToken, getHCaptchaErrorMessage } from "@/utils/hcaptcha";
 
 const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -21,6 +23,49 @@ const AuthPage = () => {
     firstName: "",
     lastName: "",
     companyName: "",
+  });
+
+  // hCaptcha configuration
+  const HCAPTCHA_SITE_KEY = "79347ba8-9cbc-459e-bbaa-b98cb36040a6";
+  
+  // hCaptcha hooks for different forms
+  const loginCaptcha = useHCaptcha({
+    siteKey: HCAPTCHA_SITE_KEY,
+    onVerify: (token) => {
+      console.log('🔐 Login captcha verified');
+    },
+    onExpire: () => {
+      console.log('🔐 Login captcha expired');
+    },
+    onError: (error) => {
+      console.error('❌ Login captcha error:', error);
+    },
+  });
+
+  const signupCaptcha = useHCaptcha({
+    siteKey: HCAPTCHA_SITE_KEY,
+    onVerify: (token) => {
+      console.log('🔐 Signup captcha verified');
+    },
+    onExpire: () => {
+      console.log('🔐 Signup captcha expired');
+    },
+    onError: (error) => {
+      console.error('❌ Signup captcha error:', error);
+    },
+  });
+
+  const passwordResetCaptcha = useHCaptcha({
+    siteKey: HCAPTCHA_SITE_KEY,
+    onVerify: (token) => {
+      console.log('🔐 Password reset captcha verified');
+    },
+    onExpire: () => {
+      console.log('🔐 Password reset captcha expired');
+    },
+    onError: (error) => {
+      console.error('❌ Password reset captcha error:', error);
+    },
   });
 
   const navigate = useNavigate();
@@ -42,6 +87,37 @@ const AuthPage = () => {
     try {
       console.log("🔐 Attempting authentication...");
       
+      // Check hCaptcha verification
+      const currentCaptcha = isLogin ? loginCaptcha : signupCaptcha;
+      if (!currentCaptcha.isVerified || !currentCaptcha.token) {
+        toast({
+          title: "Captcha Required",
+          description: "Please complete the captcha verification to continue.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Verify hCaptcha token with backend
+      console.log('🔐 Verifying hCaptcha token with backend...');
+      const verificationResult = await verifyHCaptchaToken(currentCaptcha.token);
+      
+      if (!verificationResult.success) {
+        console.error('❌ hCaptcha verification failed:', verificationResult.error);
+        toast({
+          title: "Captcha Verification Failed",
+          description: verificationResult.error || getHCaptchaErrorMessage(verificationResult.errorCodes),
+          variant: "destructive",
+        });
+        // Reset the captcha so user can try again
+        currentCaptcha.reset();
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ hCaptcha verification successful');
+
       if (isLogin) {
         console.log("🔐 Signing in with email:", formData.email);
         
@@ -155,6 +231,36 @@ const AuthPage = () => {
     try {
       console.log("🔐 Sending password reset email...");
       
+      // Check hCaptcha verification
+      if (!passwordResetCaptcha.isVerified || !passwordResetCaptcha.token) {
+        toast({
+          title: "Captcha Required",
+          description: "Please complete the captcha verification to continue.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Verify hCaptcha token with backend
+      console.log('🔐 Verifying hCaptcha token with backend...');
+      const verificationResult = await verifyHCaptchaToken(passwordResetCaptcha.token);
+      
+      if (!verificationResult.success) {
+        console.error('❌ hCaptcha verification failed:', verificationResult.error);
+        toast({
+          title: "Captcha Verification Failed",
+          description: verificationResult.error || getHCaptchaErrorMessage(verificationResult.errorCodes),
+          variant: "destructive",
+        });
+        // Reset the captcha so user can try again
+        passwordResetCaptcha.reset();
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ hCaptcha verification successful');
+      
       const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
         redirectTo: `${window.location.origin}/auth?reset=true`,
       });
@@ -233,6 +339,18 @@ const AuthPage = () => {
     setPasswordResetSent(false);
     setIsPasswordResetComplete(false);
     setIsLogin(true);
+    // Reset captchas when switching modes
+    loginCaptcha.reset();
+    signupCaptcha.reset();
+    passwordResetCaptcha.reset();
+  };
+
+  // Reset captchas when switching between login and signup
+  const handleModeSwitch = () => {
+    setIsLogin(!isLogin);
+    // Reset captchas when switching modes
+    loginCaptcha.reset();
+    signupCaptcha.reset();
   };
 
   // Password reset success view
@@ -328,12 +446,20 @@ const AuthPage = () => {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label>Security Verification</Label>
+                  <passwordResetCaptcha.HCaptchaComponent className="flex justify-center" />
+                  {passwordResetCaptcha.error && (
+                    <p className="text-sm text-red-500">{passwordResetCaptcha.error}</p>
+                  )}
+                </div>
+
                 <Button 
                   type="submit" 
                   className="w-full" 
                   variant="hero" 
                   size="lg"
-                  disabled={loading}
+                  disabled={loading || !passwordResetCaptcha.isVerified}
                 >
                   {loading ? (
                     <>
@@ -556,12 +682,26 @@ const AuthPage = () => {
                 )}
               </div>
 
+              <div className="space-y-2">
+                <Label>Security Verification</Label>
+                {isLogin ? (
+                  <loginCaptcha.HCaptchaComponent className="flex justify-center" />
+                ) : (
+                  <signupCaptcha.HCaptchaComponent className="flex justify-center" />
+                )}
+                {(isLogin ? loginCaptcha.error : signupCaptcha.error) && (
+                  <p className="text-sm text-red-500">
+                    {isLogin ? loginCaptcha.error : signupCaptcha.error}
+                  </p>
+                )}
+              </div>
+
               <Button 
                 type="submit" 
                 className="w-full" 
                 variant="hero" 
                 size="lg"
-                disabled={loading}
+                disabled={loading || !(isLogin ? loginCaptcha.isVerified : signupCaptcha.isVerified)}
               >
                 {loading ? (
                   <>
@@ -595,7 +735,7 @@ const AuthPage = () => {
                 <button
                   type="button"
                   className="text-primary hover:underline font-medium"
-                  onClick={() => setIsLogin(!isLogin)}
+                  onClick={handleModeSwitch}
                 >
                   {isLogin ? "Sign up" : "Sign in"}
                 </button>
