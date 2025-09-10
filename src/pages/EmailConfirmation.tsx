@@ -23,6 +23,14 @@ const EmailConfirmation = () => {
         const refreshToken = searchParams.get('refresh_token');
         const errorParam = searchParams.get('error');
         const errorDescription = searchParams.get('error_description');
+        const type = searchParams.get('type');
+
+        console.log('🔍 URL parameters:', { 
+          hasAccessToken: !!accessToken, 
+          hasRefreshToken: !!refreshToken, 
+          errorParam, 
+          type 
+        });
 
         // Check for error parameters first
         if (errorParam) {
@@ -30,6 +38,35 @@ const EmailConfirmation = () => {
           setError(errorDescription || errorParam);
           setStatus('error');
           return;
+        }
+
+        // Check if this is a confirmation type
+        if (type !== 'signup' && type !== 'email_change') {
+          console.log('⚠️ Not a confirmation URL, checking current session...');
+          
+          // Check if user is already signed in and email is confirmed
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionError) {
+            console.error('❌ Error getting session:', sessionError);
+            setError('Failed to verify your session. Please try again.');
+            setStatus('error');
+            return;
+          }
+
+          if (session?.user?.email_confirmed_at) {
+            console.log('✅ User already confirmed, redirecting to dashboard');
+            setStatus('success');
+            setTimeout(() => {
+              navigate('/dashboard');
+            }, 1000);
+            return;
+          } else {
+            console.error('❌ No confirmation token found and user not confirmed');
+            setError('No confirmation token found. Please check your email and try again.');
+            setStatus('error');
+            return;
+          }
         }
 
         // Check if we have tokens
