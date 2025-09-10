@@ -24,6 +24,7 @@ const LoadingSpinner = () => (
 // Lazy load pages
 const Index = lazy(() => import("./pages/Index"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
+const EmailConfirmation = lazy(() => import("./pages/EmailConfirmation"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Insights = lazy(() => import("./pages/Insights"));
 const Reports = lazy(() => import("./pages/Reports"));
@@ -79,6 +80,11 @@ const App = () => (
             <Route path="/auth" element={
               <Suspense fallback={<LoadingSpinner />}>
                 <AuthPage />
+              </Suspense>
+            } />
+            <Route path="/auth/confirm" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <EmailConfirmation />
               </Suspense>
             } />
             <Route path="/testimonials" element={

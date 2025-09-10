@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm your email - NoteX</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8fafc;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .logo {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2563eb;
+            margin-bottom: 20px;
+        }
+        .header {
+            margin-bottom: 30px;
+        }
+        .title {
+            font-size: 28px;
+            color: #1e293b;
+            margin-bottom: 15px;
+        }
+        .subtitle {
+            font-size: 16px;
+            color: #6b7280;
+            margin-bottom: 30px;
+        }
+        .cta-button {
+            display: inline-block;
+            background: #2563eb;
+            color: white;
+            padding: 16px 32px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            margin: 20px 0;
+            transition: background-color 0.2s;
+        }
+        .cta-button:hover {
+            background: #1d4ed8;
+        }
+        .features {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 30px 0;
+            text-align: left;
+        }
+        .feature {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .feature-icon {
+            width: 20px;
+            height: 20px;
+            background: #10b981;
+            border-radius: 50%;
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .trial-info {
+            background: #dbeafe;
+            border: 1px solid #93c5fd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+        .trial-info h3 {
+            color: #1e40af;
+            margin: 0 0 10px 0;
+            font-size: 18px;
+        }
+        .trial-info p {
+            color: #1e40af;
+            margin: 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">NoteX</div>
+        
+        <div class="header">
+            <h1 class="title">Welcome to NoteX!</h1>
+            <p class="subtitle">Please confirm your email address to complete your account setup and start your free trial.</p>
+        </div>
+
+        <div class="trial-info">
+            <h3>🎉 Your 8-Day Free Trial Starts Now!</h3>
+            <p>Once you confirm your email, you'll get full access to all NoteX features for 8 days, completely free.</p>
+        </div>
+
+        <a href="{{ .ConfirmationURL }}" class="cta-button">
+            Confirm Email Address
+        </a>
+
+        <div class="features">
+            <h3 style="margin-top: 0; color: #1e293b;">What you'll get with NoteX:</h3>
+            
+            <div class="feature">
+                <div class="feature-icon">✓</div>
+                <div>
+                    <strong>Real-time Feedback Collection</strong><br>
+                    <span style="color: #6b7280; font-size: 14px;">Gather customer feedback instantly across multiple channels</span>
+                </div>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">✓</div>
+                <div>
+                    <strong>AI-Powered Insights</strong><br>
+                    <span style="color: #6b7280; font-size: 14px;">Get intelligent analysis of your feedback data</span>
+                </div>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">✓</div>
+                <div>
+                    <strong>Team Collaboration</strong><br>
+                    <span style="color: #6b7280; font-size: 14px;">Share insights and collaborate with your team</span>
+                </div>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">✓</div>
+                <div>
+                    <strong>Customizable Dashboards</strong><br>
+                    <span style="color: #6b7280; font-size: 14px;">Create personalized views of your data</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>If the button doesn't work, copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #2563eb;">{{ .ConfirmationURL }}</p>
+            
+            <p style="margin-top: 30px;">
+                This link will expire in 1 hour for security reasons.<br>
+                If you didn't create an account with NoteX, you can safely ignore this email.
+            </p>
+            
+            <p style="margin-top: 20px; font-size: 12px;">
+                © 2024 NoteX. All rights reserved.<br>
+                <a href="https://notex.com.ng/privacy-policy" style="color: #2563eb;">Privacy Policy</a> | 
+                <a href="https://notex.com.ng/terms-of-service" style="color: #2563eb;">Terms of Service</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

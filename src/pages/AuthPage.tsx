@@ -72,7 +72,7 @@ const AuthPage = () => {
       } else {
         console.log("🔐 Creating account for email:", formData.email);
         
-        const redirectUrl = `${window.location.origin}/`;
+        const redirectUrl = `${window.location.origin}/auth/confirm`;
         
         const { data, error } = await supabase.auth.signUp({
           email: formData.email,
