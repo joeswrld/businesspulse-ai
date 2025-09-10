@@ -370,7 +370,7 @@ NoteX Team
 
   // Calculate subscription end date
   const subscriptionEndDate = calculateSubscriptionEndDate(billingProfile, currentPlan);
-  const statusDisplay = getSubscriptionStatusDisplay(billingProfile, currentPlan, isTrialExpired, isPaymentPastDue, isInGracePeriod);
+  const statusDisplay = getSubscriptionStatusDisplay(billingProfile, currentPlan, trialStatus.trialExpired, isPaymentPastDue, isInGracePeriod);
 
   return (
     <div className="min-h-screen bg-gray-50">

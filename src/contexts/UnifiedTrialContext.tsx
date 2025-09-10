@@ -97,8 +97,8 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
       if (existingData && !dbError) {
         console.log('🔄 Using existing trial data from database');
         const now = new Date();
-        const trialStart = existingData.trial_start || existingData.created_at;
-        const trialEnd = existingData.trial_ends_at || existingData.trial_end;
+        const trialStart = existingData.created_at;
+        const trialEnd = existingData.trial_ends_at;
         
         if (trialStart && trialEnd) {
           const trialStartDate = new Date(trialStart);
@@ -235,9 +235,9 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
       
       // Calculate days left
       let daysLeft = 0;
-      if (result.plan === 'business' && result.subscription_active) {
+      if (result.plan === 'business' && result.is_active) {
         // Business users - show days since upgrade (countdown from when they paid)
-        const upgradeDate = new Date(result.trial_end || result.created_at || new Date());
+        const upgradeDate = new Date(result.trial_end || new Date());
         daysLeft = Math.max(0, Math.floor((now.getTime() - upgradeDate.getTime()) / (1000 * 60 * 60 * 24)));
       } else if (result.plan === 'free_trial' && result.trial_end) {
         // Trial users - show days remaining (countdown to trial end)
@@ -249,12 +249,12 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
         hasAccess: result.has_access,
         plan: (result.plan || 'free_trial') as "free_trial" | "business",
         isActive: result.is_active || (result.plan === 'free_trial' && daysLeft > 0),
-        subscriptionActive: result.subscription_active || false,
+        subscriptionActive: result.is_active || false,
         trialExpired: result.trial_expired || (result.plan === 'free_trial' && daysLeft <= 0),
         daysLeft: daysLeft,
-        trialStart: result.trial_start,
+        trialStart: result.trial_end,
         trialEnd: result.trial_end,
-        subscriptionExpiryDate: result.subscription_expiry_date,
+        subscriptionExpiryDate: null,
         loading: false,
         error: null,
       };
