@@ -129,33 +129,35 @@ SET search_path = public
 AS $$
 BEGIN
     -- Insert a new profile for the user
-    INSERT INTO profiles (
-        id,
-        user_id,
-        email,
-        email_confirmed,
-        trial_start,
-        trial_end,
-        created_at,
-        updated_at
-    ) VALUES (
-        NEW.id,
-        NEW.id,
-        NEW.email,
-        (NEW.email_confirmed_at IS NOT NULL),
-        NOW(),
-        NOW() + INTERVAL '8 days',
-        NOW(),
-        NOW()
-    )
-    ON CONFLICT (id) DO UPDATE SET
-        email = EXCLUDED.email,
-        email_confirmed = EXCLUDED.email_confirmed,
-        updated_at = NOW()
-    ON CONFLICT (user_id) DO UPDATE SET
-        email = EXCLUDED.email,
-        email_confirmed = EXCLUDED.email_confirmed,
-        updated_at = NOW();
+    -- Handle conflict based on which primary key exists
+    BEGIN
+        INSERT INTO profiles (
+            id,
+            user_id,
+            email,
+            email_confirmed,
+            trial_start,
+            trial_end,
+            created_at,
+            updated_at
+        ) VALUES (
+            NEW.id,
+            NEW.id,
+            NEW.email,
+            (NEW.email_confirmed_at IS NOT NULL),
+            NOW(),
+            NOW() + INTERVAL '8 days',
+            NOW(),
+            NOW()
+        );
+    EXCEPTION WHEN unique_violation THEN
+        -- Update existing profile if it already exists
+        UPDATE profiles SET
+            email = NEW.email,
+            email_confirmed = (NEW.email_confirmed_at IS NOT NULL),
+            updated_at = NOW()
+        WHERE profiles.id = NEW.id OR profiles.user_id = NEW.id;
+    END;
     
     RAISE NOTICE 'Created profile for new user: %', NEW.id;
     RETURN NEW;

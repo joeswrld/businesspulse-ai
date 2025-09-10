@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { UnifiedTrialProvider } from "@/contexts/UnifiedTrialContext";
 import { AuthFlowGuard } from "@/components/AuthFlowGuard";
 import UnifiedProtectedRoute from "@/components/UnifiedProtectedRoute";
+import AuthGuard from "@/components/AuthGuard";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { lazy, Suspense } from "react";
@@ -23,8 +24,11 @@ const LoadingSpinner = () => (
 
 // Lazy load pages
 const Index = lazy(() => import("./pages/Index"));
-const AuthPage = lazy(() => import("./pages/AuthPage"));
-const EmailConfirmation = lazy(() => import("./pages/EmailConfirmation"));
+const Signup = lazy(() => import("./pages/Signup"));
+const Login = lazy(() => import("./pages/Login"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const TrialExpired = lazy(() => import("./pages/TrialExpired"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Insights = lazy(() => import("./pages/Insights"));
 const Reports = lazy(() => import("./pages/Reports"));
@@ -77,14 +81,29 @@ const App = () => (
                 <Index />
               </Suspense>
             } />
-            <Route path="/auth" element={
+            <Route path="/signup" element={
               <Suspense fallback={<LoadingSpinner />}>
-                <AuthPage />
+                <Signup />
               </Suspense>
             } />
-            <Route path="/auth/confirm" element={
+            <Route path="/login" element={
               <Suspense fallback={<LoadingSpinner />}>
-                <EmailConfirmation />
+                <Login />
+              </Suspense>
+            } />
+            <Route path="/reset-password" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <ResetPassword />
+              </Suspense>
+            } />
+            <Route path="/verify-email" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <VerifyEmail />
+              </Suspense>
+            } />
+            <Route path="/trial-expired" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <TrialExpired />
               </Suspense>
             } />
             <Route path="/testimonials" element={
@@ -187,104 +206,86 @@ const App = () => (
             
             {/* Protected routes */}
             <Route path="/dashboard" element={
-              <UnifiedProtectedRoute>
-                <AuthFlowGuard>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <DashboardLayout>
-                      <Dashboard />
-                    </DashboardLayout>
-                  </Suspense>
-                </AuthFlowGuard>
-              </UnifiedProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Dashboard />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
             } />
             <Route path="/insights" element={
-              <UnifiedProtectedRoute>
-                <AuthFlowGuard>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <DashboardLayout>
-                      <Insights />
-                    </DashboardLayout>
-                  </Suspense>
-                </AuthFlowGuard>
-              </UnifiedProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={true}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Insights />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
             } />
 
             <Route path="/reports" element={
-              <UnifiedProtectedRoute>
-                <AuthFlowGuard>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <DashboardLayout>
-                      <Reports />
-                    </DashboardLayout>
-                  </Suspense>
-                </AuthFlowGuard>
-              </UnifiedProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={true}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Reports />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
             } />
             <Route path="/analytics" element={
-              <UnifiedProtectedRoute>
-                <AuthFlowGuard>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <DashboardLayout>
-                      <Analytics />
-                    </DashboardLayout>
-                  </Suspense>
-                </AuthFlowGuard>
-              </UnifiedProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={true}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Analytics />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
             } />
             <Route path="/settings" element={
-              <UnifiedProtectedRoute>
-                <AuthFlowGuard>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <DashboardLayout>
-                      <Settings />
-                    </DashboardLayout>
-                  </Suspense>
-                </AuthFlowGuard>
-              </UnifiedProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Settings />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
             } />
             <Route path="/teams" element={
-                <UnifiedProtectedRoute>
-                <AuthFlowGuard>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={true}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Teams />
                   </DashboardLayout>
                 </Suspense>
-                </AuthFlowGuard>
-                </UnifiedProtectedRoute>
+              </AuthGuard>
             } />
             <Route path="/billing" element={
-              <UnifiedProtectedRoute requireActiveSubscription={false}>
-                <AuthFlowGuard>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <DashboardLayout>
-                      <Billing />
-                    </DashboardLayout>
-                  </Suspense>
-                </AuthFlowGuard>
-              </UnifiedProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Billing />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
             } />
             <Route path="/feedback" element={
-              <UnifiedProtectedRoute>
-                <AuthFlowGuard>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <DashboardLayout>
-                      <Feedback />
-                    </DashboardLayout>
-                  </Suspense>
-                </AuthFlowGuard>
-              </UnifiedProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={true}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Feedback />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
             } />
             <Route path="/feedback-settings" element={
-              <UnifiedProtectedRoute>
-                <AuthFlowGuard>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <DashboardLayout>
-                      <FeedbackSettings />
-                    </DashboardLayout>
-                  </Suspense>
-                </AuthFlowGuard>
-              </UnifiedProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={true}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <FeedbackSettings />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
             } />
             {/* <Route path="/teams/invite/:token" element={
               <Suspense fallback={<LoadingSpinner />}>
@@ -293,15 +294,13 @@ const App = () => (
             } /> */}
 
             <Route path="/profile" element={
-              <UnifiedProtectedRoute>
-                <AuthFlowGuard>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <DashboardLayout>
-                      <Profile />
-                    </DashboardLayout>
-                  </Suspense>
-                </AuthFlowGuard>
-              </UnifiedProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Profile />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
             } />
             
             {/* Catch-all route */}
