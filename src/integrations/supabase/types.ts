@@ -166,6 +166,36 @@ export type Database = {
         }
         Relationships: []
       }
+      auth_events: {
+        Row: {
+          created_at: string | null
+          event_data: Json | null
+          event_type: string
+          id: string
+          ip_address: unknown | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       billing: {
         Row: {
           created_at: string | null
@@ -719,6 +749,36 @@ export type Database = {
         }
         Relationships: []
       }
+      otp_tokens: {
+        Row: {
+          created_at: string | null
+          expires_at: string
+          id: string
+          token_hash: string
+          token_type: string
+          used_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          token_hash: string
+          token_type: string
+          used_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          token_hash?: string
+          token_type?: string
+          used_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       plans: {
         Row: {
           code: string
@@ -754,6 +814,7 @@ export type Database = {
           company_name: string | null
           created_at: string
           email: string | null
+          email_confirmed: boolean | null
           first_name: string | null
           full_name: string | null
           id: string
@@ -777,6 +838,7 @@ export type Database = {
           company_name?: string | null
           created_at?: string
           email?: string | null
+          email_confirmed?: boolean | null
           first_name?: string | null
           full_name?: string | null
           id?: string
@@ -800,6 +862,7 @@ export type Database = {
           company_name?: string | null
           created_at?: string
           email?: string | null
+          email_confirmed?: boolean | null
           first_name?: string | null
           full_name?: string | null
           id?: string
@@ -1322,6 +1385,8 @@ export type Database = {
           id: string
           is_active: boolean | null
           plan: string | null
+          subscription_active: boolean | null
+          subscription_expiry_date: string | null
           trial_end: string | null
           trial_expired: boolean | null
           trial_start: string | null
@@ -1336,6 +1401,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           plan?: string | null
+          subscription_active?: boolean | null
+          subscription_expiry_date?: string | null
           trial_end?: string | null
           trial_expired?: boolean | null
           trial_start?: string | null
@@ -1350,6 +1417,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           plan?: string | null
+          subscription_active?: boolean | null
+          subscription_expiry_date?: string | null
           trial_end?: string | null
           trial_expired?: boolean | null
           trial_start?: string | null
@@ -1499,13 +1568,20 @@ export type Database = {
           has_access: boolean
           is_active: boolean
           plan: string
+          subscription_active: boolean
+          subscription_expiry_date: string
           trial_end: string
           trial_expired: boolean
+          trial_start: string
         }[]
       }
       clean_expired_invitations: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      confirm_user_email: {
+        Args: { user_uuid: string }
+        Returns: Json
       }
       create_feedback_settings_for_user: {
         Args: { user_id_param: string }
@@ -1555,6 +1631,10 @@ export type Database = {
       delete_insights_result: {
         Args: { p_result_id: string; p_user_id: string }
         Returns: boolean
+      }
+      delete_user_safe: {
+        Args: { p_user_id: string }
+        Returns: undefined
       }
       detect_urgent_keywords: {
         Args: { message_text: string }
@@ -1717,6 +1797,16 @@ export type Database = {
       test_insights_results_table: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      track_auth_event: {
+        Args: {
+          p_event_data?: Json
+          p_event_type: string
+          p_ip_address?: unknown
+          p_user_agent?: string
+          p_user_id: string
+        }
+        Returns: undefined
       }
       update_user_plan_after_payment: {
         Args: {
