@@ -240,8 +240,8 @@
 
         try {
           await API.submitFeedback(state.projectId, {
-            user_email: email,
-            content: message,
+            email: email,
+            message: message,
           });
           
           // Success
