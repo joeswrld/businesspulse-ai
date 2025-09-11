@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback Implementation Examples</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .example {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .example h3 {
+            margin-top: 0;
+            color: #1e293b;
+        }
+        code {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+        .form-example {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 12px 0;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <h1>Multi-Channel Feedback Implementation Examples</h1>
+    
+    <div class="example">
+        <h3>1. Website Widget Integration</h3>
+        <p>Add this to your website where the feedback widget should appear:</p>
+        
+        <pre><code>&lt;!-- Include the feedback API --&gt;
+&lt;script type="module" src="./feedback-api.js"&gt;&lt;/script&gt;
+
+&lt;!-- Your existing widget HTML --&gt;
+&lt;div id="feedback-widget"&gt;
+    &lt;form id="widget-feedback-form"&gt;
+        &lt;input type="text" name="name" placeholder="Your name (optional)"&gt;
+        &lt;input type="email" name="email" placeholder="Your email (optional)"&gt;
+        &lt;textarea name="message" placeholder="Your feedback" required&gt;&lt;/textarea&gt;
+        &lt;button type="submit"&gt;Submit Feedback&lt;/button&gt;
+    &lt;/form&gt;
+&lt;/div&gt;
+
+&lt;script&gt;
+// Wire up the form
+import { handleFeedbackForm } from './feedback-api.js';
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('widget-feedback-form');
+    handleFeedbackForm(form, 'widget');
+});
+&lt;/script&gt;</code></pre>
+    </div>
+
+    <div class="example">
+        <h3>2. QR Code Landing Page</h3>
+        <p>Create a dedicated page for QR code feedback (e.g., <code>/feedback/qr</code>):</p>
+        
+        <div class="form-example">
+            <h4>QR Feedback Form</h4>
+            <form id="qr-feedback-form">
+                <div class="form-group">
+                    <label for="qr-name">Name (optional)</label>
+                    <input type="text" id="qr-name" name="name" placeholder="Your name">
+                </div>
+                <div class="form-group">
+                    <label for="qr-email">Email (optional)</label>
+                    <input type="email" id="qr-email" name="email" placeholder="your@email.com">
+                </div>
+                <div class="form-group">
+                    <label for="qr-message">Your Feedback *</label>
+                    <textarea id="qr-message" name="message" placeholder="Tell us what you think..." required></textarea>
+                </div>
+                <button type="submit">Submit Feedback</button>
+            </form>
+        </div>
+
+        <pre><code>&lt;script type="module"&gt;
+import { handleFeedbackForm } from './feedback-api.js';
+
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('qr-feedback-form');
+    handleFeedbackForm(form, 'qr');
+});
+&lt;/script&gt;</code></pre>
+    </div>
+
+    <div class="example">
+        <h3>3. Email Signature Form</h3>
+        <p>Create a page for email signature feedback (e.g., <code>/feedback/email</code>):</p>
+        
+        <div class="form-example">
+            <h4>Email Signature Feedback</h4>
+            <form id="email-feedback-form">
+                <div class="form-group">
+                    <label for="email-name">Name (optional)</label>
+                    <input type="text" id="email-name" name="name" placeholder="Your name">
+                </div>
+                <div class="form-group">
+                    <label for="email-email">Email (optional)</label>
+                    <input type="email" id="email-email" name="email" placeholder="your@email.com">
+                </div>
+                <div class="form-group">
+                    <label for="email-message">Your Feedback *</label>
+                    <textarea id="email-message" name="message" placeholder="What's on your mind?" required></textarea>
+                </div>
+                <button type="submit">Send Feedback</button>
+            </form>
+        </div>
+
+        <pre><code>&lt;script type="module"&gt;
+import { handleFeedbackForm } from './feedback-api.js';
+
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('email-feedback-form');
+    handleFeedbackForm(form, 'email_signature');
+});
+&lt;/script&gt;</code></pre>
+    </div>
+
+    <div class="example">
+        <h3>4. Direct API Usage</h3>
+        <p>If you prefer to handle form submission manually:</p>
+        
+        <pre><code>import { submitWidgetFeedback, submitQRFeedback, submitEmailSignatureFeedback } from './feedback-api.js';
+
+// For widget
+const result = await submitWidgetFeedback({
+    name: 'John Doe',
+    email: 'john@example.com',
+    message: 'Great product!'
+});
+
+// For QR code
+const result = await submitQRFeedback({
+    name: 'Jane Smith',
+    email: 'jane@example.com',
+    message: 'Could use better documentation'
+});
+
+// For email signature
+const result = await submitEmailSignatureFeedback({
+    name: 'Bob Wilson',
+    email: 'bob@example.com',
+    message: 'Love the new features!'
+});
+
+if (result.success) {
+    console.log('Feedback submitted:', result.data);
+} else {
+    console.error('Error:', result.error);
+}</code></pre>
+    </div>
+
+    <div class="example">
+        <h3>5. Environment Variables</h3>
+        <p>Create a <code>.env</code> file in your project root:</p>
+        
+        <pre><code>VITE_SUPABASE_URL=your-supabase-project-url
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key</code></pre>
+        
+        <p>Or set them directly in your code:</p>
+        
+        <pre><code>// In feedback-api.js, replace these lines:
+const supabaseUrl = 'https://your-project.supabase.co';
+const supabaseKey = 'your-anon-key-here';</code></pre>
+    </div>
+
+    <div class="example">
+        <h3>6. Dashboard Integration</h3>
+        <p>To add the dashboard to your existing app, include the HTML and JavaScript:</p>
+        
+        <pre><code>&lt;!-- Add to your existing page --&gt;
+&lt;div id="feedback-dashboard"&gt;
+    &lt;!-- Copy the content from feedback-page.html --&gt;
+&lt;/div&gt;
+
+&lt;script type="module" src="./feedback-dashboard.js"&gt;&lt;/script&gt;</code></pre>
+    </div>
+
+    <script type="module">
+        // Demo the forms
+        import { handleFeedbackForm } from './feedback-api.js';
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            // Wire up the demo forms
+            const qrForm = document.getElementById('qr-feedback-form');
+            const emailForm = document.getElementById('email-feedback-form');
+            
+            if (qrForm) {
+                handleFeedbackForm(qrForm, 'qr');
+            }
+            if (emailForm) {
+                handleFeedbackForm(emailForm, 'email_signature');
+            }
+        });
+    </script>
+</body>
+</html>
