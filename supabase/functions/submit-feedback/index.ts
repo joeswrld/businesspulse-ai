@@ -64,18 +64,17 @@ serve(async (req) => {
       )
     }
 
-    // Get project information
+    // Get project information from feedback_settings
     const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('id, user_id, name, is_active')
+      .from('feedback_settings')
+      .select('user_id, project_id')
       .eq('project_id', project_id)
-      .eq('is_active', true)
       .single()
 
     if (projectError || !project) {
-      console.error('Project not found or inactive:', project_id)
+      console.error('Project not found:', project_id)
       return new Response(
-        JSON.stringify({ error: 'Project not found or inactive' }),
+        JSON.stringify({ error: 'Project not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -116,7 +115,7 @@ serve(async (req) => {
     const { data: feedback, error: feedbackError } = await supabase
       .from('feedbacks')
       .insert({
-        project_id: project.id,
+        project_id: project_id,
         user_email: user_email || null,
         content: content.trim(),
         sentiment: sentiment,
@@ -135,7 +134,7 @@ serve(async (req) => {
 
     // Send notification to project owner (if email notifications are enabled)
     try {
-      await sendNotificationToOwner(supabase, project, feedback.id, content, user_email)
+      await sendNotificationToOwner(supabase, { user_id: project.user_id, project_id: project_id }, feedback.id, content, user_email)
     } catch (notificationError) {
       console.error('Notification error (non-critical):', notificationError)
       // Don't fail the request if notification fails
@@ -209,7 +208,7 @@ async function sendNotificationToOwner(supabase: any, project: any, feedbackId: 
     console.log('Notification for project owner:', {
       ownerEmail: ownerProfile.email,
       ownerName: ownerProfile.full_name,
-      projectName: project.name,
+      projectId: project.project_id,
       feedbackId,
       content: content.substring(0, 100) + '...',
       userEmail
