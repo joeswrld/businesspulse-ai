@@ -84,9 +84,28 @@ serve(async (req) => {
       .single()
 
     if (feedbackError) {
-      console.error('Error inserting feedback:', feedbackError)
+      // Improve diagnostics and map common DB errors to clearer HTTP responses
+      const errorMessage = typeof feedbackError === 'object' && feedbackError !== null ? (feedbackError as any).message || String(feedbackError) : String(feedbackError)
+      const errorCode = (feedbackError as any)?.code
+      const errorDetails = (feedbackError as any)?.details || (feedbackError as any)?.hint
+
+      console.error('Error inserting feedback:', { errorCode, errorMessage, errorDetails })
+
+      // 23503 = foreign_key_violation (e.g., invalid project_id referencing another table)
+      // 22P02 = invalid_text_representation (e.g., UUID expected)
+      // 23502 = not_null_violation
+      const isForeignKeyViolation = errorCode === '23503' || /foreign key/i.test(errorMessage)
+      const isInvalidUuid = errorCode === '22P02' || /uuid/i.test(errorMessage)
+
+      if (isForeignKeyViolation || isInvalidUuid) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid project_id' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
       return new Response(
-        JSON.stringify({ error: 'Failed to submit feedback' }),
+        JSON.stringify({ error: 'Failed to submit feedback', code: errorCode }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
