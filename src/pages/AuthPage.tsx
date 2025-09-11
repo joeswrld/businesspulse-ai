@@ -96,6 +96,28 @@ const AuthPage = () => {
 
         console.log("✅ Sign up successful:", data.user?.email);
 
+        // Create user profile after successful signup
+        if (data.user) {
+          try {
+            const { error: profileError } = await supabase.rpc('create_user_profile_safe', {
+              user_uuid: data.user.id,
+              user_email: data.user.email,
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+              company_name: formData.companyName
+            });
+
+            if (profileError) {
+              console.error("❌ Profile creation failed:", profileError);
+              // Don't fail signup, just log the error
+            } else {
+              console.log("✅ User profile created successfully");
+            }
+          } catch (error) {
+            console.error("❌ Error creating user profile:", error);
+          }
+        }
+
         toast({
           title: "Account created!",
           description: "Please check your email to verify your account before signing in. Your 8-day free trial will begin after verification.",

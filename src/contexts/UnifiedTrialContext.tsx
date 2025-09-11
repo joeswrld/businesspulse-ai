@@ -410,7 +410,7 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
       return false;
     }
 
-    // Default: allow access (for edge cases)
+    // Default: allow access (for edge cases and new users)
     console.log('✅ Default access granted');
     return true;
   };
@@ -535,8 +535,10 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
       refreshTrialStatus();
     }, 5 * 60 * 1000); // 5 minutes
 
-    return () => clearInterval(interval);
-  }, [user]);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [user, refreshTrialStatus]);
 
   const contextValue: UnifiedTrialContextType = {
     trialStatus,
