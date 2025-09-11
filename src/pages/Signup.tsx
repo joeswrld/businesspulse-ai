@@ -48,7 +48,7 @@ const Signup = () => {
           emailRedirectTo: redirectUrl,
           data: {
             full_name: formData.fullName.trim(),
-            company_name: formData.companyName.trim(),
+            company_name: formData.companyName.trim() || 'Individual User',
           }
         }
       });
@@ -57,7 +57,21 @@ const Signup = () => {
 
       if (error) {
         console.error("❌ Sign up error:", error);
-        throw error;
+        
+        // Provide more specific error messages
+        let errorMessage = error.message || "An error occurred during account creation.";
+        
+        if (error.message.includes("Database error saving new user")) {
+          errorMessage = "There was a database error creating your account. Please try again or contact support if the issue persists.";
+        } else if (error.message.includes("User already registered")) {
+          errorMessage = "An account with this email already exists. Please sign in instead.";
+        } else if (error.message.includes("Invalid email")) {
+          errorMessage = "Please enter a valid email address.";
+        } else if (error.message.includes("Password should be at least")) {
+          errorMessage = "Password must be at least 8 characters long.";
+        }
+        
+        throw new Error(errorMessage);
       }
 
       console.log("✅ Sign up successful:", data.user?.email);
