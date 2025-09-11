@@ -70,12 +70,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (mounted) {
-          if (error) {
-            console.error("❌ Error getting session:", error);
-            setError(error.message);
-            setLoading(false);
-            return;
+        if (error) {
+          console.error("❌ Error getting session:", error);
+          // Provide more specific error messages
+          let errorMessage = "Authentication error occurred";
+          if (error.message.includes("Invalid API key")) {
+            errorMessage = "Configuration error. Please contact support.";
+          } else if (error.message.includes("network")) {
+            errorMessage = "Network error. Please check your connection.";
+          } else if (error.message) {
+            errorMessage = error.message;
           }
+          setError(errorMessage);
+          setLoading(false);
+          return;
+        }
           
           console.log("🔐 Initial session check:", session ? "Found" : "None");
           setSession(session);
