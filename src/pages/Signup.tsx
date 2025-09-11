@@ -61,14 +61,18 @@ const Signup = () => {
         // Provide more specific error messages
         let errorMessage = error.message || "An error occurred during account creation.";
         
-        if (error.message.includes("Database error saving new user")) {
-          errorMessage = "There was a database error creating your account. Please try again or contact support if the issue persists.";
+        if (error.message.includes("Database error updating user") || error.message.includes("Database error saving new user")) {
+          errorMessage = "There was a database error creating your account. This has been fixed - please try again. If the issue persists, please contact support.";
         } else if (error.message.includes("User already registered")) {
           errorMessage = "An account with this email already exists. Please sign in instead.";
         } else if (error.message.includes("Invalid email")) {
           errorMessage = "Please enter a valid email address.";
         } else if (error.message.includes("Password should be at least")) {
           errorMessage = "Password must be at least 8 characters long.";
+        } else if (error.message.includes("signup is disabled")) {
+          errorMessage = "Account creation is temporarily disabled. Please contact support.";
+        } else if (error.message.includes("Email rate limit exceeded")) {
+          errorMessage = "Too many signup attempts. Please wait a few minutes before trying again.";
         }
         
         throw new Error(errorMessage);
