@@ -215,7 +215,7 @@ const App = () => (
               </AuthGuard>
             } />
             <Route path="/insights" element={
-              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={true}>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Insights />
@@ -225,7 +225,7 @@ const App = () => (
             } />
 
             <Route path="/reports" element={
-              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={true}>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Reports />
@@ -234,7 +234,7 @@ const App = () => (
               </AuthGuard>
             } />
             <Route path="/analytics" element={
-              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={true}>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Analytics />
@@ -252,7 +252,7 @@ const App = () => (
               </AuthGuard>
             } />
             <Route path="/teams" element={
-              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={true}>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Teams />
@@ -270,7 +270,7 @@ const App = () => (
               </AuthGuard>
             } />
             <Route path="/feedback" element={
-              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={true}>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Feedback />
@@ -279,7 +279,7 @@ const App = () => (
               </AuthGuard>
             } />
             <Route path="/feedback-settings" element={
-              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={true}>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <FeedbackSettings />

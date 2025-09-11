@@ -86,18 +86,18 @@ export const RouteProtection: React.FC<RouteProtectionProps> = ({
       const access = accessData[0]
       setUserAccess(access)
 
-      // Check if user has access
-      if (!access.has_access) {
-        if (isAllowedWhenExpired) {
-          // Allow access to billing/profile pages even when expired
-          setLoading(false)
-          return
-        } else {
-          // Redirect to billing with upgrade prompt
-          navigate('/billing?upgrade=true')
-          return
-        }
-      }
+      // UNLOCKED PLATFORM: Always allow access regardless of subscription status
+      // if (!access.has_access) {
+      //   if (isAllowedWhenExpired) {
+      //     // Allow access to billing/profile pages even when expired
+      //     setLoading(false)
+      //     return
+      //   } else {
+      //     // Redirect to billing with upgrade prompt
+      //     navigate('/billing?upgrade=true')
+      //     return
+      //   }
+      // }
 
       setLoading(false)
     } catch (error) {
@@ -122,21 +122,21 @@ export const RouteProtection: React.FC<RouteProtectionProps> = ({
     return null // Will redirect to login
   }
 
-  // If user doesn't have access and this route requires it
-  if (requireAccess && !userAccess.has_access) {
-    const isAllowedWhenExpired = allowedWhenExpired || 
-      ALLOWED_WHEN_EXPIRED.some(route => location.pathname.startsWith(route))
+  // UNLOCKED PLATFORM: Never show lock screen
+  // if (requireAccess && !userAccess.has_access) {
+  //   const isAllowedWhenExpired = allowedWhenExpired || 
+  //     ALLOWED_WHEN_EXPIRED.some(route => location.pathname.startsWith(route))
 
-    if (!isAllowedWhenExpired) {
-      return (
-        <LockScreen
-          planStatus={userAccess.plan_status}
-          trialExpiresAt={userAccess.trial_expires_at}
-          onUpgrade={() => navigate('/billing?upgrade=true')}
-        />
-      )
-    }
-  }
+  //   if (!isAllowedWhenExpired) {
+  //     return (
+  //       <LockScreen
+  //         planStatus={userAccess.plan_status}
+  //         trialExpiresAt={userAccess.trial_expires_at}
+  //         onUpgrade={() => navigate('/billing?upgrade=true')}
+  //       />
+  //     )
+  //   }
+  // }
 
   return <>{children}</>
 }

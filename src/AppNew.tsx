@@ -71,25 +71,21 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
   );
 };
 
-// Protected Dashboard Layout
+// UNLOCKED PLATFORM: No route protection needed
 const ProtectedDashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <RouteProtection requireAccess={true}>
-      <DashboardLayout>
-        {children}
-      </DashboardLayout>
-    </RouteProtection>
+    <DashboardLayout>
+      {children}
+    </DashboardLayout>
   );
 };
 
-// Always Accessible Layout (for billing, profile, etc.)
+// UNLOCKED PLATFORM: No route protection needed
 const AlwaysAccessibleLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <RouteProtection requireAccess={false}>
-      <DashboardLayout>
-        {children}
-      </DashboardLayout>
-    </RouteProtection>
+    <DashboardLayout>
+      {children}
+    </DashboardLayout>
   );
 };
 
