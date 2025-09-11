@@ -3,191 +3,166 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Signup Fix</title>
+    <title>Signup Fix Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 50px auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        button {
-            background: #007bff;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            width: 100%;
-        }
-        button:hover {
-            background: #0056b3;
-        }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        .result {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 5px;
-            display: none;
-        }
-        .success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .loading {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .container { background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; width: 200px; }
+        .log { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
     </style>
 </head>
 <body>
+    <h1>🔧 Signup Database Error Fix Test</h1>
+    
+    <div class="container info">
+        <h3>📋 Instructions</h3>
+        <p>1. First, apply the database fix by running the SQL script in your Supabase dashboard</p>
+        <p>2. Enter your Supabase credentials below</p>
+        <p>3. Click "Test Signup" to verify the fix works</p>
+    </div>
+
     <div class="container">
-        <h1>Test Signup Fix</h1>
-        <p>This page tests the signup functionality to verify the "Database error updating user" issue has been resolved.</p>
-        
-        <form id="signupForm">
-            <div class="form-group">
-                <label for="fullName">Full Name:</label>
-                <input type="text" id="fullName" name="fullName" value="Test User" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="companyName">Company Name:</label>
-                <input type="text" id="companyName" name="companyName" value="Test Company" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="email">Email:</label>
-                <input type="email" id="email" name="email" value="" placeholder="test@example.com" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="password">Password:</label>
-                <input type="password" id="password" name="password" value="testpassword123" required>
-            </div>
-            
-            <button type="submit" id="submitBtn">Test Signup</button>
-        </form>
-        
-        <div id="result" class="result"></div>
+        <h3>🔑 Supabase Configuration</h3>
+        <div>
+            <label>Supabase URL:</label><br>
+            <input type="text" id="supabaseUrl" placeholder="https://your-project.supabase.co">
+        </div>
+        <div>
+            <label>Supabase Anon Key:</label><br>
+            <input type="text" id="supabaseKey" placeholder="your-anon-key">
+        </div>
+        <button onclick="initializeSupabase()">Initialize Supabase</button>
+    </div>
+
+    <div class="container">
+        <h3>🧪 Test Signup</h3>
+        <div>
+            <label>Test Email:</label><br>
+            <input type="email" id="testEmail" placeholder="test@example.com">
+        </div>
+        <div>
+            <label>Test Password:</label><br>
+            <input type="password" id="testPassword" placeholder="testpassword123">
+        </div>
+        <div>
+            <label>Full Name:</label><br>
+            <input type="text" id="fullName" placeholder="Test User">
+        </div>
+        <div>
+            <label>Company Name:</label><br>
+            <input type="text" id="companyName" placeholder="Test Company">
+        </div>
+        <button onclick="testSignup()">Test Signup</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <div class="container">
+        <h3>📝 Test Results</h3>
+        <div id="log" class="log">Ready to test...\n</div>
     </div>
 
     <script>
-        // Get environment variables from the page (you'll need to set these)
-        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
-        
-        // Generate a random email for testing
-        document.getElementById('email').value = `test${Date.now()}@example.com`;
-        
-        document.getElementById('signupForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const submitBtn = document.getElementById('submitBtn');
-            const resultDiv = document.getElementById('result');
-            
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Testing...';
-            
-            resultDiv.className = 'result loading';
-            resultDiv.style.display = 'block';
-            resultDiv.textContent = 'Testing signup functionality...';
-            
+        let supabase = null;
+
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            logElement.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = 'Log cleared...\n';
+        }
+
+        function initializeSupabase() {
+            const url = document.getElementById('supabaseUrl').value;
+            const key = document.getElementById('supabaseKey').value;
+
+            if (!url || !key) {
+                log('❌ Please enter both Supabase URL and Anon Key', 'error');
+                return;
+            }
+
             try {
-                // Test the signup process
-                const formData = new FormData(e.target);
-                const signupData = {
-                    email: formData.get('email'),
-                    password: formData.get('password'),
+                supabase = window.supabase.createClient(url, key);
+                log('✅ Supabase client initialized successfully', 'success');
+            } catch (error) {
+                log(`❌ Failed to initialize Supabase: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSignup() {
+            if (!supabase) {
+                log('❌ Please initialize Supabase first', 'error');
+                return;
+            }
+
+            const email = document.getElementById('testEmail').value || `test-${Date.now()}@example.com`;
+            const password = document.getElementById('testPassword').value || 'testpassword123';
+            const fullName = document.getElementById('fullName').value || 'Test User';
+            const companyName = document.getElementById('companyName').value || 'Test Company';
+
+            log(`🧪 Testing signup with email: ${email}`);
+            log(`📝 Full name: ${fullName}, Company: ${companyName}`);
+
+            try {
+                const { data, error } = await supabase.auth.signUp({
+                    email: email,
+                    password: password,
                     options: {
                         data: {
-                            full_name: formData.get('fullName'),
-                            company_name: formData.get('companyName')
+                            full_name: fullName,
+                            company_name: companyName
                         }
                     }
-                };
-                
-                console.log('Testing signup with data:', signupData);
-                
-                // If Supabase is available, test the actual signup
-                if (typeof supabase !== 'undefined') {
-                    const { data, error } = await supabase.auth.signUp(signupData);
-                    
-                    if (error) {
-                        throw new Error(error.message);
+                });
+
+                if (error) {
+                    log(`❌ Signup failed: ${error.message}`, 'error');
+                    if (error.message.includes('Database error updating user')) {
+                        log('🔧 This indicates the database fix needs to be applied', 'error');
                     }
-                    
-                    resultDiv.className = 'result success';
-                    resultDiv.textContent = `✅ Signup test successful! User created: ${data.user?.email}`;
-                } else {
-                    // Mock test - just validate the form data
-                    if (!signupData.email || !signupData.password) {
-                        throw new Error('Email and password are required');
-                    }
-                    
-                    if (signupData.password.length < 8) {
-                        throw new Error('Password must be at least 8 characters');
-                    }
-                    
-                    resultDiv.className = 'result success';
-                    resultDiv.textContent = '✅ Form validation passed! (Note: This is a mock test - Supabase not available)';
+                    return;
                 }
-                
-            } catch (error) {
-                console.error('Signup test error:', error);
-                resultDiv.className = 'result error';
-                resultDiv.textContent = `❌ Signup test failed: ${error.message}`;
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Test Signup';
+
+                log('✅ Signup successful!', 'success');
+                log(`👤 User ID: ${data.user?.id}`);
+                log(`📧 Email: ${data.user?.email}`);
+
+                // Check if profile was created
+                const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('user_id', data.user?.id)
+                    .single();
+
+                if (profileError) {
+                    log(`⚠️  Profile not found: ${profileError.message}`, 'error');
+                } else {
+                    log('✅ Profile created successfully!', 'success');
+                    log(`📋 Profile data: ${JSON.stringify(profile, null, 2)}`);
+                }
+
+            } catch (err) {
+                log(`❌ Test failed: ${err.message}`, 'error');
             }
+        }
+
+        // Auto-fill with common test values
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('testEmail').value = `test-${Date.now()}@example.com`;
+            document.getElementById('testPassword').value = 'testpassword123';
+            document.getElementById('fullName').value = 'Test User';
+            document.getElementById('companyName').value = 'Test Company';
         });
-        
-        // Add instructions
-        const instructions = document.createElement('div');
-        instructions.innerHTML = `
-            <h3>Instructions:</h3>
-            <ol>
-                <li>Make sure you've applied the database fix by running the SQL script</li>
-                <li>Set your Supabase URL and key in the script above</li>
-                <li>Click "Test Signup" to verify the fix works</li>
-                <li>Check the browser console for detailed logs</li>
-            </ol>
-        `;
-        document.querySelector('.container').appendChild(instructions);
     </script>
 </body>
 </html>
