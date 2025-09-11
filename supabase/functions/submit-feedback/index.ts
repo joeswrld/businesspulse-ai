@@ -56,29 +56,29 @@ serve(async (req) => {
       )
     }
 
-    // Check if project exists in projects table
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('id, user_id, project_id')
+    // Check if project exists in feedback_settings table by project_id
+    const { data: projectSettings, error: projectError } = await supabase
+      .from('feedback_settings')
+      .select('project_id')
       .eq('project_id', project_id)
-      .single()
+      .maybeSingle()
 
-    if (projectError || !project) {
-      console.error('Project not found:', project_id)
+    if (projectError || !projectSettings) {
+      console.error('Project not found in feedback_settings:', project_id, projectError)
       return new Response(
         JSON.stringify({ error: 'Project not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Insert feedback into feedbacks table
+    // Insert feedback into feedbacks table (schema: project_id TEXT, email TEXT, message TEXT, timestamp ...)
     const { data: feedback, error: feedbackError } = await supabase
       .from('feedbacks')
       .insert({
-        project_id: project.id, // Use the UUID from projects table
-        content: message.trim(),
-        user_email: email || null,
-        created_at: new Date().toISOString()
+        project_id: project_id,
+        email: email || null,
+        message: message.trim(),
+        timestamp: new Date().toISOString(),
       })
       .select('id')
       .single()
