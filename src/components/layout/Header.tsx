@@ -149,10 +149,10 @@ const Header = () => {
               // Show sign in and CTA buttons when not logged in
               <>
                 <Button variant="ghost" size="sm" asChild>
-                  <Link to="/auth">Sign In</Link>
+                  <Link to="/login">Sign In</Link>
                 </Button>
                 <Button variant="hero" size="sm" asChild>
-                  <Link to="/auth">Start Collecting Feedback ✨</Link>
+                  <Link to="/signup">Start Collecting Feedback ✨</Link>
                 </Button>
               </>
             )}
@@ -240,10 +240,10 @@ const Header = () => {
                 <>
                   <div className="px-4 space-y-3">
                     <Button variant="ghost" size="sm" asChild className="w-full justify-start">
-                      <Link to="/auth" onClick={() => setIsMenuOpen(false)}>Sign In</Link>
+                      <Link to="/login" onClick={() => setIsMenuOpen(false)}>Sign In</Link>
                     </Button>
                     <Button variant="hero" size="sm" asChild className="w-full justify-start">
-                      <Link to="/auth" onClick={() => setIsMenuOpen(false)}>Start Collecting Feedback ✨</Link>
+                      <Link to="/signup" onClick={() => setIsMenuOpen(false)}>Start Collecting Feedback ✨</Link>
                     </Button>
                   </div>
                 </>
