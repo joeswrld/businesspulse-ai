@@ -27,7 +27,6 @@ interface ProjectData {
 interface FeedbackSubmission {
   project_id: string;
   message: string;
-  name?: string;
   email?: string;
 }
 
@@ -175,7 +174,6 @@ const EmailFeedbackPage = () => {
       const feedbackData: FeedbackSubmission = {
         project_id: project_id,
         message: message || 'No message provided',
-        name: customerName.trim() || undefined,
         email: customerEmail.trim() || undefined
       };
 
