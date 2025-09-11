@@ -6,6 +6,7 @@
   // 🔑 Your Supabase Project Ref
   const SUPABASE_REF = "xjbrqeqizpoqdjkiyqzt";
   const API_BASE_URL = `https://${SUPABASE_REF}.supabase.co/functions/v1`;
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84";
 
   // --- Default Config ---
   const CONFIG = {
@@ -56,7 +57,12 @@
     async getConfig(projectId) {
       console.log('📡 Feedback Widget: Fetching config for project:', projectId);
       try {
-        const res = await fetch(`${API_BASE_URL}/widget-config?project_id=${projectId}`);
+        const res = await fetch(`${API_BASE_URL}/widget-config?project_id=${projectId}`, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json'
+          }
+        });
         if (!res.ok) {
           console.warn('⚠️ Feedback Widget: Config fetch failed with status:', res.status);
           throw new Error(`Failed to load widget config: ${res.status}`);
@@ -74,7 +80,10 @@
       try {
         const res = await fetch(`${API_BASE_URL}/submit-feedback`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY
+          },
           body: JSON.stringify({ project_id: projectId, ...data }),
         });
         if (!res.ok) {
