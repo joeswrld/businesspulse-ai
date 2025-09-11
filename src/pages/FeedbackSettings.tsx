@@ -21,11 +21,13 @@ import {
   Image,
   Star,
   User,
-  Mail
+  Mail,
+  BarChart3
 } from "lucide-react";
 import QRCodeFeedbackSection from "@/components/feedback/QRCodeFeedbackSection";
 import EmailSignatureFeedbackSection from "@/components/feedback/EmailSignatureFeedbackSection";
 import WidgetSettingsLock from "@/components/WidgetSettingsLock";
+import FeedbackDashboard from "@/components/FeedbackDashboard";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUnifiedTrial } from "@/contexts/UnifiedTrialContext";
@@ -1401,6 +1403,24 @@ const FeedbackSettings = () => {
           >
             <EmailSignatureFeedbackSection projectId={settings.project_id} />
           </WidgetSettingsLock>
+        )}
+
+        {/* Feedback Dashboard */}
+        {settings?.project_id && settings.project_id.trim() !== '' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <BarChart3 className="h-5 w-5" />
+                <span>Feedback Dashboard</span>
+              </CardTitle>
+              <CardDescription>
+                View and analyze feedback from all channels in real-time
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FeedbackDashboard projectId={settings.project_id} />
+            </CardContent>
+          </Card>
         )}
 
       </div>
