@@ -76,25 +76,60 @@
       }
     },
     async submitFeedback(projectId, data) {
-      console.log('📤 Feedback Widget: Submitting feedback:', data);
+      console.log('📤 Feedback Widget: Submitting feedback:', {
+        project_id: projectId,
+        email: data?.email,
+        message_preview: (data?.message || '').slice(0, 80),
+      });
+      const url = `${API_BASE_URL}/submit-feedback`;
+      const payload = { project_id: projectId, ...data };
+      const headers = {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      };
       try {
-        const res = await fetch(`${API_BASE_URL}/submit-feedback`, {
+        const res = await fetch(url, {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_ANON_KEY
-          },
-          body: JSON.stringify({ project_id: projectId, ...data }),
+          headers,
+          body: JSON.stringify(payload),
         });
         if (!res.ok) {
-          console.warn('⚠️ Feedback Widget: Submit failed with status:', res.status);
-          throw new Error(`Failed to submit feedback: ${res.status}`);
+          const responseText = await res.text().catch(() => '<no-body>');
+          const enhancedError = new Error(`Failed to submit feedback: ${res.status} ${res.statusText}`);
+          enhancedError.name = 'SubmitFeedbackHttpError';
+          enhancedError.status = res.status;
+          enhancedError.statusText = res.statusText;
+          enhancedError.url = url;
+          enhancedError.responseText = responseText;
+          enhancedError.request = { headers, payload };
+          console.error('❌ Feedback Widget: HTTP error during submit', {
+            status: res.status,
+            statusText: res.statusText,
+            url,
+            responseText,
+            request: { headers, payload },
+          });
+          throw enhancedError;
         }
-        const result = await res.json();
+        const contentType = res.headers.get('content-type') || '';
+        const result = contentType.includes('application/json') ? await res.json() : await res.text();
         console.log('✅ Feedback Widget: Feedback submitted successfully:', result);
         return result;
       } catch (error) {
-        console.warn('⚠️ Feedback Widget: Submit error:', error.message);
+        // Likely network/CORS errors show up as TypeError in browsers
+        const isCorsOrNetwork = error instanceof TypeError;
+        console.error('❌ Feedback Widget: Submit error', {
+          message: error?.message,
+          name: error?.name,
+          status: error?.status,
+          statusText: error?.statusText,
+          url: error?.url || url,
+          responseText: error?.responseText,
+          request: error?.request || { headers, payload },
+          online: typeof navigator !== 'undefined' ? navigator.onLine : undefined,
+          hint: isCorsOrNetwork ? 'Possible CORS or network failure before reaching the server' : undefined,
+        });
         throw error;
       }
     },
@@ -266,7 +301,11 @@
           }
         } catch (err) {
           console.error('❌ Feedback Widget: Submit failed:', err);
-          this.showError('Failed to send feedback. Please try again.');
+          const details = [];
+          if (err?.status) details.push(`Status: ${err.status} ${err.statusText || ''}`.trim());
+          if (err?.responseText) details.push(`Response: ${(err.responseText || '').slice(0, 200)}`);
+          if (err?.message && !err?.status) details.push(err.message);
+          this.showError(`Failed to send feedback. Please try again.${details.length ? ' [' + details.join(' | ') + ']' : ''}`);
         } finally {
           // Reset loading state
           submitBtn.disabled = false;
