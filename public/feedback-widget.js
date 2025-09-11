@@ -81,13 +81,20 @@
         email: data?.email,
         message_preview: (data?.message || '').slice(0, 80),
       });
-      const url = `${API_BASE_URL}/submit-feedback`;
-      const payload = { project_id: projectId, ...data };
+      
+      // Use direct database insertion instead of edge function
+      const url = `${API_BASE_URL.replace('/functions/v1', '/rest/v1')}/feedbacks`;
+      const payload = { 
+        project_id: projectId, 
+        message: data?.message,
+        email: data?.email || null
+      };
       const headers = {
         'Content-Type': 'application/json',
         'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
       };
+      
       try {
         const res = await fetch(url, {
           method: 'POST',
