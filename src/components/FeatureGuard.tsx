@@ -33,27 +33,12 @@ export default function FeatureGuard({
 
   useEffect(() => {
     const checkAccess = async () => {
-      if (!userId) {
-        setIsAllowed(false);
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        const result = await checkUsageLimit(userId, featureType);
-        
-        setIsAllowed(result.allowed);
-        setReason(result.reason || '');
-        setUpgradeRequired(result.upgradeRequired || false);
-      } catch (error) {
-        console.error('Error checking feature access:', error);
-        setIsAllowed(false);
-        setReason('Unable to verify access');
-        setUpgradeRequired(true);
-      } finally {
-        setIsLoading(false);
-      }
+      // UNLOCKED PLATFORM: Always allow access
+      console.log('🔓 UNLOCKED PLATFORM - Feature access always allowed');
+      setIsAllowed(true);
+      setReason('Unlocked platform - all features accessible');
+      setUpgradeRequired(false);
+      setIsLoading(false);
     };
 
     checkAccess();
@@ -114,47 +99,24 @@ export function useFeatureAccess(userId: string, featureType: keyof import('@/li
 
   useEffect(() => {
     const checkAccess = async () => {
-      if (!userId) {
-        setIsAllowed(false);
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        const result = await checkUsageLimit(userId, featureType);
-        
-        setIsAllowed(result.allowed);
-        setReason(result.reason || '');
-        setUpgradeRequired(result.upgradeRequired || false);
-      } catch (error) {
-        console.error('Error checking feature access:', error);
-        setIsAllowed(false);
-        setReason('Unable to verify access');
-        setUpgradeRequired(true);
-      } finally {
-        setIsLoading(false);
-      }
+      // UNLOCKED PLATFORM: Always allow access
+      console.log('🔓 UNLOCKED PLATFORM - Feature access always allowed');
+      setIsAllowed(true);
+      setReason('Unlocked platform - all features accessible');
+      setUpgradeRequired(false);
+      setIsLoading(false);
     };
 
     checkAccess();
   }, [userId, featureType]);
 
   const refresh = async () => {
-    if (!userId) return;
-    
-    try {
-      setIsLoading(true);
-      const result = await checkUsageLimit(userId, featureType);
-      
-      setIsAllowed(result.allowed);
-      setReason(result.reason || '');
-      setUpgradeRequired(result.upgradeRequired || false);
-    } catch (error) {
-      console.error('Error refreshing feature access:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    // UNLOCKED PLATFORM: Always allow access
+    console.log('🔓 UNLOCKED PLATFORM - Feature access always allowed');
+    setIsAllowed(true);
+    setReason('Unlocked platform - all features accessible');
+    setUpgradeRequired(false);
+    setIsLoading(false);
   };
 
   return {

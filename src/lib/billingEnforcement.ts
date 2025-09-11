@@ -184,35 +184,16 @@ export function checkUsageLimit(
   plan: PlanTier,
   isTrialExpired: boolean = false
 ): UsageCheckResult {
-  const limit = PLAN_LIMITS[plan][feature];
-  const isUnlimited = limit === -1;
-  
-  // If trial is expired and user is on free plan, block all usage
-  if (isTrialExpired && plan === 'free') {
-    return {
-      canUse: false,
-      currentUsage,
-      limit,
-      plan,
-      feature,
-      isUnlimited: false,
-      remaining: 0,
-      isTrialExpired: true,
-      daysUntilExpiry: 0
-    };
-  }
-  
-  const canUse = isUnlimited || currentUsage < limit;
-  const remaining = isUnlimited ? -1 : Math.max(0, limit - currentUsage);
-
+  // UNLOCKED PLATFORM: Always allow usage
+  console.log('🔓 UNLOCKED PLATFORM - Usage limit check always allows usage');
   return {
-    canUse,
+    canUse: true,
     currentUsage,
-    limit,
+    limit: -1, // Unlimited
     plan,
     feature,
-    isUnlimited,
-    remaining,
+    isUnlimited: true,
+    remaining: -1,
     isTrialExpired: false,
     daysUntilExpiry: 0
   };
@@ -222,27 +203,18 @@ export function checkUsageLimit(
  * Check if user's trial has expired
  */
 export function isTrialExpired(subscription: SubscriptionData | null): boolean {
-  if (!subscription || subscription.plan_tier !== 'free') {
-    return false;
-  }
-  
-  return new Date(subscription.current_period_end) <= new Date();
+  // UNLOCKED PLATFORM: Trial never expires
+  console.log('🔓 UNLOCKED PLATFORM - Trial never expires');
+  return false;
 }
 
 /**
  * Get days until trial/subscription expires
  */
 export function getDaysUntilExpiry(subscription: SubscriptionData | null): number {
-  if (!subscription || !subscription.current_period_end) {
-    return 0;
-  }
-  
-  const expiryDate = new Date(subscription.current_period_end);
-  const now = new Date();
-  const diffTime = expiryDate.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  return Math.max(0, diffDays);
+  // UNLOCKED PLATFORM: Never expires
+  console.log('🔓 UNLOCKED PLATFORM - Never expires');
+  return 999; // Return a large number to indicate unlimited
 }
 
 /**

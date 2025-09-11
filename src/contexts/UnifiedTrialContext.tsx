@@ -363,55 +363,9 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   };
 
-  // FIXED: Check if user has access - Updated platform locking logic
+  // UNLOCKED PLATFORM: Always allow access regardless of trial/subscription status
   const checkAccess = (): boolean => {
-    // If loading, give access by default (don't lock out during loading)
-    if (trialStatus.loading) {
-      console.log('⏳ Loading state - allowing access');
-      return true;
-    }
-
-    // If there's an error, give access (don't lock out due to errors)
-    if (trialStatus.error) {
-      console.log('⚠️ Error state - allowing access');
-      return true;
-    }
-
-    // Business plan users with active subscription ALWAYS have access
-    if (trialStatus.plan === 'business' && trialStatus.subscriptionActive) {
-      console.log('✅ Business user with active subscription - allowing access');
-      return true;
-    }
-
-    // Trial users have access if trial is active and not expired
-    if (trialStatus.plan === 'free_trial') {
-      // New users (never used trial before) should not be locked
-      if (!trialStatus.trialStart) {
-        console.log('✅ New user without trial start - allowing access');
-        return true;
-      }
-
-      // If trial is active and not expired, allow access
-      if (!trialStatus.trialExpired && trialStatus.daysLeft > 0) {
-        console.log('✅ Trial user with active trial - allowing access');
-        return true;
-      }
-
-      // If trial is expired, lock
-      if (trialStatus.trialExpired || trialStatus.daysLeft <= 0) {
-        console.log('🔒 Trial user with expired trial - locking platform');
-        return false;
-      }
-    }
-
-    // Business plan users with inactive subscription should be locked
-    if (trialStatus.plan === 'business' && !trialStatus.subscriptionActive) {
-      console.log('🔒 Business user with inactive subscription - locking platform');
-      return false;
-    }
-
-    // Default: allow access (for edge cases and new users)
-    console.log('✅ Default access granted');
+    console.log('🔓 UNLOCKED PLATFORM - Always allowing access');
     return true;
   };
 
@@ -423,20 +377,10 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
     return 'none';
   };
 
-  // Check if trial is expired
+  // UNLOCKED PLATFORM: Never consider trial expired
   const isTrialExpired = (): boolean => {
-    // Business plan users never have expired trials
-    if (trialStatus.plan === 'business' && trialStatus.subscriptionActive) {
-      return false;
-    }
-    
-    // If loading, don't expire (give benefit of doubt)
-    if (trialStatus.loading) {
-      return false;
-    }
-    
-    // Trial is expired if explicitly set or days left <= 0
-    return trialStatus.trialExpired || (trialStatus.plan === 'free_trial' && trialStatus.daysLeft <= 0);
+    console.log('🔓 UNLOCKED PLATFORM - Trial never expires');
+    return false;
   };
 
   // Get days left in trial

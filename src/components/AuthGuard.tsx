@@ -59,11 +59,11 @@ const AuthGuard = ({
           setUserProfile(profile);
           setAccessStatus(profile);
 
-          // Check subscription/trial status if required
-          if (requireActiveSubscription && !profile.has_access) {
-            navigate("/trial-expired");
-            return;
-          }
+          // Check subscription/trial status if required - DISABLED FOR UNLOCKED PLATFORM
+          // if (requireActiveSubscription && !profile.has_access) {
+          //   navigate("/trial-expired");
+          //   return;
+          // }
         }
 
         setLoading(false);
