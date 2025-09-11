@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts"
+import crypto from 'https://deno.land/std@0.168.0/node/crypto.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,553 +14,294 @@ serve(async (req) => {
   }
 
   try {
-    const body = await req.text()
-    const signature = req.headers.get('x-paystack-signature')
-    
-    // Verify webhook signature
-    const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')
-    if (!PAYSTACK_SECRET_KEY) {
-      console.error('Paystack configuration missing')
+    // Get environment variables
+    const paystackSecret = Deno.env.get('PAYSTACK_SECRET_KEY')
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!paystackSecret || !supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing required environment variables')
       return new Response(
-        JSON.stringify({ error: 'Paystack configuration missing' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ error: 'Missing required environment variables' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Verify signature
-    const encoder = new TextEncoder()
-    const key = encoder.encode(PAYSTACK_SECRET_KEY)
-    const message = encoder.encode(body)
-    const cryptoKey = await crypto.subtle.importKey(
-      'raw',
-      key,
-      { name: 'HMAC', hash: 'SHA-512' },
-      false,
-      ['sign']
-    )
-    const signatureBytes = await crypto.subtle.sign('HMAC', cryptoKey, message)
-    const expectedSignature = Array.from(new Uint8Array(signatureBytes))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('')
-
-    if (signature !== expectedSignature) {
-      console.error('Invalid webhook signature')
-      return new Response(
-        JSON.stringify({ error: 'Invalid signature' }),
-        { 
-          status: 401, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    const event = JSON.parse(body)
-    console.log('Paystack webhook event:', event.event)
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    // Initialize Supabase client with service role key
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Check idempotency - compute hash of payload
-    const payloadHash = await computeSHA256(body)
-    
-    // Check if we've already processed this webhook
-    const { data: existingEvent } = await supabase
-      .from('webhook_events')
-      .select('id')
-      .eq('seen_hash', payloadHash)
-      .single()
+    // Get the raw body for signature verification
+    const body = await req.text()
+    const signature = req.headers.get('x-paystack-signature')
 
-    if (existingEvent) {
-      console.log('Webhook already processed, skipping:', payloadHash)
+    if (!signature) {
+      console.error('Missing Paystack signature')
       return new Response(
-        JSON.stringify({ success: true, message: 'Already processed' }),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ error: 'Missing signature' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Log webhook event for idempotency
-    const { error: logError } = await supabase
-      .from('webhook_events')
-      .insert({
-        provider: 'paystack',
-        event: event.event,
-        signature: signature,
-        payload: event,
-        seen_hash: payloadHash,
-        processed_at: new Date().toISOString()
-      })
+    // Verify Paystack signature
+    const hash = crypto.createHmac('sha512', paystackSecret)
+      .update(body)
+      .digest('hex')
 
-    if (logError) {
-      console.error('Error logging webhook event:', logError)
+    if (hash !== signature) {
+      console.error('Invalid Paystack signature')
+      return new Response(
+        JSON.stringify({ error: 'Invalid signature' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    // Process the webhook event
+    // Parse the webhook payload
+    const event = JSON.parse(body)
+    console.log('Received Paystack webhook:', event.event, event.data?.id)
+
+    // Handle different event types
     switch (event.event) {
       case 'subscription.create':
+      case 'subscription.enable':
         await handleSubscriptionCreate(supabase, event.data)
         break
-      
-      case 'subscription.disable':
-        await handleSubscriptionDisable(supabase, event.data)
-        break
-      
-      case 'charge.success':
-        await handleChargeSuccess(supabase, event.data)
-        break
-      
-      case 'charge.failed':
-        await handleChargeFailed(supabase, event.data)
-        break
-      
-      case 'invoice.payment_failed':
-        await handlePaymentFailed(supabase, event.data)
-        break
-      
-      case 'invoice.payment_success':
+
+      case 'invoice.payment_succeeded':
         await handlePaymentSuccess(supabase, event.data)
         break
-      
+
+      case 'subscription.disable':
+      case 'subscription.cancelled':
+        await handleSubscriptionCancel(supabase, event.data)
+        break
+
+      case 'customer.subscription.created':
+        await handleCustomerSubscriptionCreated(supabase, event.data)
+        break
+
       default:
         console.log('Unhandled event type:', event.event)
     }
 
     return new Response(
       JSON.stringify({ success: true }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
     console.error('Webhook processing error:', error)
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
 
-// Compute SHA256 hash for idempotency
-async function computeSHA256(data: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const dataBuffer = encoder.encode(data)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
 async function handleSubscriptionCreate(supabase: any, data: any) {
   try {
-    console.log('Processing subscription.create:', data)
+    const { customer, subscription } = data
     
-    // Get user_id from metadata or customer email
-    const userId = data.metadata?.user_id || await getUserIdFromEmail(supabase, data.customer.email)
-    
-    if (!userId) {
-      console.error('Could not find user for subscription create')
-      return
-    }
-
-    // Map plan_code to plan_tier
-    let planTier = 'pro'
-    if (data.plan?.plan_code === 'PLN_esryg99ztsy9xc8') {
-      planTier = 'business'
-    } else if (data.plan?.plan_code === 'PLN_4z2wpgmw41w2k7r') {
-      planTier = 'pro'
-    }
-
-    // Calculate billing period (monthly)
-    const now = new Date()
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate())
-
-    // Update or create user subscription
-    const { error: subError } = await supabase
-      .from('user_subscriptions')
-      .upsert({
-        user_id: userId,
-        plan_code: data.plan?.plan_code || 'PLN_4z2wpgmw41w2k7r',
-        plan_tier: planTier,
-        status: 'active',
-        current_period_start: now.toISOString(),
-        current_period_end: nextMonth.toISOString(),
-        paystack_subscription_code: data.subscription_code,
-        paystack_email_token: data.email_token
-      }, {
-        onConflict: 'user_id'
-      })
-
-    if (subError) {
-      console.error('Error updating user subscription:', subError)
-      return
-    }
-
-    // Update user plan status in profiles table
-    const { error: profileError } = await supabase
+    // Find user by Paystack customer ID
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .update({
-        plan: planTier === 'business' ? 'business' : 'pro',
-        is_active: true,
+      .select('id')
+      .eq('paystack_customer_id', customer.customer_code)
+      .single()
+
+    if (profileError || !profile) {
+      console.error('User not found for customer:', customer.customer_code)
+      return
+    }
+
+    // Update or create subscription record
+    const { error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .upsert({
+        user_id: profile.id,
+        paystack_subscription_id: subscription.subscription_code,
+        status: 'active',
+        plan_code: subscription.plan.plan_code,
+        current_period_start: new Date(subscription.createdAt).toISOString(),
+        current_period_end: new Date(subscription.next_payment_date).toISOString(),
         updated_at: new Date().toISOString()
       })
-      .eq('user_id', userId);
 
-    if (profileError) {
-      console.error('Error updating user profile plan:', profileError);
-    } else {
-      console.log(`✅ User plan updated to ${planTier} for user:`, userId);
-    }
-
-    // Reset usage counters for new plan (monthly window)
-    const { error: usageError } = await supabase
-      .from('usage_counters')
-      .upsert({
-        user_id: userId,
-        period_start: now.toISOString(),
-        period_end: nextMonth.toISOString(),
-        feedback_count: 0,
-        insights_count: 0,
-        reports_count: 0,
-        last_reset: now.toISOString()
-      }, {
-        onConflict: 'user_id'
-      })
-
-    if (usageError) {
-      console.error('Error resetting usage counters:', usageError)
-    }
-
-    // Create transaction record
-    const { error: transactionError } = await supabase
-      .from('transactions')
-      .insert({
-        user_id: userId,
-        amount_kobo: data.amount || 0,
-        status: 'success',
-        description: `Subscription to ${data.plan?.name || 'Pro Plan'}`,
-        reference: data.reference || `sub_${Date.now()}`,
-        raw: data
-      })
-
-    if (transactionError) {
-      console.error('Error creating transaction:', transactionError)
-    }
-
-    console.log('Successfully processed subscription.create for user:', userId)
-  } catch (error) {
-    console.error('Error handling subscription create:', error)
-  }
-}
-
-async function handleSubscriptionDisable(supabase: any, data: any) {
-  try {
-    console.log('Processing subscription.disable:', data)
-    
-    // Find user by subscription ID
-    const { data: subscription, error: findError } = await supabase
-      .from('user_subscriptions')
-      .select('user_id')
-      .eq('paystack_subscription_code', data.subscription_code)
-      .single()
-
-    if (findError || !subscription) {
-      console.error('Could not find subscription for disable:', data.subscription_code)
+    if (subscriptionError) {
+      console.error('Error updating subscription:', subscriptionError)
       return
     }
 
-    // Update subscription status
-    const { error: updateError } = await supabase
-      .from('user_subscriptions')
-      .update({
-        status: 'canceled',
-        cancel_at_period_end: true
-      })
-      .eq('paystack_subscription_code', data.subscription_code)
-
-    if (updateError) {
-      console.error('Error updating subscription for disable:', updateError)
-      return
-    }
-
-    // Update user plan status in profiles table
-    const { error: profileError } = await supabase
+    // Update user profile
+    const { error: profileUpdateError } = await supabase
       .from('profiles')
       .update({
-        is_active: false,
+        plan_status: 'active',
+        paystack_subscription_status: 'active',
         updated_at: new Date().toISOString()
       })
-      .eq('user_id', subscription.user_id);
+      .eq('id', profile.id)
 
-    if (profileError) {
-      console.error('Error updating user profile status:', profileError);
-    } else {
-      console.log('✅ User profile deactivated for user:', subscription.user_id);
+    if (profileUpdateError) {
+      console.error('Error updating profile:', profileUpdateError)
     }
 
-    console.log('Successfully processed subscription.disable for user:', subscription.user_id)
+    console.log('Subscription created successfully for user:', profile.id)
   } catch (error) {
-    console.error('Error handling subscription disable:', error)
-  }
-}
-
-async function handleChargeSuccess(supabase: any, data: any) {
-  try {
-    console.log('Processing charge.success:', data)
-    
-    // Find user by subscription ID
-    const { data: subscription, error: findError } = await supabase
-      .from('user_subscriptions')
-      .select('user_id, plan_tier')
-      .eq('paystack_subscription_code', data.subscription)
-      .single()
-
-    if (findError || !subscription) {
-      console.error('Could not find subscription for charge success:', data.subscription)
-      return
-    }
-
-    // Calculate next billing period (monthly)
-    const now = new Date()
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate())
-
-    // Update subscription period
-    const { error: updateError } = await supabase
-      .from('user_subscriptions')
-      .update({
-        status: 'active',
-        current_period_start: now.toISOString(),
-        current_period_end: nextMonth.toISOString()
-      })
-      .eq('paystack_subscription_code', data.subscription)
-
-    if (updateError) {
-      console.error('Error updating subscription for charge success:', updateError)
-    }
-
-    // Reset usage counters for monthly renewal (except Business which is unlimited)
-    if (subscription.plan_tier !== 'business') {
-      const { error: usageError } = await supabase
-        .from('usage_counters')
-        .upsert({
-          user_id: subscription.user_id,
-          period_start: now.toISOString(),
-          period_end: nextMonth.toISOString(),
-          feedback_count: 0,
-          insights_count: 0,
-          reports_count: 0,
-          last_reset: now.toISOString()
-        }, {
-          onConflict: 'user_id'
-        })
-
-      if (usageError) {
-        console.error('Error resetting usage counters for renewal:', usageError)
-      }
-    }
-
-    // Create transaction record
-    const { error: transactionError } = await supabase
-      .from('transactions')
-      .insert({
-        user_id: subscription.user_id,
-        amount_kobo: data.amount || 0,
-        status: 'success',
-        description: 'Subscription renewal',
-        reference: data.reference || `charge_${Date.now()}`,
-        raw: data
-      })
-
-    if (transactionError) {
-      console.error('Error creating transaction for charge success:', transactionError)
-    }
-
-    console.log('Successfully processed charge.success for user:', subscription.user_id)
-  } catch (error) {
-    console.error('Error handling charge success:', error)
-  }
-}
-
-async function handleChargeFailed(supabase: any, data: any) {
-  try {
-    console.log('Processing charge.failed:', data)
-    
-    // Find user by subscription ID
-    const { data: subscription, error: findError } = await supabase
-      .from('user_subscriptions')
-      .select('user_id')
-      .eq('paystack_subscription_code', data.subscription)
-      .single()
-
-    if (findError || !subscription) {
-      console.error('Could not find subscription for charge failed:', data.subscription)
-      return
-    }
-
-    // Update subscription status
-    const { error: updateError } = await supabase
-      .from('user_subscriptions')
-      .update({
-        status: 'past_due'
-      })
-      .eq('paystack_subscription_code', data.subscription)
-
-    if (updateError) {
-      console.error('Error updating subscription for charge failed:', updateError)
-    }
-
-    // Create failed transaction record
-    const { error: transactionError } = await supabase
-      .from('transactions')
-      .insert({
-        user_id: subscription.user_id,
-        amount_kobo: data.amount || 0,
-        status: 'failed',
-        description: 'Payment failed',
-        reference: data.reference || `failed_${Date.now()}`,
-        raw: data
-      })
-
-    if (transactionError) {
-      console.error('Error creating transaction for charge failed:', transactionError)
-    }
-
-    console.log('Successfully processed charge.failed for user:', subscription.user_id)
-  } catch (error) {
-    console.error('Error handling charge failed:', error)
-  }
-}
-
-async function handlePaymentFailed(supabase: any, data: any) {
-  try {
-    console.log('Processing invoice.payment_failed:', data)
-    
-    // Find user by subscription ID
-    const { data: subscription, error: findError } = await supabase
-      .from('user_subscriptions')
-      .select('user_id')
-      .eq('paystack_subscription_code', data.subscription)
-      .single()
-
-    if (findError || !subscription) {
-      console.error('Could not find subscription for payment failed:', data.subscription)
-      return
-    }
-
-    // Update subscription status
-    const { error: updateError } = await supabase
-      .from('user_subscriptions')
-      .update({
-        status: 'past_due'
-      })
-      .eq('paystack_subscription_code', data.subscription)
-
-    if (updateError) {
-      console.error('Error updating subscription for payment failed:', updateError)
-    }
-
-    // Create failed transaction record
-    const { error: transactionError } = await supabase
-      .from('transactions')
-      .insert({
-        user_id: subscription.user_id,
-        amount_kobo: data.amount || 0,
-        status: 'failed',
-        description: 'Payment failed',
-        reference: data.reference || `invoice_failed_${Date.now()}`,
-        invoice_url: data.invoice_url,
-        raw: data
-      })
-
-    if (transactionError) {
-      console.error('Error creating transaction for payment failed:', transactionError)
-    }
-
-    console.log('Successfully processed invoice.payment_failed for user:', subscription.user_id)
-  } catch (error) {
-    console.error('Error handling payment failed:', error)
+    console.error('Error in handleSubscriptionCreate:', error)
   }
 }
 
 async function handlePaymentSuccess(supabase: any, data: any) {
   try {
-    console.log('Processing invoice.payment_success:', data)
+    const { customer, subscription } = data
     
-    // Find user by subscription ID
-    const { data: subscription, error: findError } = await supabase
-      .from('user_subscriptions')
-      .select('user_id')
-      .eq('paystack_subscription_code', data.subscription)
+    // Find user by Paystack customer ID
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('paystack_customer_id', customer.customer_code)
       .single()
 
-    if (findError || !subscription) {
-      console.error('Could not find subscription for payment success:', data.subscription)
+    if (profileError || !profile) {
+      console.error('User not found for customer:', customer.customer_code)
       return
     }
 
-    // Update subscription
-    const { error: updateError } = await supabase
-      .from('user_subscriptions')
+    // Update subscription status
+    const { error: subscriptionError } = await supabase
+      .from('subscriptions')
       .update({
         status: 'active',
-        current_period_start: new Date().toISOString(),
-        current_period_end: data.next_payment_date || new Date(Date.now() + 30*24*60*60*1000).toISOString()
+        current_period_start: new Date(data.paid_at).toISOString(),
+        current_period_end: new Date(data.next_payment_date).toISOString(),
+        updated_at: new Date().toISOString()
       })
-      .eq('paystack_subscription_code', data.subscription)
+      .eq('user_id', profile.id)
 
-    if (updateError) {
-      console.error('Error updating subscription for payment success:', updateError)
+    if (subscriptionError) {
+      console.error('Error updating subscription:', subscriptionError)
+      return
     }
 
-    // Create transaction record
-    const { error: transactionError } = await supabase
-      .from('transactions')
-      .insert({
-        user_id: subscription.user_id,
-        amount_kobo: data.amount || 0,
-        status: 'success',
-        description: 'Payment successful',
-        reference: data.reference || `invoice_success_${Date.now()}`,
-        invoice_url: data.invoice_url,
-        raw: data
+    // Update user profile
+    const { error: profileUpdateError } = await supabase
+      .from('profiles')
+      .update({
+        plan_status: 'active',
+        paystack_subscription_status: 'active',
+        updated_at: new Date().toISOString()
       })
+      .eq('id', profile.id)
 
-    if (transactionError) {
-      console.error('Error creating transaction for payment success:', transactionError)
+    if (profileUpdateError) {
+      console.error('Error updating profile:', profileUpdateError)
     }
 
-    console.log('Successfully processed invoice.payment_success for user:', subscription.user_id)
+    console.log('Payment processed successfully for user:', profile.id)
   } catch (error) {
-    console.error('Error handling payment success:', error)
+    console.error('Error in handlePaymentSuccess:', error)
   }
 }
 
-async function getUserIdFromEmail(supabase: any, email: string): Promise<string | null> {
+async function handleSubscriptionCancel(supabase: any, data: any) {
   try {
-    const { data, error } = await supabase
-      .from('auth.users')
+    const { customer, subscription } = data
+    
+    // Find user by Paystack customer ID
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
       .select('id')
-      .eq('email', email)
+      .eq('paystack_customer_id', customer.customer_code)
       .single()
 
-    if (error) {
-      console.error('Error finding user by email:', error)
-      return null
+    if (profileError || !profile) {
+      console.error('User not found for customer:', customer.customer_code)
+      return
     }
 
-    return data?.id || null
+    // Update subscription status
+    const { error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .update({
+        status: 'cancelled',
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', profile.id)
+
+    if (subscriptionError) {
+      console.error('Error updating subscription:', subscriptionError)
+      return
+    }
+
+    // Update user profile to expired
+    const { error: profileUpdateError } = await supabase
+      .from('profiles')
+      .update({
+        plan_status: 'expired',
+        paystack_subscription_status: 'cancelled',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', profile.id)
+
+    if (profileUpdateError) {
+      console.error('Error updating profile:', profileUpdateError)
+    }
+
+    console.log('Subscription cancelled for user:', profile.id)
   } catch (error) {
-    console.error('Error in getUserIdFromEmail:', error)
-    return null
+    console.error('Error in handleSubscriptionCancel:', error)
+  }
+}
+
+async function handleCustomerSubscriptionCreated(supabase: any, data: any) {
+  try {
+    const { customer, subscription } = data
+    
+    // Find user by Paystack customer ID
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('paystack_customer_id', customer.customer_code)
+      .single()
+
+    if (profileError || !profile) {
+      console.error('User not found for customer:', customer.customer_code)
+      return
+    }
+
+    // Create subscription record
+    const { error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .insert({
+        user_id: profile.id,
+        paystack_subscription_id: subscription.subscription_code,
+        status: 'active',
+        plan_code: subscription.plan.plan_code,
+        current_period_start: new Date(subscription.createdAt).toISOString(),
+        current_period_end: new Date(subscription.next_payment_date).toISOString()
+      })
+
+    if (subscriptionError) {
+      console.error('Error creating subscription:', subscriptionError)
+      return
+    }
+
+    // Update user profile
+    const { error: profileUpdateError } = await supabase
+      .from('profiles')
+      .update({
+        plan_status: 'active',
+        paystack_subscription_status: 'active',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', profile.id)
+
+    if (profileUpdateError) {
+      console.error('Error updating profile:', profileUpdateError)
+    }
+
+    console.log('Customer subscription created successfully for user:', profile.id)
+  } catch (error) {
+    console.error('Error in handleCustomerSubscriptionCreated:', error)
   }
 }
