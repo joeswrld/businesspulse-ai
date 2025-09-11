@@ -103,12 +103,6 @@ BEGIN
         full_name = COALESCE(EXCLUDED.full_name, profiles.full_name),
         company_name = COALESCE(EXCLUDED.company_name, profiles.company_name),
         email_confirmed = EXCLUDED.email_confirmed,
-        updated_at = NOW()
-    ON CONFLICT (user_id) DO UPDATE SET
-        email = EXCLUDED.email,
-        full_name = COALESCE(EXCLUDED.full_name, profiles.full_name),
-        company_name = COALESCE(EXCLUDED.company_name, profiles.company_name),
-        email_confirmed = EXCLUDED.email_confirmed,
         updated_at = NOW();
 
     RETURN NEW;
