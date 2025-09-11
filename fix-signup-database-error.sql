@@ -180,8 +180,7 @@ SELECT
 FROM auth.users u
 LEFT JOIN public.profiles p ON p.id = u.id OR p.user_id = u.id
 WHERE p.id IS NULL
-ON CONFLICT (id) DO NOTHING
-ON CONFLICT (user_id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
 -- Step 12: Final verification
 DO $$
