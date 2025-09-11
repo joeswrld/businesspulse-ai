@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback System Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            color: #1f2937;
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            color: #6b7280;
+            font-size: 18px;
+        }
+        
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .test-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e5e7eb;
+        }
+        
+        .test-card h3 {
+            color: #1f2937;
+            font-size: 20px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .test-card .icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .widget-icon { background: #3b82f6; }
+        .qr-icon { background: #10b981; }
+        .email-icon { background: #f59e0b; }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: #374151;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .submit-btn:hover:not(:disabled) {
+            background: #2563eb;
+        }
+        
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .message {
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            display: none;
+        }
+        
+        .message.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        
+        .message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        
+        .status-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e5e7eb;
+        }
+        
+        .status-panel h3 {
+            color: #1f2937;
+            font-size: 20px;
+            margin-bottom: 16px;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        
+        .status-item:last-child {
+            border-bottom: none;
+        }
+        
+        .status-label {
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .status-value {
+            color: #1f2937;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .status-value.success {
+            color: #059669;
+        }
+        
+        .status-value.error {
+            color: #dc2626;
+        }
+        
+        .config-section {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .config-section h4 {
+            color: #374151;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+        
+        .config-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Feedback System Test</h1>
+            <p>Test all three feedback channels: Widget, QR Code, and Email Signature</p>
+        </div>
+
+        <div class="config-section">
+            <h4>Configuration</h4>
+            <div class="form-group">
+                <label for="projectId">Project ID:</label>
+                <input type="text" id="projectId" class="config-input" placeholder="Enter your project ID" value="test-project-123">
+            </div>
+        </div>
+
+        <div class="test-grid">
+            <!-- Widget Test -->
+            <div class="test-card">
+                <h3>
+                    <span class="icon widget-icon">W</span>
+                    Widget Feedback
+                </h3>
+                <form id="widgetForm">
+                    <div class="form-group">
+                        <label for="widgetName">Name (optional):</label>
+                        <input type="text" id="widgetName" name="name" placeholder="Your name">
+                    </div>
+                    <div class="form-group">
+                        <label for="widgetEmail">Email (optional):</label>
+                        <input type="email" id="widgetEmail" name="email" placeholder="your@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="widgetMessage">Message *:</label>
+                        <textarea id="widgetMessage" name="message" placeholder="Your feedback..." required></textarea>
+                    </div>
+                    <button type="submit" class="submit-btn">Submit Widget Feedback</button>
+                    <div class="message" id="widgetMessage"></div>
+                </form>
+            </div>
+
+            <!-- QR Code Test -->
+            <div class="test-card">
+                <h3>
+                    <span class="icon qr-icon">Q</span>
+                    QR Code Feedback
+                </h3>
+                <form id="qrForm">
+                    <div class="form-group">
+                        <label for="qrName">Name *:</label>
+                        <input type="text" id="qrName" name="name" placeholder="Your name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="qrEmail">Email *:</label>
+                        <input type="email" id="qrEmail" name="email" placeholder="your@email.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="qrMessage">Message *:</label>
+                        <textarea id="qrMessage" name="message" placeholder="Your feedback..." required></textarea>
+                    </div>
+                    <button type="submit" class="submit-btn">Submit QR Feedback</button>
+                    <div class="message" id="qrMessage"></div>
+                </form>
+            </div>
+
+            <!-- Email Signature Test -->
+            <div class="test-card">
+                <h3>
+                    <span class="icon email-icon">E</span>
+                    Email Signature Feedback
+                </h3>
+                <form id="emailForm">
+                    <div class="form-group">
+                        <label for="emailName">Name (optional):</label>
+                        <input type="text" id="emailName" name="name" placeholder="Your name">
+                    </div>
+                    <div class="form-group">
+                        <label for="emailEmail">Email (optional):</label>
+                        <input type="email" id="emailEmail" name="email" placeholder="your@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="emailMessage">Message *:</label>
+                        <textarea id="emailMessage" name="message" placeholder="Your feedback..." required></textarea>
+                    </div>
+                    <button type="submit" class="submit-btn">Submit Email Feedback</button>
+                    <div class="message" id="emailMessage"></div>
+                </form>
+            </div>
+        </div>
+
+        <div class="status-panel">
+            <h3>System Status</h3>
+            <div class="status-item">
+                <span class="status-label">API Connection:</span>
+                <span class="status-value" id="apiStatus">Testing...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Database Schema:</span>
+                <span class="status-value" id="schemaStatus">Testing...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">RLS Policies:</span>
+                <span class="status-value" id="rlsStatus">Testing...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Last Test:</span>
+                <span class="status-value" id="lastTest">Not tested yet</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="feedback-api-unified.js"></script>
+    <script>
+        // Initialize the feedback API
+        const feedbackAPI = new FeedbackAPI({
+            defaultProjectId: 'test-project-123'
+        });
+
+        // Get project ID from input
+        function getProjectId() {
+            return document.getElementById('projectId').value || 'test-project-123';
+        }
+
+        // Test API connection
+        async function testAPIConnection() {
+            try {
+                const result = await feedbackAPI.submitFeedback({
+                    projectId: getProjectId(),
+                    channel: 'widget',
+                    name: 'Test User',
+                    email: 'test@example.com',
+                    message: 'API connection test'
+                });
+                
+                document.getElementById('apiStatus').textContent = result.success ? 'Connected' : 'Failed';
+                document.getElementById('apiStatus').className = 'status-value ' + (result.success ? 'success' : 'error');
+                
+                return result.success;
+            } catch (error) {
+                document.getElementById('apiStatus').textContent = 'Error';
+                document.getElementById('apiStatus').className = 'status-value error';
+                return false;
+            }
+        }
+
+        // Test database schema
+        async function testDatabaseSchema() {
+            try {
+                // Try to get feedback for the project
+                const feedback = await feedbackAPI.getFeedbackForProject(getProjectId());
+                document.getElementById('schemaStatus').textContent = 'Valid';
+                document.getElementById('schemaStatus').className = 'status-value success';
+                return true;
+            } catch (error) {
+                document.getElementById('schemaStatus').textContent = 'Invalid';
+                document.getElementById('schemaStatus').className = 'status-value error';
+                return false;
+            }
+        }
+
+        // Test RLS policies
+        async function testRLSPolicies() {
+            try {
+                // Test anonymous insert
+                const result = await feedbackAPI.submitFeedback({
+                    projectId: getProjectId(),
+                    channel: 'widget',
+                    name: 'RLS Test',
+                    email: 'rls@test.com',
+                    message: 'RLS policy test'
+                });
+                
+                document.getElementById('rlsStatus').textContent = result.success ? 'Working' : 'Failed';
+                document.getElementById('rlsStatus').className = 'status-value ' + (result.success ? 'success' : 'error');
+                return result.success;
+            } catch (error) {
+                document.getElementById('rlsStatus').textContent = 'Error';
+                document.getElementById('rlsStatus').className = 'status-value error';
+                return false;
+            }
+        }
+
+        // Show message in form
+        function showMessage(formId, message, type) {
+            const messageDiv = document.getElementById(formId + 'Message');
+            messageDiv.textContent = message;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Handle form submissions
+        document.getElementById('widgetForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                name: formData.get('name')?.trim() || null,
+                email: formData.get('email')?.trim() || null,
+                message: formData.get('message').trim()
+            };
+            
+            const result = await feedbackAPI.submitWidgetFeedback(data, getProjectId());
+            showMessage('widget', result.success ? 'Widget feedback submitted!' : result.error, result.success ? 'success' : 'error');
+            document.getElementById('lastTest').textContent = new Date().toLocaleTimeString();
+        });
+
+        document.getElementById('qrForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                name: formData.get('name').trim(),
+                email: formData.get('email').trim(),
+                message: formData.get('message').trim()
+            };
+            
+            const result = await feedbackAPI.submitQRFeedback(data, getProjectId());
+            showMessage('qr', result.success ? 'QR feedback submitted!' : result.error, result.success ? 'success' : 'error');
+            document.getElementById('lastTest').textContent = new Date().toLocaleTimeString();
+        });
+
+        document.getElementById('emailForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                name: formData.get('name')?.trim() || null,
+                email: formData.get('email')?.trim() || null,
+                message: formData.get('message').trim()
+            };
+            
+            const result = await feedbackAPI.submitEmailSignatureFeedback(data, getProjectId());
+            showMessage('email', result.success ? 'Email feedback submitted!' : result.error, result.success ? 'success' : 'error');
+            document.getElementById('lastTest').textContent = new Date().toLocaleTimeString();
+        });
+
+        // Run initial tests
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('🧪 Running feedback system tests...');
+            
+            await testAPIConnection();
+            await testDatabaseSchema();
+            await testRLSPolicies();
+            
+            console.log('✅ Feedback system tests completed');
+        });
+    </script>
+</body>
+</html>
