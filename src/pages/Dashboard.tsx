@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 import { usePlatformAccess } from '@/hooks/usePlatformAccess';
+import { useRealtimeFeedback } from '@/hooks/useRealtimeFeedback';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import PlanStatusDisplay from '@/components/PlanStatusDisplay';
+import { FeedbackBadgeGroup } from '@/components/ui/FeedbackBadge';
 import { toast } from 'sonner';
 // import { checkAndSetupDatabase } from '@/utils/databaseCheck';
 import { 
