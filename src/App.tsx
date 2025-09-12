@@ -31,6 +31,8 @@ const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const TrialExpired = lazy(() => import("./pages/TrialExpired"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Insights = lazy(() => import("./pages/Insights"));
+const Feedback = lazy(() => import("./pages/Feedback"));
+const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -196,6 +198,24 @@ const App = () => (
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Insights />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
+            } />
+            <Route path="/feedback" element={
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Feedback />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
+            } />
+            <Route path="/feedback-settings" element={
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <FeedbackSettings />
                   </DashboardLayout>
                 </Suspense>
               </AuthGuard>

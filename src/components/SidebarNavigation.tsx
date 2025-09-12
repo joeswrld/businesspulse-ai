@@ -11,7 +11,9 @@ import {
   User, 
   LogOut,
   Lock,
-  Zap
+  Zap,
+  MessageSquare,
+  SlidersHorizontal
 } from 'lucide-react'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
@@ -35,10 +37,24 @@ const navigationItems: NavItem[] = [
     requiresAccess: true
   },
   {
+    id: 'feedback',
+    label: 'Feedback',
+    icon: <MessageSquare className="h-5 w-5" />,
+    path: '/feedback',
+    requiresAccess: true
+  },
+  {
     id: 'insights',
     label: 'AI Insights',
     icon: <Brain className="h-5 w-5" />,
     path: '/insights',
+    requiresAccess: true
+  },
+  {
+    id: 'feedback-settings',
+    label: 'Feedback Settings',
+    icon: <SlidersHorizontal className="h-5 w-5" />,
+    path: '/feedback-settings',
     requiresAccess: true
   },
   {
