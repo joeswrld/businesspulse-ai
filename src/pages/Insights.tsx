@@ -3,7 +3,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useUsageEnforcement } from '@/hooks/useUsageEnforcement';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
-import { FeedbackBadgeGroup } from '@/components/ui/FeedbackBadge';
 import { toast } from 'sonner';
 import { 
   Brain, 
