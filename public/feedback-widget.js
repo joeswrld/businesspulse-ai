@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  console.log('🚀 Feedback Widget: Script loaded');
+  console.log('🚀 Feedback Widget: Script loaded (Fixed Version)');
 
   // 🔑 Your Supabase Project Ref
   const SUPABASE_REF = "xjbrqeqizpoqdjkiyqzt";
@@ -78,16 +78,20 @@
     async submitFeedback(projectId, data) {
       console.log('📤 Feedback Widget: Submitting feedback:', {
         project_id: projectId,
+        channel: 'widget',
+        name: data?.name,
         email: data?.email,
         message_preview: (data?.message || '').slice(0, 80),
       });
       
-      // Use direct database insertion instead of edge function
-      const url = `${API_BASE_URL.replace('/functions/v1', '/rest/v1')}/feedbacks`;
+      // Use the safe insert function
+      const url = `${API_BASE_URL.replace('/functions/v1', '/rest/v1')}/rpc/insert_feedback_safe`;
       const payload = { 
-        project_id: projectId, 
-        message: data?.message,
-        email: data?.email || null
+        p_project_id: projectId,
+        p_channel: 'widget',
+        p_name: data?.name || null,
+        p_email: data?.email || null,
+        p_message: data?.message
       };
       const headers = {
         'Content-Type': 'application/json',
@@ -101,6 +105,7 @@
           headers,
           body: JSON.stringify(payload),
         });
+        
         if (!res.ok) {
           const responseText = await res.text().catch(() => '<no-body>');
           const enhancedError = new Error(`Failed to submit feedback: ${res.status} ${res.statusText}`);
@@ -119,6 +124,7 @@
           });
           throw enhancedError;
         }
+        
         const contentType = res.headers.get('content-type') || '';
         const result = contentType.includes('application/json') ? await res.json() : await res.text();
         console.log('✅ Feedback Widget: Feedback submitted successfully:', result);
@@ -231,6 +237,7 @@
       modal.innerHTML = `
         <h3>${c.title}</h3>
         ${c.showEmailField ? '<input type="email" placeholder="Your email (optional)" class="nx-email">' : ''}
+        <input type="text" placeholder="Your name (optional)" class="nx-name" style="display: none;">
         <textarea placeholder="${c.placeholder}" class="nx-message"></textarea>
         <button class="nx-submit">${c.submitText}</button>
         <div class="nx-thankyou">${c.thankYouMessage}</div>
@@ -255,12 +262,14 @@
 
       const submitBtn = modal.querySelector('.nx-submit');
       const emailInput = modal.querySelector('.nx-email');
+      const nameInput = modal.querySelector('.nx-name');
       const messageInput = modal.querySelector('.nx-message');
       const thankYouDiv = modal.querySelector('.nx-thankyou');
       const errorDiv = modal.querySelector('.nx-error');
 
       submitBtn.addEventListener('click', async () => {
         const email = c.showEmailField && emailInput ? emailInput.value.trim() : null;
+        const name = nameInput ? nameInput.value.trim() : null;
         const message = messageInput.value.trim();
         
         // Validation
@@ -282,6 +291,7 @@
 
         try {
           await API.submitFeedback(state.projectId, {
+            name: name,
             email: email,
             message: message,
           });
@@ -289,8 +299,10 @@
           // Success
           messageInput.value = '';
           if (emailInput) emailInput.value = '';
+          if (nameInput) nameInput.value = '';
           DOM.hide(messageInput);
           DOM.hide(emailInput);
+          DOM.hide(nameInput);
           DOM.hide(submitBtn);
           DOM.show(thankYouDiv);
           
@@ -302,6 +314,7 @@
               // Reset modal state
               DOM.show(messageInput);
               if (emailInput) DOM.show(emailInput);
+              if (nameInput) DOM.show(nameInput);
               DOM.show(submitBtn);
               DOM.hide(thankYouDiv);
             }, 2000);
