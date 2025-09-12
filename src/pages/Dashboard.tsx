@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FeedbackBadgeGroup } from '@/components/ui/FeedbackBadge';
 import { useRealtimeFeedback } from '@/hooks/useRealtimeFeedback';
 
 import PlanStatusDisplay from '@/components/PlanStatusDisplay';
