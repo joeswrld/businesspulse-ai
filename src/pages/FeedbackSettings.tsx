@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -34,47 +35,55 @@ const FeedbackSettings: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       if (!user) return;
-      const { data: proj } = await supabase
-        .from('projects' as any)
-        .select('project_id')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      const pid = (proj as any)?.project_id || user.id;
-      setProjectId(pid);
 
-      // Ensure row exists
-      const { data } = await supabase
+      // Load settings by user_id
+      const { data: existing, error } = await supabase
         .from('feedback_settings')
         .select('*')
-        .eq('project_id', pid)
+        .eq('user_id', user.id)
         .maybeSingle();
-      if (!data) {
-        const { data: inserted } = await supabase
+
+      if (error) {
+        console.error('Error loading feedback settings:', error);
+      }
+
+      if (!existing) {
+        const generatedProjectId = (globalThis.crypto?.randomUUID?.() || undefined) as string | undefined;
+        const payload: any = {
+          user_id: user.id,
+          project_id: generatedProjectId || user.id,
+        };
+        const { data: inserted, error: insertError } = await supabase
           .from('feedback_settings')
-          .insert({ project_id: pid })
+          .insert(payload)
           .select('*')
           .single();
+        if (insertError) {
+          console.error('Error creating feedback settings:', insertError);
+          return;
+        }
         setRow(inserted as any);
+        setProjectId((inserted as any)?.project_id || null);
       } else {
-        setRow(data as any);
+        setRow(existing as any);
+        setProjectId((existing as any)?.project_id || null);
       }
     };
     init();
   }, [user]);
 
   const uploadLogo = async (file: File) => {
-    if (!projectId) return;
+    if (!projectId || !user) return;
     setUploading(true);
     try {
-      const path = `${projectId}/${Date.now()}-${file.name}`;
-      const { data, error } = await supabase.storage.from('logos').upload(path, file, { upsert: true });
+      const path = `${user.id}/${Date.now()}-${file.name}`;
+      const { data, error } = await supabase.storage.from('widget-logos').upload(path, file, { upsert: true });
       if (error) throw error;
-      const { data: pub } = supabase.storage.from('logos').getPublicUrl(data.path);
+      const { data: pub } = supabase.storage.from('widget-logos').getPublicUrl(data.path);
       setRow(prev => prev ? { ...prev, logo_url: pub.publicUrl } : prev);
       toast.success('Logo uploaded');
     } catch (e: any) {
+      console.error(e);
       toast.error('Upload failed');
     } finally {
       setUploading(false);
@@ -82,28 +91,72 @@ const FeedbackSettings: React.FC = () => {
   };
 
   const save = async () => {
-    if (!row) return;
+    if (!user) return;
     setSaving(true);
-    const { error } = await supabase
-      .from('feedback_settings')
-      .update({
-        brand_color: row.brand_color || '#3B82F6',
-        greeting: row.greeting || 'Share your feedback with us!',
-        logo_url: row.logo_url || null,
-        widget_position: row.widget_position || 'right',
-        show_emojis: Boolean(row.show_emojis),
-        ask_email: Boolean(row.ask_email),
-        allow_screenshots: Boolean(row.allow_screenshots),
-        enable_inline: Boolean(row.enable_inline),
-        enable_chat_style: Boolean(row.enable_chat_style),
-      })
-      .eq('id', row.id);
-    setSaving(false);
-    if (!error) toast.success('Settings saved.'); else toast.error('Save failed');
+    try {
+      let current = row;
+      // Ensure we have a project_id
+      const ensuredProjectId = current?.project_id || (globalThis.crypto?.randomUUID?.() as string) || user.id;
+      if (!current) {
+        current = {
+          id: '',
+          project_id: ensuredProjectId,
+          brand_color: '#3B82F6',
+          greeting: 'Share your feedback with us!',
+          logo_url: null,
+          widget_position: 'right',
+          show_emojis: true,
+          ask_email: false,
+          allow_screenshots: true,
+          enable_inline: false,
+          enable_chat_style: false,
+        } as any;
+      }
+
+      const payload: any = {
+        user_id: user.id,
+        project_id: ensuredProjectId,
+        brand_color: current.brand_color || '#3B82F6',
+        greeting: current.greeting || 'Share your feedback with us!',
+        logo_url: current.logo_url || null,
+        widget_position: current.widget_position || 'right',
+        show_emojis: Boolean(current.show_emojis),
+        ask_email: Boolean(current.ask_email),
+        allow_screenshots: Boolean(current.allow_screenshots),
+        enable_inline: Boolean(current.enable_inline),
+        enable_chat_style: Boolean(current.enable_chat_style),
+      };
+
+      let error: any = null;
+      if (row?.id) {
+        const { error: upd } = await supabase
+          .from('feedback_settings')
+          .update(payload)
+          .eq('id', row.id);
+        error = upd;
+      } else {
+        const { error: ins } = await supabase
+          .from('feedback_settings')
+          .insert(payload);
+        error = ins;
+      }
+
+      setProjectId(ensuredProjectId);
+      if (!error) {
+        toast.success('Settings saved.');
+      } else {
+        throw error;
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Save failed');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const scriptSnippet = useMemo(() => {
-    return `<script src="https://notex.com.ng/widget.js" data-project-id="${projectId || ''}"></script>`;
+    return `<script src="https://notex.com.ng/widget.js" data-user-id="${projectId || ''}"></script>`;
   }, [projectId]);
 
   return (
@@ -130,7 +183,7 @@ const FeedbackSettings: React.FC = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Greeting</Label>
-                  <Input value={row.greeting || ''} onChange={e => setRow({ ...row, greeting: e.target.value })} placeholder="Share your feedback with us!" />
+                  <Textarea value={row.greeting || ''} onChange={e => setRow({ ...row, greeting: e.target.value })} placeholder="Share your feedback with us!" rows={4} />
                 </div>
                 <div className="space-y-2">
                   <Label>Logo</Label>
