@@ -2,7 +2,6 @@ import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { 
   LayoutDashboard, 
-  MessageSquare, 
   Brain, 
   BarChart3, 
   TrendingUp, 
@@ -33,13 +32,6 @@ const navigationItems: NavItem[] = [
     label: 'Dashboard',
     icon: <LayoutDashboard className="h-5 w-5" />,
     path: '/dashboard',
-    requiresAccess: true
-  },
-  {
-    id: 'feedback',
-    label: 'Feedback',
-    icon: <MessageSquare className="h-5 w-5" />,
-    path: '/feedback',
     requiresAccess: true
   },
   {
@@ -77,13 +69,6 @@ const navigationItems: NavItem[] = [
     path: '/billing',
     requiresAccess: false,
     allowedWhenExpired: true
-  },
-  {
-    id: 'widget-settings',
-    label: 'Widget Settings',
-    icon: <Settings className="h-5 w-5" />,
-    path: '/feedback-settings',
-    requiresAccess: true
   },
   {
     id: 'account-settings',

@@ -9,10 +9,7 @@ import {
   FileText, 
   Settings, 
   Crown,
-  Lock,
-  MessageSquare,
-  QrCode,
-  Mail
+  Lock
 } from 'lucide-react';
 import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 import NoteXTrialCountdown from '@/components/NoteXTrialCountdown';
@@ -34,24 +31,6 @@ const NoteXSidebar: React.FC = () => {
       name: 'Dashboard',
       href: '/dashboard',
       icon: Home,
-      requiresActiveSubscription: false,
-    },
-    {
-      name: 'Feedback',
-      href: '/feedback',
-      icon: MessageSquare,
-      requiresActiveSubscription: false,
-    },
-    {
-      name: 'QR Forms',
-      href: '/feedback-settings',
-      icon: QrCode,
-      requiresActiveSubscription: false,
-    },
-    {
-      name: 'Email Forms',
-      href: '/feedback-settings',
-      icon: Mail,
       requiresActiveSubscription: false,
     },
     {

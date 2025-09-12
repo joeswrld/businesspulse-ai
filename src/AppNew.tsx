@@ -32,12 +32,6 @@ const Analytics = lazy(() => import("./pages/Analytics"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Teams = lazy(() => import("./pages/Teams"));
 const Profile = lazy(() => import("./pages/Profile"));
-const Feedback = lazy(() => import("./pages/Feedback"));
-
-// Feedback form pages
-const QRFeedbackPage = lazy(() => import("./pages/feedback/qr/[project_id]"));
-const EmailFeedbackPage = lazy(() => import("./pages/feedback/email/[project_id]"));
-const ThankYouPage = lazy(() => import("./pages/feedback/thank-you"));
 
 const Testimonials = lazy(() => import("./pages/Testimonials"));
 const About = lazy(() => import("./pages/About"));
@@ -192,22 +186,6 @@ const App = () => (
                 </Suspense>
               } />
               
-              {/* Feedback form routes - Public access */}
-              <Route path="/feedback/qr/:project_id" element={
-                <Suspense fallback={<LoadingSpinner />}>
-                  <QRFeedbackPage />
-                </Suspense>
-              } />
-              <Route path="/feedback/email/:project_id" element={
-                <Suspense fallback={<LoadingSpinner />}>
-                  <EmailFeedbackPage />
-                </Suspense>
-              } />
-              <Route path="/feedback/thank-you" element={
-                <Suspense fallback={<LoadingSpinner />}>
-                  <ThankYouPage />
-                </Suspense>
-              } />
               
               {/* Protected routes that require active subscription */}
               <Route path="/dashboard" element={
@@ -218,13 +196,6 @@ const App = () => (
                 </ProtectedDashboardLayout>
               } />
               
-              <Route path="/feedback" element={
-                <ProtectedDashboardLayout>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <Feedback />
-                  </Suspense>
-                </ProtectedDashboardLayout>
-              } />
               
               <Route path="/insights" element={
                 <ProtectedDashboardLayout>
@@ -258,11 +229,6 @@ const App = () => (
                 </ProtectedDashboardLayout>
               } />
               
-              <Route path="/feedback-settings" element={
-                <ProtectedDashboardLayout>
-                  <ProjectManagement />
-                </ProtectedDashboardLayout>
-              } />
               
               {/* Always accessible routes (billing, profile, settings) */}
               <Route path="/billing" element={

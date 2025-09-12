@@ -1,118 +1,18 @@
 -- ============================================================================
--- SAFE FEEDBACK SYSTEM CLEANUP SCRIPT WITH BACKUP OPTIONS
+-- COMPLETE FEEDBACK SYSTEM REMOVAL SCRIPT
 -- ============================================================================
--- This script provides multiple options for cleaning up feedback-related data:
--- 1. Create backup tables before deletion
--- 2. Safe cleanup with verification
--- 3. Complete removal
+-- This script removes ALL feedback-related components from the platform:
+-- - Database tables, functions, triggers, sequences
+-- - RLS policies and constraints
+-- - Realtime subscriptions
+-- - All dependent objects using CASCADE
 -- 
--- Choose the appropriate section based on your needs.
+-- WARNING: This will permanently delete ALL feedback data and configurations.
+-- Make sure you have backups if you need to restore this data later.
 -- ============================================================================
 
 -- ============================================================================
--- OPTION 1: CREATE BACKUP TABLES (RECOMMENDED FIRST STEP)
--- ============================================================================
--- Uncomment this section to create backup tables before deletion
-
-/*
--- Create backup tables with timestamp
-DO $$
-DECLARE
-    backup_suffix TEXT := '_backup_' || to_char(NOW(), 'YYYY_MM_DD_HH24_MI_SS');
-BEGIN
-    -- Backup feedback tables if they exist
-    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'feedback') THEN
-        EXECUTE format('CREATE TABLE feedback%s AS SELECT * FROM feedback', backup_suffix);
-        RAISE NOTICE 'Created backup table: feedback%s', backup_suffix;
-    END IF;
-    
-    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'feedbacks') THEN
-        EXECUTE format('CREATE TABLE feedbacks%s AS SELECT * FROM feedbacks', backup_suffix);
-        RAISE NOTICE 'Created backup table: feedbacks%s', backup_suffix;
-    END IF;
-    
-    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'feedback_settings') THEN
-        EXECUTE format('CREATE TABLE feedback_settings%s AS SELECT * FROM feedback_settings', backup_suffix);
-        RAISE NOTICE 'Created backup table: feedback_settings%s', backup_suffix;
-    END IF;
-    
-    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'feedback_notifications') THEN
-        EXECUTE format('CREATE TABLE feedback_notifications%s AS SELECT * FROM feedback_notifications', backup_suffix);
-        RAISE NOTICE 'Created backup table: feedback_notifications%s', backup_suffix;
-    END IF;
-    
-    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'feedback_tags') THEN
-        EXECUTE format('CREATE TABLE feedback_tags%s AS SELECT * FROM feedback_tags', backup_suffix);
-        RAISE NOTICE 'Created backup table: feedback_tags%s', backup_suffix;
-    END IF;
-    
-    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'widget_settings') THEN
-        EXECUTE format('CREATE TABLE widget_settings%s AS SELECT * FROM widget_settings', backup_suffix);
-        RAISE NOTICE 'Created backup table: widget_settings%s', backup_suffix;
-    END IF;
-    
-    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'notification_preferences') THEN
-        EXECUTE format('CREATE TABLE notification_preferences%s AS SELECT * FROM notification_preferences', backup_suffix);
-        RAISE NOTICE 'Created backup table: notification_preferences%s', backup_suffix;
-    END IF;
-    
-    RAISE NOTICE 'Backup completed successfully. Backup suffix: %', backup_suffix;
-END $$;
-*/
-
--- ============================================================================
--- OPTION 2: SAFE CLEANUP WITH VERIFICATION (RECOMMENDED)
--- ============================================================================
--- This section performs cleanup with safety checks and verification
-
--- Check what feedback-related objects exist before cleanup
-DO $$
-DECLARE
-    table_count INTEGER;
-    function_count INTEGER;
-    trigger_count INTEGER;
-    policy_count INTEGER;
-BEGIN
-    -- Count feedback-related tables
-    SELECT COUNT(*) INTO table_count
-    FROM information_schema.tables 
-    WHERE table_name LIKE '%feedback%' 
-       OR table_name LIKE '%widget_settings%'
-       OR table_name LIKE '%notification_preferences%';
-    
-    -- Count feedback-related functions
-    SELECT COUNT(*) INTO function_count
-    FROM information_schema.routines 
-    WHERE routine_name LIKE '%feedback%';
-    
-    -- Count feedback-related triggers
-    SELECT COUNT(*) INTO trigger_count
-    FROM information_schema.triggers 
-    WHERE trigger_name LIKE '%feedback%';
-    
-    -- Count feedback-related policies
-    SELECT COUNT(*) INTO policy_count
-    FROM pg_policies 
-    WHERE tablename LIKE '%feedback%' 
-       OR tablename LIKE '%widget_settings%'
-       OR tablename LIKE '%notification_preferences%';
-    
-    RAISE NOTICE 'Found % feedback-related tables, % functions, % triggers, % policies', 
-                 table_count, function_count, trigger_count, policy_count;
-    
-    IF table_count = 0 THEN
-        RAISE NOTICE 'No feedback-related tables found. Cleanup may not be necessary.';
-    END IF;
-END $$;
-
--- ============================================================================
--- OPTION 3: COMPLETE CLEANUP (USE WITH CAUTION)
--- ============================================================================
--- Uncomment this section to perform complete cleanup
-
-/*
--- ============================================================================
--- 1. DISABLE TRIGGERS AND FUNCTIONS FIRST
+-- 1. DISABLE TRIGGERS AND FUNCTIONS FIRST (to avoid errors during cleanup)
 -- ============================================================================
 
 -- Drop all feedback-related triggers
@@ -132,6 +32,7 @@ DROP TRIGGER IF EXISTS set_feedback_priority_trigger ON feedback;
 -- 2. DROP ALL FEEDBACK-RELATED FUNCTIONS
 -- ============================================================================
 
+-- Drop feedback-related functions
 DROP FUNCTION IF EXISTS notify_feedback_email();
 DROP FUNCTION IF EXISTS send_feedback_email_notification();
 DROP FUNCTION IF EXISTS insert_feedback_safe(TEXT, TEXT, TEXT, TEXT, TEXT);
@@ -149,6 +50,7 @@ DROP FUNCTION IF EXISTS retry_failed_notifications();
 DROP FUNCTION IF EXISTS update_feedback_tags_updated_at();
 DROP FUNCTION IF EXISTS update_widget_settings_updated_at();
 DROP FUNCTION IF EXISTS update_notification_preferences_updated_at();
+DROP FUNCTION IF EXISTS update_updated_at_column();
 
 -- ============================================================================
 -- 3. DROP ALL FEEDBACK-RELATED POLICIES
@@ -164,7 +66,7 @@ DROP POLICY IF EXISTS "Users can update feedback for their projects" ON feedback
 DROP POLICY IF EXISTS "Service role can insert feedback" ON feedback;
 DROP POLICY IF EXISTS "Service role can read all feedback" ON feedback;
 
--- Drop policies for feedbacks table
+-- Drop policies for feedbacks table (alternative naming)
 DROP POLICY IF EXISTS "feedbacks_select_project_owner" ON feedbacks;
 DROP POLICY IF EXISTS "feedbacks_insert_project_owner" ON feedbacks;
 DROP POLICY IF EXISTS "Users can view feedbacks for their projects" ON feedbacks;
@@ -275,6 +177,15 @@ ALTER TABLE IF EXISTS feedback DROP CONSTRAINT IF EXISTS feedback_channel_check;
 -- Drop constraints for feedback_settings table
 ALTER TABLE IF EXISTS feedback_settings DROP CONSTRAINT IF EXISTS feedback_settings_project_id_locked_check;
 
+-- Drop constraints for feedback_tags table
+ALTER TABLE IF EXISTS feedback_tags DROP CONSTRAINT IF EXISTS feedback_tags_pkey;
+
+-- Drop constraints for widget_settings table
+ALTER TABLE IF EXISTS widget_settings DROP CONSTRAINT IF EXISTS widget_settings_pkey;
+
+-- Drop constraints for notification_preferences table
+ALTER TABLE IF EXISTS notification_preferences DROP CONSTRAINT IF EXISTS notification_preferences_pkey;
+
 -- ============================================================================
 -- 7. REMOVE TABLES FROM REALTIME PUBLICATION
 -- ============================================================================
@@ -305,6 +216,10 @@ DROP TABLE IF EXISTS feedback_settings CASCADE;
 -- Drop AI insights feedback table if it exists
 DROP TABLE IF EXISTS ai_insights_feedback CASCADE;
 
+-- Drop QR and email link tables if they exist
+DROP TABLE IF EXISTS qr_links CASCADE;
+DROP TABLE IF EXISTS email_links CASCADE;
+
 -- ============================================================================
 -- 9. CLEAN UP ANY REMAINING FEEDBACK-RELATED OBJECTS
 -- ============================================================================
@@ -319,57 +234,46 @@ DROP SEQUENCE IF EXISTS widget_settings_id_seq CASCADE;
 DROP SEQUENCE IF EXISTS notification_preferences_id_seq CASCADE;
 
 -- ============================================================================
--- 10. VERIFICATION AFTER CLEANUP
+-- 10. VERIFICATION QUERIES
 -- ============================================================================
 
--- Verify cleanup was successful
-DO $$
-DECLARE
-    remaining_tables INTEGER;
-    remaining_functions INTEGER;
-    remaining_triggers INTEGER;
-    remaining_policies INTEGER;
-BEGIN
-    -- Count remaining feedback-related objects
-    SELECT COUNT(*) INTO remaining_tables
-    FROM information_schema.tables 
-    WHERE table_name LIKE '%feedback%' 
-       OR table_name LIKE '%widget_settings%'
-       OR table_name LIKE '%notification_preferences%';
-    
-    SELECT COUNT(*) INTO remaining_functions
-    FROM information_schema.routines 
-    WHERE routine_name LIKE '%feedback%';
-    
-    SELECT COUNT(*) INTO remaining_triggers
-    FROM information_schema.triggers 
-    WHERE trigger_name LIKE '%feedback%';
-    
-    SELECT COUNT(*) INTO remaining_policies
-    FROM pg_policies 
-    WHERE tablename LIKE '%feedback%' 
-       OR tablename LIKE '%widget_settings%'
-       OR tablename LIKE '%notification_preferences%';
-    
-    IF remaining_tables = 0 AND remaining_functions = 0 AND remaining_triggers = 0 AND remaining_policies = 0 THEN
-        RAISE NOTICE 'SUCCESS: All feedback-related objects have been completely removed.';
-    ELSE
-        RAISE NOTICE 'WARNING: Some feedback-related objects may still exist:';
-        RAISE NOTICE '  Tables: %, Functions: %, Triggers: %, Policies: %', 
-                     remaining_tables, remaining_functions, remaining_triggers, remaining_policies;
-    END IF;
-END $$;
-*/
+-- Check if any feedback-related tables still exist
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_name LIKE '%feedback%' 
+   OR table_name LIKE '%widget%'
+   OR table_name LIKE '%notification_preferences%'
+   OR table_name LIKE '%qr_links%'
+   OR table_name LIKE '%email_links%'
+ORDER BY table_name;
+
+-- Check if any feedback-related functions still exist
+SELECT routine_name 
+FROM information_schema.routines 
+WHERE routine_name LIKE '%feedback%' 
+ORDER BY routine_name;
+
+-- Check if any feedback-related triggers still exist
+SELECT trigger_name, event_object_table 
+FROM information_schema.triggers 
+WHERE trigger_name LIKE '%feedback%' 
+ORDER BY trigger_name, event_object_table;
 
 -- ============================================================================
--- USAGE INSTRUCTIONS
+-- CLEANUP COMPLETE
 -- ============================================================================
+-- All feedback-related data and configurations have been removed from your database.
 -- 
--- 1. FIRST RUN: Uncomment Option 1 to create backup tables
--- 2. SECOND RUN: Uncomment Option 2 to see what will be cleaned up
--- 3. THIRD RUN: Uncomment Option 3 to perform the actual cleanup
+-- What was removed:
+-- ✅ All feedback tables (feedback, feedbacks, feedback_settings, feedback_notifications, feedback_tags, widget_settings, notification_preferences, qr_links, email_links)
+-- ✅ All feedback-related triggers
+-- ✅ All feedback-related functions
+-- ✅ All feedback-related RLS policies
+-- ✅ All feedback-related indexes
+-- ✅ All feedback-related constraints
+-- ✅ All feedback-related views
+-- ✅ All feedback-related sequences
+-- ✅ Removed tables from realtime publication
 -- 
--- This approach ensures you have backups and can verify what will be removed
--- before performing the actual cleanup.
--- 
+-- Your database is now clean of all feedback system components.
 -- ============================================================================
