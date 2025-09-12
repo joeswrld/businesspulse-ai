@@ -1,226 +1,205 @@
 // @ts-nocheck
-import { useEffect, useMemo, useState } from 'react';
-import Head from 'next/head';
-import { createBrowserClient } from '@supabase/auth-helpers-nextjs';
-import type { User } from '@supabase/supabase-js';
-
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import React, { useEffect, useMemo, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import { ImagePlus, Save, Palette } from 'lucide-react';
 
-type FeedbackSettings = {
-  id?: string;
-  user_id: string;
+type FeedbackSettingsRow = {
+  id: string;
+  user_id: string | null;
   project_id: string;
-  brand_color?: string | null;
-  logo_url?: string | null;
-  greeting_text?: string | null;
+  brand_color: string | null;
+  logo_url: string | null;
+  greeting_text: string | null;
 };
 
-export default function WidgetSettingsPage() {
-  const supabase = useMemo(() => createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL as string, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string), []);
-
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+const WidgetSettingsPage: React.FC = () => {
+  const { user } = useAuth();
+  const [row, setRow] = useState<FeedbackSettingsRow | null>(null);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
-  const [projectId, setProjectId] = useState<string>('');
-  const [brandColor, setBrandColor] = useState<string>('#7c3aed');
-  const [greetingText, setGreetingText] = useState<string>('Hi! We would love your feedback.');
-  const [logoUrl, setLogoUrl] = useState<string>('');
-
-  const [showEmbed, setShowEmbed] = useState<boolean>(false);
-
+  // Load or initialize settings for the current user
   useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data: userResp, error: userErr } = await supabase.auth.getUser();
-        if (userErr) throw userErr;
-        const currentUser = userResp.user ?? null;
-        if (!currentUser) {
-          throw new Error('You must be logged in to view this page.');
-        }
-        if (!isMounted) return;
-        setUser(currentUser);
+    const init = async () => {
+      if (!user) return;
 
-        const { data: settings, error: fetchErr } = await supabase
-          .from('feedback_settings')
-          .select('*')
-          .eq('user_id', currentUser.id)
-          .maybeSingle();
-        if (fetchErr) throw fetchErr;
-
-        if (settings) {
-          setProjectId(settings.project_id);
-          setBrandColor(settings.brand_color || '#7c3aed');
-          setGreetingText(settings.greeting_text || 'Hi! We would love your feedback.');
-          setLogoUrl(settings.logo_url || '');
-        } else {
-          // Prepare a project id but don't persist until save
-          setProjectId(crypto.randomUUID());
-        }
-      } catch (e: any) {
-        if (!isMounted) return;
-        setError(e?.message ?? 'Failed to load settings.');
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, [supabase]);
-
-  const handleLogoUpload = async (file: File) => {
-    if (!user) return;
-    setError(null);
-    setSuccess(null);
-    const fileExt = file.name.split('.').pop();
-    const path = `${user.id}/${Date.now()}.${fileExt}`;
-    const { error: uploadErr } = await supabase.storage.from('widget-logos').upload(path, file, {
-      cacheControl: '3600',
-      upsert: false,
-    });
-    if (uploadErr) {
-      setError(uploadErr.message);
-      return;
-    }
-    const { data: publicUrlData } = supabase.storage.from('widget-logos').getPublicUrl(path);
-    setLogoUrl(publicUrlData.publicUrl);
-    setSuccess('Logo uploaded');
-  };
-
-  const handleSave = async () => {
-    if (!user) return;
-    setSaving(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const ensureProjectId = projectId || crypto.randomUUID();
-      const payload: FeedbackSettings = {
-        user_id: user.id,
-        project_id: ensureProjectId,
-        brand_color: brandColor,
-        logo_url: logoUrl || null,
-        greeting_text: greetingText,
-      };
-
-      const { error: upsertErr } = await supabase
+      // Try loading existing settings by user_id
+      const { data: existing, error } = await supabase
         .from('feedback_settings')
-        .upsert(payload, { onConflict: 'project_id' });
-      if (upsertErr) throw upsertErr;
-      setProjectId(ensureProjectId);
-      setSuccess('Settings saved');
-      setShowEmbed(true);
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error(error);
+        toast.error('Failed loading settings');
+        return;
+      }
+
+      if (existing) {
+        setRow(existing as any);
+        return;
+      }
+
+      // If none exists, create a new settings row with a project_id
+      const newProjectId = crypto.randomUUID();
+      const { data: created, error: insertErr } = await supabase
+        .from('feedback_settings')
+        .insert({
+          user_id: user.id,
+          project_id: newProjectId,
+          brand_color: '#3B82F6',
+          greeting_text: 'Share your feedback with us!',
+        })
+        .select('*')
+        .single();
+
+      if (insertErr) {
+        console.error(insertErr);
+        toast.error('Failed creating settings');
+        return;
+      }
+      setRow(created as any);
+    };
+    init();
+  }, [user]);
+
+  const uploadLogo = async (file: File) => {
+    if (!row) return;
+    setUploading(true);
+    try {
+      const path = `${row.project_id}/${Date.now()}-${file.name}`;
+      const { data, error } = await supabase.storage
+        .from('widget-logos')
+        .upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: pub } = supabase.storage
+        .from('widget-logos')
+        .getPublicUrl(data.path);
+      setRow(prev => (prev ? { ...prev, logo_url: pub.publicUrl } : prev));
+      toast.success('Logo uploaded');
     } catch (e: any) {
-      setError(e?.message ?? 'Failed to save settings.');
+      console.error(e);
+      toast.error('Upload failed');
     } finally {
-      setSaving(false);
+      setUploading(false);
     }
   };
 
-  const embedCode = `<script src=\"https://notex.com.ng/widget.js\" data-user-id=\"${projectId}\"></script>`;
+  const save = async () => {
+    if (!row) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from('feedback_settings')
+      .upsert({
+        id: row.id,
+        user_id: user?.id ?? null,
+        project_id: row.project_id || crypto.randomUUID(),
+        brand_color: row.brand_color || '#3B82F6',
+        logo_url: row.logo_url || null,
+        greeting_text: row.greeting_text || 'Share your feedback with us!',
+      })
+      .eq('id', row.id);
+    setSaving(false);
+    if (error) {
+      console.error(error);
+      toast.error('Save failed');
+    } else {
+      toast.success('Settings saved');
+    }
+  };
+
+  const scriptSnippet = useMemo(() => {
+    const pid = row?.project_id || '';
+    return `<script src="https://notex.com.ng/widget.js" data-user-id="${pid}"></script>`;
+  }, [row?.project_id]);
 
   return (
-    <>
-      <Head>
-        <title>Feedback Widget Settings • NoteX</title>
-      </Head>
-      <div className="mx-auto w-full max-w-2xl p-4 sm:p-6">
-        <h1 className="text-2xl font-semibold tracking-tight mb-4">Feedback Widget Settings</h1>
+    <div className="container mx-auto p-4 md:p-6 space-y-6">
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Feedback Settings</h1>
 
-        {error ? (
-          <div className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>
-        ) : null}
-        {success ? (
-          <div className="mb-4 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-700">{success}</div>
-        ) : null}
-
-        <Card className="p-4 sm:p-6">
-          {loading ? (
-            <div className="text-sm text-muted-foreground">Loading settings…</div>
-          ) : (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {!row ? (
+        <div className="text-gray-500 py-12">Loading...</div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Customize Widget</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Brand color</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      className="h-10 w-16 cursor-pointer rounded border"
-                      value={brandColor}
-                      onChange={(e) => setBrandColor(e.target.value)}
-                    />
-                    <Input value={brandColor} onChange={(e) => setBrandColor(e.target.value)} />
+                  <Label>Brand color</Label>
+                  <div className="flex items-center gap-2">
+                    <Input type="color" value={row.brand_color || '#3B82F6'} onChange={e => setRow({ ...row, brand_color: e.target.value })} className="w-12 p-1" />
+                    <Input value={row.brand_color || '#3B82F6'} onChange={e => setRow({ ...row, brand_color: e.target.value })} />
+                    <Palette className="h-4 w-4 text-gray-500" />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Logo</label>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Greeting text</Label>
+                  <Textarea value={row.greeting_text || ''} onChange={e => setRow({ ...row, greeting_text: e.target.value })} placeholder="Share your feedback with us!" />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Logo</Label>
                   <div className="flex items-center gap-3">
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) void handleLogoUpload(file);
-                      }}
-                    />
+                    <Input type="file" accept="image/*" onChange={e => e.target.files && uploadLogo(e.target.files[0])} />
+                    <Button type="button" variant="outline" disabled={uploading}>
+                      <ImagePlus className="h-4 w-4 mr-2" /> {uploading ? 'Uploading...' : 'Upload'}
+                    </Button>
                   </div>
-                  {logoUrl ? (
-                    <div className="mt-2">
-                      <img src={logoUrl} alt="Logo preview" className="h-12 w-auto rounded border" />
-                    </div>
-                  ) : null}
+                  {row.logo_url && (
+                    <img src={row.logo_url} alt="Logo" className="h-10 mt-2" />
+                  )}
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Greeting text</label>
-                <Textarea
-                  value={greetingText}
-                  onChange={(e) => setGreetingText(e.target.value)}
-                  placeholder="Write a friendly greeting for your feedback widget..."
-                  className="min-h-[100px]"
-                />
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? 'Saving…' : 'Save settings'}
+              <div className="flex justify-end">
+                <Button onClick={save} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
+                  <Save className="h-4 w-4 mr-2" /> {saving ? 'Saving...' : 'Save Settings'}
                 </Button>
-                {projectId ? (
-                  <div className="text-xs text-muted-foreground">Project ID: {projectId}</div>
-                ) : null}
               </div>
-            </div>
-          )}
-        </Card>
-
-        {showEmbed && projectId ? (
-          <Card className="mt-6 p-4 sm:p-6">
-            <div className="space-y-3">
-              <div className="text-sm font-medium">Embed code</div>
-              <div className="rounded-md border bg-muted p-3 text-xs overflow-x-auto">
-                <code>{embedCode}</code>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Paste this before the closing <code>&lt;/body&gt;</code> tag on your website.
-              </div>
-            </div>
+            </CardContent>
           </Card>
-        ) : null}
 
-        <div className="mt-6 text-xs text-muted-foreground">
-          Feedback submissions created via this widget will be stored in the <code>feedback</code> table and linked by <code>project_id</code>.
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Live Preview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="border rounded-xl p-4" style={{ borderColor: row.brand_color || '#3B82F6' }}>
+                  <div className="flex items-center gap-3">
+                    {row.logo_url && <img src={row.logo_url} alt="Logo" className="h-8" />}
+                    <p className="font-medium" style={{ color: row.brand_color || '#3B82F6' }}>{row.greeting_text || 'Share your feedback with us!'}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Embed Code</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <pre className="bg-slate-900 text-slate-100 p-3 rounded-md text-sm overflow-x-auto">{scriptSnippet}</pre>
+                <Button variant="outline" onClick={() => { navigator.clipboard.writeText(scriptSnippet); toast.success('Copied to clipboard'); }}>Copy</Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
-    </>
+      )}
+    </div>
   );
-}
+};
 
+export default WidgetSettingsPage;
