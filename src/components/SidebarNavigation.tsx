@@ -37,6 +37,13 @@ const navigationItems: NavItem[] = [
     requiresAccess: true
   },
   {
+    id: 'widget',
+    label: 'Widget',
+    icon: <MessageSquare className="h-5 w-5" />,
+    path: '/widget',
+    requiresAccess: true
+  },
+  {
     id: 'feedback',
     label: 'Feedback',
     icon: <MessageSquare className="h-5 w-5" />,
