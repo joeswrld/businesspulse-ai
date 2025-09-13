@@ -1296,6 +1296,65 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback_settings: {
+        Row: {
+          id: string
+          user_id: string
+          project_id: string | null
+          project_id_locked: boolean
+          title: string
+          show_name: boolean
+          show_email: boolean
+          button_text: string
+          redirect_url: string | null
+          theme: 'light' | 'dark'
+          brand_color: string
+          notify_email: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          project_id?: string | null
+          project_id_locked?: boolean
+          title?: string
+          show_name?: boolean
+          show_email?: boolean
+          button_text?: string
+          redirect_url?: string | null
+          theme?: 'light' | 'dark'
+          brand_color?: string
+          notify_email?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          project_id?: string | null
+          project_id_locked?: boolean
+          title?: string
+          show_name?: boolean
+          show_email?: boolean
+          button_text?: string
+          redirect_url?: string | null
+          theme?: 'light' | 'dark'
+          brand_color?: string
+          notify_email?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
