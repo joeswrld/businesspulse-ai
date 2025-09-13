@@ -14,7 +14,10 @@ type SettingsRow = {
   project_id: string;
   widget_title: string;
   widget_color: string;
+  greeting_text: string;
+  allow_screenshots: boolean;
   created_at: string;
+  updated_at: string;
 };
 
 const FeedbackSettings: React.FC = () => {
@@ -54,6 +57,8 @@ const FeedbackSettings: React.FC = () => {
               user_id: user.id,
               widget_title: 'Share your feedback with us!',
               widget_color: '#3B82F6',
+              greeting_text: 'We\'d love to hear your thoughts!',
+              allow_screenshots: true,
             })
             .select('*')
             .single();
@@ -83,18 +88,16 @@ const FeedbackSettings: React.FC = () => {
     if (!user || !row) return;
     setSaving(true);
     try {
-      const payload = {
-        user_id: user.id,
-        widget_title: row.widget_title,
-        widget_color: row.widget_color,
-      };
-
       const { error } = await supabase
         .from('feedback_settings')
-        .upsert(payload, { 
-          onConflict: 'user_id',
-          ignoreDuplicates: false 
-        });
+        .update({
+          widget_title: row.widget_title,
+          widget_color: row.widget_color,
+          greeting_text: row.greeting_text,
+          allow_screenshots: row.allow_screenshots,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id);
 
       if (error) {
         throw error;
@@ -164,15 +167,37 @@ const FeedbackSettings: React.FC = () => {
                     <Palette className="h-4 w-4 text-gray-500" />
                   </div>
                 </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Greeting Text</Label>
+                  <Input 
+                    value={row.greeting_text} 
+                    onChange={e => setRow({ ...row, greeting_text: e.target.value })}
+                    placeholder="We'd love to hear your thoughts!"
+                  />
+                  <p className="text-sm text-gray-500">This text will be shown to users when they open the feedback widget</p>
+                </div>
                 <div className="space-y-2">
                   <Label>Project ID</Label>
                   <Input 
                     value={row.project_id || ''} 
                     onChange={e => setRow({ ...row, project_id: e.target.value })}
                     placeholder="Enter project ID"
-                    className="md:col-span-2"
+                    readOnly
                   />
                   <p className="text-sm text-gray-500">This ID is used to identify your feedback submissions</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="allow_screenshots"
+                      checked={row.allow_screenshots}
+                      onChange={e => setRow({ ...row, allow_screenshots: e.target.checked })}
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                    />
+                    <Label htmlFor="allow_screenshots">Allow Screenshots</Label>
+                  </div>
+                  <p className="text-sm text-gray-500">Allow users to attach screenshots with their feedback</p>
                 </div>
               </div>
 
@@ -194,8 +219,15 @@ const FeedbackSettings: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <p className="font-medium" style={{ color: row.widget_color }}>{row.widget_title}</p>
                   </div>
-                  <div className="mt-3 space-y-2">
-                    <div className="text-sm text-gray-600">Message: [User input field]</div>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-600 mb-3">{row.greeting_text}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-xs text-gray-500">Email: [input field]</div>
+                    <div className="text-xs text-gray-500">Message: [textarea]</div>
+                    {row.allow_screenshots && (
+                      <div className="text-xs text-gray-400">📎 Screenshot attachment available</div>
+                    )}
                     <Button 
                       size="sm" 
                       className="mt-2" 

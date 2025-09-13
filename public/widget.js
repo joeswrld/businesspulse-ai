@@ -11,7 +11,7 @@
   // Configuration
   const CONFIG = {
     supabaseUrl: 'https://xjbrqeqizpoqdjkiyqzt.supabase.co',
-    supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU0NzQ4NzQsImV4cCI6MjA1MTA1MDg3NH0.placeholder', // This will be replaced with actual anon key
+    supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84',
     widgetPosition: 'bottom-right',
     widgetSize: '60px',
     zIndex: 9999
@@ -87,7 +87,9 @@
     if (!settings) {
       settings = {
         widget_title: 'Share your feedback with us!',
-        widget_color: '#3B82F6'
+        widget_color: '#3B82F6',
+        greeting_text: 'We\'d love to hear your thoughts!',
+        allow_screenshots: true
       };
     }
   }
@@ -166,6 +168,11 @@
               font-weight: 600;
               color: #1f2937;
             ">${settings?.widget_title || 'Share your feedback with us!'}</h3>
+            <p style="
+              margin: 8px 0 0 0;
+              font-size: 14px;
+              color: #6b7280;
+            ">${settings?.greeting_text || 'We\'d love to hear your thoughts!'}</p>
             <button id="notex-close-modal" style="
               background: none;
               border: none;
