@@ -11,7 +11,7 @@ import { Save, Palette, Loader2 } from 'lucide-react';
 type SettingsRow = {
   id: string;
   user_id: string;
-  project_id: string | null;
+  project_id: string;
   widget_title: string;
   widget_color: string;
   created_at: string;
@@ -32,31 +32,29 @@ const FeedbackSettings: React.FC = () => {
       }
 
       try {
-        // Load settings by user_id
-        const { data: existing, error } = await supabase
-          .from('feedback_settings')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle();
+        // Use the helper function to get or create settings
+        const { data: settings, error } = await supabase
+          .rpc('get_or_create_feedback_settings', { p_user_id: user.id });
 
         if (error) {
           console.error('Error loading feedback settings:', error);
           toast.error('Failed to load settings');
+          return;
         }
 
-        if (!existing) {
-          // Create default settings if none exist
-          const generatedProjectId = (globalThis.crypto?.randomUUID?.() || user.id) as string;
-          const payload = {
-            user_id: user.id,
-            project_id: generatedProjectId,
-            widget_title: 'Share your feedback with us!',
-            widget_color: '#3B82F6',
-          };
-          
+        if (settings && settings.length > 0) {
+          const setting = settings[0];
+          setRow(setting);
+          setProjectId(setting.project_id);
+        } else {
+          // Fallback: create settings manually
           const { data: inserted, error: insertError } = await supabase
             .from('feedback_settings')
-            .insert(payload)
+            .insert({
+              user_id: user.id,
+              widget_title: 'Share your feedback with us!',
+              widget_color: '#3B82F6',
+            })
             .select('*')
             .single();
             
@@ -68,9 +66,6 @@ const FeedbackSettings: React.FC = () => {
           
           setRow(inserted);
           setProjectId(inserted.project_id);
-        } else {
-          setRow(existing);
-          setProjectId(existing.project_id);
         }
       } catch (error) {
         console.error('Error in init:', error);
@@ -88,12 +83,8 @@ const FeedbackSettings: React.FC = () => {
     if (!user || !row) return;
     setSaving(true);
     try {
-      // Ensure we have a project_id
-      const ensuredProjectId = row.project_id || (globalThis.crypto?.randomUUID?.() as string) || user.id;
-      
       const payload = {
         user_id: user.id,
-        project_id: ensuredProjectId,
         widget_title: row.widget_title,
         widget_color: row.widget_color,
       };
@@ -109,7 +100,6 @@ const FeedbackSettings: React.FC = () => {
         throw error;
       }
 
-      setProjectId(ensuredProjectId);
       toast.success('Settings saved successfully!');
     } catch (e) {
       console.error(e);
