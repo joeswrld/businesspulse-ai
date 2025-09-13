@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoteX Widget Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #1f2937;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #6b7280;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .code {
+            background: #f3f4f6;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        .note {
+            background: #dbeafe;
+            border: 1px solid #3b82f6;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>NoteX Feedback Widget Test</h1>
+        
+        <p>This page demonstrates the NoteX feedback widget in action. You should see a floating feedback button in the bottom-right corner of the screen.</p>
+        
+        <div class="note">
+            <strong>Note:</strong> This is a test page. The widget will only work if you have a valid project ID and the Supabase configuration is properly set up.
+        </div>
+        
+        <h2>How to use the widget:</h2>
+        <ol>
+            <li>Click the floating feedback button (bottom-right corner)</li>
+            <li>Fill out the feedback form</li>
+            <li>Submit your feedback</li>
+        </ol>
+        
+        <h2>Embed Code:</h2>
+        <div class="code">
+&lt;script src="https://notex.com.ng/widget.js" data-project-id="YOUR_PROJECT_ID"&gt;&lt;/script&gt;
+        </div>
+        
+        <p>Replace <code>YOUR_PROJECT_ID</code> with your actual project ID from the NoteX dashboard.</p>
+        
+        <h2>Features:</h2>
+        <ul>
+            <li>✅ Lightweight and fast loading</li>
+            <li>✅ Responsive design</li>
+            <li>✅ Customizable colors and text</li>
+            <li>✅ Email collection (optional)</li>
+            <li>✅ Page URL tracking</li>
+            <li>✅ Browser information collection</li>
+            <li>✅ Easy integration</li>
+        </ul>
+        
+        <p>Scroll down to see more content and test the widget positioning...</p>
+        
+        <div style="height: 1000px; background: linear-gradient(45deg, #f0f0f0, #e0e0e0); display: flex; align-items: center; justify-content: center; margin: 40px 0; border-radius: 8px;">
+            <p style="color: #666; font-size: 18px;">Scrollable content area</p>
+        </div>
+        
+        <p>This is more content at the bottom of the page to test scrolling behavior.</p>
+    </div>
+
+    <!-- NoteX Feedback Widget -->
+    <script src="/widget.js" data-project-id="test-project-123"></script>
+</body>
+</html>

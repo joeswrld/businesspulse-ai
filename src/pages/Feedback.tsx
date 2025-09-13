@@ -42,8 +42,10 @@ const Feedback: React.FC = () => {
         .select('project_id')
         .eq('user_id', user.id)
         .maybeSingle();
-      const pid = data?.project_id || user.id; // fallback to user.id
-      setProjectId(pid);
+      const pid = data?.project_id;
+      if (pid) {
+        setProjectId(pid);
+      }
     };
     loadProject();
   }, [user]);
