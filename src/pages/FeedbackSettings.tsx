@@ -4,28 +4,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { ImagePlus, Save, Palette, Loader2 } from 'lucide-react';
+import { Save, Palette, Loader2 } from 'lucide-react';
 
 type SettingsRow = {
   id: string;
   user_id: string;
   project_id: string | null;
-  project_id_locked: boolean;
-  title: string;
-  show_name: boolean;
-  show_email: boolean;
-  button_text: string;
-  redirect_url: string | null;
-  theme: 'light' | 'dark';
-  brand_color: string;
-  notify_email: string | null;
+  widget_title: string;
+  widget_color: string;
   created_at: string;
-  updated_at: string;
 };
 
 const FeedbackSettings: React.FC = () => {
@@ -33,7 +22,6 @@ const FeedbackSettings: React.FC = () => {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [row, setRow] = useState<SettingsRow | null>(null);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -62,15 +50,8 @@ const FeedbackSettings: React.FC = () => {
           const payload = {
             user_id: user.id,
             project_id: generatedProjectId,
-            project_id_locked: false,
-            title: 'Share your feedback with us!',
-            show_name: true,
-            show_email: false,
-            button_text: 'Send Feedback',
-            redirect_url: null,
-            theme: 'light' as const,
-            brand_color: '#3B82F6',
-            notify_email: user.email,
+            widget_title: 'Share your feedback with us!',
+            widget_color: '#3B82F6',
           };
           
           const { data: inserted, error: insertError } = await supabase
@@ -102,23 +83,6 @@ const FeedbackSettings: React.FC = () => {
     init();
   }, [user]);
 
-  const uploadLogo = async (file: File) => {
-    if (!user) return;
-    setUploading(true);
-    try {
-      const path = `${user.id}/${Date.now()}-${file.name}`;
-      const { data, error } = await supabase.storage.from('widget-logos').upload(path, file, { upsert: true });
-      if (error) throw error;
-      const { data: pub } = supabase.storage.from('widget-logos').getPublicUrl(data.path);
-      // Note: The current table structure doesn't have logo_url field, but we'll keep this for future use
-      toast.success('Logo uploaded successfully');
-    } catch (e: any) {
-      console.error(e);
-      toast.error('Upload failed');
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const save = async () => {
     if (!user || !row) return;
@@ -130,16 +94,8 @@ const FeedbackSettings: React.FC = () => {
       const payload = {
         user_id: user.id,
         project_id: ensuredProjectId,
-        project_id_locked: row.project_id_locked,
-        title: row.title,
-        show_name: row.show_name,
-        show_email: row.show_email,
-        button_text: row.button_text,
-        redirect_url: row.redirect_url,
-        theme: row.theme,
-        brand_color: row.brand_color,
-        notify_email: row.notify_email,
-        updated_at: new Date().toISOString(),
+        widget_title: row.widget_title,
+        widget_color: row.widget_color,
       };
 
       const { error } = await supabase
@@ -189,87 +145,44 @@ const FeedbackSettings: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Customization</CardTitle>
+              <CardTitle>Widget Settings</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Brand color</Label>
+                  <Label>Widget Title</Label>
+                  <Input 
+                    value={row.widget_title} 
+                    onChange={e => setRow({ ...row, widget_title: e.target.value })} 
+                    placeholder="Share your feedback with us!" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Widget Color</Label>
                   <div className="flex items-center gap-2">
-                    <Input type="color" value={row.brand_color} onChange={e => setRow({ ...row, brand_color: e.target.value })} className="w-12 p-1" />
-                    <Input value={row.brand_color} onChange={e => setRow({ ...row, brand_color: e.target.value })} />
+                    <Input 
+                      type="color" 
+                      value={row.widget_color} 
+                      onChange={e => setRow({ ...row, widget_color: e.target.value })} 
+                      className="w-12 p-1" 
+                    />
+                    <Input 
+                      value={row.widget_color} 
+                      onChange={e => setRow({ ...row, widget_color: e.target.value })} 
+                      placeholder="#3B82F6"
+                    />
                     <Palette className="h-4 w-4 text-gray-500" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Title/Greeting</Label>
-                  <Textarea value={row.title} onChange={e => setRow({ ...row, title: e.target.value })} placeholder="Share your feedback with us!" rows={4} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Button Text</Label>
-                  <Input value={row.button_text} onChange={e => setRow({ ...row, button_text: e.target.value })} placeholder="Send Feedback" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Theme</Label>
-                  <Select value={row.theme} onValueChange={v => setRow({ ...row, theme: v as 'light' | 'dark' })}>
-                    <SelectTrigger><SelectValue placeholder="Theme" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">Light</SelectItem>
-                      <SelectItem value="dark">Dark</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
                   <Label>Project ID</Label>
-                  <div className="flex items-center gap-2">
-                    <Input 
-                      value={row.project_id || ''} 
-                      onChange={e => setRow({ ...row, project_id: e.target.value })}
-                      placeholder="Enter project ID"
-                      disabled={row.project_id_locked}
-                    />
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setRow({ ...row, project_id_locked: !row.project_id_locked })}
-                    >
-                      {row.project_id_locked ? 'Unlock' : 'Lock'}
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Notification Email</Label>
                   <Input 
-                    type="email" 
-                    value={row.notify_email || ''} 
-                    onChange={e => setRow({ ...row, notify_email: e.target.value })}
-                    placeholder="Email for notifications"
+                    value={row.project_id || ''} 
+                    onChange={e => setRow({ ...row, project_id: e.target.value })}
+                    placeholder="Enter project ID"
+                    className="md:col-span-2"
                   />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center justify-between border rounded-lg p-3">
-                  <div>
-                    <p className="font-medium">Show Name Field</p>
-                    <p className="text-sm text-gray-500">Ask users for their name</p>
-                  </div>
-                  <Switch checked={row.show_name} onCheckedChange={v => setRow({ ...row, show_name: v })} />
-                </div>
-                <div className="flex items-center justify-between border rounded-lg p-3">
-                  <div>
-                    <p className="font-medium">Show Email Field</p>
-                    <p className="text-sm text-gray-500">Ask users for their email</p>
-                  </div>
-                  <Switch checked={row.show_email} onCheckedChange={v => setRow({ ...row, show_email: v })} />
-                </div>
-                <div className="flex items-center justify-between border rounded-lg p-3">
-                  <div>
-                    <p className="font-medium">Lock Project ID</p>
-                    <p className="text-sm text-gray-500">Prevent changes to project ID</p>
-                  </div>
-                  <Switch checked={row.project_id_locked} onCheckedChange={v => setRow({ ...row, project_id_locked: v })} />
+                  <p className="text-sm text-gray-500">This ID is used to identify your feedback submissions</p>
                 </div>
               </div>
 
@@ -287,24 +200,18 @@ const FeedbackSettings: React.FC = () => {
                 <CardTitle>Live Preview</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className={`border rounded-xl p-4 ${row.theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white'}`} style={{ borderColor: row.brand_color }}>
+                <div className="border rounded-xl p-4 bg-white" style={{ borderColor: row.widget_color }}>
                   <div className="flex items-center gap-3">
-                    <p className="font-medium" style={{ color: row.brand_color }}>{row.title}</p>
+                    <p className="font-medium" style={{ color: row.widget_color }}>{row.widget_title}</p>
                   </div>
                   <div className="mt-3 space-y-2">
-                    {row.show_name && (
-                      <div className="text-sm opacity-75">Name: [User input field]</div>
-                    )}
-                    {row.show_email && (
-                      <div className="text-sm opacity-75">Email: [User input field]</div>
-                    )}
-                    <div className="text-sm opacity-75">Message: [User input field]</div>
+                    <div className="text-sm text-gray-600">Message: [User input field]</div>
                     <Button 
                       size="sm" 
                       className="mt-2" 
-                      style={{ backgroundColor: row.brand_color }}
+                      style={{ backgroundColor: row.widget_color }}
                     >
-                      {row.button_text}
+                      Send Feedback
                     </Button>
                   </div>
                 </div>

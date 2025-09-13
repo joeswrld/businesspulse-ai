@@ -36,15 +36,13 @@ const Feedback: React.FC = () => {
   useEffect(() => {
     const loadProject = async () => {
       if (!user) return;
-      // Get user's first project_id
+      // Get user's project_id from feedback_settings
       const { data } = await supabase
-        .from('projects' as any)
+        .from('feedback_settings')
         .select('project_id')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: true })
-        .limit(1)
         .maybeSingle();
-      const pid = (data as any)?.project_id || user.id; // fallback to user.id
+      const pid = data?.project_id || user.id; // fallback to user.id
       setProjectId(pid);
     };
     loadProject();
