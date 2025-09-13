@@ -1296,52 +1296,67 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback: {
+        Row: {
+          id: string
+          project_id: string
+          email: string | null
+          message: string
+          page_url: string | null
+          browser: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          email?: string | null
+          message: string
+          page_url?: string | null
+          browser?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          email?: string | null
+          message?: string
+          page_url?: string | null
+          browser?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       feedback_settings: {
         Row: {
           id: string
           user_id: string
-          project_id: string | null
-          project_id_locked: boolean
-          title: string
-          show_name: boolean
-          show_email: boolean
-          button_text: string
-          redirect_url: string | null
-          theme: 'light' | 'dark'
-          brand_color: string
-          notify_email: string | null
+          project_id: string
+          widget_title: string
+          widget_color: string
+          greeting_text: string
+          allow_screenshots: boolean
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
           user_id: string
-          project_id?: string | null
-          project_id_locked?: boolean
-          title?: string
-          show_name?: boolean
-          show_email?: boolean
-          button_text?: string
-          redirect_url?: string | null
-          theme?: 'light' | 'dark'
-          brand_color?: string
-          notify_email?: string | null
+          project_id?: string
+          widget_title?: string
+          widget_color?: string
+          greeting_text?: string
+          allow_screenshots?: boolean
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           user_id?: string
-          project_id?: string | null
-          project_id_locked?: boolean
-          title?: string
-          show_name?: boolean
-          show_email?: boolean
-          button_text?: string
-          redirect_url?: string | null
-          theme?: 'light' | 'dark'
-          brand_color?: string
-          notify_email?: string | null
+          project_id?: string
+          widget_title?: string
+          widget_color?: string
+          greeting_text?: string
+          allow_screenshots?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -1653,6 +1668,20 @@ export type Database = {
           policies_count: number
           rls_enabled: boolean
           table_name: string
+        }[]
+      }
+      get_or_create_feedback_settings: {
+        Args: { p_user_id: string }
+        Returns: {
+          id: string
+          user_id: string
+          project_id: string
+          widget_title: string
+          widget_color: string
+          greeting_text: string
+          allow_screenshots: boolean
+          created_at: string
+          updated_at: string
         }[]
       }
     }
