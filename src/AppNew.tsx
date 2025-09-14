@@ -27,6 +27,7 @@ const LoadingSpinner = () => (
 const Index = lazy(() => import("./pages/Index"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Insights = lazy(() => import("./pages/Insights"));
+const InsightsSimple = lazy(() => import("./pages/InsightsSimple"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -201,6 +202,14 @@ const App = () => (
                 <ProtectedDashboardLayout>
                   <Suspense fallback={<LoadingSpinner />}>
                     <Insights />
+                  </Suspense>
+                </ProtectedDashboardLayout>
+              } />
+              
+              <Route path="/insights-simple" element={
+                <ProtectedDashboardLayout>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <InsightsSimple />
                   </Suspense>
                 </ProtectedDashboardLayout>
               } />

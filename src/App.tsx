@@ -31,6 +31,7 @@ const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const TrialExpired = lazy(() => import("./pages/TrialExpired"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Insights = lazy(() => import("./pages/Insights"));
+const InsightsSimple = lazy(() => import("./pages/InsightsSimple"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Teams = lazy(() => import("./pages/Teams"));
@@ -202,7 +203,15 @@ const App = () => (
                 </Suspense>
               </AuthGuard>
             } />
-
+            <Route path="/insights-simple" element={
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <InsightsSimple />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
+            } />
 
             <Route path="/reports" element={
               <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
