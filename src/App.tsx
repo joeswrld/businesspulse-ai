@@ -31,11 +31,7 @@ const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const TrialExpired = lazy(() => import("./pages/TrialExpired"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Insights = lazy(() => import("./pages/Insights"));
-const Feedback = lazy(() => import("./pages/Feedback"));
-const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
-const Widget = lazy(() => import("./pages/widget"));
 const Reports = lazy(() => import("./pages/Reports"));
-const Analytics = lazy(() => import("./pages/Analytics"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Teams = lazy(() => import("./pages/Teams"));
 const Profile = lazy(() => import("./pages/Profile"));
@@ -203,49 +199,13 @@ const App = () => (
                 </Suspense>
               </AuthGuard>
             } />
-            <Route path="/feedback" element={
-              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <Feedback />
-                  </DashboardLayout>
-                </Suspense>
-              </AuthGuard>
-            } />
-            <Route path="/feedback-settings" element={
-              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <FeedbackSettings />
-                  </DashboardLayout>
-                </Suspense>
-              </AuthGuard>
-            } />
 
-            <Route path="/widget" element={
-              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <Widget />
-                  </DashboardLayout>
-                </Suspense>
-              </AuthGuard>
-            } />
 
             <Route path="/reports" element={
               <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Reports />
-                  </DashboardLayout>
-                </Suspense>
-              </AuthGuard>
-            } />
-            <Route path="/analytics" element={
-              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <Analytics />
                   </DashboardLayout>
                 </Suspense>
               </AuthGuard>
