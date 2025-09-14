@@ -4,7 +4,7 @@
   // Configuration
   const CONFIG = {
     apiUrl: 'https://xjbrqeqizpoqdjkiyqzt.supabase.co',
-    apiKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NzQ4NzMsImV4cCI6MjA1MDU1MDg3M30.placeholder',
+    apiKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84',
     widgetId: 'notex-feedback-widget',
     buttonId: 'notex-feedback-button',
     modalId: 'notex-feedback-modal',
@@ -48,7 +48,9 @@
         headers: {
           'apikey': CONFIG.apiKey,
           'Authorization': `Bearer ${CONFIG.apiKey}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Prefer': 'return=minimal'
         },
         body: JSON.stringify({
           project_id: projectId,
@@ -57,10 +59,16 @@
         })
       });
       
-      return response.ok;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', response.status, errorText);
+        throw new Error(`API Error: ${response.status}`);
+      }
+      
+      return true;
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      return false;
+      throw error; // Re-throw to be handled by caller
     }
   }
 
@@ -133,6 +141,28 @@
         to {
           opacity: 1;
           transform: translateY(0);
+        }
+      }
+      
+      @keyframes slideInRight {
+        from {
+          opacity: 0;
+          transform: translateX(100%);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+      
+      @keyframes slideOutRight {
+        from {
+          opacity: 1;
+          transform: translateX(0);
+        }
+        to {
+          opacity: 0;
+          transform: translateX(100%);
         }
       }
       
@@ -400,12 +430,63 @@
         </div>
       `;
       
+      // Clear the form
+      const messageInput = document.getElementById('notex-message');
+      const emailInput = document.getElementById('notex-email');
+      if (messageInput) messageInput.value = '';
+      if (emailInput) emailInput.value = '';
+      
+      // Show success toast
+      showToast('Feedback submitted successfully!', 'success');
+      
       setTimeout(() => {
         closeModal();
         // Reset modal content
         initWidget();
       }, 2000);
     }
+  }
+
+  // Show toast notification
+  function showToast(message, type = 'success') {
+    // Remove existing toast if any
+    const existingToast = document.getElementById('notex-toast');
+    if (existingToast) {
+      existingToast.remove();
+    }
+    
+    const toast = document.createElement('div');
+    toast.id = 'notex-toast';
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: ${type === 'success' ? '#10b981' : '#ef4444'};
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 10002;
+      font-size: 14px;
+      font-weight: 500;
+      animation: slideInRight 0.3s ease;
+      max-width: 300px;
+    `;
+    
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.style.animation = 'slideOutRight 0.3s ease';
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.remove();
+          }
+        }, 300);
+      }
+    }, 3000);
   }
 
   // Handle form submission
@@ -435,15 +516,11 @@
     submitBtn.textContent = 'Sending...';
     
     try {
-      const success = await submitFeedback(projectId, email, message);
-      
-      if (success) {
-        showSuccess();
-      } else {
-        throw new Error('Failed to submit feedback');
-      }
+      await submitFeedback(projectId, email, message);
+      showSuccess();
     } catch (error) {
       console.error('Error submitting feedback:', error);
+      // Only show error message for API failures, not validation errors
       errorDiv.textContent = 'Failed to submit feedback. Please try again.';
       submitBtn.disabled = false;
       submitBtn.textContent = 'Send Feedback';
