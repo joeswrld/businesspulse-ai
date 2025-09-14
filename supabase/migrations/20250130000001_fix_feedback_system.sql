@@ -116,24 +116,32 @@ RETURNS TABLE(
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 ) AS $$
+DECLARE
+  settings_exists BOOLEAN := FALSE;
 BEGIN
-  -- Try to get existing settings
-  RETURN QUERY
-  SELECT 
-    fs.id,
-    fs.user_id,
-    fs.project_id,
-    fs.widget_title,
-    fs.widget_color,
-    fs.greeting_text,
-    fs.allow_screenshots,
-    fs.created_at,
-    fs.updated_at
-  FROM public.feedback_settings fs
-  WHERE fs.user_id = p_user_id;
+  -- Check if settings exist
+  SELECT EXISTS(
+    SELECT 1 FROM public.feedback_settings WHERE user_id = p_user_id
+  ) INTO settings_exists;
   
-  -- If no settings exist, create them
-  IF NOT FOUND THEN
+  -- If settings exist, return them
+  IF settings_exists THEN
+    RETURN QUERY
+    SELECT 
+      fs.id,
+      fs.user_id,
+      fs.project_id,
+      fs.widget_title,
+      fs.widget_color,
+      fs.greeting_text,
+      fs.allow_screenshots,
+      fs.created_at,
+      fs.updated_at
+    FROM public.feedback_settings fs
+    WHERE fs.user_id = p_user_id;
+  ELSE
+    -- Create new settings and return them
+    RETURN QUERY
     INSERT INTO public.feedback_settings (user_id, widget_title, widget_color, greeting_text, allow_screenshots)
     VALUES (p_user_id, 'Share your feedback with us!', '#3B82F6', 'We\'d love to hear from you!', true)
     RETURNING 
