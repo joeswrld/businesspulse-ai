@@ -36,6 +36,9 @@ const Settings = lazy(() => import("./pages/Settings"));
 const Teams = lazy(() => import("./pages/Teams"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Billing = lazy(() => import("./pages/Billing"));
+const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
+const Feedback = lazy(() => import("./pages/Feedback"));
+const Widget = lazy(() => import("./pages/Widget"));
 
 const Testimonials = lazy(() => import("./pages/Testimonials"));
 const About = lazy(() => import("./pages/About"));
@@ -248,6 +251,33 @@ const App = () => (
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Profile />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
+            } />
+            <Route path="/feedback-settings" element={
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <FeedbackSettings />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
+            } />
+            <Route path="/feedback" element={
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Feedback />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
+            } />
+            <Route path="/widget" element={
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Widget />
                   </DashboardLayout>
                 </Suspense>
               </AuthGuard>
