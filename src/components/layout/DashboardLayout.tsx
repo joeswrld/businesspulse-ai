@@ -16,7 +16,6 @@ import {
   CreditCard,
   Users,
   MessageSquare,
-  SlidersHorizontal,
   Crown,
   Star,
   Zap,
@@ -131,11 +130,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
   const navigation = [
     { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Feedback", href: "/feedback", icon: MessageSquare },
     { name: "AI Insights", href: "/insights", icon: Brain },
-    { name: "Feedback Settings", href: "/feedback-settings", icon: SlidersHorizontal },
     { name: "Reports & Analytics", href: "/reports", icon: FileText },
-    { name: "Business Metrics", href: "/analytics", icon: BarChart3 },
     { name: "Team Collaboration", href: "/teams", icon: Users,  },
     { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
     { name: "Account Settings", href: "/settings", icon: Settings },

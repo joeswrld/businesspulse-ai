@@ -1,7 +1,7 @@
 -- ============================================================================
--- COMPLETE FEEDBACK SYSTEM REMOVAL SCRIPT
+-- REMOVE FEEDBACK_SETTINGS FEATURE
 -- ============================================================================
--- This script removes ALL feedback-related components from the platform:
+-- This migration removes the entire feedback_settings feature from the platform:
 -- - Database tables, functions, triggers, sequences
 -- - RLS policies and constraints
 -- - Realtime subscriptions
@@ -51,6 +51,8 @@ DROP FUNCTION IF EXISTS update_feedback_tags_updated_at();
 DROP FUNCTION IF EXISTS update_widget_settings_updated_at();
 DROP FUNCTION IF EXISTS update_notification_preferences_updated_at();
 DROP FUNCTION IF EXISTS update_updated_at_column();
+DROP FUNCTION IF EXISTS get_or_create_feedback_settings(UUID);
+DROP FUNCTION IF EXISTS get_user_feedback_settings(UUID);
 
 -- ============================================================================
 -- 3. DROP ALL FEEDBACK-RELATED POLICIES
@@ -77,6 +79,8 @@ DROP POLICY IF EXISTS "Users can update feedbacks for their projects" ON feedbac
 DROP POLICY IF EXISTS "Users can view their own feedback settings" ON feedback_settings;
 DROP POLICY IF EXISTS "Users can update their own feedback settings" ON feedback_settings;
 DROP POLICY IF EXISTS "Users can insert their own feedback settings" ON feedback_settings;
+DROP POLICY IF EXISTS "Users can delete their own feedback settings" ON feedback_settings;
+DROP POLICY IF EXISTS "Users can select their own feedback settings" ON feedback_settings;
 
 -- Drop policies for feedback_notifications table
 DROP POLICY IF EXISTS "Users can view their own feedback notifications" ON feedback_notifications;
@@ -117,6 +121,7 @@ DROP POLICY IF EXISTS "Users can update their own feedback" ON ai_insights_feedb
 -- ============================================================================
 
 DROP VIEW IF EXISTS notification_statistics;
+DROP VIEW IF EXISTS active_feedback_settings;
 
 -- ============================================================================
 -- 5. DROP ALL FEEDBACK-RELATED INDEXES
@@ -143,6 +148,9 @@ DROP INDEX IF EXISTS idx_feedback_settings_user_id;
 DROP INDEX IF EXISTS idx_feedback_settings_project_id;
 DROP INDEX IF EXISTS idx_feedback_settings_project_id_user_unique;
 DROP INDEX IF EXISTS idx_feedback_settings_project_id_unique;
+DROP INDEX IF EXISTS idx_feedback_settings_project_id_global_unique;
+DROP INDEX IF EXISTS idx_feedback_settings_user_id_created_at;
+DROP INDEX IF EXISTS idx_feedback_settings_active;
 
 -- Drop indexes for feedback_notifications table
 DROP INDEX IF EXISTS idx_feedback_notifications_user_id;
@@ -176,6 +184,8 @@ ALTER TABLE IF EXISTS feedback DROP CONSTRAINT IF EXISTS feedback_channel_check;
 
 -- Drop constraints for feedback_settings table
 ALTER TABLE IF EXISTS feedback_settings DROP CONSTRAINT IF EXISTS feedback_settings_project_id_locked_check;
+ALTER TABLE IF EXISTS feedback_settings DROP CONSTRAINT IF EXISTS feedback_settings_project_id_not_empty;
+ALTER TABLE IF EXISTS feedback_settings DROP CONSTRAINT IF EXISTS feedback_settings_user_id_unique;
 
 -- Drop constraints for feedback_tags table
 ALTER TABLE IF EXISTS feedback_tags DROP CONSTRAINT IF EXISTS feedback_tags_pkey;

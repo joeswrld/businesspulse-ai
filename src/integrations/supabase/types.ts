@@ -1326,50 +1326,6 @@ export type Database = {
         }
         Relationships: []
       }
-      feedback_settings: {
-        Row: {
-          id: string
-          user_id: string
-          project_id: string
-          widget_title: string
-          widget_color: string
-          greeting_text: string
-          allow_screenshots: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          project_id?: string
-          widget_title?: string
-          widget_color?: string
-          greeting_text?: string
-          allow_screenshots?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          project_id?: string
-          widget_title?: string
-          widget_color?: string
-          greeting_text?: string
-          allow_screenshots?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "feedback_settings_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
@@ -1668,20 +1624,6 @@ export type Database = {
           policies_count: number
           rls_enabled: boolean
           table_name: string
-        }[]
-      }
-      get_or_create_feedback_settings: {
-        Args: { p_user_id: string }
-        Returns: {
-          id: string
-          user_id: string
-          project_id: string
-          widget_title: string
-          widget_color: string
-          greeting_text: string
-          allow_screenshots: boolean
-          created_at: string
-          updated_at: string
         }[]
       }
     }
