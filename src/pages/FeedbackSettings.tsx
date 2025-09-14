@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, Save, Settings } from 'lucide-react'
+import { Loader2, Save, Settings, Copy, Check } from 'lucide-react'
 
 interface FeedbackSettings {
   id: string
@@ -25,6 +25,7 @@ const FeedbackSettings: React.FC = () => {
   const [settings, setSettings] = useState<FeedbackSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [formData, setFormData] = useState({
     widget_title: 'Share your feedback with us!',
     widget_color: '#3B82F6',
@@ -127,6 +128,31 @@ const FeedbackSettings: React.FC = () => {
     }))
   }
 
+  const handleCopyEmbedCode = async () => {
+    if (!settings) return
+    
+    const embedCode = `<script src="https://notex.com.ng/widget.js" data-project-id="${settings.project_id}"></script>`
+    
+    try {
+      await navigator.clipboard.writeText(embedCode)
+      setCopied(true)
+      toast({
+        title: 'Copied',
+        description: 'Embed code copied to clipboard'
+      })
+      
+      // Reset copied state after 2 seconds
+      setTimeout(() => setCopied(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to copy embed code',
+        variant: 'destructive'
+      })
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -218,42 +244,91 @@ const FeedbackSettings: React.FC = () => {
         </Card>
 
         {settings && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Project Information</CardTitle>
-              <CardDescription>
-                Your unique project identifier for the feedback widget
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label>Project ID</Label>
-                <div className="flex items-center space-x-2">
-                  <Input
-                    value={settings.project_id}
-                    readOnly
-                    className="font-mono"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      navigator.clipboard.writeText(settings.project_id)
-                      toast({
-                        title: 'Copied',
-                        description: 'Project ID copied to clipboard'
-                      })
-                    }}
-                  >
-                    Copy
-                  </Button>
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle>Project Information</CardTitle>
+                <CardDescription>
+                  Your unique project identifier for the feedback widget
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label>Project ID</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      value={settings.project_id}
+                      readOnly
+                      className="font-mono"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(settings.project_id)
+                        toast({
+                          title: 'Copied',
+                          description: 'Project ID copied to clipboard'
+                        })
+                      }}
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Use this Project ID in your widget embed code
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Use this Project ID in your widget embed code
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Widget Embed Code</CardTitle>
+                <CardDescription>
+                  Copy and paste this code into your website to display the feedback widget
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="relative">
+                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto">
+                      <code className="text-sm">
+                        {`<script src="https://notex.com.ng/widget.js" data-project-id="${settings.project_id}"></script>`}
+                      </code>
+                    </pre>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopyEmbedCode}
+                      className="absolute top-2 right-2"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="h-4 w-4 mr-2" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy Code
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <div className="text-sm text-muted-foreground space-y-2">
+                    <p><strong>Installation Instructions:</strong></p>
+                    <ol className="list-decimal list-inside space-y-1 ml-4">
+                      <li>Copy the embed code above</li>
+                      <li>Paste it before the closing <code>&lt;/body&gt;</code> tag of your website</li>
+                      <li>The feedback widget will appear on your website</li>
+                      <li>Feedback will be collected and displayed in this dashboard</li>
+                    </ol>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
     </div>
