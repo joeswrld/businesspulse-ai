@@ -128,15 +128,18 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     };
   };
 
-  const navigation = [
-    { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-    { name: "AI Insights", href: "/insights", icon: Brain },
-    { name: "Reports & Analytics", href: "/reports", icon: FileText },
-    { name: "Team Collaboration", href: "/teams", icon: Users,  },
-    { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
-    { name: "Account Settings", href: "/settings", icon: Settings },
-    { name: "My Profile", href: "/profile", icon: User },
-  ];
+ const navigation = [
+  { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Feedback", href: "/feedback", icon: MessageSquare },
+  { name: "AI Insights", href: "/insights", icon: Brain },
+  { name: "Reports & Analytics", href: "/reports", icon: FileText },
+  { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
+  { name: "Team Collaboration", href: "/teams", icon: Users },
+  { name: "Feedback Settings", href: "/feedback-settings", icon: Settings },
+  { name: "Account Settings", href: "/settings", icon: Settings },
+  { name: "My Profile", href: "/profile", icon: User },
+];
+
 
   const handleSignOut = async () => {
     try {
