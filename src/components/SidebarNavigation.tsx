@@ -12,7 +12,9 @@ import {
   LogOut,
   Lock,
   Zap,
-  MessageSquare
+  MessageSquare,
+  MessageCircle,
+  Widget
 } from 'lucide-react'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
@@ -55,6 +57,30 @@ const navigationItems: NavItem[] = [
     icon: <Users className="h-5 w-5" />,
     path: '/teams',
     requiresAccess: true
+  },
+  {
+    id: 'feedback-settings',
+    label: 'Feedback Settings',
+    icon: <Settings className="h-5 w-5" />,
+    path: '/feedback-settings',
+    requiresAccess: false,
+    allowedWhenExpired: true
+  },
+  {
+    id: 'feedback',
+    label: 'Feedback',
+    icon: <MessageCircle className="h-5 w-5" />,
+    path: '/feedback',
+    requiresAccess: false,
+    allowedWhenExpired: true
+  },
+  {
+    id: 'widget',
+    label: 'Widget',
+    icon: <Widget className="h-5 w-5" />,
+    path: '/widget',
+    requiresAccess: false,
+    allowedWhenExpired: true
   },
   {
     id: 'billing',
