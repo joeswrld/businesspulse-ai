@@ -159,20 +159,22 @@
           <div style="
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             margin-bottom: 20px;
           ">
-            <h3 style="
-              margin: 0;
-              font-size: 20px;
-              font-weight: 600;
-              color: #1f2937;
-            ">${settings?.widget_title || 'Share your feedback with us!'}</h3>
-            <p style="
-              margin: 8px 0 0 0;
-              font-size: 14px;
-              color: #6b7280;
-            ">${settings?.greeting_text || 'We\'d love to hear your thoughts!'}</p>
+            <div style="flex: 1;">
+              <h3 style="
+                margin: 0 0 8px 0;
+                font-size: 20px;
+                font-weight: 600;
+                color: #1f2937;
+              ">${settings?.widget_title || 'Share your feedback with us!'}</h3>
+              <p style="
+                margin: 0;
+                font-size: 14px;
+                color: #6b7280;
+              ">${settings?.greeting_text || 'We\'d love to hear your thoughts!'}</p>
+            </div>
             <button id="notex-close-modal" style="
               background: none;
               border: none;
@@ -185,6 +187,7 @@
               display: flex;
               align-items: center;
               justify-content: center;
+              margin-left: 16px;
             ">&times;</button>
           </div>
           
@@ -203,7 +206,11 @@
                 border-radius: 6px;
                 font-size: 14px;
                 box-sizing: border-box;
-              " placeholder="your@email.com">
+                background: white;
+                color: #374151;
+                outline: none;
+                transition: border-color 0.2s;
+              " placeholder="your@email.com" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#d1d5db'">
             </div>
             
             <div>
@@ -222,7 +229,11 @@
                 resize: vertical;
                 box-sizing: border-box;
                 font-family: inherit;
-              " placeholder="Tell us what you think..." required></textarea>
+                background: white;
+                color: #374151;
+                outline: none;
+                transition: border-color 0.2s;
+              " placeholder="Tell us what you think..." required onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#d1d5db'"></textarea>
             </div>
             
             <div style="display: flex; gap: 12px; justify-content: flex-end;">
@@ -234,7 +245,9 @@
                 border-radius: 6px;
                 cursor: pointer;
                 font-size: 14px;
-              ">Cancel</button>
+                font-weight: 500;
+                transition: all 0.2s;
+              " onmouseover="this.style.backgroundColor='#f9fafb'" onmouseout="this.style.backgroundColor='white'">Cancel</button>
               <button type="submit" id="notex-submit" style="
                 padding: 10px 20px;
                 border: none;
@@ -244,7 +257,8 @@
                 cursor: pointer;
                 font-size: 14px;
                 font-weight: 500;
-              ">Send Feedback</button>
+                transition: all 0.2s;
+              " onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">Send Feedback</button>
             </div>
           </form>
           

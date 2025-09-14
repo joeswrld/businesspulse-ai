@@ -41,7 +41,8 @@ const FeedbackSettings: React.FC = () => {
 
         if (error) {
           console.error('Error loading feedback settings:', error);
-          toast.error('Failed to load settings');
+          toast.error('Failed to load settings. Please try again.');
+          setLoading(false);
           return;
         }
 
@@ -65,7 +66,8 @@ const FeedbackSettings: React.FC = () => {
             
           if (insertError) {
             console.error('Error creating feedback settings:', insertError);
-            toast.error('Failed to create settings');
+            toast.error('Failed to create settings. Please try again.');
+            setLoading(false);
             return;
           }
           
@@ -74,7 +76,8 @@ const FeedbackSettings: React.FC = () => {
         }
       } catch (error) {
         console.error('Error in init:', error);
-        toast.error('Failed to initialize settings');
+        toast.error('Failed to initialize settings. Please refresh the page.');
+        setLoading(false);
       } finally {
         setLoading(false);
       }
