@@ -151,10 +151,10 @@ export default function Dashboard() {
         // Load feedbacks
         projectIds.length > 0 
           ? supabase
-              .from('feedbacks')
+              .from('feedback')
               .select('*')
               .in('project_id', projectIds)
-              .order('timestamp', { ascending: false })
+              .order('created_at', { ascending: false })
           : Promise.resolve({ data: [], error: null }),
         
         // Load insights
@@ -308,7 +308,7 @@ export default function Dashboard() {
     
     // Filter feedbacks by date range
     const filteredFeedbacks = feedbacks.filter(feedback => {
-      const feedbackDate = new Date(feedback.timestamp);
+      const feedbackDate = new Date(feedback.created_at);
       return feedbackDate >= start && feedbackDate <= end;
     });
 
@@ -340,14 +340,14 @@ export default function Dashboard() {
     const { start, end } = getDateRange();
     
     const filteredFeedbacks = feedbacks.filter(feedback => {
-      const feedbackDate = new Date(feedback.timestamp);
+      const feedbackDate = new Date(feedback.created_at);
       return feedbackDate >= start && feedbackDate <= end;
     });
 
     // Group by date
     const volumeData: Record<string, number> = {};
     filteredFeedbacks.forEach(feedback => {
-      const date = new Date(feedback.timestamp).toISOString().split('T')[0];
+      const date = new Date(feedback.created_at).toISOString().split('T')[0];
       volumeData[date] = (volumeData[date] || 0) + 1;
     });
 
@@ -361,7 +361,7 @@ export default function Dashboard() {
     const { start, end } = getDateRange();
     
     const filteredFeedbacks = feedbacks.filter(feedback => {
-      const feedbackDate = new Date(feedback.timestamp);
+      const feedbackDate = new Date(feedback.created_at);
       return feedbackDate >= start && feedbackDate <= end;
     });
 
@@ -415,7 +415,7 @@ export default function Dashboard() {
 
   // Format date
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toISOString().split('T')[0];
+    return new Date(dateString).toLocaleString();
   };
 
   // Get sentiment badge variant
@@ -837,7 +837,7 @@ export default function Dashboard() {
                       </div>
                       <div className="flex items-center space-x-2 text-sm text-gray-500">
                         <Clock className="h-4 w-4" />
-                        <span>{formatDate(feedback.timestamp)}</span>
+                        <span>{formatDate(feedback.created_at)}</span>
                       </div>
                     </div>
                     <p className="text-gray-700 text-sm line-clamp-2">{feedback.message}</p>
