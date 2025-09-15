@@ -151,12 +151,15 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
   if (!data) {
     return (
       <Card className="p-6 rounded-xl shadow-lg bg-white border-0">
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            Unable to load usage data. Please try again.
-          </AlertDescription>
-        </Alert>
+        <div className="text-center">
+          <p className="text-sm text-gray-600">No usage data yet. Start using features to see your usage here.</p>
+          <div className="mt-3">
+            <Button variant="outline" size="sm" onClick={refresh} disabled={refreshing}>
+              {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              <span className="ml-2">Try Again</span>
+            </Button>
+          </div>
+        </div>
       </Card>
     );
   }
@@ -212,7 +215,7 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
     },
     {
       key: 'analytics',
-      name: 'Analytics Reports',
+      name: 'Basic Analytics',
       icon: BarChart3,
       description: 'Data analytics and reports',
       count: data.usage.analytics_count,
@@ -223,7 +226,7 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
     },
     {
       key: 'reports',
-      name: 'Detailed Reports',
+      name: 'Reports',
       icon: FileText,
       description: 'Comprehensive business reports',
       count: data.usage.reports_count,
@@ -296,12 +299,23 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
 
       {/* Usage Alerts */}
       {features.some(feature => feature.isLimitReached) && (
-        <Alert className="mb-6 border-red-200 bg-red-50">
-          <AlertTriangle className="h-4 w-4 text-red-600" />
-          <AlertDescription className="text-red-800">
-            <strong>Some features have reached their limits!</strong> Upgrade your plan to continue using these features.
-          </AlertDescription>
-        </Alert>
+        <div className="mb-6">
+          <Alert className="border-red-200 bg-red-50">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span>
+                  <strong>Limits reached.</strong> Upgrade to continue using all features.
+                </span>
+                {onUpgrade && (
+                  <Button size="sm" className="bg-red-600 hover:bg-red-700" onClick={() => onUpgrade('business')}>
+                    Upgrade to Business
+                  </Button>
+                )}
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
       {features.some(feature => feature.percentage >= 90) && !features.some(feature => feature.isLimitReached) && (
