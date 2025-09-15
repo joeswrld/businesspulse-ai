@@ -11,6 +11,7 @@ import AuthGuard from "@/components/AuthGuard";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { lazy, Suspense } from "react";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 // Loading component
 const LoadingSpinner = () => (
@@ -71,6 +72,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <UnifiedTrialProvider>
+            <ThemeProvider>
             <Routes>
             {/* Public routes */}
             <Route path="/" element={
@@ -308,7 +310,8 @@ const App = () => (
                 <NotFound />
               </Suspense>
             } />
-          </Routes>
+            </Routes>
+            </ThemeProvider>
           </UnifiedTrialProvider>
         </AuthProvider>
       </BrowserRouter>
