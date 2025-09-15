@@ -98,6 +98,9 @@ const UsageBar: React.FC = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'feedback' }, () => loadBillingData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'insights_results' }, () => loadBillingData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, () => loadBillingData())
+      // React to plan/profile changes so plan limits update instantly without refresh
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_subscriptions', filter: `user_id=eq.${user.id}` }, () => loadBillingData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `user_id=eq.${user.id}` }, () => loadBillingData())
       .subscribe();
 
     return () => {
@@ -127,30 +130,38 @@ const UsageBar: React.FC = () => {
   const getUsageData = (): UsageData[] => {
     if (!billingData) return [];
 
+    // Normalize Free plan limits per product spec
+    const isFreePlan = billingData.plan === 'free' || billingData.plan_display_name?.toLowerCase().includes('free');
+    const normalized = {
+      feedback: isFreePlan ? 50 : billingData.feedback_limit,
+      ai_insights: isFreePlan ? 5 : billingData.ai_insights_limit,
+      reports: isFreePlan ? 5 : billingData.reports_limit,
+    };
+
     return [
       {
         feature_type: 'feedback',
         usage_count: billingData.current_feedback_usage || 0,
-        limit: billingData.feedback_limit,
-        remaining: billingData.feedback_limit === -1 ? null : Math.max(0, billingData.feedback_limit - (billingData.current_feedback_usage || 0)),
-        percentage: billingData.feedback_limit === -1 ? 0 : Math.round(((billingData.current_feedback_usage || 0) / billingData.feedback_limit) * 100),
-        is_unlimited: billingData.feedback_limit === -1
+        limit: normalized.feedback,
+        remaining: normalized.feedback === -1 ? null : Math.max(0, normalized.feedback - (billingData.current_feedback_usage || 0)),
+        percentage: normalized.feedback === -1 ? 0 : Math.round(((billingData.current_feedback_usage || 0) / Math.max(1, normalized.feedback)) * 100),
+        is_unlimited: normalized.feedback === -1
       },
       {
         feature_type: 'ai_insights',
         usage_count: billingData.current_ai_insights_usage || 0,
-        limit: billingData.ai_insights_limit,
-        remaining: billingData.ai_insights_limit === -1 ? null : Math.max(0, billingData.ai_insights_limit - (billingData.current_ai_insights_usage || 0)),
-        percentage: billingData.ai_insights_limit === -1 ? 0 : Math.round(((billingData.current_ai_insights_usage || 0) / billingData.ai_insights_limit) * 100),
-        is_unlimited: billingData.ai_insights_limit === -1
+        limit: normalized.ai_insights,
+        remaining: normalized.ai_insights === -1 ? null : Math.max(0, normalized.ai_insights - (billingData.current_ai_insights_usage || 0)),
+        percentage: normalized.ai_insights === -1 ? 0 : Math.round(((billingData.current_ai_insights_usage || 0) / Math.max(1, normalized.ai_insights)) * 100),
+        is_unlimited: normalized.ai_insights === -1
       },
       {
         feature_type: 'reports',
         usage_count: billingData.current_reports_usage || 0,
-        limit: billingData.reports_limit,
-        remaining: billingData.reports_limit === -1 ? null : Math.max(0, billingData.reports_limit - (billingData.current_reports_usage || 0)),
-        percentage: billingData.reports_limit === -1 ? 0 : Math.round(((billingData.current_reports_usage || 0) / billingData.reports_limit) * 100),
-        is_unlimited: billingData.reports_limit === -1
+        limit: normalized.reports,
+        remaining: normalized.reports === -1 ? null : Math.max(0, normalized.reports - (billingData.current_reports_usage || 0)),
+        percentage: normalized.reports === -1 ? 0 : Math.round(((billingData.current_reports_usage || 0) / Math.max(1, normalized.reports)) * 100),
+        is_unlimited: normalized.reports === -1
       }
     ];
   };
@@ -218,7 +229,10 @@ const UsageBar: React.FC = () => {
     const hasHighUsage = usageData.some(usage => usage.percentage >= 80 && !usage.is_unlimited);
     const hasReachedLimit = usageData.some(usage => usage.percentage >= 100 && !usage.is_unlimited);
 
-    if (hasReachedLimit) {
+    // Only show upgrade prompts to Free users
+    const isFreePlan = billingData.plan === 'free' || billingData.plan_display_name?.toLowerCase().includes('free');
+
+    if (isFreePlan && hasReachedLimit) {
       return {
         type: 'error',
         message: 'You\'ve reached your plan limits. Upgrade now to continue using all features.',
@@ -226,7 +240,7 @@ const UsageBar: React.FC = () => {
       };
     }
 
-    if (hasHighUsage) {
+    if (isFreePlan && hasHighUsage) {
       return {
         type: 'warning',
         message: 'You\'re approaching your plan limits. Consider upgrading for unlimited access.',
@@ -234,7 +248,7 @@ const UsageBar: React.FC = () => {
       };
     }
 
-    if (billingData.plan === 'free' && billingData.subscription_status === 'trial') {
+    if (isFreePlan && billingData.subscription_status === 'trial') {
       return {
         type: 'info',
         message: 'You\'re on a free trial. Upgrade to unlock unlimited features and advanced analytics.',
@@ -356,8 +370,9 @@ const UsageBar: React.FC = () => {
         <div className="space-y-4">
           {usageData.map((usage) => {
             const isAtOrOverLimit = !usage.is_unlimited && usage.percentage >= 100;
+            const isFreePlan = billingData.plan === 'free' || billingData.plan_display_name?.toLowerCase().includes('free');
             return (
-              <div key={usage.feature_type} className={`space-y-2 p-3 rounded-lg border ${isAtOrOverLimit ? 'bg-red-50 border-red-200' : 'border-gray-200'}`}>
+              <div key={usage.feature_type} className={`space-y-2 p-3 rounded-lg border ${isAtOrOverLimit ? 'bg-red-50 border-red-200' : 'border-gray-200'} transition-colors duration-300`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     {getFeatureIcon(usage.feature_type)}
@@ -378,7 +393,7 @@ const UsageBar: React.FC = () => {
                     </TooltipProvider>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-medium text-gray-900">
+                    <div className="text-sm font-medium text-gray-900 transition-all duration-300">
                       {usage.is_unlimited ? (
                         <span className="text-green-600">Unlimited</span>
                       ) : (
@@ -386,7 +401,7 @@ const UsageBar: React.FC = () => {
                       )}
                     </div>
                     {!usage.is_unlimited && (
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 transition-all duration-300">
                         {Math.max(0, usage.remaining || 0)} remaining
                       </div>
                     )}
@@ -396,7 +411,7 @@ const UsageBar: React.FC = () => {
                   <div className="space-y-1">
                     <Progress 
                       value={Math.min(100, usage.percentage)} 
-                      className="h-2"
+                      className="h-2 transition-all duration-300"
                     />
                     <div className="flex items-center justify-between text-xs text-gray-500">
                       <span>0</span>
@@ -411,7 +426,7 @@ const UsageBar: React.FC = () => {
                     </div>
                   </div>
                 )}
-                {isAtOrOverLimit && (
+                {isFreePlan && isAtOrOverLimit && (
                   <div className="mt-2 flex items-center justify-between">
                     <div className="flex items-center space-x-2 text-sm text-red-700">
                       <AlertTriangle className="h-4 w-4" />
