@@ -55,6 +55,7 @@ interface Feedback {
   message: string;
   page_url: string | null;
   browser: string | null;
+  sentiment: 'positive' | 'negative' | 'neutral' | null;
   created_at: string;
 }
 
@@ -210,8 +211,13 @@ export default function Dashboard() {
     }
   }, [dateRange, customDateRange, loadDashboardData, user]);
 
-  // Analyze sentiment from message content
-  const analyzeSentiment = (message: string): 'positive' | 'negative' | 'neutral' => {
+  // Get sentiment from database or fallback to analysis
+  const getSentiment = (feedback: Feedback): 'positive' | 'negative' | 'neutral' => {
+    if (feedback.sentiment) {
+      return feedback.sentiment;
+    }
+    
+    // Fallback to client-side analysis if no sentiment in database
     const positiveWords = [
       'great', 'good', 'excellent', 'amazing', 'wonderful', 'fantastic', 'love', 'like', 'happy', 'satisfied',
       'perfect', 'awesome', 'outstanding', 'brilliant', 'superb', 'terrific', 'pleased', 'impressed', 'smooth',
@@ -224,7 +230,7 @@ export default function Dashboard() {
       'useless', 'waste', 'problem', 'issue', 'complaint', 'unhappy', 'dissatisfied', 'poor', 'weak'
     ];
 
-    const messageLower = message.toLowerCase();
+    const messageLower = feedback.message.toLowerCase();
     const positiveCount = positiveWords.filter(word => messageLower.includes(word)).length;
     const negativeCount = negativeWords.filter(word => messageLower.includes(word)).length;
 
@@ -260,7 +266,7 @@ export default function Dashboard() {
     });
 
     // Calculate sentiment counts
-    const sentiments = filteredFeedbacks.map(feedback => analyzeSentiment(feedback.message));
+    const sentiments = filteredFeedbacks.map(feedback => getSentiment(feedback));
     const positiveCount = sentiments.filter(s => s === 'positive').length;
     const negativeCount = sentiments.filter(s => s === 'negative').length;
 
@@ -310,7 +316,7 @@ export default function Dashboard() {
       return feedbackDate >= start && feedbackDate <= end;
     });
 
-    const sentiments = filteredFeedbacks.map(feedback => analyzeSentiment(feedback.message));
+    const sentiments = filteredFeedbacks.map(feedback => getSentiment(feedback));
     const positiveCount = sentiments.filter(s => s === 'positive').length;
     const negativeCount = sentiments.filter(s => s === 'negative').length;
     const neutralCount = sentiments.filter(s => s === 'neutral').length;
@@ -758,8 +764,8 @@ export default function Dashboard() {
                         <span className="font-medium text-gray-900">
                           {feedback.email || 'Anonymous'}
                         </span>
-                        <Badge variant={getSentimentBadgeVariant(analyzeSentiment(feedback.message)) as any}>
-                          {analyzeSentiment(feedback.message)}
+                        <Badge variant={getSentimentBadgeVariant(getSentiment(feedback)) as any}>
+                          {getSentiment(feedback)}
                         </Badge>
                       </div>
                       <div className="flex items-center space-x-2 text-sm text-gray-500">
