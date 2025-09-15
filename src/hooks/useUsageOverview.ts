@@ -130,39 +130,49 @@ export const useUsageOverview = (userId: string) => {
   };
 
   const fetchUsageData = async (monthStart: string): Promise<UsageData> => {
-    const [feedbacksResult, insightsResult, analyticsResult, reportsResult] = await Promise.all([
-      supabase
-        .from('feedback')
-        .select('id', { count: 'exact' })
-        .gte('timestamp', monthStart),
-      
-      supabase
-        .from('analytics_events')
-        .select('id', { count: 'exact' })
-        .eq('user_id', userId)
-        .eq('event_type', 'insight')
-        .gte('created_at', monthStart),
-      
-      supabase
-        .from('analytics_history')
-        .select('id', { count: 'exact' })
-        .eq('user_id', userId)
-        .gte('created_at', monthStart),
-      
-      supabase
-        .from('analytics_events')
-        .select('id', { count: 'exact' })
-        .eq('user_id', userId)
-        .eq('event_type', 'report')
-        .gte('created_at', monthStart),
-    ]);
+    try {
+      const [feedbacksResult, insightsResult, analyticsResult, reportsResult] = await Promise.all([
+        supabase
+          .from('feedback')
+          .select('id', { count: 'exact', head: true })
+          .gte('timestamp', monthStart),
+        
+        supabase
+          .from('analytics_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('event_type', 'insight')
+          .gte('created_at', monthStart),
+        
+        supabase
+          .from('analytics_history')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .gte('created_at', monthStart),
+        
+        supabase
+          .from('analytics_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('event_type', 'report')
+          .gte('created_at', monthStart),
+      ]);
 
-    return {
-      feedback_count: feedbacksResult.count || 0,
-      insights_count: insightsResult.count || 0,
-      analytics_count: analyticsResult.count || 0,
-      reports_count: reportsResult.count || 0,
-    };
+      return {
+        feedback_count: (feedbacksResult && typeof feedbacksResult.count === 'number') ? feedbacksResult.count : 0,
+        insights_count: (insightsResult && typeof insightsResult.count === 'number') ? insightsResult.count : 0,
+        analytics_count: (analyticsResult && typeof analyticsResult.count === 'number') ? analyticsResult.count : 0,
+        reports_count: (reportsResult && typeof reportsResult.count === 'number') ? reportsResult.count : 0,
+      };
+    } catch (e) {
+      console.warn('Usage queries failed, defaulting to zeros:', e);
+      return {
+        feedback_count: 0,
+        insights_count: 0,
+        analytics_count: 0,
+        reports_count: 0,
+      };
+    }
   };
 
   const refreshUsageCounters = async (monthStart: string) => {
@@ -293,6 +303,23 @@ export const useUsageOverview = (userId: string) => {
     const interval = setInterval(loadData, 30000);
     return () => clearInterval(interval);
   }, [loadData, userId]);
+
+  // Realtime reactivity: refresh on relevant table changes
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel('usage-overview-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'feedback' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'analytics_events' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'analytics_history' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `user_id=eq.${userId}` }, () => loadData())
+      .subscribe();
+
+    return () => {
+      try { channel.unsubscribe(); } catch (_) {}
+    };
+  }, [userId, loadData]);
 
   return {
     data,
