@@ -26,7 +26,8 @@ import {
   LineChart,
   BarChart as BarChartIcon,
   Activity,
-  Zap
+  Zap,
+  Minus
 } from 'lucide-react';
 
 import {
@@ -56,7 +57,7 @@ interface Feedback {
   page_url: string | null;
   browser: string | null;
   sentiment: 'positive' | 'negative' | 'neutral' | null;
-  created_at: string;
+  timestamp: string;
 }
 
 interface Insight {
@@ -87,6 +88,7 @@ interface DashboardMetrics {
   totalFeedback: number;
   positiveFeedback: number;
   negativeFeedback: number;
+  neutralFeedback: number;
   activeUsers: number;
   currentPlan: string;
 }
@@ -149,10 +151,10 @@ export default function Dashboard() {
         // Load feedbacks
         projectIds.length > 0 
           ? supabase
-              .from('feedback')
+              .from('feedbacks')
               .select('*')
               .in('project_id', projectIds)
-              .order('created_at', { ascending: false })
+              .order('timestamp', { ascending: false })
           : Promise.resolve({ data: [], error: null }),
         
         // Load insights
@@ -203,6 +205,51 @@ export default function Dashboard() {
       loadDashboardData();
     }
   }, [loadDashboardData, user]);
+
+  // Set up real-time subscriptions
+  useEffect(() => {
+    if (!user) return;
+
+    // Subscribe to feedback changes
+    const feedbackChannel = supabase
+      .channel('dashboard-feedback-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'feedbacks'
+        },
+        (payload) => {
+          console.log('Feedback change received in dashboard:', payload);
+          loadDashboardData(); // Reload all data when feedback changes
+        }
+      )
+      .subscribe();
+
+    // Subscribe to insights changes
+    const insightsChannel = supabase
+      .channel('dashboard-insights-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'insights_results',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Insights change received in dashboard:', payload);
+          loadDashboardData(); // Reload all data when insights change
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(feedbackChannel);
+      supabase.removeChannel(insightsChannel);
+    };
+  }, [user, loadDashboardData]);
 
   // Refresh data when date range changes
   useEffect(() => {
@@ -261,7 +308,7 @@ export default function Dashboard() {
     
     // Filter feedbacks by date range
     const filteredFeedbacks = feedbacks.filter(feedback => {
-      const feedbackDate = new Date(feedback.created_at);
+      const feedbackDate = new Date(feedback.timestamp);
       return feedbackDate >= start && feedbackDate <= end;
     });
 
@@ -269,6 +316,7 @@ export default function Dashboard() {
     const sentiments = filteredFeedbacks.map(feedback => getSentiment(feedback));
     const positiveCount = sentiments.filter(s => s === 'positive').length;
     const negativeCount = sentiments.filter(s => s === 'negative').length;
+    const neutralCount = sentiments.filter(s => s === 'neutral').length;
 
     // Calculate active users (unique emails)
     const uniqueUsers = new Set(
@@ -281,6 +329,7 @@ export default function Dashboard() {
       totalFeedback: filteredFeedbacks.length,
       positiveFeedback: positiveCount,
       negativeFeedback: negativeCount,
+      neutralFeedback: neutralCount,
       activeUsers: uniqueUsers.size,
       currentPlan: profile?.plan || 'Free Trial'
     };
@@ -291,14 +340,14 @@ export default function Dashboard() {
     const { start, end } = getDateRange();
     
     const filteredFeedbacks = feedbacks.filter(feedback => {
-      const feedbackDate = new Date(feedback.created_at);
+      const feedbackDate = new Date(feedback.timestamp);
       return feedbackDate >= start && feedbackDate <= end;
     });
 
     // Group by date
     const volumeData: Record<string, number> = {};
     filteredFeedbacks.forEach(feedback => {
-      const date = new Date(feedback.created_at).toISOString().split('T')[0];
+      const date = new Date(feedback.timestamp).toISOString().split('T')[0];
       volumeData[date] = (volumeData[date] || 0) + 1;
     });
 
@@ -312,7 +361,7 @@ export default function Dashboard() {
     const { start, end } = getDateRange();
     
     const filteredFeedbacks = feedbacks.filter(feedback => {
-      const feedbackDate = new Date(feedback.created_at);
+      const feedbackDate = new Date(feedback.timestamp);
       return feedbackDate >= start && feedbackDate <= end;
     });
 
@@ -522,7 +571,7 @@ export default function Dashboard() {
       </Card>
 
       {/* Key Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
         {/* Total Feedback */}
         <Card className="rounded-xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -569,6 +618,24 @@ export default function Dashboard() {
             </div>
             <p className="text-xs text-muted-foreground">
               {dashboardMetrics.negativeFeedback} feedbacks
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Neutral Feedback */}
+        <Card className="rounded-xl shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Neutral Feedback</CardTitle>
+            <Minus className="h-4 w-4 text-gray-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-600">
+              {dashboardMetrics.totalFeedback > 0 
+                ? Math.round((dashboardMetrics.neutralFeedback / dashboardMetrics.totalFeedback) * 100)
+                : 0}%
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {dashboardMetrics.neutralFeedback} feedbacks
             </p>
           </CardContent>
         </Card>
@@ -770,7 +837,7 @@ export default function Dashboard() {
                       </div>
                       <div className="flex items-center space-x-2 text-sm text-gray-500">
                         <Clock className="h-4 w-4" />
-                        <span>{formatDate(feedback.created_at)}</span>
+                        <span>{formatDate(feedback.timestamp)}</span>
                       </div>
                     </div>
                     <p className="text-gray-700 text-sm line-clamp-2">{feedback.message}</p>
