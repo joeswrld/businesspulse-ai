@@ -41,7 +41,22 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
 
-    
+    <script>
+      (function() {
+        try {
+          var stored = localStorage.getItem('theme');
+          var mql = window.matchMedia('(prefers-color-scheme: dark)');
+          var shouldDark = stored ? stored === 'dark' : mql.matches;
+          if (shouldDark) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {
+          // no-op
+        }
+      })();
+    </script>
     <!-- NoteX Feedback Widget - Disabled to prevent console errors -->
     <script src="https://notex.com.ng/widget.js" data-project-id="32ffd49b"></script>
   </body>
