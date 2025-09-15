@@ -51,23 +51,25 @@ function getSentiment(text) {
   }
 
   // Submit feedback
-  async function submitFeedback(projectId, email, message) {
-    try {
-      const response = await fetch(`${CONFIG.apiUrl}/rest/v1/feedback`, {
-        method: 'POST',
-        headers: {
-          'apikey': CONFIG.apiKey,
-          'Authorization': `Bearer ${CONFIG.apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          project_id: projectId,
-          email: email || null,
-          message: message
-        })
-      });
+  async function submitFeedback(projectId, email, message, sentiment) {
+  try {
+    const response = await fetch(`${CONFIG.apiUrl}/rest/v1/feedback`, {
+      method: 'POST',
+      headers: {
+        'apikey': CONFIG.apiKey,
+        'Authorization': `Bearer ${CONFIG.apiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        project_id: projectId,
+        email: email || null,
+        message: message,
+        sentiment: sentiment
+      })
+    });
+
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -501,16 +503,40 @@ function getSentiment(text) {
 
   // Handle form submission
   async function handleSubmit(event, projectId) {
-    event.preventDefault();
-    
-    const submitBtn = document.getElementById('notex-submit-btn');
-    const messageInput = document.getElementById('notex-message');
-    const emailInput = document.getElementById('notex-email');
-    const errorDiv = document.getElementById('notex-message-error');
-    
-    const message = messageInput.value.trim();
-    const email = emailInput.value.trim();
-    
+  event.preventDefault();
+  
+  const submitBtn = document.getElementById('notex-submit-btn');
+  const messageInput = document.getElementById('notex-message');
+  const emailInput = document.getElementById('notex-email');
+  const errorDiv = document.getElementById('notex-message-error');
+  
+  const message = messageInput.value.trim();
+  const email = emailInput.value.trim();
+
+  errorDiv.textContent = '';
+
+  if (!message) {
+    errorDiv.textContent = 'Message is required';
+    messageInput.focus();
+    return;
+  }
+
+  const sentiment = getSentiment(message); // 🧠 detect sentiment
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Sending...';
+
+  try {
+    await submitFeedback(projectId, email, message, sentiment);
+    showSuccess();
+  } catch (error) {
+    console.error('Error submitting feedback:', error);
+    errorDiv.textContent = 'Failed to submit feedback. Please try again.';
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Send Feedback';
+  }
+}
+
     // Clear previous errors
     errorDiv.textContent = '';
     
