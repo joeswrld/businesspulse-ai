@@ -54,7 +54,7 @@ const PricingSection = () => {
   ];
 
   return (
-    <section id="pricing" className="py-24">
+    <section id="pricing" className="py-24 bg-gradient-subtle transition-colors">
       <div className="container mx-auto px-4">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
@@ -75,16 +75,16 @@ const PricingSection = () => {
           {plans.map((plan, index) => (
             <Card
               key={index}
-              className={`relative border-0 ${
+              className={`relative ${
                 plan.popular
-                  ? "bg-gradient-to-br from-primary-light to-secondary-light shadow-glow scale-105"
-                  : "bg-background shadow-soft hover:shadow-medium"
-              } transition-all duration-300`}
+                  ? "bg-gradient-to-br from-primary/15 to-secondary/15 dark:from-primary/20 dark:to-secondary/20 shadow-glow scale-105"
+                  : "bg-card shadow-soft hover:shadow-medium"
+              } border border-border transition-all duration-300`}
             >
               {/* Popular Badge */}
               {plan.popular && (
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <Badge variant="default" className="bg-gradient-primary text-white px-4 py-1">
+                  <Badge variant="default" className="bg-gradient-primary text-primary-foreground px-4 py-1">
                     {plan.badge}
                   </Badge>
                 </div>
@@ -92,8 +92,8 @@ const PricingSection = () => {
 
               <CardHeader className="text-center pb-2">
                 {/* Icon */}
-                <div className="w-12 h-12 mx-auto mb-4 bg-primary-light rounded-xl flex items-center justify-center">
-                  <plan.icon className="h-6 w-6 text-primary" />
+                <div className="w-12 h-12 mx-auto mb-4 rounded-xl flex items-center justify-center bg-primary-light dark:bg-secondary">
+                  <plan.icon className="h-6 w-6 text-primary dark:text-primary-foreground" />
                 </div>
 
                 {/* Plan Name & Badge */}
@@ -142,7 +142,7 @@ const PricingSection = () => {
 
         {/* Feature Comparison Table */}
         <div className="mt-16">
-          <div className="bg-muted/30 rounded-2xl p-6 sm:p-8">
+          <div className="rounded-2xl p-6 sm:p-8 border border-border bg-card">
             <h3 className="text-xl sm:text-2xl font-bold text-center mb-6">
               Feature Comparison
             </h3>
@@ -200,7 +200,7 @@ const PricingSection = () => {
 
         {/* Bottom CTA */}
         <div className="text-center mt-16">
-          <div className="bg-muted/50 rounded-2xl p-8">
+          <div className="rounded-2xl p-8 border border-border bg-card">
             <h3 className="text-xl font-bold mb-4">
               Ready to Get Started?
             </h3>

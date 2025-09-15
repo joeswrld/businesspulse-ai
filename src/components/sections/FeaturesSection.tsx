@@ -57,7 +57,7 @@ const FeaturesSection = () => {
   ];
 
   return (
-    <section id="features" className="py-16 sm:py-20 lg:py-24 bg-muted/30">
+    <section id="features" className="py-16 sm:py-20 lg:py-24 bg-gradient-subtle transition-colors">
       <div className="container mx-auto px-3 sm:px-4">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
@@ -76,13 +76,13 @@ const FeaturesSection = () => {
         {/* Features Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {features.map((feature, index) => (
-            <Card key={index} className="group hover:shadow-medium transition-all duration-300 border-0 bg-background/80 backdrop-blur-sm">
+            <Card key={index} className="group hover:shadow-medium transition-all duration-300 border border-border bg-card/90 backdrop-blur-sm">
               <CardContent className="p-4 sm:p-6">
                 <div className="space-y-3 sm:space-y-4">
                   {/* Icon and Badge */}
                   <div className="flex items-start justify-between">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary-light rounded-lg flex items-center justify-center group-hover:bg-primary-light/80 transition-colors">
-                      <feature.icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center bg-primary-light dark:bg-secondary group-hover:bg-primary-light/80 dark:group-hover:bg-secondary/80 transition-colors">
+                      <feature.icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary dark:text-primary-foreground" />
                     </div>
                     <Badge variant="secondary" className="text-xs">
                       {feature.badge}
@@ -106,7 +106,7 @@ const FeaturesSection = () => {
 
         {/* CTA Section */}
         <div className="text-center mt-12 sm:mt-16">
-          <div className="bg-background rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-soft border">
+          <div className="bg-card rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-soft border border-border">
             <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">
               Ready to transform your customer feedback?
             </h3>
