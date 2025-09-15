@@ -551,12 +551,11 @@ NoteX Team
 
 
         {/* Billing Usage Section */}
-        <div className="mb-8">
-          <UsageOverview
-            userId={user.id}
-            onUpgrade={() => handleUpgradeClick('business')}
-          />
-        </div>
+        <UsageOverview
+  userId={user.id}
+  onUpgrade={() => handleUpgradeClick('business')}
+  refreshKey={currentPlan} // <-- add this line
+/>
 
         {/* Plan Comparison */}
         <div className="mb-8">
@@ -667,6 +666,7 @@ NoteX Team
                     
                     // Refresh billing data
                     await refreshData();
+                     await refreshTrialStatus(); // <-- add this line
                     
                     console.log('Upgrade completed successfully');
                   } catch (e: any) {
