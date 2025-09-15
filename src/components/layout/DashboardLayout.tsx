@@ -138,8 +138,6 @@ const navigation = [
   { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
   { name: "Team Collaboration", href: "/teams", icon: Users },
   { name: "Feedback Settings", href: "/feedback-settings", icon: Settings },
-  { name: "Account Settings", href: "/settings", icon: Settings },
-  { name: "My Profile", href: "/profile", icon: User },
 ];
 
 
