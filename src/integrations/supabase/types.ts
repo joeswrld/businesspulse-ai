@@ -713,51 +713,38 @@ export type Database = {
       }
       reports: {
         Row: {
-          created_at: string
-          date_range_end: string | null
-          date_range_start: string | null
-          file_size: number | null
-          file_url: string | null
-          format: string
           id: string
-          insights_included: number | null
-          status: string
-          title: string
-          type: string
-          updated_at: string
           user_id: string
+          title: string
+          feedback_ids: string[]
+          insights_text: string
+          created_at: string
         }
         Insert: {
-          created_at?: string
-          date_range_end?: string | null
-          date_range_start?: string | null
-          file_size?: number | null
-          file_url?: string | null
-          format: string
           id?: string
-          insights_included?: number | null
-          status?: string
-          title: string
-          type: string
-          updated_at?: string
           user_id: string
+          title?: string
+          feedback_ids?: string[]
+          insights_text: string
+          created_at?: string
         }
         Update: {
-          created_at?: string
-          date_range_end?: string | null
-          date_range_start?: string | null
-          file_size?: number | null
-          file_url?: string | null
-          format?: string
           id?: string
-          insights_included?: number | null
-          status?: string
-          title?: string
-          type?: string
-          updated_at?: string
           user_id?: string
+          title?: string
+          feedback_ids?: string[]
+          insights_text?: string
+          created_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "reports_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscription_plans: {
         Row: {
