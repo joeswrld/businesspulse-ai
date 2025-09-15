@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { Loader2, Save, Settings, Copy, Check } from 'lucide-react'
+import WidgetPreview from '@/components/WidgetPreview'
 
 interface FeedbackSettings {
   id: string
@@ -125,43 +126,58 @@ const FeedbackSettingsPage: React.FC = () => {
             <CardDescription>Customize how your feedback widget appears</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label>Widget Title</Label>
-              <Input
-                value={formData.widget_title}
-                onChange={(e) => setFormData(prev => ({ ...prev, widget_title: e.target.value }))}
-              />
-            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Configuration Form */}
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label>Widget Title</Label>
+                  <Input
+                    value={formData.widget_title}
+                    onChange={(e) => setFormData(prev => ({ ...prev, widget_title: e.target.value }))}
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label>Widget Color</Label>
-              <div className="flex items-center space-x-3">
-                <Input
-                  type="color"
-                  value={formData.widget_color}
-                  onChange={(e) => setFormData(prev => ({ ...prev, widget_color: e.target.value }))}
-                  className="w-20 h-10 p-1 border rounded"
-                />
-                <Input
-                  value={formData.widget_color}
-                  onChange={(e) => setFormData(prev => ({ ...prev, widget_color: e.target.value }))}
-                  className="flex-1"
+                <div className="space-y-2">
+                  <Label>Widget Color</Label>
+                  <div className="flex items-center space-x-3">
+                    <Input
+                      type="color"
+                      value={formData.widget_color}
+                      onChange={(e) => setFormData(prev => ({ ...prev, widget_color: e.target.value }))}
+                      className="w-20 h-10 p-1 border rounded"
+                    />
+                    <Input
+                      value={formData.widget_color}
+                      onChange={(e) => setFormData(prev => ({ ...prev, widget_color: e.target.value }))}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Greeting Text</Label>
+                  <Textarea
+                    value={formData.greeting_text}
+                    onChange={(e) => setFormData(prev => ({ ...prev, greeting_text: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+
+                <Button onClick={handleSave} disabled={saving} className="w-full">
+                  {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</> : <><Save className="h-4 w-4 mr-2" />Save Settings</>}
+                </Button>
+              </div>
+
+              {/* Live Preview */}
+              <div>
+                <WidgetPreview
+                  widgetTitle={formData.widget_title}
+                  widgetColor={formData.widget_color}
+                  greetingText={formData.greeting_text}
+                  projectId={settings?.project_id}
                 />
               </div>
             </div>
-
-            <div className="space-y-2">
-              <Label>Greeting Text</Label>
-              <Textarea
-                value={formData.greeting_text}
-                onChange={(e) => setFormData(prev => ({ ...prev, greeting_text: e.target.value }))}
-                rows={3}
-              />
-            </div>
-
-            <Button onClick={handleSave} disabled={saving} className="mt-4">
-              {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</> : <><Save className="h-4 w-4 mr-2" />Save Settings</>}
-            </Button>
           </CardContent>
         </Card>
 
