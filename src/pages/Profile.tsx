@@ -147,7 +147,7 @@ const Profile: React.FC = () => {
 
       // Count feedback entries
       const { count: feedbackCount } = await (supabase as any)
-        .from('feedbacks')
+        .from('feedback')
         .select('*', { count: 'exact', head: true })
         .eq('project_id', user.id); // Using user.id as project_id for now
 

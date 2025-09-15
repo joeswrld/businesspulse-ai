@@ -132,7 +132,7 @@ export const useUsageOverview = (userId: string) => {
   const fetchUsageData = async (monthStart: string): Promise<UsageData> => {
     const [feedbacksResult, insightsResult, analyticsResult, reportsResult] = await Promise.all([
       supabase
-        .from('feedbacks')
+        .from('feedback')
         .select('id', { count: 'exact' })
         .gte('timestamp', monthStart),
       
