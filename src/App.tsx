@@ -39,6 +39,7 @@ const Profile = lazy(() => import("./pages/Profile"));
 const Billing = lazy(() => import("./pages/Billing"));
 const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
 const Feedback = lazy(() => import("./pages/Feedback"));
+const Roadmap = lazy(() => import("./pages/Roadmap"));
 const Widget = lazy(() => import("./pages/Widget"));
 
 const Testimonials = lazy(() => import("./pages/Testimonials"));
@@ -278,6 +279,15 @@ const App = () => (
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Feedback />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
+            } />
+            <Route path="/roadmap" element={
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Roadmap />
                   </DashboardLayout>
                 </Suspense>
               </AuthGuard>

@@ -9,7 +9,9 @@ import {
   FileText, 
   Settings, 
   Crown,
-  Lock
+  Lock,
+  Target,
+  MessageSquare
 } from 'lucide-react';
 import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 import NoteXTrialCountdown from '@/components/NoteXTrialCountdown';
@@ -31,6 +33,18 @@ const NoteXSidebar: React.FC = () => {
       name: 'Dashboard',
       href: '/dashboard',
       icon: Home,
+      requiresActiveSubscription: false,
+    },
+    {
+      name: 'Feedback',
+      href: '/feedback',
+      icon: MessageSquare,
+      requiresActiveSubscription: false,
+    },
+    {
+      name: 'Roadmap',
+      href: '/roadmap',
+      icon: Target,
       requiresActiveSubscription: false,
     },
     {

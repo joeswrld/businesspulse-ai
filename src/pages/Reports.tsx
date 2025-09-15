@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -25,8 +25,29 @@ import {
   FileText as FileTextIcon,
   Users,
   Hash,
-  Loader2
+  Loader2,
+  Rocket,
+  CheckCircle,
+  AlertCircle,
+  Minus
 } from 'lucide-react';
+import {
+  BarChart as RechartsBarChart,
+  Bar,
+  PieChart as RechartsPieChart,
+  Cell,
+  Pie,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  LineChart as RechartsLineChart,
+  Line,
+  AreaChart,
+  Area
+} from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +71,29 @@ interface Feedback {
   message: string;
   email: string | null;
   created_at: string;
+  sentiment: 'positive' | 'negative' | 'neutral' | null;
+}
+
+interface FeatureRequest {
+  id: string;
+  title: string;
+  description: string | null;
+  status: 'Planned' | 'In Progress' | 'Released';
+  feedback_ids: string[];
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface AnalyticsData {
+  topFeatures: Array<{ title: string; count: number }>;
+  sentimentData: Array<{ name: string; value: number; color: string }>;
+  feedbackVolume: Array<{ date: string; count: number }>;
+  featureStatus: Array<{ status: string; count: number }>;
+  totalFeedback: number;
+  totalFeatures: number;
+  releasedFeatures: number;
+  averageFeedbackPerFeature: number;
 }
 
 interface AIInsights {
@@ -74,6 +118,9 @@ export default function Reports() {
   
   // State management
   const [reports, setReports] = useState<Report[]>([]);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [featureRequests, setFeatureRequests] = useState<FeatureRequest[]>([]);
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -85,33 +132,173 @@ export default function Reports() {
   const [feedbackData, setFeedbackData] = useState<Feedback[]>([]);
   const [loadingFeedback, setLoadingFeedback] = useState(false);
 
-  // Load user's reports
-  const loadReports = useCallback(async () => {
+  // Load all data for comprehensive analytics
+  const loadAllData = useCallback(async () => {
     if (!user) return;
 
     try {
       setLoading(true);
       
-      const { data: reportsData, error: reportsError } = await supabase
-        .from('reports')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: sortOrder === 'oldest' });
+      // Get user's project IDs from feedback_settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('feedback_settings')
+        .select('project_id')
+        .eq('user_id', user.id);
 
-      if (reportsError) {
-        console.error('Error loading reports:', reportsError);
+      if (settingsError) {
+        console.error('Error loading feedback settings:', settingsError);
+        return;
+      }
+
+      const projectIds = settingsData?.map(s => s.project_id) || [];
+
+      // Load all data in parallel
+      const [reportsResult, feedbacksResult, featureRequestsResult] = await Promise.all([
+        // Load reports
+        supabase
+          .from('reports')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: sortOrder === 'oldest' }),
+        
+        // Load feedbacks
+        projectIds.length > 0 
+          ? supabase
+              .from('feedback')
+              .select('*')
+              .in('project_id', projectIds)
+              .order('created_at', { ascending: false })
+          : Promise.resolve({ data: [], error: null }),
+        
+        // Load feature requests
+        supabase
+          .from('feature_requests')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+      ]);
+
+      if (reportsResult.error) {
+        console.error('Error loading reports:', reportsResult.error);
         toast.error('Failed to load reports');
         return;
       }
 
-      setReports(reportsData || []);
+      if (feedbacksResult.error) {
+        console.error('Error loading feedbacks:', feedbacksResult.error);
+        toast.error('Failed to load feedbacks');
+        return;
+      }
+
+      if (featureRequestsResult.error) {
+        console.error('Error loading feature requests:', featureRequestsResult.error);
+        toast.error('Failed to load feature requests');
+        return;
+      }
+
+      setReports(reportsResult.data || []);
+      setFeedbacks(feedbacksResult.data || []);
+      setFeatureRequests(featureRequestsResult.data || []);
+
     } catch (error) {
-      console.error('Error in loadReports:', error);
-      toast.error('Failed to load reports');
+      console.error('Error in loadAllData:', error);
+      toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
   }, [user, sortOrder]);
+
+  // Legacy function for backward compatibility
+  const loadReports = loadAllData;
+
+  // Calculate analytics data
+  const calculateAnalytics = useMemo((): AnalyticsData => {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    // Filter data by date range
+    const filteredFeedbacks = feedbacks.filter(feedback => {
+      const feedbackDate = new Date(feedback.created_at);
+      return feedbackDate >= thirtyDaysAgo;
+    });
+
+    // Top requested features (by number of linked feedback)
+    const featureFeedbackCounts: Record<string, number> = {};
+    featureRequests.forEach(feature => {
+      featureFeedbackCounts[feature.title] = feature.feedback_ids.length;
+    });
+    
+    const topFeatures = Object.entries(featureFeedbackCounts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([title, count]) => ({ title, count }));
+
+    // Sentiment analysis
+    const sentimentCounts = {
+      positive: filteredFeedbacks.filter(f => f.sentiment === 'positive').length,
+      negative: filteredFeedbacks.filter(f => f.sentiment === 'negative').length,
+      neutral: filteredFeedbacks.filter(f => f.sentiment === 'neutral').length
+    };
+
+    const totalSentiment = sentimentCounts.positive + sentimentCounts.negative + sentimentCounts.neutral;
+    const sentimentData = [
+      { 
+        name: 'Positive', 
+        value: totalSentiment > 0 ? Math.round((sentimentCounts.positive / totalSentiment) * 100) : 0,
+        color: '#10b981'
+      },
+      { 
+        name: 'Neutral', 
+        value: totalSentiment > 0 ? Math.round((sentimentCounts.neutral / totalSentiment) * 100) : 0,
+        color: '#f59e0b'
+      },
+      { 
+        name: 'Negative', 
+        value: totalSentiment > 0 ? Math.round((sentimentCounts.negative / totalSentiment) * 100) : 0,
+        color: '#ef4444'
+      }
+    ];
+
+    // Feedback volume over time (last 30 days)
+    const volumeData: Record<string, number> = {};
+    filteredFeedbacks.forEach(feedback => {
+      const date = new Date(feedback.created_at).toISOString().split('T')[0];
+      volumeData[date] = (volumeData[date] || 0) + 1;
+    });
+
+    const feedbackVolume = Object.entries(volumeData)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, count]) => ({ date, count }));
+
+    // Feature status distribution
+    const featureStatus = [
+      { status: 'Planned', count: featureRequests.filter(f => f.status === 'Planned').length },
+      { status: 'In Progress', count: featureRequests.filter(f => f.status === 'In Progress').length },
+      { status: 'Released', count: featureRequests.filter(f => f.status === 'Released').length }
+    ];
+
+    // Summary metrics
+    const totalFeedback = feedbacks.length;
+    const totalFeatures = featureRequests.length;
+    const releasedFeatures = featureRequests.filter(f => f.status === 'Released').length;
+    const averageFeedbackPerFeature = totalFeatures > 0 ? Math.round(totalFeedback / totalFeatures) : 0;
+
+    return {
+      topFeatures,
+      sentimentData,
+      feedbackVolume,
+      featureStatus,
+      totalFeedback,
+      totalFeatures,
+      releasedFeatures,
+      averageFeedbackPerFeature
+    };
+  }, [feedbacks, featureRequests]);
+
+  // Update analytics data when data changes
+  useEffect(() => {
+    setAnalyticsData(calculateAnalytics);
+  }, [calculateAnalytics]);
 
   // Load reports on component mount and when sort order changes
   useEffect(() => {
@@ -517,6 +704,235 @@ export default function Reports() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Analytics Overview */}
+      {analyticsData && (
+        <div className="space-y-6">
+          {/* Key Metrics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="rounded-xl shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Feedback</CardTitle>
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{analyticsData.totalFeedback}</div>
+                <p className="text-xs text-muted-foreground">
+                  All time feedback entries
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-xl shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Feature Requests</CardTitle>
+                <Target className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{analyticsData.totalFeatures}</div>
+                <p className="text-xs text-muted-foreground">
+                  {analyticsData.releasedFeatures} released
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-xl shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Released Features</CardTitle>
+                <Rocket className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{analyticsData.releasedFeatures}</div>
+                <p className="text-xs text-muted-foreground">
+                  {analyticsData.totalFeatures > 0 ? Math.round((analyticsData.releasedFeatures / analyticsData.totalFeatures) * 100) : 0}% completion rate
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-xl shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Avg Feedback/Feature</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{analyticsData.averageFeedbackPerFeature}</div>
+                <p className="text-xs text-muted-foreground">
+                  Feedback per feature request
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Analytics Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top Requested Features */}
+            <Card className="rounded-xl shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Target className="h-5 w-5" />
+                  <span>Top Requested Features</span>
+                </CardTitle>
+                <CardDescription>
+                  Features with the most linked feedback
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {analyticsData.topFeatures.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsBarChart data={analyticsData.topFeatures}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="title" 
+                        fontSize={12}
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis fontSize={12} />
+                      <Tooltip formatter={(value: any) => [value, 'Linked Feedback']} />
+                      <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    </RechartsBarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-gray-500">
+                    <div className="text-center">
+                      <Target className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                      <p>No feature data available</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Sentiment Analysis */}
+            <Card className="rounded-xl shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <MessageSquare className="h-5 w-5" />
+                  <span>Feedback Sentiment (30 days)</span>
+                </CardTitle>
+                <CardDescription>
+                  Distribution of feedback sentiment
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {analyticsData.sentimentData.some(s => s.value > 0) ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsPieChart>
+                      <Pie
+                        data={analyticsData.sentimentData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {analyticsData.sentimentData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-gray-500">
+                    <div className="text-center">
+                      <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                      <p>No sentiment data available</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Bottom Row Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Feedback Volume Over Time */}
+            <Card className="rounded-xl shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <TrendingUp className="h-5 w-5" />
+                  <span>Feedback Volume (30 days)</span>
+                </CardTitle>
+                <CardDescription>
+                  Daily feedback count over the last 30 days
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {analyticsData.feedbackVolume.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={analyticsData.feedbackVolume}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="date" 
+                        fontSize={12}
+                        tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      />
+                      <YAxis fontSize={12} />
+                      <Tooltip 
+                        labelFormatter={(value) => new Date(value).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}
+                        formatter={(value: any) => [value, 'Feedback Count']}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="count" 
+                        stroke="#3b82f6" 
+                        fill="#3b82f6" 
+                        fillOpacity={0.3}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-gray-500">
+                    <div className="text-center">
+                      <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                      <p>No volume data available</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Feature Status Distribution */}
+            <Card className="rounded-xl shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <CheckCircle className="h-5 w-5" />
+                  <span>Feature Status Distribution</span>
+                </CardTitle>
+                <CardDescription>
+                  Current status of all feature requests
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {analyticsData.featureStatus.some(f => f.count > 0) ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsBarChart data={analyticsData.featureStatus}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="status" fontSize={12} />
+                      <YAxis fontSize={12} />
+                      <Tooltip formatter={(value: any) => [value, 'Features']} />
+                      <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    </RechartsBarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-gray-500">
+                    <div className="text-center">
+                      <CheckCircle className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                      <p>No feature status data available</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
 
       {/* Reports Grid */}
       {loading ? (
