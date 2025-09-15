@@ -1,13 +1,39 @@
-import React, { useEffect } from 'react';
-import { Card, Badge, Button, Progress } from '@/components/ui';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import React from 'react';
+
+// Explicit imports from UI components
+import { Card } from '@/components/ui/card';
+import { CardContent } from '@/components/ui/card';
+import { CardHeader } from '@/components/ui/card';
+import { CardTitle } from '@/components/ui/card';
+import { CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Alert } from '@/components/ui/alert';
+import { AlertDescription } from '@/components/ui/alert';
+
+// Icons
 import { 
-  MessageSquare, Brain, BarChart3, FileText,
-  AlertTriangle, CheckCircle, Infinity, Lock,
-  Loader2, RefreshCw, Clock, Crown, XCircle
+  MessageSquare, 
+  Brain, 
+  BarChart3, 
+  FileText, 
+  AlertTriangle,
+  CheckCircle,
+  Infinity,
+  RefreshCw,
+  Loader2,
+  Lock,
+  Clock,
+  Crown,
+  XCircle,
+  DollarSign
 } from 'lucide-react';
+
+// Custom hooks & utilities
 import { useUsageOverview } from '@/hooks/useUsageOverview';
 import { toast } from 'sonner';
+
 
 interface UsageOverviewProps {
   userId: string;
