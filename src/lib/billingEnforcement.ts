@@ -64,8 +64,8 @@ export const PLAN_LIMITS: Record<PlanTier, UsageLimits> = {
   free: {
     feedback: 50,
     insights: 5,
-    reports: 2,
-    retention_days: 30
+    reports: 5,
+    retention_days: 8
   },
   pro: {
     feedback: 300,
@@ -83,7 +83,7 @@ export const PLAN_LIMITS: Record<PlanTier, UsageLimits> = {
 
 // Plan display names
 export const PLAN_NAMES: Record<PlanTier, string> = {
-  free: 'Free Trial',
+  free: 'Free Plan',
   pro: 'Pro Plan',
   business: 'Business Plan'
 };
@@ -142,29 +142,29 @@ export async function getUserSubscription(userId: string): Promise<SubscriptionD
  */
 export async function getUserUsage(userId: string): Promise<UsageData | null> {
   try {
-    // Use usage_tracking table with type assertion
+    // Use rolling 30-day cycle from usage_counters via RPC
     const { data, error } = await (supabase as any)
-      .from('usage_tracking')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+      .rpc('ensure_current_cycle_usage', { user_uuid: userId });
 
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching usage data:', error);
       return null;
     }
 
-    // Map usage_tracking data to UsageData interface
-    if (data) {
+    // ensure_current_cycle_usage returns a row or array; normalize
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row) {
+      const cycleStart = row.cycle_start || row.period_start || row.month_start;
+      const updatedAt = row.updated_at || new Date().toISOString();
       return {
-        user_id: data.user_id,
-        period_start: data.created_at,
-        period_end: new Date(new Date(data.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        feedback_count: data.feedback_count || 0,
-        insights_count: data.insights_count || 0,
-        reports_count: data.reports_count || 0,
-        last_reset: data.updated_at,
-        updated_at: data.updated_at,
+        user_id: row.user_id,
+        period_start: cycleStart,
+        period_end: new Date(new Date(cycleStart).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        feedback_count: row.feedback_count || 0,
+        insights_count: row.insights_count || 0,
+        reports_count: row.reports_count || 0,
+        last_reset: updatedAt,
+        updated_at: updatedAt,
       } as UsageData;
     }
 
@@ -184,17 +184,19 @@ export function checkUsageLimit(
   plan: PlanTier,
   isTrialExpired: boolean = false
 ): UsageCheckResult {
-  // UNLOCKED PLATFORM: Always allow usage
-  console.log('🔓 UNLOCKED PLATFORM - Usage limit check always allows usage');
+  const limit = PLAN_LIMITS[plan][feature];
+  const isUnlimited = limit === -1;
+  const canUse = isUnlimited || currentUsage < limit;
+  const remaining = isUnlimited ? -1 : Math.max(0, limit - currentUsage);
   return {
-    canUse: true,
+    canUse,
     currentUsage,
-    limit: -1, // Unlimited
+    limit,
     plan,
     feature,
-    isUnlimited: true,
-    remaining: -1,
-    isTrialExpired: false,
+    isUnlimited,
+    remaining,
+    isTrialExpired,
     daysUntilExpiry: 0
   };
 }
@@ -203,8 +205,7 @@ export function checkUsageLimit(
  * Check if user's trial has expired
  */
 export function isTrialExpired(subscription: SubscriptionData | null): boolean {
-  // UNLOCKED PLATFORM: Trial never expires
-  console.log('🔓 UNLOCKED PLATFORM - Trial never expires');
+  // Free plan rolls every 30 days; no expiration concept
   return false;
 }
 
@@ -212,9 +213,8 @@ export function isTrialExpired(subscription: SubscriptionData | null): boolean {
  * Get days until trial/subscription expires
  */
 export function getDaysUntilExpiry(subscription: SubscriptionData | null): number {
-  // UNLOCKED PLATFORM: Never expires
-  console.log('🔓 UNLOCKED PLATFORM - Never expires');
-  return 999; // Return a large number to indicate unlimited
+  // Handled in getUsageSummary using the rolling cycle window
+  return 0;
 }
 
 /**
@@ -238,7 +238,13 @@ export async function checkFeatureUsage(
     const plan = subscription.plan_tier;
     const currentUsage = usage[`${feature}_count` as keyof UsageData] as number;
     const trialExpired = isTrialExpired(subscription);
-    const daysUntilExpiry = getDaysUntilExpiry(subscription);
+    // Compute days until cycle reset
+    let daysUntilExpiry = 0;
+    if (usage?.period_end) {
+      const end = new Date(usage.period_end);
+      const now = new Date();
+      daysUntilExpiry = Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    }
 
     const result = checkUsageLimit(feature, currentUsage, plan, trialExpired);
     

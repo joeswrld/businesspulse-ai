@@ -87,8 +87,8 @@ export interface BillingSystemState {
 const PLAN_LIMITS: Record<string, UsageLimits> = {
   trial: {
     feedback: 50,
-    analytics: 5,
-    reports: 2,
+    analytics: 0,
+    reports: 5,
     insights: 5,
     teams: 1,
     export: ['CSV'],

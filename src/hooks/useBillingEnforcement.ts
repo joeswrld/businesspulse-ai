@@ -81,8 +81,8 @@ export function useBillingEnforcement(): UseBillingEnforcementReturn {
   const [limits, setLimits] = useState<UsageLimits>({
     feedback: 50,
     insights: 5,
-    reports: 2,
-    retention_days: 30
+    reports: 5,
+    retention_days: 8
   });
   const [checks, setChecks] = useState<Record<FeatureType, UsageCheckResult>>({
     feedback: {
@@ -204,8 +204,8 @@ export function useBillingEnforcement(): UseBillingEnforcementReturn {
   // Computed values
   const needsUpgradeCheck = needsUpgrade(checks);
   const featuresNeedingUpgrade = getFeaturesNeedingUpgrade(checks);
-  const hasActiveAccess = subscription?.status === 'active' || (!isTrialExpired && subscription?.status === 'trialing');
-  const isTrialActive = subscription?.status === 'trialing' && !isTrialExpired;
+  const hasActiveAccess = true; // Free plan stays active with rolling cycles
+  const isTrialActive = false;
 
   // Load data on mount and when user changes
   useEffect(() => {

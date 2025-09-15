@@ -129,44 +129,33 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({
           </div>
         </CardHeader>
         <CardContent>
-          {/* Trial Status */}
+          {/* Free Plan 30-day Cycle Status */}
           {plan === 'free' && (
             <div className={`p-4 rounded-lg mb-4 ${
-              isTrialExpired 
-                ? 'bg-red-50 border border-red-200' 
-                : daysUntilExpiry <= 3 
-                  ? 'bg-yellow-50 border border-yellow-200'
-                  : 'bg-blue-50 border border-blue-200'
+              daysUntilExpiry <= 3 
+                ? 'bg-yellow-50 border border-yellow-200' 
+                : 'bg-blue-50 border border-blue-200'
             }`}>
               <div className="flex items-center gap-2 mb-2">
                 <Clock className={`h-4 w-4 ${
-                  isTrialExpired 
-                    ? 'text-red-600' 
-                    : daysUntilExpiry <= 3 
-                      ? 'text-yellow-600'
-                      : 'text-blue-600'
+                  daysUntilExpiry <= 3 
+                    ? 'text-yellow-600' 
+                    : 'text-blue-600'
                 }`} />
                 <span className={`font-medium ${
-                  isTrialExpired 
-                    ? 'text-red-800' 
-                    : daysUntilExpiry <= 3 
-                      ? 'text-yellow-800'
-                      : 'text-blue-800'
+                  daysUntilExpiry <= 3 
+                    ? 'text-yellow-800' 
+                    : 'text-blue-800'
                 }`}>
-                  {isTrialExpired ? 'Trial Expired' : 'Free Trial Active'}
+                  Free Plan: 30-day rolling usage
                 </span>
               </div>
               <p className={`text-sm ${
-                isTrialExpired 
-                  ? 'text-red-700' 
-                  : daysUntilExpiry <= 3 
-                    ? 'text-yellow-700'
-                    : 'text-blue-700'
+                daysUntilExpiry <= 3 
+                  ? 'text-yellow-700' 
+                  : 'text-blue-700'
               }`}>
-                {isTrialExpired 
-                  ? 'Your free trial has ended. Upgrade to continue using NoteX.'
-                  : `Your trial ends in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? 's' : ''}. Upgrade now to avoid losing access.`
-                }
+                Cycle resets in {daysUntilExpiry} day{daysUntilExpiry !== 1 ? 's' : ''}. Limits per cycle: Feedback 50, Insights 5, Reports 5. Data retention: 8 days.
               </p>
             </div>
           )}

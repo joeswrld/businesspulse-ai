@@ -242,6 +242,7 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Usage Overview</h2>
+          <p className="text-sm text-gray-600 mt-1">Free plan resets every 30 days (rolling). Limits per cycle: Feedback 50, Insights 5, Reports 5. Data retention: 8 days.</p>
           <div className="mt-2 space-y-1">
             <div className="flex items-center gap-2">
               <p className="text-gray-600">Current Plan:</p>
