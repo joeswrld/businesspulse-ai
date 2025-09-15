@@ -7,9 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { SentimentBadge } from '@/components/ui/SentimentBadge'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, RefreshCw, Search, MessageSquare, Mail, Calendar, Filter, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { Loader2, RefreshCw, Search, MessageSquare, Mail, Calendar, Filter, TrendingUp, TrendingDown, Minus, Eye, Play } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import SessionReplayPlayer from '@/components/SessionReplayPlayer'
 
 interface FeedbackEntry {
   id: string
@@ -17,6 +19,7 @@ interface FeedbackEntry {
   email: string | null
   message: string
   sentiment: 'positive' | 'negative' | 'neutral' | null
+  session_id: string | null
   created_at: string
 }
 
@@ -30,6 +33,8 @@ const Feedback: React.FC = () => {
   const [filterEmail, setFilterEmail] = useState('all')
   const [filterSentiment, setFilterSentiment] = useState('all')
   const [projectId, setProjectId] = useState<string | null>(null)
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [showSessionReplay, setShowSessionReplay] = useState(false)
 
   useEffect(() => {
     if (user?.id) {
@@ -143,6 +148,16 @@ const Feedback: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString()
+  }
+
+  const handleViewSessionReplay = (sessionId: string) => {
+    setSelectedSessionId(sessionId)
+    setShowSessionReplay(true)
+  }
+
+  const handleCloseSessionReplay = () => {
+    setShowSessionReplay(false)
+    setSelectedSessionId(null)
   }
 
   // Calculate sentiment counts
@@ -342,6 +357,7 @@ const Feedback: React.FC = () => {
                     <TableHead className="font-semibold text-gray-900">Email</TableHead>
                     <TableHead className="font-semibold text-gray-900">Sentiment</TableHead>
                     <TableHead className="font-semibold text-gray-900">Date</TableHead>
+                    <TableHead className="font-semibold text-gray-900">Session</TableHead>
                     <TableHead className="font-semibold text-gray-900">Project ID</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -377,6 +393,23 @@ const Feedback: React.FC = () => {
                         </div>
                       </TableCell>
                       <TableCell>
+                        {entry.session_id ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewSessionReplay(entry.session_id!)}
+                            className="flex items-center space-x-1"
+                          >
+                            <Play className="h-3 w-3" />
+                            <span>Replay</span>
+                          </Button>
+                        ) : (
+                          <Badge variant="outline" className="text-gray-500">
+                            No Session
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700">
                           {entry.project_id}
                         </code>
@@ -389,6 +422,22 @@ const Feedback: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Session Replay Dialog */}
+      <Dialog open={showSessionReplay} onOpenChange={setShowSessionReplay}>
+        <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Session Replay</DialogTitle>
+          </DialogHeader>
+          {selectedSessionId && projectId && (
+            <SessionReplayPlayer
+              sessionId={selectedSessionId}
+              projectId={projectId}
+              onClose={handleCloseSessionReplay}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
