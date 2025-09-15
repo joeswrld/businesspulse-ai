@@ -58,7 +58,7 @@ const CTASection = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4" >
               <Button 
                 size="xl" 
-                className="bg-white text-primary hover:bg-white/90 shadow-large font-semibold"
+                className="bg-primary text-white hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-primary/80 dark:focus-visible:ring-offset-primary/60 shadow-large font-semibold"
                 asChild
               >
                 <Link to="/auth">
