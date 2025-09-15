@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -28,56 +22,78 @@ import {
   SortAsc,
   SortDesc,
   FileDown,
-  FileText as FileTextIcon
+  FileText as FileTextIcon,
+  Users,
+  Hash,
+  Loader2
 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 // Types
-interface InsightHistory {
+interface Report {
   id: string;
   user_id: string;
-  selected_feedback_ids: string[];
-  analysis_result: {
-    summary: string;
-    key_themes: string[];
-    suggested_actions: string[];
-    trends: string[];
-    performance: {
-      metrics: string[];
-      score: number;
-    };
-    sentiment: {
-      positive: number;
-      negative: number;
-      neutral: number;
-      overall: 'positive' | 'negative' | 'neutral';
-    };
-  };
+  title: string;
+  feedback_ids: string[];
+  insights_text: string;
   created_at: string;
+}
+
+interface Feedback {
+  id: string;
+  message: string;
+  email: string | null;
+  created_at: string;
+}
+
+interface AIInsights {
+  summary: string;
+  key_themes: string[];
+  suggested_actions: string[];
+  trends: string[];
+  performance: {
+    metrics: string[];
+    score: number;
+  };
+  sentiment: {
+    positive: number;
+    negative: number;
+    neutral: number;
+    overall: 'positive' | 'negative' | 'neutral';
+  };
 }
 
 export default function Reports() {
   const { user } = useAuth();
   
   // State management
-  const [reports, setReports] = useState<InsightHistory[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedReport, setSelectedReport] = useState<InsightHistory | null>(null);
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState<'all' | '7d' | '30d' | '90d'>('all');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [exportingPDF, setExportingPDF] = useState(false);
   const [exportingCSV, setExportingCSV] = useState(false);
+  const [feedbackData, setFeedbackData] = useState<Feedback[]>([]);
+  const [loadingFeedback, setLoadingFeedback] = useState(false);
 
-  // Load user's insights history
+  // Load user's reports
   const loadReports = useCallback(async () => {
     if (!user) return;
 
     try {
       setLoading(true);
       
-      const { data: reportsData, error: reportsError } = await (supabase as any)
-        .from('insights_history')
+      const { data: reportsData, error: reportsError } = await supabase
+        .from('reports')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: sortOrder === 'oldest' });
@@ -88,7 +104,7 @@ export default function Reports() {
         return;
       }
 
-      setReports((reportsData || []) as any);
+      setReports(reportsData || []);
     } catch (error) {
       console.error('Error in loadReports:', error);
       toast.error('Failed to load reports');
@@ -102,13 +118,62 @@ export default function Reports() {
     loadReports();
   }, [loadReports]);
 
+  // Set up real-time subscription for reports
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('reports-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'reports',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          // Refetch reports when changes occur
+          loadReports();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, loadReports]);
+
+  // Load feedback data for a specific report
+  const loadFeedbackData = async (feedbackIds: string[]) => {
+    if (feedbackIds.length === 0) return [];
+
+    try {
+      setLoadingFeedback(true);
+      const { data: feedbackData, error: feedbackError } = await supabase
+        .from('feedback')
+        .select('id, message, email, created_at')
+        .in('id', feedbackIds);
+
+      if (feedbackError) {
+        console.error('Error loading feedback:', feedbackError);
+        return [];
+      }
+
+      return feedbackData || [];
+    } catch (error) {
+      console.error('Error loading feedback:', error);
+      return [];
+    } finally {
+      setLoadingFeedback(false);
+    }
+  };
+
   // Filter reports based on search term and date range
   const filteredReports = reports.filter(report => {
     const matchesSearch = searchTerm === '' || 
-      report.analysis_result.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      report.analysis_result.key_themes.some(theme => 
-        theme.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      report.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      report.insights_text.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (!matchesSearch) return false;
 
@@ -142,25 +207,53 @@ export default function Reports() {
     });
   };
 
-  // Get summary preview (first 1-2 sentences)
-  const getSummaryPreview = (summary: string) => {
-    const sentences = summary.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    return sentences.slice(0, 2).join('. ') + (sentences.length > 2 ? '...' : '');
+  // Get insights preview (first 150 chars)
+  const getInsightsPreview = (insightsText: string) => {
+    try {
+      const insights = JSON.parse(insightsText);
+      return insights.summary ? insights.summary.substring(0, 150) + '...' : 'No summary available';
+    } catch {
+      return insightsText.substring(0, 150) + '...';
+    }
   };
 
-  // Get themes preview (comma separated, truncated)
-  const getThemesPreview = (themes: string[]) => {
-    if (themes.length <= 3) return themes.join(', ');
-    return themes.slice(0, 3).join(', ') + ` +${themes.length - 3} more`;
+  // Parse insights text
+  const parseInsights = (insightsText: string): AIInsights | null => {
+    try {
+      return JSON.parse(insightsText);
+    } catch {
+      return null;
+    }
+  };
+
+  // Calculate word count
+  const getWordCount = (text: string) => {
+    return text.split(/\s+/).filter(word => word.length > 0).length;
+  };
+
+  // Calculate sentiment breakdown
+  const getSentimentBreakdown = (insights: AIInsights) => {
+    return {
+      positive: insights.sentiment.positive,
+      neutral: insights.sentiment.neutral,
+      negative: insights.sentiment.negative,
+      overall: insights.sentiment.overall
+    };
   };
 
   // Export to PDF
-  const exportToPDF = async (report: InsightHistory) => {
+  const exportToPDF = async (report: Report) => {
     setExportingPDF(true);
     try {
       toast.info('Generating PDF...', {
         description: 'Please wait while we create your report.'
       });
+
+      const insights = parseInsights(report.insights_text);
+      if (!insights) {
+        toast.error('Invalid report data');
+        return;
+      }
 
       // Create a temporary div for PDF generation
       const pdfContainer = document.createElement('div');
@@ -178,11 +271,11 @@ export default function Reports() {
       pdfContainer.innerHTML = `
         <div style="margin-bottom: 30px;">
           <h1 style="color: #1f2937; font-size: 28px; margin-bottom: 10px; border-bottom: 3px solid #3b82f6; padding-bottom: 10px;">
-            AI Insights Analysis Report
+            ${report.title}
           </h1>
           <p style="color: #6b7280; font-size: 14px; margin-bottom: 20px;">
             Generated on ${formatDate(report.created_at)} • 
-            Based on ${report.selected_feedback_ids.length} feedback entries
+            Based on ${report.feedback_ids.length} feedback entries
           </p>
         </div>
 
@@ -191,7 +284,7 @@ export default function Reports() {
             Summary
           </h2>
           <p style="font-size: 16px; line-height: 1.6; color: #374151;">
-            ${report.analysis_result.summary}
+            ${insights.summary}
           </p>
         </div>
 
@@ -200,7 +293,7 @@ export default function Reports() {
             Key Themes
           </h2>
           <ul style="font-size: 14px; line-height: 1.6; color: #374151; padding-left: 20px;">
-            ${report.analysis_result.key_themes.map(theme => 
+            ${insights.key_themes.map(theme => 
               `<li style="margin-bottom: 8px;">${theme}</li>`
             ).join('')}
           </ul>
@@ -208,21 +301,10 @@ export default function Reports() {
 
         <div style="margin-bottom: 30px;">
           <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #f59e0b; padding-left: 15px;">
-            Trends
-          </h2>
-          <ul style="font-size: 14px; line-height: 1.6; color: #374151; padding-left: 20px;">
-            ${report.analysis_result.trends.map(trend => 
-              `<li style="margin-bottom: 8px;">${trend}</li>`
-            ).join('')}
-          </ul>
-        </div>
-
-        <div style="margin-bottom: 30px;">
-          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #ef4444; padding-left: 15px;">
             Suggested Actions
           </h2>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            ${report.analysis_result.suggested_actions.map((action, index) => `
+            ${insights.suggested_actions.map((action, index) => `
               <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; background-color: #f9fafb;">
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
                   <div style="width: 24px; height: 24px; background-color: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 12px;">
@@ -244,13 +326,13 @@ export default function Reports() {
             <div style="display: flex; align-items: center; margin-bottom: 10px;">
               <span style="font-weight: 600; color: #1f2937; margin-right: 15px;">Overall Score:</span>
               <div style="width: 100px; height: 20px; background-color: #e5e7eb; border-radius: 10px; overflow: hidden;">
-                <div style="width: ${report.analysis_result.performance.score}%; height: 100%; background-color: #10b981;"></div>
+                <div style="width: ${insights.performance.score}%; height: 100%; background-color: #10b981;"></div>
               </div>
-              <span style="margin-left: 10px; font-weight: 600; color: #1f2937;">${report.analysis_result.performance.score}/100</span>
+              <span style="margin-left: 10px; font-weight: 600; color: #1f2937;">${insights.performance.score}/100</span>
             </div>
           </div>
           <ul style="font-size: 14px; line-height: 1.6; color: #374151; padding-left: 20px;">
-            ${report.analysis_result.performance.metrics.map(metric => 
+            ${insights.performance.metrics.map(metric => 
               `<li style="margin-bottom: 8px;">${metric}</li>`
             ).join('')}
           </ul>
@@ -262,22 +344,22 @@ export default function Reports() {
           </h2>
           <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
             <div style="text-align: center; padding: 20px; background-color: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
-              <div style="font-size: 24px; font-weight: bold; color: #16a34a; margin-bottom: 5px;">${report.analysis_result.sentiment.positive}%</div>
+              <div style="font-size: 24px; font-weight: bold; color: #16a34a; margin-bottom: 5px;">${insights.sentiment.positive}%</div>
               <div style="color: #16a34a; font-weight: 500;">Positive</div>
             </div>
             <div style="text-align: center; padding: 20px; background-color: #fefce8; border-radius: 8px; border: 1px solid #fde68a;">
-              <div style="font-size: 24px; font-weight: bold; color: #ca8a04; margin-bottom: 5px;">${report.analysis_result.sentiment.neutral}%</div>
+              <div style="font-size: 24px; font-weight: bold; color: #ca8a04; margin-bottom: 5px;">${insights.sentiment.neutral}%</div>
               <div style="color: #ca8a04; font-weight: 500;">Neutral</div>
             </div>
             <div style="text-align: center; padding: 20px; background-color: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
-              <div style="font-size: 24px; font-weight: bold; color: #dc2626; margin-bottom: 5px;">${report.analysis_result.sentiment.negative}%</div>
+              <div style="font-size: 24px; font-weight: bold; color: #dc2626; margin-bottom: 5px;">${insights.sentiment.negative}%</div>
               <div style="color: #dc2626; font-weight: 500;">Negative</div>
             </div>
           </div>
           <div style="text-align: center; margin-top: 20px;">
-            <Badge style="background-color: #3b82f6; color: white; padding: 8px 16px; border-radius: 16px; font-size: 14px;">
-              Overall: ${report.analysis_result.sentiment.overall}
-            </Badge>
+            <span style="background-color: #3b82f6; color: white; padding: 8px 16px; border-radius: 16px; font-size: 14px;">
+              Overall: ${insights.sentiment.overall}
+            </span>
           </div>
         </div>
       `;
@@ -322,56 +404,14 @@ export default function Reports() {
     }
   };
 
-  // Export to CSV
-  const exportToCSV = async (report: InsightHistory) => {
-    setExportingCSV(true);
-    try {
-      // Flatten the analysis result into CSV format
-      const csvData = [
-        ['Report ID', report.id],
-        ['Generated Date', formatDate(report.created_at)],
-        ['Feedback Entries Analyzed', report.selected_feedback_ids.length.toString()],
-        ['Summary', report.analysis_result.summary],
-        ['Key Themes', report.analysis_result.key_themes.join('; ')],
-        ['Suggested Actions', report.analysis_result.suggested_actions.join('; ')],
-        ['Trends', report.analysis_result.trends.join('; ')],
-        ['Performance Score', report.analysis_result.performance.score.toString()],
-        ['Performance Metrics', report.analysis_result.performance.metrics.join('; ')],
-        ['Sentiment Positive', report.analysis_result.sentiment.positive.toString()],
-        ['Sentiment Neutral', report.analysis_result.sentiment.neutral.toString()],
-        ['Sentiment Negative', report.analysis_result.sentiment.negative.toString()],
-        ['Overall Sentiment', report.analysis_result.sentiment.overall]
-      ];
-
-      // Convert to CSV string
-      const csvContent = csvData.map(row => 
-        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-      ).join('\n');
-
-      // Create and download CSV file
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `insights-report-${report.id}-${new Date(report.created_at).toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      toast.success('CSV exported successfully!');
-    } catch (error) {
-      console.error('Error exporting CSV:', error);
-      toast.error('Failed to export CSV');
-    } finally {
-      setExportingCSV(false);
-    }
-  };
-
   // View full report
-  const viewFullReport = (report: InsightHistory) => {
+  const viewFullReport = async (report: Report) => {
     setSelectedReport(report);
     setShowViewModal(true);
+    
+    // Load feedback data for this report
+    const feedback = await loadFeedbackData(report.feedback_ids);
+    setFeedbackData(feedback);
   };
 
   // Get sentiment badge variant
@@ -407,9 +447,9 @@ export default function Reports() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Insights Reports</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Reports</h1>
           <p className="text-gray-600 mt-2">
-            View and export your AI-generated insights analysis reports
+            View and export your AI-generated insights reports
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -433,7 +473,7 @@ export default function Reports() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search reports by summary or themes..."
+                  placeholder="Search reports by title or content..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -481,7 +521,7 @@ export default function Reports() {
       {/* Reports Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <RefreshCw className="h-8 w-8 animate-spin mr-3" />
+          <Loader2 className="h-8 w-8 animate-spin mr-3" />
           <span className="text-lg">Loading reports...</span>
         </div>
       ) : filteredReports.length === 0 ? (
@@ -506,289 +546,325 @@ export default function Reports() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredReports.map((report) => (
-            <Card key={report.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm text-gray-600">
-                      {formatDate(report.created_at)}
-                    </span>
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    {report.selected_feedback_ids.length} feedbacks
-                  </Badge>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="space-y-4">
-                {/* Summary Preview */}
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Summary</h3>
-                  <p className="text-sm text-gray-600 line-clamp-3">
-                    {getSummaryPreview(report.analysis_result.summary)}
-                  </p>
-                </div>
-
-                {/* Key Themes Preview */}
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Key Themes</h3>
-                  <p className="text-sm text-gray-600">
-                    {getThemesPreview(report.analysis_result.key_themes)}
-                  </p>
-                </div>
-
-                {/* Performance Score */}
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Performance Score</h3>
-                  <div className="flex items-center space-x-2">
-                    <div className="flex-1 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${report.analysis_result.performance.score}%` }}
-                      />
+          {filteredReports.map((report) => {
+            const insights = parseInsights(report.insights_text);
+            return (
+              <Card key={report.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm text-gray-600">
+                        {formatDate(report.created_at)}
+                      </span>
                     </div>
-                    <span className="text-sm font-medium text-gray-900">
-                      {report.analysis_result.performance.score}/100
-                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {report.feedback_ids.length} feedbacks
+                    </Badge>
                   </div>
-                </div>
+                </CardHeader>
+                
+                <CardContent className="space-y-4">
+                  {/* Title */}
+                  <div>
+                    <h3 className="font-medium text-gray-900 mb-2">{report.title}</h3>
+                    <p className="text-sm text-gray-600 line-clamp-3">
+                      {getInsightsPreview(report.insights_text)}
+                    </p>
+                  </div>
 
-                {/* Sentiment */}
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Overall Sentiment</h3>
-                  <Badge variant={getSentimentBadgeVariant(report.analysis_result.sentiment.overall)}>
-                    {report.analysis_result.sentiment.overall}
-                  </Badge>
-                </div>
+                  {/* Performance Score */}
+                  {insights && (
+                    <div>
+                      <h3 className="font-medium text-gray-900 mb-2">Performance Score</h3>
+                      <div className="flex items-center space-x-2">
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${insights.performance.score}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">
+                          {insights.performance.score}/100
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
-                {/* Action Buttons */}
-                <div className="flex flex-col space-y-2 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => viewFullReport(report)}
-                    className="w-full"
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    View Full
-                  </Button>
-                  
-                  <div className="grid grid-cols-2 gap-2">
+                  {/* Sentiment */}
+                  {insights && (
+                    <div>
+                      <h3 className="font-medium text-gray-900 mb-2">Overall Sentiment</h3>
+                      <Badge variant={getSentimentBadgeVariant(insights.sentiment.overall)}>
+                        {insights.sentiment.overall}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col space-y-2 pt-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => exportToPDF(report)}
-                      disabled={exportingPDF}
+                      onClick={() => viewFullReport(report)}
                       className="w-full"
                     >
-                      {exportingPDF ? (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <FileTextIcon className="h-4 w-4" />
-                      )}
-                      PDF
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Full
                     </Button>
                     
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => exportToCSV(report)}
-                      disabled={exportingCSV}
-                      className="w-full"
-                    >
-                      {exportingCSV ? (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <FileDown className="h-4 w-4" />
-                      )}
-                      CSV
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => exportToPDF(report)}
+                        disabled={exportingPDF}
+                        className="w-full"
+                      >
+                        {exportingPDF ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileTextIcon className="h-4 w-4" />
+                        )}
+                        PDF
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => exportToPDF(report)}
+                        disabled={exportingPDF}
+                        className="w-full"
+                      >
+                        {exportingPDF ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileDown className="h-4 w-4" />
+                        )}
+                        CSV
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
       {/* View Full Report Modal */}
       <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <FileText className="h-5 w-5" />
               <span>Full Report - {selectedReport && formatDate(selectedReport.created_at)}</span>
             </DialogTitle>
             <DialogDescription>
-              Complete analysis based on {selectedReport?.selected_feedback_ids.length} feedback entries
+              Complete analysis based on {selectedReport?.feedback_ids.length} feedback entries
             </DialogDescription>
           </DialogHeader>
           
-          {selectedReport && (
-            <div className="space-y-6">
-              {/* Summary */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                  <Lightbulb className="h-5 w-5 text-yellow-600" />
-                  <span>Summary</span>
-                </h3>
-                <p className="text-gray-700 leading-relaxed">
-                  {selectedReport.analysis_result.summary}
-                </p>
-              </div>
+          {selectedReport && (() => {
+            const insights = parseInsights(selectedReport.insights_text);
+            if (!insights) return <div>Invalid report data</div>;
 
-              {/* Key Themes */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                  <Target className="h-5 w-5 text-blue-600" />
-                  <span>Key Themes</span>
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {selectedReport.analysis_result.key_themes.map((theme, index) => (
-                    <div key={index} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                      <Target className="h-4 w-4 text-blue-600" />
-                      <span className="text-gray-700">{theme}</span>
-                    </div>
-                  ))}
+            return (
+              <div className="space-y-6">
+                {/* Summary */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
+                    <Lightbulb className="h-5 w-5 text-yellow-600" />
+                    <span>Summary</span>
+                  </h3>
+                  <p className="text-gray-700 leading-relaxed">
+                    {insights.summary}
+                  </p>
                 </div>
-              </div>
 
-              {/* Suggested Actions */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                  <TrendingUp className="h-5 w-5 text-green-600" />
-                  <span>Suggested Actions</span>
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {selectedReport.analysis_result.suggested_actions.map((action, index) => (
-                    <div key={index} className="flex items-center space-x-2 p-3 bg-green-50 rounded-lg">
-                      <TrendingUp className="h-4 w-4 text-green-600" />
-                      <span className="text-gray-700">{action}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Trends */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                  <BarChart3 className="h-5 w-5 text-purple-600" />
-                  <span>Trends</span>
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {selectedReport.analysis_result.trends.map((trend, index) => (
-                    <div key={index} className="flex items-center space-x-2 p-3 bg-purple-50 rounded-lg">
-                      <BarChart3 className="h-4 w-4 text-purple-600" />
-                      <span className="text-gray-700">{trend}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Performance */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                  <BarChart3 className="h-5 w-5 text-indigo-600" />
-                  <span>Performance Metrics</span>
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Overall Score</span>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-24 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${selectedReport.analysis_result.performance.score}%` }}
-                        />
-                      </div>
-                      <span className="font-semibold">{selectedReport.analysis_result.performance.score}/100</span>
-                    </div>
-                  </div>
+                {/* Key Themes */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
+                    <Target className="h-5 w-5 text-blue-600" />
+                    <span>Key Themes</span>
+                  </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {selectedReport.analysis_result.performance.metrics.map((metric, index) => (
-                      <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                        <span className="text-sm text-gray-700">{metric}</span>
+                    {insights.key_themes.map((theme, index) => (
+                      <div key={index} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
+                        <Target className="h-4 w-4 text-blue-600" />
+                        <span className="text-gray-700">{theme}</span>
                       </div>
                     ))}
                   </div>
                 </div>
-              </div>
 
-              {/* Sentiment */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                  <MessageSquare className="h-5 w-5 text-pink-600" />
-                  <span>Sentiment Analysis</span>
-                </h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Overall Sentiment</span>
-                    <Badge 
-                      variant={getSentimentBadgeVariant(selectedReport.analysis_result.sentiment.overall)}
-                      className="text-sm"
+                {/* Suggested Actions */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
+                    <TrendingUp className="h-5 w-5 text-green-600" />
+                    <span>Suggested Actions</span>
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {insights.suggested_actions.map((action, index) => (
+                      <div key={index} className="flex items-center space-x-2 p-3 bg-green-50 rounded-lg">
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                        <span className="text-gray-700">{action}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Performance */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
+                    <BarChart3 className="h-5 w-5 text-indigo-600" />
+                    <span>Performance Metrics</span>
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Overall Score</span>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-24 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${insights.performance.score}%` }}
+                          />
+                        </div>
+                        <span className="font-semibold">{insights.performance.score}/100</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {insights.performance.metrics.map((metric, index) => (
+                        <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                          <span className="text-sm text-gray-700">{metric}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sentiment */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
+                    <MessageSquare className="h-5 w-5 text-pink-600" />
+                    <span>Sentiment Analysis</span>
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Overall Sentiment</span>
+                      <Badge 
+                        variant={getSentimentBadgeVariant(insights.sentiment.overall)}
+                        className="text-sm"
+                      >
+                        {insights.sentiment.overall}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">
+                          {insights.sentiment.positive}%
+                        </div>
+                        <div className="text-sm text-gray-600">Positive</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-gray-600">
+                          {insights.sentiment.neutral}%
+                        </div>
+                        <div className="text-sm text-gray-600">Neutral</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-red-600">
+                          {insights.sentiment.negative}%
+                        </div>
+                        <div className="text-sm text-gray-600">Negative</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Analytics */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
+                    <BarChart3 className="h-5 w-5 text-purple-600" />
+                    <span>Analytics</span>
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-gray-50 rounded-lg text-center">
+                      <div className="text-2xl font-bold text-gray-900">
+                        {getWordCount(insights.summary)}
+                      </div>
+                      <div className="text-sm text-gray-600">Word Count</div>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg text-center">
+                      <div className="text-2xl font-bold text-gray-900">
+                        {selectedReport.feedback_ids.length}
+                      </div>
+                      <div className="text-sm text-gray-600">Feedback Items</div>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg text-center">
+                      <div className="text-2xl font-bold text-gray-900">
+                        {insights.key_themes.length}
+                      </div>
+                      <div className="text-sm text-gray-600">Key Themes</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Feedback Messages */}
+                {feedbackData.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
+                      <MessageSquare className="h-5 w-5 text-blue-600" />
+                      <span>Feedback Messages Used</span>
+                    </h3>
+                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                      {feedbackData.map((feedback) => (
+                        <div key={feedback.id} className="p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              {feedback.email ? (
+                                <Badge variant="secondary" className="flex items-center space-x-1">
+                                  <MessageSquare className="h-3 w-3" />
+                                  <span>{feedback.email}</span>
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">Anonymous</Badge>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-500">
+                              {formatDate(feedback.created_at)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700">{feedback.message}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Export Actions */}
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <div className="text-sm text-gray-500">
+                    Report ID: {selectedReport.id}
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => exportToPDF(selectedReport)}
+                      disabled={exportingPDF}
                     >
-                      {selectedReport.analysis_result.sentiment.overall}
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">
-                        {selectedReport.analysis_result.sentiment.positive}%
-                      </div>
-                      <div className="text-sm text-gray-600">Positive</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-gray-600">
-                        {selectedReport.analysis_result.sentiment.neutral}%
-                      </div>
-                      <div className="text-sm text-gray-600">Neutral</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-red-600">
-                        {selectedReport.analysis_result.sentiment.negative}%
-                      </div>
-                      <div className="text-sm text-gray-600">Negative</div>
-                    </div>
+                      {exportingPDF ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <FileTextIcon className="h-4 w-4 mr-2" />
+                      )}
+                      Export PDF
+                    </Button>
                   </div>
                 </div>
               </div>
-
-              {/* Export Actions */}
-              <div className="flex items-center justify-between pt-4 border-t">
-                <div className="text-sm text-gray-500">
-                  Report ID: {selectedReport.id}
-                </div>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => exportToPDF(selectedReport)}
-                    disabled={exportingPDF}
-                  >
-                    {exportingPDF ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <FileTextIcon className="h-4 w-4 mr-2" />
-                    )}
-                    Export PDF
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => exportToCSV(selectedReport)}
-                    disabled={exportingCSV}
-                  >
-                    {exportingCSV ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <FileDown className="h-4 w-4 mr-2" />
-                    )}
-                    Export CSV
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>

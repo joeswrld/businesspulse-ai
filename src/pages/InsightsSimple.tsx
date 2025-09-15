@@ -203,6 +203,29 @@ const InsightsSimple: React.FC = () => {
         }
 
         setInsights(result.analysis);
+        
+        // Save the report to the reports table
+        try {
+          const { error: reportError } = await supabase
+            .from('reports')
+            .insert({
+              user_id: user.id,
+              title: 'Insight Report',
+              feedback_ids: selectedIds,
+              insights_text: JSON.stringify(result.analysis)
+            });
+
+          if (reportError) {
+            console.error('Error saving report:', reportError);
+            // Don't show error to user as insights were still generated successfully
+          } else {
+            console.log('Report saved successfully');
+          }
+        } catch (reportError) {
+          console.error('Error saving report:', reportError);
+          // Don't show error to user as insights were still generated successfully
+        }
+        
         toast.success('Insights generated successfully!');
       } else {
         const errorText = await response.text();
