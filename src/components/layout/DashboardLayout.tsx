@@ -26,6 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import TopNav from "@/components/layout/TopNav";
 
 // Mock hook for feedback notifications - replace with actual implementation
 const useFeedbackNotifications = () => {
@@ -370,11 +371,14 @@ const navigation = [
         "min-h-screen bg-background transition-all duration-300",
         sidebarCollapsed ? "lg:pl-16" : "lg:pl-72"
       )}>
+        {/* Top Navigation Bar */}
+        <TopNav />
         {/* Mobile menu button */}
-        <div className="lg:hidden p-4">
+        <div className="lg:hidden px-4 pt-2">
           <button
             className="p-2 -ml-2 hover:bg-slate-100 rounded-lg transition-colors"
             onClick={() => setSidebarOpen(true)}
+            aria-label="Open sidebar"
           >
             <Menu className="h-5 w-5 text-slate-600" />
           </button>
