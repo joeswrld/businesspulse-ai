@@ -133,6 +133,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   { name: "Feedback", href: "/feedback", icon: MessageSquare },
   { name: "AI Insights", href: "/insights-simple", icon: Brain },
   { name: "Reports & Analytics", href: "/reports", icon: FileText },
+  { name: "Product Roadmap", href: "/roadmap", icon: Target },
   { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
   { name: "Team Collaboration", href: "/teams", icon: Users },
   { name: "Feedback Settings", href: "/feedback-settings", icon: Settings },
