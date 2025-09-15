@@ -17,7 +17,7 @@ interface FeedbackEntry {
   email: string | null
   message: string
   sentiment: 'positive' | 'negative' | 'neutral' | null
-  created_at: string
+  timestamp: string
 }
 
 const Feedback: React.FC = () => {
@@ -40,6 +40,28 @@ const Feedback: React.FC = () => {
   useEffect(() => {
     if (projectId) {
       loadFeedback()
+      
+      // Set up real-time subscription for feedback updates
+      const channel = supabase
+        .channel('feedback-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'feedbacks',
+            filter: `project_id=eq.${projectId}`
+          },
+          (payload) => {
+            console.log('Feedback change received:', payload)
+            loadFeedback() // Reload all feedback when any change occurs
+          }
+        )
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
     }
   }, [projectId])
 
@@ -68,10 +90,10 @@ const Feedback: React.FC = () => {
       setLoading(true)
       
       const { data, error } = await supabase
-        .from('feedback')
+        .from('feedbacks')
         .select('*')
         .eq('project_id', projectId)
-        .order('created_at', { ascending: false })
+        .order('timestamp', { ascending: false })
 
       if (error) {
         console.error('Error loading feedback:', error)
@@ -357,7 +379,7 @@ const Feedback: React.FC = () => {
                       <TableCell>
                         <div className="flex items-center space-x-2 text-sm text-gray-600">
                           <Calendar className="h-4 w-4" />
-                          <span>{formatDate(entry.created_at)}</span>
+                          <span>{formatDate(entry.timestamp)}</span>
                         </div>
                       </TableCell>
                       <TableCell>

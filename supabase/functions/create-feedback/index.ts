@@ -225,6 +225,25 @@ serve(async (req) => {
       }
     }
 
+    // Analyze sentiment using Gemini API
+    console.log('Analyzing sentiment...');
+    let analyzedSentiment = sentiment || 'neutral';
+    
+    try {
+      const sentimentResult = await analyzeSentimentWithGemini(message);
+      if (sentimentResult && ['positive', 'negative', 'neutral'].includes(sentimentResult)) {
+        analyzedSentiment = sentimentResult;
+        console.log(`Sentiment analysis result: ${analyzedSentiment}`);
+      } else {
+        console.log('Sentiment analysis failed, using fallback: neutral');
+        analyzedSentiment = 'neutral';
+      }
+    } catch (error) {
+      console.error('Sentiment analysis error:', error);
+      console.log('Using fallback: neutral');
+      analyzedSentiment = 'neutral';
+    }
+
     // Insert feedback into database
     console.log('Inserting feedback...');
     const { data: feedback, error: feedbackError } = await supabase
@@ -236,7 +255,7 @@ serve(async (req) => {
         name: name || null,
         email: email || null,
         status: 'new',
-        sentiment: sentiment || 'neutral',
+        sentiment: analyzedSentiment,
         tags: tags || [],
         timestamp: new Date().toISOString()
       })
@@ -318,3 +337,69 @@ serve(async (req) => {
     )
   }
 })
+
+async function analyzeSentimentWithGemini(message: string): Promise<string | null> {
+  const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+  
+  if (!GEMINI_API_KEY) {
+    console.error('GEMINI_API_KEY not found');
+    return null;
+  }
+
+  const prompt = `Analyze the sentiment of the following feedback message and return ONLY one of these three words: positive, negative, or neutral.
+
+Feedback message: "${message}"
+
+Rules:
+- "positive" for praise, satisfaction, compliments, or positive experiences
+- "negative" for complaints, criticism, dissatisfaction, or negative experiences  
+- "neutral" for factual statements, questions, suggestions, or mixed/unclear sentiment
+
+Return only the single word (positive, negative, or neutral) with no other text.`;
+
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          topK: 1,
+          topP: 0.1,
+          maxOutputTokens: 10,
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const responseData = await response.json();
+    
+    if (!responseData.candidates || !responseData.candidates[0] || !responseData.candidates[0].content) {
+      throw new Error('Invalid response from Gemini API');
+    }
+
+    const text = responseData.candidates[0].content.parts[0].text.trim().toLowerCase();
+    
+    // Validate the response
+    if (['positive', 'negative', 'neutral'].includes(text)) {
+      return text;
+    } else {
+      console.error('Invalid sentiment response from Gemini:', text);
+      return null;
+    }
+
+  } catch (error) {
+    console.error('Error calling Gemini API for sentiment analysis:', error);
+    return null;
+  }
+}
