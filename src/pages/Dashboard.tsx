@@ -27,7 +27,8 @@ import {
   BarChart as BarChartIcon,
   Activity,
   Zap,
-  Minus
+  Minus,
+  Brain
 } from 'lucide-react';
 
 import {
@@ -74,6 +75,14 @@ interface Insight {
   created_at: string;
 }
 
+interface FeedbackInsight {
+  id: string;
+  user_id: string;
+  feedback_ids: string[];
+  summary: string;
+  created_at: string;
+}
+
 interface Profile {
   id: string;
   user_id: string | null;
@@ -115,6 +124,7 @@ export default function Dashboard() {
   // State management
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [insights, setInsights] = useState<Insight[]>([]);
+  const [feedbackInsights, setFeedbackInsights] = useState<FeedbackInsight[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +157,7 @@ export default function Dashboard() {
       const projectIds = settingsData?.map(s => s.project_id) || [];
 
       // Load all data in parallel
-      const [feedbacksResult, insightsResult, profileResult] = await Promise.all([
+      const [feedbacksResult, insightsResult, feedbackInsightsResult, profileResult] = await Promise.all([
         // Load feedbacks
         projectIds.length > 0 
           ? supabase
@@ -160,6 +170,13 @@ export default function Dashboard() {
         // Load insights
         supabase
           .from('insights_results')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false }),
+        
+        // Load feedback insights
+        supabase
+          .from('insights')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false }),
@@ -182,6 +199,11 @@ export default function Dashboard() {
         throw insightsResult.error;
       }
 
+      if (feedbackInsightsResult.error) {
+        console.error('Error loading feedback insights:', feedbackInsightsResult.error);
+        throw feedbackInsightsResult.error;
+      }
+
       if (profileResult.error && profileResult.error.code !== 'PGRST116') {
         console.error('Error loading profile:', profileResult.error);
         throw profileResult.error;
@@ -189,6 +211,7 @@ export default function Dashboard() {
 
       setFeedbacks(feedbacksResult.data || []);
       setInsights(insightsResult.data || []);
+      setFeedbackInsights(feedbackInsightsResult.data || []);
       setProfile(profileResult.data || null);
 
     } catch (error) {
@@ -245,9 +268,28 @@ export default function Dashboard() {
       )
       .subscribe();
 
+    // Subscribe to feedback insights changes
+    const feedbackInsightsChannel = supabase
+      .channel('dashboard-feedback-insights-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'insights',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Feedback insights change received in dashboard:', payload);
+          loadDashboardData(); // Reload all data when feedback insights change
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(feedbackChannel);
       supabase.removeChannel(insightsChannel);
+      supabase.removeChannel(feedbackInsightsChannel);
     };
   }, [user, loadDashboardData]);
 
@@ -685,6 +727,46 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Latest AI Insight Widget */}
+      {feedbackInsights.length > 0 && (
+        <Card className="rounded-xl shadow-lg border-purple-200 bg-purple-50/30">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Brain className="h-5 w-5 text-purple-600" />
+              <span>Latest AI Insight</span>
+            </CardTitle>
+            <CardDescription>
+              Most recent AI-generated insight from your feedback analysis
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="bg-white rounded-lg p-4 border">
+                <p className="text-gray-700 text-sm leading-relaxed">
+                  {feedbackInsights[0].summary}
+                </p>
+              </div>
+              <div className="flex items-center justify-between text-sm text-gray-500">
+                <span>
+                  Generated from {feedbackInsights[0].feedback_ids.length} feedback entries
+                </span>
+                <span>
+                  {formatDate(feedbackInsights[0].created_at)}
+                </span>
+              </div>
+              <div className="flex space-x-2">
+                <Button variant="outline" size="sm" asChild>
+                  <a href="/insights-simple">View All Insights</a>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <a href="/feedback">Generate New Insights</a>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

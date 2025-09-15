@@ -7,9 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { SentimentBadge } from '@/components/ui/SentimentBadge'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, RefreshCw, Search, MessageSquare, Mail, Calendar, Filter, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { Loader2, RefreshCw, Search, MessageSquare, Mail, Calendar, Filter, TrendingUp, TrendingDown, Minus, Brain, CheckSquare, Square, Sparkles } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Checkbox } from '@/components/ui/checkbox'
 
 interface FeedbackEntry {
   id: string
@@ -18,6 +19,17 @@ interface FeedbackEntry {
   message: string
   sentiment: 'positive' | 'negative' | 'neutral' | null
   created_at: string
+}
+
+interface AIInsights {
+  summary: string
+  key_themes: string[]
+  suggested_actions: string[]
+  sentiment_breakdown: {
+    positive: number
+    negative: number
+    neutral: number
+  }
 }
 
 const Feedback: React.FC = () => {
@@ -30,6 +42,12 @@ const Feedback: React.FC = () => {
   const [filterEmail, setFilterEmail] = useState('all')
   const [filterSentiment, setFilterSentiment] = useState('all')
   const [projectId, setProjectId] = useState<string | null>(null)
+  
+  // AI Insights state
+  const [selectedFeedbacks, setSelectedFeedbacks] = useState<Set<string>>(new Set())
+  const [generatingInsights, setGeneratingInsights] = useState(false)
+  const [insights, setInsights] = useState<AIInsights | null>(null)
+  const [showInsights, setShowInsights] = useState(false)
 
   useEffect(() => {
     if (user?.id) {
@@ -122,6 +140,84 @@ const Feedback: React.FC = () => {
     setRefreshing(true)
     await loadFeedback()
     setRefreshing(false)
+  }
+
+  // AI Insights functions
+  const handleFeedbackSelection = (feedbackId: string, checked: boolean) => {
+    const newSelection = new Set(selectedFeedbacks)
+    if (checked) {
+      newSelection.add(feedbackId)
+    } else {
+      newSelection.delete(feedbackId)
+    }
+    setSelectedFeedbacks(newSelection)
+  }
+
+  const handleSelectAll = () => {
+    if (selectedFeedbacks.size === filteredFeedback.length && filteredFeedback.length > 0) {
+      setSelectedFeedbacks(new Set())
+    } else {
+      setSelectedFeedbacks(new Set(filteredFeedback.map(f => f.id)))
+    }
+  }
+
+  const generateInsights = async () => {
+    if (!user) {
+      toast({
+        title: 'Error',
+        description: 'Please log in to generate insights',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    if (selectedFeedbacks.size === 0) {
+      toast({
+        title: 'Error',
+        description: 'Please select at least one feedback to analyze',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    try {
+      setGeneratingInsights(true)
+      
+      const response = await fetch('https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/generate-feedback-insights', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({
+          feedback_ids: Array.from(selectedFeedbacks),
+          user_id: user.id
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate insights')
+      }
+
+      const result = await response.json()
+      setInsights(result.analysis)
+      setShowInsights(true)
+      
+      toast({
+        title: 'Success',
+        description: 'AI insights generated successfully!',
+        variant: 'default'
+      })
+    } catch (error) {
+      console.error('Error generating insights:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to generate insights. Please try again.',
+        variant: 'destructive'
+      })
+    } finally {
+      setGeneratingInsights(false)
+    }
   }
 
   const filteredFeedback = feedback.filter(entry => {
@@ -258,6 +354,141 @@ const Feedback: React.FC = () => {
         </Card>
       </div>
 
+      {/* AI Insights Section */}
+      <Card className="rounded-xl shadow-lg border-blue-200 bg-blue-50/30">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center space-x-2">
+            <Brain className="h-5 w-5 text-blue-600" />
+            <span>AI Insights Generator</span>
+          </CardTitle>
+          <CardDescription>
+            Select feedback entries to generate AI-powered insights and analysis
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Selection Controls */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="outline"
+                onClick={handleSelectAll}
+                disabled={filteredFeedback.length === 0}
+              >
+                {selectedFeedbacks.size === filteredFeedback.length && filteredFeedback.length > 0 ? (
+                  <>
+                    <Square className="h-4 w-4 mr-2" />
+                    Deselect All
+                  </>
+                ) : (
+                  <>
+                    <CheckSquare className="h-4 w-4 mr-2" />
+                    Select All
+                  </>
+                )}
+              </Button>
+              <span className="text-sm text-gray-600">
+                {selectedFeedbacks.size} of {filteredFeedback.length} selected
+              </span>
+            </div>
+            <Button
+              onClick={generateInsights}
+              disabled={selectedFeedbacks.size === 0 || generatingInsights}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {generatingInsights ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Brain className="h-4 w-4 mr-2" />
+                  Generate Insights
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* AI Insights Results */}
+          {insights && showInsights && (
+            <div className="mt-6 p-4 bg-white rounded-lg border">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center space-x-2">
+                  <Sparkles className="h-5 w-5 text-blue-600" />
+                  <span>AI Analysis Results</span>
+                </h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowInsights(false)}
+                >
+                  Hide
+                </Button>
+              </div>
+              
+              {/* Summary */}
+              <div className="mb-4">
+                <h4 className="font-medium mb-2">Summary</h4>
+                <p className="text-gray-700 text-sm">{insights.summary}</p>
+              </div>
+
+              {/* Key Themes */}
+              {insights.key_themes && insights.key_themes.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="font-medium mb-2">Key Themes</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {insights.key_themes.map((theme, index) => (
+                      <Badge key={index} variant="secondary" className="text-xs">
+                        {theme}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Suggested Actions */}
+              {insights.suggested_actions && insights.suggested_actions.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="font-medium mb-2">Suggested Actions</h4>
+                  <ul className="list-disc list-inside space-y-1">
+                    {insights.suggested_actions.map((action, index) => (
+                      <li key={index} className="text-sm text-gray-700">{action}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Sentiment Breakdown */}
+              {insights.sentiment_breakdown && (
+                <div>
+                  <h4 className="font-medium mb-2">Sentiment Breakdown</h4>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-green-600">
+                        {insights.sentiment_breakdown.positive}%
+                      </div>
+                      <div className="text-sm text-gray-600">Positive</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-gray-600">
+                        {insights.sentiment_breakdown.neutral}%
+                      </div>
+                      <div className="text-sm text-gray-600">Neutral</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-red-600">
+                        {insights.sentiment_breakdown.negative}%
+                      </div>
+                      <div className="text-sm text-gray-600">Negative</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Search and Filters */}
       <Card className="rounded-xl shadow-lg">
         <CardHeader>
@@ -338,6 +569,13 @@ const Feedback: React.FC = () => {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold text-gray-900 w-12">
+                      <Checkbox
+                        checked={selectedFeedbacks.size === filteredFeedback.length && filteredFeedback.length > 0}
+                        onCheckedChange={handleSelectAll}
+                        className="ml-2"
+                      />
+                    </TableHead>
                     <TableHead className="font-semibold text-gray-900">Message</TableHead>
                     <TableHead className="font-semibold text-gray-900">Email</TableHead>
                     <TableHead className="font-semibold text-gray-900">Sentiment</TableHead>
@@ -348,6 +586,14 @@ const Feedback: React.FC = () => {
                 <TableBody>
                   {filteredFeedback.map((entry) => (
                     <TableRow key={entry.id} className="hover:bg-gray-50 transition-colors">
+                      <TableCell className="w-12">
+                        <Checkbox
+                          checked={selectedFeedbacks.has(entry.id)}
+                          onCheckedChange={(checked) => 
+                            handleFeedbackSelection(entry.id, checked as boolean)
+                          }
+                        />
+                      </TableCell>
                       <TableCell className="max-w-md">
                         <div className="bg-gray-50 rounded-lg p-3">
                           <p className="text-sm text-gray-900 line-clamp-3">
