@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Zap, User, LogOut } from "lucide-react";
+import { Menu, X, User, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,8 +18,10 @@ interface UserProfile {
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const { user, loading } = useAuth();
+  const avatarMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Load user profile data
   useEffect(() => {
@@ -55,6 +57,28 @@ const Header = () => {
       console.error('Error signing out:', error);
     }
   };
+
+  // Close avatar dropdown on outside click or Escape key
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (avatarMenuRef.current && !avatarMenuRef.current.contains(event.target as Node)) {
+        setIsAvatarMenuOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsAvatarMenuOpen(false);
+      }
+    };
+    if (isAvatarMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isAvatarMenuOpen]);
 
   const navigation = [
     { name: "Features", href: "#features" },
@@ -94,17 +118,18 @@ const Header = () => {
                 <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
               </div>
             ) : user ? (
-              // Show user profile and dashboard button when logged in
+              // Show user profile when logged in
               <div className="flex items-center space-x-3">
-                
-                <div className="relative group">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                <div className="relative" ref={avatarMenuRef}>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="flex items-center space-x-2 px-3"
-                    onClick={() => setIsMenuOpen(false)}
+                    aria-haspopup="menu"
+                    aria-expanded={isAvatarMenuOpen}
+                    onClick={() => setIsAvatarMenuOpen((prev) => !prev)}
                   >
-                    <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                    <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center overflow-hidden">
                       {profile?.avatar_url ? (
                         <img 
                           src={profile.avatar_url} 
@@ -119,30 +144,39 @@ const Header = () => {
                       {profile?.first_name || user.email?.split('@')[0] || 'User'}
                     </span>
                   </Button>
-                  
-                  {/* Dropdown menu */}
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                    <div className="py-2">
-                      <Link 
-                        to="/profile" 
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        Profile Settings
-                      </Link>
-                      <Link 
-                        to="/dashboard" 
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        Dashboard
-                      </Link>
-                      <button 
-                        onClick={handleLogout}
-                        className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        Sign Out
-                      </button>
+                  {isAvatarMenuOpen && (
+                    <div
+                      className="absolute right-0 top-full mt-2 w-56 bg-popover text-popover-foreground rounded-lg shadow-lg border border-border/50 z-50 animate-in fade-in-0 zoom-in-95"
+                      role="menu"
+                      aria-label="User menu"
+                    >
+                      <div className="py-2">
+                        <Link 
+                          to="/profile" 
+                          className="block px-4 py-2 text-sm hover:bg-muted/60 focus:bg-muted/60 focus:outline-none rounded-md"
+                          role="menuitem"
+                          onClick={() => setIsAvatarMenuOpen(false)}
+                        >
+                          Profile
+                        </Link>
+                        <Link 
+                          to="/settings" 
+                          className="block px-4 py-2 text-sm hover:bg-muted/60 focus:bg-muted/60 focus:outline-none rounded-md"
+                          role="menuitem"
+                          onClick={() => setIsAvatarMenuOpen(false)}
+                        >
+                          Settings
+                        </Link>
+                        <button 
+                          onClick={() => { setIsAvatarMenuOpen(false); handleLogout(); }}
+                          className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 focus:bg-red-50 rounded-md"
+                          role="menuitem"
+                        >
+                          Sign Out
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -194,7 +228,7 @@ const Header = () => {
                 // Show user profile and dashboard button when logged in
                 <>
                   <div className="flex items-center space-x-3 p-4 bg-muted/30 rounded-lg mb-4 mx-4">
-                    <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+                    <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
                       {profile?.avatar_url ? (
                         <img 
                           src={profile.avatar_url} 
@@ -219,7 +253,10 @@ const Header = () => {
                       <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>Dashboard</Link>
                     </Button>
                     <Button variant="ghost" size="sm" asChild className="w-full justify-start">
-                      <Link to="/profile" onClick={() => setIsMenuOpen(false)}>Profile Settings</Link>
+                      <Link to="/profile" onClick={() => setIsMenuOpen(false)}>Profile</Link>
+                    </Button>
+                    <Button variant="ghost" size="sm" asChild className="w-full justify-start">
+                      <Link to="/settings" onClick={() => setIsMenuOpen(false)}>Settings</Link>
                     </Button>
                     <Button 
                       variant="ghost" 
