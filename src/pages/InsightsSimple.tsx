@@ -22,7 +22,19 @@ interface Feedback {
   id: string;
   message: string;
   email: string | null;
+  session_id: string | null;
   created_at: string;
+}
+
+interface BehaviorAnalysis {
+  id: string;
+  session_id: string;
+  feedback_id: string;
+  rage_clicks: number;
+  scroll_behavior_score: number;
+  time_on_page_seconds: number;
+  behavior_sentiment: 'positive' | 'negative' | 'neutral' | 'frustrated';
+  ai_analysis: string;
 }
 
 interface AIInsights {
@@ -47,6 +59,7 @@ const InsightsSimple: React.FC = () => {
   
   // State
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [behaviorAnalyses, setBehaviorAnalyses] = useState<BehaviorAnalysis[]>([]);
   const [selectedFeedbacks, setSelectedFeedbacks] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -81,7 +94,7 @@ const InsightsSimple: React.FC = () => {
       // Fetch feedbacks for this project
       const { data: feedbackData, error: feedbackError } = await supabase
         .from('feedback')
-        .select('id, message, email, created_at')
+        .select('id, message, email, session_id, created_at')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
 
@@ -92,6 +105,24 @@ const InsightsSimple: React.FC = () => {
       }
 
       setFeedbacks(feedbackData || []);
+
+      // Fetch behavior analyses for feedbacks with session IDs
+      const feedbackIdsWithSessions = feedbackData
+        ?.filter(f => f.session_id)
+        .map(f => f.id) || [];
+
+      if (feedbackIdsWithSessions.length > 0) {
+        const { data: behaviorData, error: behaviorError } = await supabase
+          .from('behavior_analysis')
+          .select('*')
+          .in('feedback_id', feedbackIdsWithSessions);
+
+        if (behaviorError) {
+          console.error('Error loading behavior analysis:', behaviorError);
+        } else {
+          setBehaviorAnalyses(behaviorData || []);
+        }
+      }
     } catch (error) {
       console.error('Error in fetchFeedbacks:', error);
       setError('Failed to load feedback');
@@ -166,13 +197,21 @@ const InsightsSimple: React.FC = () => {
       setGenerating(true);
       setError(null);
 
-      // Get selected feedback messages
+      // Get selected feedback messages with behavior data
       const selectedIds = Array.from(selectedFeedbacks);
       const selectedFeedbackData = feedbacks.filter(f => selectedIds.includes(f.id));
 
-      const feedbackText = selectedFeedbackData.map(f => 
-        `[${f.email || 'Anonymous'}] ${f.message}`
-      ).join('\n\n');
+      // Create enhanced feedback text with behavior context
+      const feedbackText = selectedFeedbackData.map(f => {
+        const behaviorAnalysis = behaviorAnalyses.find(b => b.feedback_id === f.id);
+        let behaviorContext = '';
+        
+        if (behaviorAnalysis) {
+          behaviorContext = `\n[Behavior Analysis: ${behaviorAnalysis.behavior_sentiment} sentiment, ${behaviorAnalysis.rage_clicks} rage clicks, ${behaviorAnalysis.time_on_page_seconds}s on page]`;
+        }
+        
+        return `[${f.email || 'Anonymous'}] ${f.message}${behaviorContext}`;
+      }).join('\n\n');
 
       // Call the AI endpoint
       const session = await supabase.auth.getSession();
@@ -470,6 +509,82 @@ const InsightsSimple: React.FC = () => {
                       {insights.sentiment.negative}%
                     </div>
                     <div className="text-sm text-gray-600">Negative</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Behavior Analysis Summary */}
+            {behaviorAnalyses.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Behavior Analysis Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white rounded-lg border p-4">
+                    <h4 className="font-medium text-gray-900 mb-2">User Frustration Indicators</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Rage Clicks</span>
+                        <span className="font-medium">
+                          {behaviorAnalyses.reduce((sum, b) => sum + b.rage_clicks, 0)} total
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Frustrated Sessions</span>
+                        <span className="font-medium text-red-600">
+                          {behaviorAnalyses.filter(b => b.behavior_sentiment === 'frustrated').length}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white rounded-lg border p-4">
+                    <h4 className="font-medium text-gray-900 mb-2">Engagement Metrics</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Avg. Time on Page</span>
+                        <span className="font-medium">
+                          {Math.round(behaviorAnalyses.reduce((sum, b) => sum + b.time_on_page_seconds, 0) / behaviorAnalyses.length)}s
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Positive Sessions</span>
+                        <span className="font-medium text-green-600">
+                          {behaviorAnalyses.filter(b => b.behavior_sentiment === 'positive').length}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Individual Behavior Analyses */}
+                <div className="mt-4">
+                  <h4 className="font-medium text-gray-900 mb-2">Individual Session Behaviors</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {behaviorAnalyses.map((analysis) => {
+                      const feedback = feedbacks.find(f => f.id === analysis.feedback_id);
+                      return (
+                        <div key={analysis.id} className="bg-gray-50 rounded-lg p-3 text-sm">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium">
+                              {feedback?.email || 'Anonymous'}
+                            </span>
+                            <Badge 
+                              variant={
+                                analysis.behavior_sentiment === 'positive' ? 'default' :
+                                analysis.behavior_sentiment === 'negative' ? 'destructive' :
+                                analysis.behavior_sentiment === 'frustrated' ? 'destructive' : 'secondary'
+                              }
+                              className="text-xs"
+                            >
+                              {analysis.behavior_sentiment}
+                            </Badge>
+                          </div>
+                          <div className="text-gray-600">
+                            {analysis.rage_clicks} rage clicks • {analysis.time_on_page_seconds}s on page
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
