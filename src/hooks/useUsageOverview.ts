@@ -11,6 +11,8 @@ export interface UsageData {
 
 export interface SubscriptionData {
   plan_type: 'trial' | 'business';
+  plan_code: string | null;
+  plan_name: string | null;
   renewal_date: string | null;
   trial_start: string | null;
   trial_end: string | null;
@@ -48,15 +50,15 @@ export interface UsageOverviewData {
   monthStart: string;
 }
 
-const PLAN_LIMITS = {
+const FALLBACK_PLAN_LIMITS = {
   trial: {
     feedback: 50,
-    insights: 10,
+    insights: 5,
     analytics: 10,
     reports: 5,
   },
   business: {
-    feedback: -1, // Unlimited
+    feedback: -1,
     insights: -1,
     analytics: -1,
     reports: -1,
@@ -76,101 +78,98 @@ export const useUsageOverview = (userId: string) => {
 
   const fetchSubscription = async (): Promise<SubscriptionData> => {
     console.log('Fetching subscription for user:', userId);
-    
-      // Use profiles table instead of subscriptions for trial data
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('plan, trial_start, trial_end, is_active')
-        .eq('user_id', userId)
-        .single();
 
-      if (profileError) {
-        console.warn('No profile found, creating defaults:', profileError);
-        
-        // Create default profile with 8-day trial
-        const trialEnd = new Date(Date.now() + 8 * 24 * 60 * 60 * 1000);
-        const defaultProfile = {
-          plan: 'free_trial' as const,
-          trial_start: new Date().toISOString(),
-          trial_end: trialEnd.toISOString(),
-          is_active: true,
-        };
-        
-        // Attempt to create profile (will be handled by trigger)
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: userId,
-            ...defaultProfile
-          });
-        
-        if (insertError) {
-          console.warn('Failed to create default profile:', insertError);
-        } else {
-          console.log('✓ Created default trial profile');
+    // Prefer user_subscriptions for active plan
+    const { data: sub, error: subError } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!subError && sub && (sub.status === 'active' || sub.status === 'trialing' || sub.status === 'past_due')) {
+      const isBusiness = (sub.plan_code || '').toLowerCase().includes('business');
+      return {
+        plan_type: isBusiness ? 'business' : 'trial',
+        plan_code: sub.plan_code || null,
+        plan_name: sub.plan_name || null,
+        renewal_date: sub.current_period_end,
+        trial_start: null,
+        trial_end: sub.current_period_end,
+        is_active: sub.status === 'active',
+      };
+    }
+
+    // Fallback to profiles for trial/free users
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('plan, trial_start, trial_end, is_active')
+      .eq('user_id', userId)
+      .single();
+
+    const planType = profile?.plan === 'business' ? 'business' as const : 'trial' as const;
+    return {
+      plan_type: planType,
+      plan_code: planType === 'business' ? 'business' : 'trial',
+      plan_name: planType === 'business' ? 'Business' : 'Free Trial',
+      renewal_date: null,
+      trial_start: profile?.trial_start || null,
+      trial_end: profile?.trial_end || null,
+      is_active: Boolean(profile?.is_active),
+    };
+  };
+
+  const fetchUsageData = async (monthStart: string): Promise<{ usage: UsageData; monthStartOut: string }> => {
+    try {
+      // Use RPC that ensures monthly reset window
+      const { data: usageRows, error } = await supabase
+        .rpc('get_user_usage_with_monthly_reset', { user_uuid: userId });
+
+      if (error) throw error;
+
+      const row = Array.isArray(usageRows) && usageRows.length > 0 ? usageRows[0] : null;
+      if (row) {
+        // Compute feedback_count based on user's feedback_settings projects
+        let feedbackCount = 0;
+        try {
+          const { data: settings } = await supabase
+            .from('feedback_settings')
+            .select('project_id')
+            .eq('user_id', userId);
+
+          const projectIds = (settings || []).map((s: any) => s.project_id);
+          if (projectIds.length > 0) {
+            const { count } = await supabase
+              .from('feedback')
+              .select('id', { count: 'exact', head: true })
+              .in('project_id', projectIds)
+              .gte('created_at', row.month_start || monthStart);
+            feedbackCount = typeof count === 'number' ? count : 0;
+          }
+        } catch (e) {
+          console.warn('Failed to count feedback usage:', e);
         }
-        
         return {
-          plan_type: 'trial' as const,
-          renewal_date: null,
-          trial_start: defaultProfile.trial_start,
-          trial_end: defaultProfile.trial_end,
-          is_active: defaultProfile.is_active,
+          usage: {
+            feedback_count: feedbackCount,
+            insights_count: row.insights_count || 0,
+            analytics_count: row.analytics_count || 0,
+            reports_count: row.reports_count || 0,
+          },
+          monthStartOut: row.month_start || monthStart,
         };
       }
 
-      console.log('✓ Found profile:', profile);
       return {
-        plan_type: profile.plan === 'business' ? 'business' as const : 'trial' as const,
-        renewal_date: null,
-        trial_start: profile.trial_start,
-        trial_end: profile.trial_end,
-        is_active: profile.is_active,
-      };
-  };
-
-  const fetchUsageData = async (monthStart: string): Promise<UsageData> => {
-    try {
-      const [feedbacksResult, insightsResult, analyticsResult, reportsResult] = await Promise.all([
-        supabase
-          .from('feedback')
-          .select('id', { count: 'exact', head: true })
-          .gte('timestamp', monthStart),
-        
-        supabase
-          .from('analytics_events')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .eq('event_type', 'insight')
-          .gte('created_at', monthStart),
-        
-        supabase
-          .from('analytics_history')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .gte('created_at', monthStart),
-        
-        supabase
-          .from('analytics_events')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .eq('event_type', 'report')
-          .gte('created_at', monthStart),
-      ]);
-
-      return {
-        feedback_count: (feedbacksResult && typeof feedbacksResult.count === 'number') ? feedbacksResult.count : 0,
-        insights_count: (insightsResult && typeof insightsResult.count === 'number') ? insightsResult.count : 0,
-        analytics_count: (analyticsResult && typeof analyticsResult.count === 'number') ? analyticsResult.count : 0,
-        reports_count: (reportsResult && typeof reportsResult.count === 'number') ? reportsResult.count : 0,
+        usage: { feedback_count: 0, insights_count: 0, analytics_count: 0, reports_count: 0 },
+        monthStartOut: monthStart,
       };
     } catch (e) {
-      console.warn('Usage queries failed, defaulting to zeros:', e);
+      console.warn('Usage RPC failed, defaulting to zeros:', e);
       return {
-        feedback_count: 0,
-        insights_count: 0,
-        analytics_count: 0,
-        reports_count: 0,
+        usage: { feedback_count: 0, insights_count: 0, analytics_count: 0, reports_count: 0 },
+        monthStartOut: monthStart,
       };
     }
   };
@@ -190,13 +189,37 @@ export const useUsageOverview = (userId: string) => {
     }
   };
 
+  const fetchPlanLimits = async (subscription: SubscriptionData) => {
+    // Try server-side limits first
+    if (subscription.plan_code) {
+      const { data: limitsJson, error } = await supabase.rpc('get_plan_limits', {
+        plan_code: subscription.plan_code,
+      });
+      if (!error && limitsJson) {
+        try {
+          const parsed = limitsJson as any;
+          return {
+            feedback: typeof parsed.feedback === 'number' ? parsed.feedback : FALLBACK_PLAN_LIMITS[subscription.plan_type].feedback,
+            insights: typeof parsed.insights === 'number' ? parsed.insights : FALLBACK_PLAN_LIMITS[subscription.plan_type].insights,
+            analytics: typeof parsed.analytics === 'number' ? parsed.analytics : FALLBACK_PLAN_LIMITS[subscription.plan_type].analytics,
+            reports: typeof parsed.reports === 'number' ? parsed.reports : FALLBACK_PLAN_LIMITS[subscription.plan_type].reports,
+          };
+        } catch (_) {
+          // fall through to defaults
+        }
+      }
+    }
+    // Fallback
+    return FALLBACK_PLAN_LIMITS[subscription.plan_type];
+  };
+
   const calculateUsageData = (
     subscription: SubscriptionData,
     usage: UsageData,
+    limits: { feedback: number; insights: number; analytics: number; reports: number },
     monthStart: string
   ): UsageOverviewData => {
     const planType = subscription.plan_type;
-    const limits = PLAN_LIMITS[planType];
     
     // Check if trial is expired
     const isTrialExpired = planType === 'trial' && (
@@ -254,21 +277,24 @@ export const useUsageOverview = (userId: string) => {
       setError(null);
       console.log('Loading usage overview data for user:', userId);
       
-      const monthStart = getCurrentMonthStart();
-      console.log('Current month start:', monthStart);
-      
-      // Refresh usage counters first
-      await refreshUsageCounters(monthStart);
-      
-      // Fetch subscription and usage data in parallel
-      const [subscription, usage] = await Promise.all([
-        fetchSubscription(),
-        fetchUsageData(monthStart),
-      ]);
+      const monthStartGuess = getCurrentMonthStart();
+      console.log('Current month start (guess):', monthStartGuess);
 
-      console.log('Fetched data:', { subscription, usage });
+      // Fetch subscription first to know plan/limits
+      const subscription = await fetchSubscription();
 
-      const usageData = calculateUsageData(subscription, usage, monthStart);
+      // Refresh usage counters using guess (server will normalize)
+      await refreshUsageCounters(monthStartGuess);
+
+      // Fetch usage via RPC (includes server month_start)
+      const { usage, monthStartOut } = await fetchUsageData(monthStartGuess);
+
+      // Fetch limits via RPC or fallback
+      const limits = await fetchPlanLimits(subscription);
+
+      console.log('Fetched data:', { subscription, usage, limits, monthStartOut });
+
+      const usageData = calculateUsageData(subscription, usage, limits, monthStartOut);
       console.log('Calculated usage data:', usageData);
       
       setData(usageData);
@@ -313,6 +339,8 @@ export const useUsageOverview = (userId: string) => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'feedback' }, () => loadData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'analytics_events' }, () => loadData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'analytics_history' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'usage_counters', filter: `user_id=eq.${userId}` }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_subscriptions', filter: `user_id=eq.${userId}` }, () => loadData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `user_id=eq.${userId}` }, () => loadData())
       .subscribe();
 
