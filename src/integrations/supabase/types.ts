@@ -633,6 +633,7 @@ export type Database = {
           onboarding_completed: boolean | null
           phone: string | null
           plan: string | null
+          plan_type: string | null
           preferences: Json | null
           role: string | null
           trial_end: string | null
@@ -657,6 +658,7 @@ export type Database = {
           onboarding_completed?: boolean | null
           phone?: string | null
           plan?: string | null
+          plan_type?: string | null
           preferences?: Json | null
           role?: string | null
           trial_end?: string | null
@@ -681,6 +683,7 @@ export type Database = {
           onboarding_completed?: boolean | null
           phone?: string | null
           plan?: string | null
+          plan_type?: string | null
           preferences?: Json | null
           role?: string | null
           trial_end?: string | null

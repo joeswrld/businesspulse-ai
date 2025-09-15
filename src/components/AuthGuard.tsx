@@ -47,23 +47,31 @@ const AuthGuard = ({
           return;
         }
 
-        // Get user profile and access status
+        // Get user profile from profiles table
         const { data: profileData, error: profileError } = await supabase
-          .rpc('get_user_profile_with_access', { user_uuid: user.id });
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
 
         if (profileError) {
           console.error("Error fetching profile:", profileError);
           // Continue anyway, let the app handle the error
-        } else if (profileData && profileData.length > 0) {
-          const profile = profileData[0];
-          setUserProfile(profile);
-          setAccessStatus(profile);
+        } else if (profileData) {
+          setUserProfile(profileData);
+          setAccessStatus(profileData);
 
-          // Check subscription/trial status if required - DISABLED FOR UNLOCKED PLATFORM
-          // if (requireActiveSubscription && !profile.has_access) {
-          //   navigate("/trial-expired");
-          //   return;
-          // }
+          // Check trial expiration
+          if (profileData.plan_type === 'trial' && profileData.trial_end) {
+            const now = new Date();
+            const trialEnd = new Date(profileData.trial_end);
+            
+            if (now > trialEnd) {
+              // Trial expired, redirect to billing page
+              navigate("/billing");
+              return;
+            }
+          }
         }
 
         setLoading(false);
