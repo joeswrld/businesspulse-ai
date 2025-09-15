@@ -177,14 +177,37 @@ export default function UsageOverview({ userId, onUpgrade, refreshTrigger }: Usa
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Usage Overview</h2>
           <div className="mt-2 space-y-1">
-            <div className="flex items-center gap-2">
-              <p className="text-gray-600">Current Plan:</p>
-              <Badge variant="outline">{planDisplayName}</Badge>
-              {planType === 'trial' && <Badge variant="secondary" className="bg-blue-100 text-blue-800"><Clock className="h-3 w-3 mr-1" />Trial</Badge>}
-            </div>
-            {planType !== 'trial' && <div className="text-sm text-gray-600">{formatCurrency(planPricing.price/100, planPricing.currency)}/month • Next Renewal: {formatDate(data.subscription?.renewal_date)}</div>}
-            {planType === 'trial' && <div className="text-sm text-gray-600">Trial ends: {formatDate(data.subscription?.trial_end)}</div>}
-          </div>
+            <div className="flex flex-col gap-2">
+  <div className="flex items-center gap-2">
+    <p className="text-gray-600">Current Plan:</p>
+    <Badge variant="outline">
+      {planType === 'business' ? 'Business' : 'Free'}
+    </Badge>
+
+    {/* Show Trial Badge only if trial */}
+    {planType === 'trial' && data.subscription?.trial_end && (
+      <Badge variant="secondary" className="bg-blue-100 text-blue-800 flex items-center gap-1">
+        <Clock className="h-3 w-3" /> Trial
+      </Badge>
+    )}
+  </div>
+
+  {/* Pricing info for paid users */}
+  {planType === 'business' && (
+    <div className="text-sm text-gray-600">
+      {formatCurrency(planPricing.price / 100, planPricing.currency)}/month
+      {data.subscription?.renewal_date && ` • Next Renewal: ${formatDate(data.subscription.renewal_date)}`}
+    </div>
+  )}
+
+  {/* Trial info for free/trial users */}
+  {planType === 'trial' && data.subscription?.trial_end && (
+    <div className="text-sm text-gray-600">
+      Trial ends: {formatDate(data.subscription.trial_end)}
+    </div>
+  )}
+</div>
+
         </div>
         <Button variant="outline" size="sm" onClick={refresh} disabled={refreshing} className="border-gray-300 hover:bg-gray-50">
           {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Refresh
