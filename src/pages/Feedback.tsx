@@ -90,10 +90,10 @@ const Feedback: React.FC = () => {
       setLoading(true)
       
       const { data, error } = await supabase
-        .from('feedbacks')
+        .from('feedback')
         .select('*')
         .eq('project_id', projectId)
-        .order('timestamp', { ascending: false })
+        .order('created_at', { ascending: false })
 
       if (error) {
         console.error('Error loading feedback:', error)
