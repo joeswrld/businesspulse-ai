@@ -102,7 +102,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
           <h2 className="text-3xl font-bold text-gray-900">Choose Your Plan</h2>
         </div>
         <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-          Start with a free trial, then upgrade to Business for unlimited access to all features
+          Free plan has a 30-day rolling period with limits: 50 Feedback, 5 Insights, 5 Reports. Upgrade to Business for unlimited features.
         </p>
       </div>
 
