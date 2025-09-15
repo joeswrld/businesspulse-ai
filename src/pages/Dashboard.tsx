@@ -30,6 +30,10 @@ import {
   Minus
 } from 'lucide-react';
 
+import OnboardingChecklist from '@/components/OnboardingChecklist';
+import GuidedTour from '@/components/GuidedTour';
+import { useOnboarding } from '@/hooks/useOnboarding';
+
 import {
   BarChart as RechartsBarChart,
   Bar,
@@ -124,6 +128,8 @@ export default function Dashboard() {
     from: undefined,
     to: undefined
   });
+  const [showTour, setShowTour] = useState(false);
+  const { isNewUser } = useOnboarding();
 
   // Load dashboard data
   const loadDashboardData = useCallback(async () => {
@@ -487,8 +493,11 @@ export default function Dashboard() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      {/* Guided Tour */}
+      <GuidedTour run={showTour} onComplete={() => setShowTour(false)} />
+      
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between" data-tour="dashboard-welcome">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
           <p className="text-gray-600 mt-2">
@@ -496,6 +505,16 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
+          {isNewUser && (
+            <Button
+              variant="outline"
+              onClick={() => setShowTour(true)}
+              className="border-blue-200 text-blue-600 hover:bg-blue-50"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Take Tour
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={loadDashboardData}
@@ -506,6 +525,13 @@ export default function Dashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Onboarding Checklist */}
+      {isNewUser && (
+        <div data-tour="onboarding-checklist">
+          <OnboardingChecklist />
+        </div>
+      )}
 
       {/* Date Range Filter */}
       <Card className="rounded-xl shadow-lg">
@@ -571,7 +597,7 @@ export default function Dashboard() {
       </Card>
 
       {/* Key Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6" data-tour="feedback-metrics">
         {/* Total Feedback */}
         <Card className="rounded-xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -687,7 +713,7 @@ export default function Dashboard() {
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" data-tour="feedback-charts">
         {/* Feedback Volume Over Time */}
         <Card className="rounded-xl shadow-lg lg:col-span-2">
           <CardHeader>
@@ -811,7 +837,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Recent Feedback Feed */}
-        <Card className="rounded-xl shadow-lg">
+        <Card className="rounded-xl shadow-lg" data-tour="recent-feedback">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <MessageSquare className="h-5 w-5" />

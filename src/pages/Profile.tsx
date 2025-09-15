@@ -699,7 +699,7 @@ const Profile: React.FC = () => {
       </div>
 
       {/* Quick Actions */}
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-2xl mx-auto" data-tour="navigation-sidebar">
         <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Quick Actions</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
