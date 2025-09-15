@@ -62,6 +62,7 @@ import {
 } from 'lucide-react';
 import PaystackPayment from '@/components/PaystackPayment';
 import PlanComparison from '@/components/billing/PlanComparison';
+import UsageBar from '@/components/billing/UsageBar';
 
 type UpgradePlan = 'business' | null;
 
@@ -548,6 +549,11 @@ NoteX Team
           </CardContent>
         </Card>
 
+
+        {/* Billing Usage Section */}
+        <div className="mb-8">
+          <UsageBar />
+        </div>
 
         {/* Plan Comparison */}
         <div className="mb-8">

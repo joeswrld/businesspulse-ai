@@ -4,7 +4,7 @@ export const PLAN_LIMITS = {
   free: { 
     feedback: 50, 
     insights: 5, 
-    reports: 2,
+    reports: 5,
     retention_days: 30
   },
   pro: { 
@@ -120,7 +120,7 @@ export const getPlanFeatures = (planTier: keyof typeof PLAN_LIMITS): string[] =>
       return [
         '50 feedback responses',
         '5 AI insights',
-        '2 reports',
+        '5 reports',
         '30-day data retention',
         'Basic support'
       ];

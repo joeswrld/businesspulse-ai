@@ -19,6 +19,8 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface UsageData {
   feature_type: string;
@@ -87,6 +89,22 @@ const UsageBar: React.FC = () => {
     }
   };
 
+  // Realtime updates when feedback/insights/reports change
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('usage-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'feedback' }, () => loadBillingData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'insights_results' }, () => loadBillingData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, () => loadBillingData())
+      .subscribe();
+
+    return () => {
+      try { channel.unsubscribe(); } catch (_) {}
+    };
+  }, [user]);
+
   const refreshUsage = async () => {
     if (!user) return;
 
@@ -153,11 +171,11 @@ const UsageBar: React.FC = () => {
   const getFeatureName = (featureType: string) => {
     switch (featureType) {
       case 'feedback':
-        return 'Feedback Responses';
+        return 'Feedback Collection';
       case 'ai_insights':
         return 'AI Insights';
       case 'reports':
-        return 'Reports';
+        return 'Reports / Basic Analytics';
       default:
         return featureType;
     }
@@ -336,52 +354,95 @@ const UsageBar: React.FC = () => {
 
         {/* Usage Bars */}
         <div className="space-y-4">
-          {usageData.map((usage) => (
-            <div key={usage.feature_type} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  {getFeatureIcon(usage.feature_type)}
-                  <span className="font-medium text-gray-900">
-                    {getFeatureName(usage.feature_type)}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-medium text-gray-900">
-                    {usage.is_unlimited ? (
-                      <span className="text-green-600">Unlimited</span>
-                    ) : (
-                      `${usage.usage_count} / ${usage.limit}`
+          {usageData.map((usage) => {
+            const isAtOrOverLimit = !usage.is_unlimited && usage.percentage >= 100;
+            return (
+              <div key={usage.feature_type} className={`space-y-2 p-3 rounded-lg border ${isAtOrOverLimit ? 'bg-red-50 border-red-200' : 'border-gray-200'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    {getFeatureIcon(usage.feature_type)}
+                    <span className="font-medium text-gray-900">
+                      {getFeatureName(usage.feature_type)}
+                    </span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-xs text-gray-500 underline cursor-help">What is this?</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-sm">
+                            Usage counts reset monthly. Feedback includes responses from the feedback page, widget, and forms. Reports are generated from the reports page. AI Insights come from the insights page.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-gray-900">
+                      {usage.is_unlimited ? (
+                        <span className="text-green-600">Unlimited</span>
+                      ) : (
+                        `${usage.usage_count} / ${usage.limit}`
+                      )}
+                    </div>
+                    {!usage.is_unlimited && (
+                      <div className="text-xs text-gray-500">
+                        {Math.max(0, usage.remaining || 0)} remaining
+                      </div>
                     )}
                   </div>
-                  {!usage.is_unlimited && (
-                    <div className="text-xs text-gray-500">
-                      {usage.remaining} remaining
+                </div>
+                {!usage.is_unlimited && (
+                  <div className="space-y-1">
+                    <Progress 
+                      value={Math.min(100, usage.percentage)} 
+                      className="h-2"
+                    />
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>0</span>
+                      <span className={`font-medium ${
+                        usage.percentage >= 100 ? 'text-red-600' :
+                        usage.percentage >= 80 ? 'text-yellow-600' :
+                        'text-green-600'
+                      }`}>
+                        {usage.percentage}%
+                      </span>
+                      <span>{usage.limit}</span>
                     </div>
-                  )}
-                </div>
-              </div>
-              
-              {!usage.is_unlimited && (
-                <div className="space-y-1">
-                  <Progress 
-                    value={usage.percentage} 
-                    className="h-2"
-                  />
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>0</span>
-                    <span className={`font-medium ${
-                      usage.percentage >= 100 ? 'text-red-600' :
-                      usage.percentage >= 80 ? 'text-yellow-600' :
-                      'text-green-600'
-                    }`}>
-                      {usage.percentage}%
-                    </span>
-                    <span>{usage.limit}</span>
                   </div>
-                </div>
-              )}
+                )}
+                {isAtOrOverLimit && (
+                  <div className="mt-2 flex items-center justify-between">
+                    <div className="flex items-center space-x-2 text-sm text-red-700">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span>Limit reached. Upgrade to continue.</span>
+                    </div>
+                    <Button asChild size="sm" className="bg-red-600 hover:bg-red-700">
+                      <a href="/billing">
+                        <Zap className="h-4 w-4 mr-1" />
+                        Upgrade to Business
+                      </a>
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Team Members (Coming soon) */}
+        <div className="mt-4 p-3 rounded-lg border border-dashed border-gray-300 bg-gray-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Users className="h-4 w-4" />
+              <span className="font-medium text-gray-900">Team Members</span>
+              <Badge variant="secondary">Coming soon</Badge>
             </div>
-          ))}
+            <div className="text-sm text-gray-600">
+              {billingData?.team_members_limit === -1 ? 'Unlimited' : 'Limited on free trial'}
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-gray-600">Team management from the teams page is coming soon.</p>
         </div>
 
         {/* Plan Features */}
