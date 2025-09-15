@@ -64,7 +64,7 @@ const HowItWorksSection = () => {
   ];
 
   return (
-    <section id="how-it-works" className="py-16 sm:py-20 lg:py-24 bg-background">
+    <section id="how-it-works" className="py-16 sm:py-20 lg:py-24 bg-gradient-subtle transition-colors">
       <div className="container mx-auto px-3 sm:px-4">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
@@ -83,13 +83,13 @@ const HowItWorksSection = () => {
         {/* Steps Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-12 sm:mb-16">
           {steps.map((step, index) => (
-            <Card key={index} className="group hover:shadow-medium transition-all duration-300 border-0 bg-background/80 backdrop-blur-sm relative">
+            <Card key={index} className="group hover:shadow-medium transition-all duration-300 border border-border/60 bg-card/90 backdrop-blur-sm relative">
               <CardContent className="p-4 sm:p-6">
                 <div className="space-y-3 sm:space-y-4">
                   {/* Icon and Badge */}
                   <div className="flex items-start justify-between">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary-light rounded-lg flex items-center justify-center group-hover:bg-primary-light/80 transition-colors">
-                      <step.icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center bg-primary-light dark:bg-secondary hover:bg-primary-light/80 dark:hover:bg-secondary/80 transition-colors">
+                      <step.icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary dark:text-primary-foreground" />
                     </div>
                     <Badge variant="secondary" className="text-xs">
                       {step.badge}
@@ -109,7 +109,7 @@ const HowItWorksSection = () => {
                     <ul className="space-y-1.5 sm:space-y-2">
                       {step.features.map((feature, featureIndex) => (
                         <li key={featureIndex} className="flex items-center space-x-2 text-xs text-muted-foreground">
-                          <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                          <CheckCircle className="h-3 w-3 text-success flex-shrink-0" />
                           <span>{feature}</span>
                         </li>
                       ))}
@@ -121,8 +121,8 @@ const HowItWorksSection = () => {
               {/* Arrow for connection */}
               {index < steps.length - 1 && (
                 <div className="hidden lg:block absolute -right-3 top-1/2 transform -translate-y-1/2 z-10">
-                  <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
-                    <ArrowRight className="h-3 w-3 text-white" />
+                  <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-soft">
+                    <ArrowRight className="h-3 w-3 text-primary-foreground" />
                   </div>
                 </div>
               )}
@@ -131,7 +131,7 @@ const HowItWorksSection = () => {
         </div>
 
         {/* Demo Section */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl sm:rounded-2xl p-6 sm:p-8 md:p-12">
+        <div className="rounded-xl sm:rounded-2xl p-6 sm:p-8 md:p-12 border border-border bg-card transition-colors">
           <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 items-center">
             <div>
               <h3 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3 sm:mb-4">
@@ -143,20 +143,20 @@ const HowItWorksSection = () => {
               
               <div className="space-y-3 sm:space-y-4">
                 <div className="flex items-center space-x-2 sm:space-x-3">
-                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-success/15 rounded-full flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
                   </div>
                   <span className="text-xs sm:text-sm">Setup in under 5 minutes</span>
                 </div>
                 <div className="flex items-center space-x-2 sm:space-x-3">
-                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-success/15 rounded-full flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
                   </div>
                   <span className="text-xs sm:text-sm">Real-time AI analysis</span>
                 </div>
                 <div className="flex items-center space-x-2 sm:space-x-3">
-                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-success/15 rounded-full flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
                   </div>
                   <span className="text-xs sm:text-sm">Beautiful insights dashboard</span>
                 </div>
