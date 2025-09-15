@@ -1,6 +1,16 @@
 (function() {
   'use strict';
-
+// Simple sentiment analyzer
+function getSentiment(text) {
+  const t = text.toLowerCase();
+  if (t.includes('love') || t.includes('great') || t.includes('good') || t.includes('awesome')) {
+    return 'Positive';
+  }
+  if (t.includes('hate') || t.includes('bad') || t.includes('terrible') || t.includes('worst')) {
+    return 'Negative';
+  }
+  return 'Neutral';
+}
   // Configuration
   const CONFIG = {
     apiUrl: 'https://xjbrqeqizpoqdjkiyqzt.supabase.co',
