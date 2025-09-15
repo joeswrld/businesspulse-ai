@@ -64,7 +64,7 @@ const HeroSection = () => {
               />
               
               {/* Floating Elements */}
-              <div className="absolute top-2 sm:top-4 left-2 sm:left-4 bg-white/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-medium">
+              <div className="absolute top-2 sm:top-4 left-2 sm:left-4 bg-card/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-medium border border-border">
                 <div className="flex items-center space-x-1 sm:space-x-2">
                   <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-success" />
                   <div>
@@ -74,7 +74,7 @@ const HeroSection = () => {
                 </div>
               </div>
               
-              <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-white/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-medium">
+              <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-card/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-medium border border-border">
                 <div className="flex items-center space-x-2">
                   <Brain className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                   <div>
@@ -84,7 +84,7 @@ const HeroSection = () => {
                 </div>
               </div>
               
-              <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-medium">
+              <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2 bg-card/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-medium border border-border">
                 <div className="text-xs font-medium text-center">
                   Real-time Feedback Analytics
                 </div>
