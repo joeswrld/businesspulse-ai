@@ -1351,6 +1351,47 @@ export type Database = {
           },
         ]
       }
+      feature_requests: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          status: 'Planned' | 'In Progress' | 'Released'
+          feedback_ids: string[]
+          user_id: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          status?: 'Planned' | 'In Progress' | 'Released'
+          feedback_ids?: string[]
+          user_id: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          status?: 'Planned' | 'In Progress' | 'Released'
+          feedback_ids?: string[]
+          user_id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
