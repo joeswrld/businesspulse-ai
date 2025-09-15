@@ -247,11 +247,11 @@ const BillingPage: React.FC = () => {
   const getStatusBadge = (planType: string) => {
     switch (planType) {
       case 'business':
-        return <Badge className="bg-green-100 text-green-800">Business</Badge>;
+        return <span className="inline-flex items-center rounded px-2 py-1 text-sm font-medium bg-green-100 text-green-800">Business</span>;
       case 'trial':
-        return <Badge className="bg-blue-100 text-blue-800">Trial</Badge>;
+        return <span className="inline-flex items-center rounded px-2 py-1 text-sm font-medium bg-blue-100 text-blue-800">Trial</span>;
       default:
-        return <Badge variant="secondary">{planType}</Badge>;
+        return <span className="inline-flex items-center rounded px-2 py-1 text-sm font-medium bg-gray-100 text-gray-800">{planType}</span>;
     }
   };
 
