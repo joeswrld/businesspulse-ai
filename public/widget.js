@@ -504,48 +504,31 @@ function getSentiment(text) {
   // Handle form submission
   async function handleSubmit(event, projectId) {
   event.preventDefault();
-  
-  const submitBtn = document.getElementById('notex-submit-btn');
-  const messageInput = document.getElementById('notex-message');
-  const emailInput = document.getElementById('notex-email');
-  const errorDiv = document.getElementById('notex-message-error');
-  
-  const message = messageInput.value.trim();
-  const email = emailInput.value.trim();
 
+  const email = emailInput.value.trim();
+  const message = messageInput.value.trim();
+  const errorDiv = document.getElementById('notex-error');
+
+  // Clear previous errors
   errorDiv.textContent = '';
 
+  // Validate message
   if (!message) {
     errorDiv.textContent = 'Message is required';
     messageInput.focus();
     return;
   }
 
-  const sentiment = getSentiment(message); // 🧠 detect sentiment
-
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Sending...';
-
   try {
+    const sentiment = await analyzeSentiment(message);
     await submitFeedback(projectId, email, message, sentiment);
     showSuccess();
   } catch (error) {
     console.error('Error submitting feedback:', error);
     errorDiv.textContent = 'Failed to submit feedback. Please try again.';
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Send Feedback';
   }
 }
 
-    // Clear previous errors
-    errorDiv.textContent = '';
-    
-    // Validate message
-    if (!message) {
-      errorDiv.textContent = 'Message is required';
-      messageInput.focus();
-      return;
-    }
     
     // Disable submit button
     submitBtn.disabled = true;
