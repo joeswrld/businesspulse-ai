@@ -128,11 +128,12 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     };
   };
 
- const navigation = [
+const navigation = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { name: "Feedback", href: "/feedback", icon: MessageSquare },
   { name: "AI Insights", href: "/insights-simple", icon: Brain },
   { name: "Reports & Analytics", href: "/reports", icon: FileText },
+  { name: "Roadmap", href: "/roadmap", icon: BarChart3 }, // <-- NEW ENTRY
   { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
   { name: "Team Collaboration", href: "/teams", icon: Users },
   { name: "Feedback Settings", href: "/feedback-settings", icon: Settings },
