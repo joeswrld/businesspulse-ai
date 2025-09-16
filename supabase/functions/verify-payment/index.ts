@@ -344,6 +344,23 @@ serve(async (req) => {
 
     console.log('User subscription updated successfully')
 
+    // Update user's plan_type in profiles table
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ 
+        plan_type: 'business',
+        authorization_code: transaction.subscription?.subscription_code || reference
+      })
+      .eq('user_id', user.id)
+
+    if (profileError) {
+      console.error('Profile update error:', profileError)
+      // Don't fail the entire operation, just log the error
+      console.warn('Failed to update user profile plan_type, but payment was successful')
+    } else {
+      console.log('User profile plan_type updated to business')
+    }
+
     // Log successful upgrade
     console.log(`User ${user.id} upgraded to ${plan} plan successfully`)
 

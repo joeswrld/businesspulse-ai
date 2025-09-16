@@ -10,7 +10,8 @@ import {
   Clock, 
   Calendar,
   DollarSign,
-  AlertTriangle
+  AlertTriangle,
+  Crown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,10 +40,10 @@ interface Transaction {
 interface User {
   id: string;
   email: string;
+  trial_start: string;
   trial_end: string;
-  subscription_status: string;
-  plan: string;
-  subscription_id: string;
+  plan_type: 'trial' | 'business';
+  subscription_id: string | null;
   authorization_code: string | null;
 }
 
@@ -52,24 +53,9 @@ const BillingPage: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPayment, setShowPayment] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'pro' | 'business' | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<'business' | null>(null);
 
   const plans = [
-    {
-      id: 'pro',
-      name: 'Pro',
-      price: '₦35,000',
-      pricePerMonth: '₦35,000/month',
-      features: [
-        'Unlimited data sources',
-        '100 AI insights per month',
-        'Advanced analytics',
-        'Priority support',
-        'Custom reports',
-        'Team collaboration'
-      ],
-      planCode: 'PLN_4z2wpgmw41z2k7r'
-    },
     {
       id: 'business',
       name: 'Business',
@@ -100,60 +86,72 @@ const BillingPage: React.FC = () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) return;
 
-      // Get user profile from profiles table (if exists)
+      // Get user profile from profiles table
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', authUser.id)
         .single();
 
-      if (authUser) {
-        // Construct user object with proper structure
+      if (profileData) {
+        // Construct user object with trial system
         const userObj: User = {
           id: authUser.id,
           email: authUser.email || '',
-          trial_end: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(), // 8 days from now
-          subscription_status: 'trial',
-          plan: 'trial',
-          subscription_id: '',
-          authorization_code: null
+          trial_start: profileData.trial_start || new Date().toISOString(),
+          trial_end: profileData.trial_end || new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
+          plan_type: profileData.plan_type || 'trial',
+          subscription_id: profileData.authorization_code,
+          authorization_code: profileData.authorization_code
         };
         setUser(userObj);
       }
 
-      // Get subscription from new billing system
-      const { data: subscriptionData } = await supabase
-        .from('user_subscriptions')
-        .select(`
-          *,
-          plans!inner(name, tier)
-        `)
-        .eq('user_id', authUser.id)
-        .single();
+      // Get subscription data if user has business plan
+      if (profileData?.plan_type === 'business') {
+        const { data: subscriptionData } = await supabase
+          .from('user_subscriptions')
+          .select('*')
+          .eq('user_id', authUser.id)
+          .single();
 
-      if (subscriptionData) {
-        // Map the subscription data to our interface
-        const subData = subscriptionData as any;
-        const subscriptionObj: Subscription = {
-          id: subData.id,
-          plan_code: subData.plan_code || 'free',
-          plan_name: subData.plans?.name || 'Free Trial',
-          status: subData.status || 'trialing',
-          current_period_start: subData.current_period_start || '',
-          current_period_end: subData.current_period_end || '',
-          cancel_at_period_end: subData.cancel_at_period_end || false,
-          canceled_at: subData.canceled_at || null
-        };
-        setSubscription(subscriptionObj);
+        if (subscriptionData) {
+          const subscriptionObj: Subscription = {
+            id: subscriptionData.id,
+            plan_code: subscriptionData.plan_code || 'business',
+            plan_name: subscriptionData.plan_name || 'Business',
+            status: subscriptionData.status || 'active',
+            current_period_start: subscriptionData.current_period_start || '',
+            current_period_end: subscriptionData.current_period_end || '',
+            cancel_at_period_end: subscriptionData.cancel_at_period_end || false,
+            canceled_at: subscriptionData.canceled_at || null
+          };
+          setSubscription(subscriptionObj);
+        }
       }
 
-      // Skip transactions for now to avoid type issues - will be added when needed
-      setTransactions([]);
+      // Get transaction history
+      const { data: transactionData } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', authUser.id)
+        .order('created_at', { ascending: false });
+
+      if (transactionData) {
+        const transactionsList: Transaction[] = transactionData.map(t => ({
+          id: t.id.toString(),
+          reference: t.paystack_reference || `TXN-${t.id}`,
+          amount: t.amount || 0,
+          status: t.status || 'pending',
+          paid_at: t.created_at || '',
+          created_at: t.created_at || ''
+        }));
+        setTransactions(transactionsList);
+      }
 
     } catch (error) {
       console.error('Error fetching billing data:', error);
-      // Don't show error toast for missing data, as it's expected for new users
-      console.log('This is normal for new users - billing data will be created on first payment');
+      toast.error('Failed to load billing information');
     } finally {
       setLoading(false);
     }
@@ -180,20 +178,37 @@ const BillingPage: React.FC = () => {
     };
   };
 
-  const handlePlanSelect = (plan: 'pro' | 'business') => {
+  const handlePlanSelect = (plan: 'business') => {
     setSelectedPlan(plan);
     setShowPayment(true);
   };
 
   const handlePaymentSuccess = async (subscriptionData: any) => {
-    toast.success('Payment successful! Your subscription is being activated...');
-    setShowPayment(false);
-    setSelectedPlan(null);
-    
-    // Refresh billing data
-    setTimeout(() => {
-      fetchBillingData();
-    }, 2000);
+    try {
+      // Update user's plan_type to business
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        await supabase
+          .from('profiles')
+          .update({ 
+            plan_type: 'business',
+            authorization_code: subscriptionData.subscription_id || subscriptionData.reference
+          })
+          .eq('user_id', authUser.id);
+      }
+
+      toast.success('Payment successful! Your subscription is being activated...');
+      setShowPayment(false);
+      setSelectedPlan(null);
+      
+      // Refresh billing data
+      setTimeout(() => {
+        fetchBillingData();
+      }, 2000);
+    } catch (error) {
+      console.error('Error updating plan after payment:', error);
+      toast.error('Payment successful but failed to update plan. Please contact support.');
+    }
   };
 
   const handlePaymentCancel = () => {
@@ -228,24 +243,31 @@ const BillingPage: React.FC = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <Badge className="bg-green-100 text-green-800">Active</Badge>;
-      case 'past_due':
-        return <Badge className="bg-yellow-100 text-yellow-800">Past Due</Badge>;
-      case 'canceled':
-        return <Badge className="bg-red-100 text-red-800">Canceled</Badge>;
-      case 'trialing':
-        return <Badge className="bg-blue-100 text-blue-800">Trial</Badge>;
+  const getStatusBadge = (planType: string) => {
+    switch (planType) {
+      case 'business':
+        return <span className="inline-flex items-center rounded px-2 py-1 text-sm font-medium bg-green-100 text-green-800">Business</span>;
+      case 'trial':
+        return <span className="inline-flex items-center rounded px-2 py-1 text-sm font-medium bg-blue-100 text-blue-800">Trial</span>;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return <span className="inline-flex items-center rounded px-2 py-1 text-sm font-medium bg-gray-100 text-gray-800">{planType}</span>;
     }
   };
 
-  const isTrialActive = subscription?.status === 'trialing' && subscription?.current_period_end && 
-                       new Date(subscription.current_period_end) > new Date();
-  const hasActiveSubscription = subscription?.status === 'active';
+  const isTrialActive = user?.plan_type === 'trial' && user?.trial_end && 
+                       new Date(user.trial_end) > new Date();
+  const isTrialExpired = user?.plan_type === 'trial' && user?.trial_end && 
+                        new Date(user.trial_end) <= new Date();
+  const hasActiveSubscription = user?.plan_type === 'business';
+  
+  const getTrialDaysRemaining = () => {
+    if (!user?.trial_end) return 0;
+    const now = new Date();
+    const trialEnd = new Date(user.trial_end);
+    const diffTime = trialEnd.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffDays);
+  };
 
   if (loading) {
     return (
@@ -274,13 +296,13 @@ const BillingPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-gray-900">
-                {subscription?.plan_name || 'Free Trial'}
+                {user?.plan_type === 'business' ? 'Business Plan' : 'Free Trial'}
               </div>
               <div className="text-sm text-gray-600">Current Plan</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-gray-900">
-                {getStatusBadge(subscription?.status || 'trialing')}
+                {getStatusBadge(user?.plan_type || 'trial')}
               </div>
               <div className="text-sm text-gray-600">Status</div>
             </div>
@@ -290,22 +312,25 @@ const BillingPage: React.FC = () => {
                   <div className="flex items-center justify-center gap-1">
                     <Clock className="h-4 w-4 text-blue-600" />
                     <span className="text-blue-600">
-                      {Math.ceil((new Date(subscription?.current_period_end || '').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
+                      {getTrialDaysRemaining()} days
                     </span>
                   </div>
-                ) : subscription?.current_period_end ? (
+                ) : isTrialExpired ? (
                   <div className="flex items-center justify-center gap-1">
-                    <Calendar className="h-4 w-4 text-gray-600" />
-                    <span>
-                      {new Date(subscription.current_period_end).toLocaleDateString()}
-                    </span>
+                    <XCircle className="h-4 w-4 text-red-600" />
+                    <span className="text-red-600">Expired</span>
+                  </div>
+                ) : hasActiveSubscription ? (
+                  <div className="flex items-center justify-center gap-1">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-green-600">Active</span>
                   </div>
                 ) : (
                   'N/A'
                 )}
               </div>
               <div className="text-sm text-gray-600">
-                {isTrialActive ? 'Trial Remaining' : 'Next Payment'}
+                {isTrialActive ? 'Trial Remaining' : isTrialExpired ? 'Trial Status' : 'Plan Status'}
               </div>
             </div>
           </div>
@@ -314,65 +339,76 @@ const BillingPage: React.FC = () => {
             <div className="mt-4 p-4 bg-blue-50 rounded-lg">
               <div className="flex items-center gap-2 text-blue-800">
                 <Clock className="h-4 w-4" />
-                <span className="font-medium">Free Trial Active - Upgrade Early</span>
+                <span className="font-medium">Your free trial ends in {getTrialDaysRemaining()} days</span>
               </div>
               <p className="text-blue-700 text-sm mt-1">
                 Love what you see? Upgrade anytime during your trial to unlock unlimited features. 
-                Your trial ends on {new Date(subscription?.current_period_end || '').toLocaleDateString()}.
+                Your trial ends on {user?.trial_end ? new Date(user.trial_end).toLocaleDateString() : 'N/A'}.
               </p>
             </div>
           )}
 
-          {subscription?.status === 'past_due' && (
-            <div className="mt-4 p-4 bg-yellow-50 rounded-lg">
-              <div className="flex items-center gap-2 text-yellow-800">
+          {isTrialExpired && (
+            <div className="mt-4 p-4 bg-red-50 rounded-lg">
+              <div className="flex items-center gap-2 text-red-800">
                 <AlertTriangle className="h-4 w-4" />
-                <span className="font-medium">Payment Failed</span>
+                <span className="font-medium">Trial Expired</span>
               </div>
-              <p className="text-yellow-700 text-sm mt-1">
-                Your last payment failed. Please update your payment method to continue.
+              <p className="text-red-700 text-sm mt-1">
+                Your free trial has ended. Upgrade to Business Plan to continue using all features.
               </p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Plans */}
+      {/* Upgrade Section */}
       {!hasActiveSubscription && (
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Choose Your Plan</CardTitle>
-            <p className="text-gray-600 text-sm">Upgrade now to unlock all features and continue building amazing experiences.</p>
+            <CardTitle className="flex items-center gap-2">
+              <Crown className="h-5 w-5" />
+              {isTrialExpired ? 'Upgrade to Continue' : 'Upgrade to Business Plan'}
+            </CardTitle>
+            <p className="text-gray-600 text-sm">
+              {isTrialExpired 
+                ? 'Your trial has expired. Upgrade now to continue using all features.'
+                : 'Upgrade now to unlock unlimited features and continue building amazing experiences.'
+              }
+            </p>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {plans.map((plan) => (
-                <Card key={plan.id} className="relative border-2 hover:border-primary/50 transition-colors">
-                  <CardHeader>
-                    <CardTitle className="text-xl">{plan.name}</CardTitle>
-                    <div className="text-3xl font-bold text-gray-900">
-                      {plan.pricePerMonth}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2 mb-6">
-                      {plan.features.map((feature, index) => (
-                        <li key={index} className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
-                          <span className="text-sm">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Button 
-                      onClick={() => handlePlanSelect(plan.id as 'pro' | 'business')}
-                      className="w-full bg-primary hover:bg-primary/90"
-                      size="lg"
-                    >
-                      Upgrade to {plan.name}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="max-w-md mx-auto">
+              <Card className="relative border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+                <CardHeader className="text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <Crown className="h-6 w-6 text-primary" />
+                    <CardTitle className="text-2xl">Business Plan</CardTitle>
+                  </div>
+                  <div className="text-4xl font-bold text-gray-900">
+                    ₦53,000
+                  </div>
+                  <div className="text-gray-600">per month</div>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3 mb-6">
+                    {plans[0].features.map((feature, index) => (
+                      <li key={index} className="flex items-center gap-3">
+                        <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+                        <span className="text-sm">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button 
+                    onClick={() => handlePlanSelect('business')}
+                    className="w-full bg-primary hover:bg-primary/90"
+                    size="lg"
+                  >
+                    <Crown className="h-4 w-4 mr-2" />
+                    Upgrade to Business Plan
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </CardContent>
         </Card>
@@ -382,17 +418,20 @@ const BillingPage: React.FC = () => {
       {hasActiveSubscription && (
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Subscription Details</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Crown className="h-5 w-5" />
+              Business Plan Details
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Plan:</span>
-                <span className="font-medium">{subscription?.plan_name}</span>
+                <span className="font-medium">Business Plan</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Status:</span>
-                {getStatusBadge(subscription?.status || '')}
+                {getStatusBadge('business')}
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Started:</span>
@@ -480,12 +519,12 @@ const BillingPage: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold mb-4">
-              Complete Payment for {plans.find(p => p.id === selectedPlan)?.name} Plan
+              Complete Payment for Business Plan
             </h3>
             <PaystackPayment
               plan={selectedPlan}
-              planName={plans.find(p => p.id === selectedPlan)?.name || ''}
-              planPrice={plans.find(p => p.id === selectedPlan)?.price || ''}
+              planName="Business Plan"
+              planPrice="₦53,000"
               onSuccess={handlePaymentSuccess}
               onCancel={handlePaymentCancel}
             />

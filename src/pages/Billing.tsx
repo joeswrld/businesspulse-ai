@@ -62,7 +62,7 @@ import {
 } from 'lucide-react';
 import PaystackPayment from '@/components/PaystackPayment';
 import PlanComparison from '@/components/billing/PlanComparison';
-import UsageOverview from '@/components/billing/UsageOverview';
+// Removed UsageOverview per new trial system (no usage metrics)
 
 type UpgradePlan = 'business' | null;
 
@@ -382,7 +382,7 @@ NoteX Team
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Billing & Subscription</h1>
               <p className="text-gray-600 mt-1">
-                Manage your subscription, track usage, and view billing history
+                Manage your subscription and view billing history
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -550,12 +550,7 @@ NoteX Team
         </Card>
 
 
-        {/* Billing Usage Section */}
-        <UsageOverview
-  userId={user.id}
-  onUpgrade={() => handleUpgradeClick('business')}
-  refreshKey={currentPlan} // <-- add this line
-/>
+        {/* Usage overview removed */}
 
         {/* Plan Comparison */}
         <div className="mb-8">
