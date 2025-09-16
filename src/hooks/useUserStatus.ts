@@ -13,6 +13,7 @@ export interface UserStatus {
   trial_days_remaining: number;
   is_trial_expired: boolean;
   should_show_lock: boolean;
+  email_confirmed: boolean;
 }
 
 export async function fetchUserStatus(userId: string): Promise<UserStatus> {
@@ -30,7 +31,7 @@ export async function fetchUserStatus(userId: string): Promise<UserStatus> {
   }
   
   console.log('✅ User status fetched successfully:', data);
-  return data as UserStatus;
+  return data as unknown as UserStatus;
 }
 
 export function useUserStatus() {
@@ -57,7 +58,7 @@ export function useUserStatus() {
       console.error('Error refreshing user status:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
       
-  // Fallback status for new users
+      // Fallback status for new users
       console.log('⚠️ Error fetching user status, using fallback');
       const fallbackStatus: UserStatus = {
         plan: 'free_trial',
@@ -69,7 +70,8 @@ export function useUserStatus() {
         next_billing_date: null,
         trial_days_remaining: 8,
         is_trial_expired: false,
-        should_show_lock: false
+        should_show_lock: false,
+        email_confirmed: false
       };
       setStatus(fallbackStatus);
     } finally {

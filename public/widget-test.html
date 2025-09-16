@@ -6,7 +6,7 @@
     <title>NoteX Widget Test</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
             padding: 20px;
             background: #f5f5f5;
@@ -16,91 +16,81 @@
             margin: 0 auto;
             background: white;
             padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         h1 {
-            color: #333;
-            text-align: center;
+            color: #1f2937;
+            margin-bottom: 20px;
         }
         p {
+            color: #6b7280;
             line-height: 1.6;
-            color: #666;
+            margin-bottom: 20px;
         }
-        .test-info {
-            background: #e3f2fd;
+        .code {
+            background: #f3f4f6;
             padding: 20px;
             border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            overflow-x: auto;
             margin: 20px 0;
         }
-        .test-info h3 {
-            margin-top: 0;
-            color: #1976d2;
-        }
-        .steps {
-            background: #f3e5f5;
-            padding: 20px;
+        .note {
+            background: #dbeafe;
+            border: 1px solid #3b82f6;
+            padding: 16px;
             border-radius: 8px;
             margin: 20px 0;
-        }
-        .steps ol {
-            margin: 0;
-            padding-left: 20px;
-        }
-        .steps li {
-            margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎯 NoteX Widget Test Page</h1>
+        <h1>NoteX Feedback Widget Test</h1>
         
-        <div class="test-info">
-            <h3>✅ Widget Status</h3>
-            <p>This page is testing the NoteX feedback widget. You should see a blue feedback button in the bottom-right corner of this page.</p>
-        </div>
-
-        <div class="steps">
-            <h3>🧪 Testing Steps</h3>
-            <ol>
-                <li><strong>Look for the widget:</strong> Check the bottom-right corner for a blue circular button</li>
-                <li><strong>Click the button:</strong> It should open a feedback form</li>
-                <li><strong>Fill out the form:</strong> Test all the form fields</li>
-                <li><strong>Submit feedback:</strong> You should see a success message</li>
-                <li><strong>Check console:</strong> Open Developer Tools (F12) and look for NoteX messages</li>
-            </ol>
-        </div>
-
-        <h3>📝 Sample Content</h3>
-        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+        <p>This page demonstrates the NoteX feedback widget in action. You should see a floating feedback button in the bottom-right corner of the screen.</p>
         
-        <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
-
-        <h3>🔧 Troubleshooting</h3>
-        <p>If you don't see the widget:</p>
+        <div class="note">
+            <strong>Note:</strong> This is a test page. The widget will only work if you have a valid project ID and the Supabase configuration is properly set up.
+        </div>
+        
+        <h2>How to use the widget:</h2>
+        <ol>
+            <li>Click the floating feedback button (bottom-right corner)</li>
+            <li>Fill out the feedback form</li>
+            <li>Submit your feedback</li>
+        </ol>
+        
+        <h2>Embed Code:</h2>
+        <div class="code">
+&lt;script src="https://notex.com.ng/widget.js" data-project-id="YOUR_PROJECT_ID"&gt;&lt;/script&gt;
+        </div>
+        
+        <p>Replace <code>YOUR_PROJECT_ID</code> with your actual project ID from the NoteX dashboard.</p>
+        
+        <h2>Features:</h2>
         <ul>
-            <li>Check the browser console for errors (F12 → Console)</li>
-            <li>Make sure JavaScript is enabled</li>
-            <li>Try refreshing the page</li>
-            <li>Check if any ad blockers are interfering</li>
+            <li>✅ Lightweight and fast loading</li>
+            <li>✅ Responsive design</li>
+            <li>✅ Customizable colors and text</li>
+            <li>✅ Email collection (optional)</li>
+            <li>✅ Page URL tracking</li>
+            <li>✅ Browser information collection</li>
+            <li>✅ Easy integration</li>
         </ul>
-
-        <div class="test-info">
-            <h3>📊 Expected Console Messages</h3>
-            <p>When the page loads, you should see these messages in the console:</p>
-            <ul>
-                <li><code>NoteX Widget: Script loaded successfully</code></li>
-                <li><code>NoteX Widget: Initializing...</code></li>
-                <li><code>NoteX Widget: User ID found: [your-user-id]</code></li>
-                <li><code>NoteX Widget: Elements created and added to page</code></li>
-                <li><code>NoteX Widget: Styles injected</code></li>
-                <li><code>NoteX Widget: Initialized successfully!</code></li>
-            </ul>
+        
+        <p>Scroll down to see more content and test the widget positioning...</p>
+        
+        <div style="height: 1000px; background: linear-gradient(45deg, #f0f0f0, #e0e0e0); display: flex; align-items: center; justify-content: center; margin: 40px 0; border-radius: 8px;">
+            <p style="color: #666; font-size: 18px;">Scrollable content area</p>
         </div>
+        
+        <p>This is more content at the bottom of the page to test scrolling behavior.</p>
     </div>
 
-    <!-- NoteX Widget - Replace YOUR_USER_ID with your actual user ID -->
-    <script src="/widget-simple.js" data-user-id="9a59f1bf-3e74-42d5-9c7e-8c92478e3515"></script>
+    <!-- NoteX Feedback Widget -->
+    <script src="/widget.js" data-project-id="test-project-123"></script>
 </body>
 </html>

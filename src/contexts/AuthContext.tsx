@@ -35,39 +35,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [seededSettingsFor, setSeededSettingsFor] = useState<string | null>(null);
-
-  // Helper function to ensure feedback settings exist (non-blocking)
-  const ensureFeedbackSettings = async (userId: string) => {
-    try {
-      if (seededSettingsFor === userId) return;
-
-      // Probe if row exists
-      const { data: existing } = await (supabase as any)
-        .from('feedback_settings')
-        .select('id')
-        .eq('user_id', userId)
-        .limit(1);
-
-      if (!existing || existing.length === 0) {
-        // Create row idempotently
-        await (supabase as any)
-          .from('feedback_settings')
-          .upsert({ user_id: userId }, { onConflict: 'user_id' });
-      }
-      setSeededSettingsFor(userId);
-    } catch (e) {
-      console.warn('Non-fatal: could not seed feedback_settings:', e);
-    }
-  };
-
 
   useEffect(() => {
     let mounted = true;
 
     console.log("🔐 AuthProvider: Initializing authentication...");
 
-    // Set up auth state listener FIRST
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("🔐 Auth state changed:", event, session?.user?.email);
@@ -86,30 +60,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.log("🔄 Token refreshed");
           }
         }
-
-        // Defer feedback_settings creation to avoid blocking auth flow
-        if (session?.user?.id && !seededSettingsFor) {
-          // Defer this operation to avoid blocking the auth state change
-          setTimeout(() => {
-            ensureFeedbackSettings(session.user.id);
-          }, 1000);
-        }
       }
     );
 
-    // THEN check for existing session
+    // Check for existing session
     const getInitialSession = async () => {
       try {
         console.log("🔐 Checking for existing session...");
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (mounted) {
-          if (error) {
-            console.error("❌ Error getting session:", error);
-            setError(error.message);
-            setLoading(false);
-            return;
+        if (error) {
+          console.error("❌ Error getting session:", error);
+          // Provide more specific error messages
+          let errorMessage = "Authentication error occurred";
+          if (error.message.includes("Invalid API key")) {
+            errorMessage = "Configuration error. Please contact support.";
+          } else if (error.message.includes("network")) {
+            errorMessage = "Network error. Please check your connection.";
+          } else if (error.message) {
+            errorMessage = error.message;
           }
+          setError(errorMessage);
+          setLoading(false);
+          return;
+        }
           
           console.log("🔐 Initial session check:", session ? "Found" : "None");
           setSession(session);

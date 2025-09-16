@@ -28,9 +28,8 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
       features: [
         { name: 'Feedback Collection', limit: 50, unit: 'responses' },
         { name: 'AI Insights', limit: 5, unit: 'insights' },
-        { name: 'Basic Analytics', limit: 5, unit: 'reports' },
-        { name: 'Reports', limit: 2, unit: 'reports' },
-        { name: 'Team Members', limit: 1, unit: 'member' },
+        { name: 'Reports / Basic Analytics', limit: 5, unit: 'reports' },
+        { name: 'Team Members (Coming soon)', limit: 1, unit: 'member' },
         { name: 'Export Formats', limit: ['CSV'], unit: 'formats' },
         { name: 'Support', limit: ['Email'], unit: 'channels' },
         { name: 'Data Retention', limit: '8 days', unit: 'retention' }
@@ -49,6 +48,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
       features: [
         { name: 'Feedback Collection', limit: -1, unit: 'unlimited' },
         { name: 'AI Insights', limit: -1, unit: 'unlimited' },
+<<<<<<< HEAD
         { name: 'Advanced Analytics', limit: -1, unit: 'unlimited' },
         { name: 'Reports', limit: -1, unit: 'unlimited' },
         { name: 'Team Members', limit: -1, unit: 'unlimited' },
@@ -58,7 +58,17 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
         { name: 'Priority Support', limit: true, unit: 'feature' },
         { name: 'Predictive Analytics', limit: true, unit: 'feature' },
         { name: 'Custom Widget Integrations', limit: true, unit: 'feature' }
+=======
+        { name: 'Reports / Advanced Analytics', limit: -1, unit: 'unlimited' },
+        { name: 'Team Members (Coming soon)', limit: -1, unit: 'unlimited' },
+        { name: 'Export Formats', limit: ['CSV', 'PDF', 'Excel'], unit: 'formats' },
+        { name: 'Support', limit: ['Email'], unit: 'channels' },
+        { name: 'Data Retention', limit: 'Unlimited', unit: 'retention' },
+        { name: 'Priority Support', limit: true, unit: 'feature' },
+        { name: 'Predictive Analytics', limit: true, unit: 'feature' },
+>>>>>>> b9df94dbef7c4db977b55eca447ab13c1efa6f66
       ],
+  
       popular: true,
       comingSoon: false
     }
@@ -102,7 +112,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
           <h2 className="text-3xl font-bold text-gray-900">Choose Your Plan</h2>
         </div>
         <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-          Start with a free trial, then upgrade to Business for unlimited access to all features
+          Free plan has a 30-day rolling period with limits: 50 Feedback, 5 Insights, 5 Reports. Upgrade to Business for unlimited features.
         </p>
       </div>
 

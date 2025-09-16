@@ -4,11 +4,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { NoteXTrialProvider } from "@/contexts/NoteXTrialContext";
-import ProtectedRoute from "@/components/ProtectedRoute";
+import { UnifiedTrialProvider } from "@/contexts/UnifiedTrialContext";
+import { AuthFlowGuard } from "@/components/AuthFlowGuard";
+import UnifiedProtectedRoute from "@/components/UnifiedProtectedRoute";
+import AuthGuard from "@/components/AuthGuard";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { lazy, Suspense } from "react";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 // Loading component
 const LoadingSpinner = () => (
@@ -22,30 +25,23 @@ const LoadingSpinner = () => (
 
 // Lazy load pages
 const Index = lazy(() => import("./pages/Index"));
-const AuthPage = lazy(() => import("./pages/AuthPage"));
+const Signup = lazy(() => import("./pages/Signup"));
+const Login = lazy(() => import("./pages/Login"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const TrialExpired = lazy(() => import("./pages/TrialExpired"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-const DataUpload = lazy(() => import("./pages/DataUpload"));
-
-
 const Insights = lazy(() => import("./pages/Insights"));
-
-
-
+const InsightsSimple = lazy(() => import("./pages/InsightsSimple"));
 const Reports = lazy(() => import("./pages/Reports"));
-const Analytics = lazy(() => import("./pages/Analytics"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Teams = lazy(() => import("./pages/Teams"));
 const Profile = lazy(() => import("./pages/Profile"));
-const Feedback = lazy(() => import("./pages/Feedback"));
 const Billing = lazy(() => import("./pages/Billing"));
-
 const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
-const RealtimeTest = lazy(() => import("./pages/RealtimeTest"));
-
-// Feedback form pages
-const QRFeedbackPage = lazy(() => import("./pages/feedback/qr/[project_id]"));
-const EmailFeedbackPage = lazy(() => import("./pages/feedback/email/[project_id]"));
-const ThankYouPage = lazy(() => import("./pages/feedback/thank-you"));
+const Feedback = lazy(() => import("./pages/Feedback"));
+const Roadmap = lazy(() => import("./pages/Roadmap"));
+const Widget = lazy(() => import("./pages/Widget"));
 
 const Testimonials = lazy(() => import("./pages/Testimonials"));
 const About = lazy(() => import("./pages/About"));
@@ -75,7 +71,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-                <NoteXTrialProvider>
+          <UnifiedTrialProvider>
+            <ThemeProvider>
             <Routes>
             {/* Public routes */}
             <Route path="/" element={
@@ -83,9 +80,29 @@ const App = () => (
                 <Index />
               </Suspense>
             } />
-            <Route path="/auth" element={
+            <Route path="/signup" element={
               <Suspense fallback={<LoadingSpinner />}>
-                <AuthPage />
+                <Signup />
+              </Suspense>
+            } />
+            <Route path="/login" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <Login />
+              </Suspense>
+            } />
+            <Route path="/reset-password" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <ResetPassword />
+              </Suspense>
+            } />
+            <Route path="/verify-email" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <VerifyEmail />
+              </Suspense>
+            } />
+            <Route path="/trial-expired" element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <TrialExpired />
               </Suspense>
             } />
             <Route path="/testimonials" element={
@@ -169,114 +186,71 @@ const App = () => (
               </Suspense>
             } />
             
-            {/* Feedback form routes - Public access */}
-            <Route path="/feedback/qr/:project_id" element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <QRFeedbackPage />
-              </Suspense>
-            } />
-            <Route path="/feedback/email/:project_id" element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <EmailFeedbackPage />
-              </Suspense>
-            } />
-            <Route path="/feedback/thank-you" element={
-              <Suspense fallback={<LoadingSpinner />}>
-                <ThankYouPage />
-              </Suspense>
-            } />
             
             {/* Protected routes */}
             <Route path="/dashboard" element={
-              <ProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Dashboard />
                   </DashboardLayout>
                 </Suspense>
-              </ProtectedRoute>
+              </AuthGuard>
             } />
             <Route path="/insights" element={
-              <ProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Insights />
                   </DashboardLayout>
                 </Suspense>
-              </ProtectedRoute>
+              </AuthGuard>
+            } />
+            <Route path="/insights-simple" element={
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <InsightsSimple />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
             } />
 
             <Route path="/reports" element={
-              <ProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Reports />
                   </DashboardLayout>
                 </Suspense>
-              </ProtectedRoute>
-            } />
-            <Route path="/analytics" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <Analytics />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
+              </AuthGuard>
             } />
             <Route path="/settings" element={
-              <ProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Settings />
                   </DashboardLayout>
                 </Suspense>
-              </ProtectedRoute>
+              </AuthGuard>
             } />
             <Route path="/teams" element={
-                <ProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Teams />
                   </DashboardLayout>
                 </Suspense>
-                </ProtectedRoute>
+              </AuthGuard>
             } />
             <Route path="/billing" element={
-              <ProtectedRoute requireActiveSubscription={false}>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Billing />
                   </DashboardLayout>
                 </Suspense>
-              </ProtectedRoute>
-            } />
-            <Route path="/feedback" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <Feedback />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
-            } />
-            <Route path="/feedback-settings" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <FeedbackSettings />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
-            } />
-            <Route path="/realtime-test" element={
-              <ProtectedRoute>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <RealtimeTest />
-                  </DashboardLayout>
-                </Suspense>
-              </ProtectedRoute>
+              </AuthGuard>
             } />
             {/* <Route path="/teams/invite/:token" element={
               <Suspense fallback={<LoadingSpinner />}>
@@ -285,13 +259,49 @@ const App = () => (
             } /> */}
 
             <Route path="/profile" element={
-              <ProtectedRoute>
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
                 <Suspense fallback={<LoadingSpinner />}>
                   <DashboardLayout>
                     <Profile />
                   </DashboardLayout>
                 </Suspense>
-              </ProtectedRoute>
+              </AuthGuard>
+            } />
+            <Route path="/feedback-settings" element={
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <FeedbackSettings />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
+            } />
+            <Route path="/feedback" element={
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Feedback />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
+            } />
+            <Route path="/roadmap" element={
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Roadmap />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
+            } />
+            <Route path="/widget" element={
+              <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <DashboardLayout>
+                    <Widget />
+                  </DashboardLayout>
+                </Suspense>
+              </AuthGuard>
             } />
             
             {/* Catch-all route */}
@@ -300,8 +310,9 @@ const App = () => (
                 <NotFound />
               </Suspense>
             } />
-          </Routes>
-          </NoteXTrialProvider>
+            </Routes>
+            </ThemeProvider>
+          </UnifiedTrialProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

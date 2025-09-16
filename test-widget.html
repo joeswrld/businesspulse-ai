@@ -3,79 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Feedback Widget</title>
+    <title>NoteX Feedback Widget Test</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
             max-width: 800px;
             margin: 0 auto;
-            padding: 20px;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #1f2937;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #6b7280;
             line-height: 1.6;
+            margin-bottom: 16px;
         }
         .test-section {
-            background: #f8f9fa;
+            background: #f9fafb;
             padding: 20px;
             border-radius: 8px;
             margin: 20px 0;
         }
-        .project-id {
-            background: #e3f2fd;
-            padding: 10px;
-            border-radius: 4px;
-            font-family: monospace;
-            margin: 10px 0;
+        .test-section h3 {
+            margin-top: 0;
+            color: #374151;
         }
         .instructions {
-            background: #fff3cd;
-            padding: 15px;
-            border-radius: 4px;
-            border-left: 4px solid #ffc107;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .instructions h4 {
+            margin-top: 0;
+            color: #1e40af;
+        }
+        .instructions ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 4px 0;
+            color: #1e40af;
         }
     </style>
 </head>
 <body>
-    <h1>Feedback Widget Test Page</h1>
-    
-    <div class="test-section">
-        <h2>Widget Information</h2>
-        <p><strong>Version:</strong> 1.1.0</p>
-        <p><strong>Project ID:</strong> <span class="project-id">NoteX_home</span></p>
-        <p><strong>API Endpoint:</strong> <span class="project-id">https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/feedback-api</span></p>
-    </div>
-
-    <div class="instructions">
-        <h3>Testing Instructions:</h3>
-        <ol>
-            <li>Open browser console (F12) to see widget logs</li>
-            <li>Click the feedback button (bottom right corner)</li>
-            <li>Fill out the feedback form</li>
-            <li>Submit and check console for API response</li>
-            <li>Check if feedback appears on the Feedback page</li>
-        </ol>
-    </div>
-
-    <div class="test-section">
-        <h2>Test Content</h2>
-        <p>This is a test page to verify the feedback widget is working correctly. You should see a blue feedback button in the bottom right corner of this page.</p>
+    <div class="container">
+        <h1>NoteX Feedback Widget Test Page</h1>
         
-        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+        <p>This page demonstrates the NoteX feedback widget in action. You should see a floating feedback button in the bottom-right corner of the screen.</p>
         
-        <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+        <div class="instructions">
+            <h4>Testing Instructions:</h4>
+            <ol>
+                <li>Look for the blue feedback button in the bottom-right corner</li>
+                <li>Click the button to open the feedback form</li>
+                <li>Verify that the form fields are visible and functional</li>
+                <li>Test filling out the email and message fields</li>
+                <li>Try submitting the form</li>
+                <li>Check that the form closes after submission</li>
+            </ol>
+        </div>
+        
+        <div class="test-section">
+            <h3>Widget Features to Test:</h3>
+            <ul>
+                <li>✅ Widget button appears and is clickable</li>
+                <li>✅ Modal opens when button is clicked</li>
+                <li>✅ Form fields are visible and styled properly</li>
+                <li>✅ Email input field works</li>
+                <li>✅ Message textarea works</li>
+                <li>✅ Submit button is functional</li>
+                <li>✅ Cancel button closes the modal</li>
+                <li>✅ Close (X) button works</li>
+                <li>✅ Form validation works (message is required)</li>
+            </ul>
+        </div>
+        
+        <div class="test-section">
+            <h3>Sample Content</h3>
+            <p>This is some sample content to make the page more realistic. The feedback widget should work regardless of the page content.</p>
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+            <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+        </div>
     </div>
 
-    <div class="test-section">
-        <h2>Expected Behavior</h2>
-        <ul>
-            <li>✅ Widget should load without errors in console</li>
-            <li>✅ Feedback button should appear in bottom right</li>
-            <li>✅ Modal should open when button is clicked</li>
-            <li>✅ Form should submit to the API endpoint</li>
-            <li>✅ Success message should appear after submission</li>
-            <li>✅ Feedback should appear on the Feedback page</li>
-        </ul>
-    </div>
-
-    <!-- Feedback Widget -->
-    <script src="/feedback-widget.js" data-project-id="NoteX_home"></script>
+    <!-- NoteX Feedback Widget -->
+    <script src="widget.js" data-project-id="test-project-123"></script>
 </body>
 </html>

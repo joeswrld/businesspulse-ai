@@ -34,96 +34,18 @@ const PLAN_LIMITS: Record<PlanType, UsageLimits> = {
  * Check if a user can perform a specific action based on their plan and current usage
  */
 export async function checkUsageLimit(userId: string, action: keyof UsageLimits): Promise<EnforcementResult> {
-  try {
-    // Use profiles table for plan information
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('plan, is_active, trial_end')
-      .eq('user_id', userId)
-      .single();
-
-    const planType = (profile?.plan || 'free_trial') as PlanType;
-    
-    // Check if user has active business plan
-    if (planType === 'business' && profile?.is_active) {
-      return { allowed: true };
-    }
-
-    // Check if trial is expired
-    if (planType === 'free_trial' && profile?.trial_end) {
-      const isExpired = new Date() > new Date(profile.trial_end);
-      if (isExpired) {
-        return {
-          allowed: false,
-          reason: 'Trial expired. Upgrade to Business to continue.',
-          upgradeRequired: true
-        };
-      }
-    }
-    
-    // Get plan limits
-    const limits = PLAN_LIMITS[planType];
-    const limit = limits[action];
-    
-    // If unlimited (-1), allow
-    if (limit === -1) {
-      return { allowed: true };
-    }
-    
-    // Get current usage
-    const currentUsage = await getCurrentUsage(userId, action);
-    
-    if (currentUsage >= limit) {
-      return {
-        allowed: false,
-        reason: `${action} limit reached (${limit}). Upgrade to Business for unlimited access.`,
-        upgradeRequired: true
-      };
-    }
-    
-    return { allowed: true };
-  } catch (error) {
-    console.error('Error checking usage limit:', error);
-    return {
-      allowed: false,
-      reason: 'Error checking usage limits',
-      upgradeRequired: false
-    };
-  }
+  // UNLOCKED PLATFORM: Always allow access
+  console.log('🔓 UNLOCKED PLATFORM - Usage limit check always allows access');
+  return { allowed: true };
 }
 
 /**
  * Check if trial has expired for a user
  */
 export async function isTrialExpired(userId: string): Promise<boolean> {
-  try {
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('plan, trial_end, is_active')
-      .eq('user_id', userId)
-      .single();
-
-    if (error || !profile) {
-      // If no profile found, assume trial expired
-      return true;
-    }
-
-    // Business users with active subscription are never expired
-    if (profile.plan === 'business' && profile.is_active) {
-      return false;
-    }
-
-    // Check trial expiration for free trial users
-    if (profile.plan === 'free_trial' && profile.trial_end) {
-      return new Date() > new Date(profile.trial_end);
-    }
-
-    // Default to expired if no trial end date
-    return true;
-  } catch (error) {
-    console.error('Error checking trial status:', error);
-    return true; // Assume expired on error
-  }
+  // UNLOCKED PLATFORM: Trial never expires
+  console.log('🔓 UNLOCKED PLATFORM - Trial never expires');
+  return false;
 }
 
 /**

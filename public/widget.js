@@ -1,241 +1,272 @@
 (function() {
   'use strict';
 
-  // Widget configuration
-  let config = {
-    userId: null,
+  // Configuration
+  const CONFIG = {
     apiUrl: 'https://xjbrqeqizpoqdjkiyqzt.supabase.co',
-    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84',
-    colors: {
-      primary: '#3b82f6',
-      secondary: '#1e40af'
-    },
-    greeting: 'How was your experience?',
-    placement: 'bottom',
-    enabled: true
+    apiKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84',
+    widgetId: 'notex-feedback-widget',
+    buttonId: 'notex-feedback-button',
+    modalId: 'notex-feedback-modal',
+    overlayId: 'notex-feedback-overlay'
   };
 
-  // Widget state
-  let widgetState = {
-    isOpen: false,
-    isSubmitting: false,
-    settings: null
-  };
-
-  // DOM elements
-  let elements = {
-    button: null,
-    modal: null,
-    overlay: null,
-    form: null
-  };
-
-  // Initialize widget
-  function init() {
-    // Get configuration from script tag
-    const script = document.currentScript || document.querySelector('script[src*="widget.js"]');
-    if (script) {
-      config.userId = script.getAttribute('data-user-id');
-    }
-
-    if (!config.userId) {
-      console.error('NoteX Feedback Widget: Missing data-user-id attribute');
-      return;
-    }
-
-    // Load settings from API
-    loadSettings().then(() => {
-      if (config.enabled) {
-        createWidget();
-        injectStyles();
-      }
-    }).catch(error => {
-      console.error('NoteX Feedback Widget: Failed to load settings', error);
-    });
+  // Get project ID from script tag
+  function getProjectId() {
+    const script = document.querySelector('script[data-project-id]');
+    return script ? script.getAttribute('data-project-id') : null;
   }
 
-  // Load widget settings from API
-  async function loadSettings() {
+  // Fetch widget settings
+  async function fetchWidgetSettings(projectId) {
     try {
-      const response = await fetch(`${config.apiUrl}/rest/v1/feedback_settings?user_id=eq.${config.userId}&select=*`, {
+      const response = await fetch(`${CONFIG.apiUrl}/rest/v1/feedback_settings?project_id=eq.${projectId}&select=*`, {
         headers: {
-          'apikey': config.supabaseKey,
-          'Authorization': `Bearer ${config.supabaseKey}`
+          'apikey': CONFIG.apiKey,
+          'Authorization': `Bearer ${CONFIG.apiKey}`,
+          'Content-Type': 'application/json'
         }
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data && data.length > 0) {
-          const settings = data[0];
-          config.colors = settings.brand_colors;
-          config.greeting = settings.greeting_text;
-          config.placement = settings.button_placement;
-          config.enabled = settings.widget_enabled;
-          widgetState.settings = settings;
-        }
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch widget settings');
       }
+      
+      const data = await response.json();
+      return data.length > 0 ? data[0] : null;
     } catch (error) {
-      console.error('Failed to load widget settings:', error);
+      console.error('Error fetching widget settings:', error);
+      return null;
     }
   }
 
-  // Create widget elements
-  function createWidget() {
-    // Create floating button
-    elements.button = document.createElement('div');
-    elements.button.id = 'notex-feedback-button';
-    elements.button.innerHTML = `
-      <div class="notex-feedback-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-      </div>
-      <span class="notex-feedback-text">${config.greeting}</span>
-    `;
-    elements.button.addEventListener('click', openModal);
-
-    // Create modal overlay
-    elements.overlay = document.createElement('div');
-    elements.overlay.id = 'notex-feedback-overlay';
-    elements.overlay.addEventListener('click', closeModal);
-
-    // Create modal
-    elements.modal = document.createElement('div');
-    elements.modal.id = 'notex-feedback-modal';
-    elements.modal.innerHTML = `
-      <div class="notex-feedback-header">
-        <h3>Share Your Feedback</h3>
-        <button class="notex-feedback-close" onclick="window.notexFeedback.closeModal()">×</button>
-      </div>
-      <form class="notex-feedback-form" id="notex-feedback-form">
-        <div class="notex-feedback-field">
-          <label for="notex-name">Name (optional)</label>
-          <input type="text" id="notex-name" name="name" placeholder="Your name">
-        </div>
-        <div class="notex-feedback-field">
-          <label for="notex-email">Email (optional)</label>
-          <input type="email" id="notex-email" name="email" placeholder="your@email.com">
-        </div>
-        <div class="notex-feedback-field">
-          <label for="notex-message">Your Feedback *</label>
-          <textarea id="notex-message" name="message" placeholder="Tell us about your experience..." required rows="4"></textarea>
-        </div>
-        <div class="notex-feedback-field">
-          <label for="notex-category">Category</label>
-          <select id="notex-category" name="category">
-            <option value="general">General Feedback</option>
-            <option value="bug">Bug Report</option>
-            <option value="feature">Feature Request</option>
-            <option value="complaint">Complaint</option>
-            <option value="praise">Praise</option>
-          </select>
-        </div>
-        <div class="notex-feedback-actions">
-          <button type="button" class="notex-feedback-cancel" onclick="window.notexFeedback.closeModal()">Cancel</button>
-          <button type="submit" class="notex-feedback-submit">Submit Feedback</button>
-        </div>
-      </form>
-    `;
-
-    // Add form submit handler
-    elements.form = elements.modal.querySelector('#notex-feedback-form');
-    elements.form.addEventListener('submit', handleSubmit);
-
-    // Append elements to DOM
-    document.body.appendChild(elements.button);
-    document.body.appendChild(elements.overlay);
-    document.body.appendChild(elements.modal);
+  // Submit feedback
+  async function submitFeedback(projectId, email, message) {
+    try {
+      const response = await fetch(`${CONFIG.apiUrl}/rest/v1/feedback`, {
+        method: 'POST',
+        headers: {
+          'apikey': CONFIG.apiKey,
+          'Authorization': `Bearer ${CONFIG.apiKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          project_id: projectId,
+          email: email || null,
+          message: message
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', response.status, errorText);
+        throw new Error(`API Error: ${response.status}`);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      throw error; // Re-throw to be handled by caller
+    }
   }
 
-  // Inject CSS styles
-  function injectStyles() {
+  // Create widget styles
+  function createStyles() {
     const style = document.createElement('style');
     style.textContent = `
-      #notex-feedback-button {
+      #${CONFIG.widgetId} {
         position: fixed;
-        z-index: 9999;
+        bottom: 20px;
+        right: 20px;
+        z-index: 10000;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      
+      #${CONFIG.buttonId} {
+        background: #3B82F6;
+        color: white;
+        border: none;
+        border-radius: 50px;
+        padding: 12px 20px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transition: all 0.3s ease;
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 12px 16px;
-        background-color: ${config.colors.primary};
-        color: white;
-        border: 2px solid ${config.colors.secondary};
-        border-radius: 8px;
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        font-size: 14px;
-        font-weight: 500;
-        transition: all 0.2s ease;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        min-width: 120px;
+        justify-content: center;
       }
-
-      #notex-feedback-button:hover {
+      
+      #${CONFIG.buttonId}:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
       }
-
-      #notex-feedback-button .notex-feedback-icon {
-        display: flex;
-        align-items: center;
-      }
-
-      #notex-feedback-button .notex-feedback-text {
-        white-space: nowrap;
-      }
-
-      #notex-feedback-overlay {
+      
+      #${CONFIG.overlayId} {
         position: fixed;
         top: 0;
         left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.5);
-        z-index: 10000;
-        display: none;
-        backdrop-filter: blur(2px);
-      }
-
-      #notex-feedback-modal {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
         z-index: 10001;
         display: none;
-        width: 90%;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      
+      #${CONFIG.modalId} {
+        background: white;
+        border-radius: 12px;
+        padding: 0;
         max-width: 500px;
+        width: 100%;
         max-height: 90vh;
         overflow-y: auto;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        animation: slideIn 0.3s ease;
       }
-
-      .notex-feedback-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 20px 24px;
+      
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      
+      @keyframes slideInRight {
+        from {
+          opacity: 0;
+          transform: translateX(100%);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+      
+      @keyframes slideOutRight {
+        from {
+          opacity: 1;
+          transform: translateX(0);
+        }
+        to {
+          opacity: 0;
+          transform: translateX(100%);
+        }
+      }
+      
+      .notex-modal-header {
+        padding: 24px 24px 0 24px;
         border-bottom: 1px solid #e5e7eb;
+        margin-bottom: 24px;
       }
-
-      .notex-feedback-header h3 {
-        margin: 0;
-        font-size: 18px;
+      
+      .notex-modal-title {
+        font-size: 20px;
         font-weight: 600;
         color: #111827;
+        margin: 0 0 8px 0;
       }
-
-      .notex-feedback-close {
+      
+      .notex-modal-subtitle {
+        font-size: 14px;
+        color: #6b7280;
+        margin: 0;
+      }
+      
+      .notex-modal-body {
+        padding: 0 24px 24px 24px;
+      }
+      
+      .notex-form-group {
+        margin-bottom: 20px;
+      }
+      
+      .notex-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 6px;
+      }
+      
+      .notex-input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: border-color 0.2s;
+        box-sizing: border-box;
+      }
+      
+      .notex-input:focus {
+        outline: none;
+        border-color: #3B82F6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+      
+      .notex-textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+        min-height: 100px;
+        resize: vertical;
+        font-family: inherit;
+        transition: border-color 0.2s;
+        box-sizing: border-box;
+      }
+      
+      .notex-textarea:focus {
+        outline: none;
+        border-color: #3B82F6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+      
+      .notex-button {
+        background: #3B82F6;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 24px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        width: 100%;
+      }
+      
+      .notex-button:hover {
+        background: #2563eb;
+      }
+      
+      .notex-button:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+      }
+      
+      .notex-close {
+        position: absolute;
+        top: 16px;
+        right: 16px;
         background: none;
         border: none;
         font-size: 24px;
         cursor: pointer;
         color: #6b7280;
-        padding: 0;
         width: 32px;
         height: 32px;
         display: flex;
@@ -244,279 +275,322 @@
         border-radius: 6px;
         transition: background-color 0.2s;
       }
-
-      .notex-feedback-close:hover {
-        background-color: #f3f4f6;
+      
+      .notex-close:hover {
+        background: #f3f4f6;
       }
-
-      .notex-feedback-form {
-        padding: 24px;
-      }
-
-      .notex-feedback-field {
-        margin-bottom: 20px;
-      }
-
-      .notex-feedback-field label {
-        display: block;
-        margin-bottom: 6px;
-        font-size: 14px;
-        font-weight: 500;
-        color: #374151;
-      }
-
-      .notex-feedback-field input,
-      .notex-feedback-field textarea,
-      .notex-feedback-field select {
-        width: 100%;
-        padding: 10px 12px;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        font-size: 14px;
-        transition: border-color 0.2s;
-        box-sizing: border-box;
-      }
-
-      .notex-feedback-field input:focus,
-      .notex-feedback-field textarea:focus,
-      .notex-feedback-field select:focus {
-        outline: none;
-        border-color: ${config.colors.primary};
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-      }
-
-      .notex-feedback-actions {
-        display: flex;
-        gap: 12px;
-        justify-content: flex-end;
-        margin-top: 24px;
-      }
-
-      .notex-feedback-cancel {
-        padding: 10px 16px;
-        background: white;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        color: #374151;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s;
-      }
-
-      .notex-feedback-cancel:hover {
-        background-color: #f9fafb;
-        border-color: #9ca3af;
-      }
-
-      .notex-feedback-submit {
-        padding: 10px 16px;
-        background-color: ${config.colors.primary};
-        border: 1px solid ${config.colors.primary};
-        border-radius: 6px;
-        color: white;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s;
-      }
-
-      .notex-feedback-submit:hover {
-        background-color: ${config.colors.secondary};
-        border-color: ${config.colors.secondary};
-      }
-
-      .notex-feedback-submit:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
-
-      .notex-feedback-success {
+      
+      .notex-success {
         text-align: center;
         padding: 40px 24px;
       }
-
-      .notex-feedback-success h3 {
-        color: #059669;
-        margin-bottom: 8px;
+      
+      .notex-success-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
       }
-
-      .notex-feedback-success p {
+      
+      .notex-success-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #111827;
+        margin: 0 0 8px 0;
+      }
+      
+      .notex-success-message {
+        font-size: 14px;
         color: #6b7280;
         margin: 0;
       }
-
+      
+      .notex-error {
+        color: #dc2626;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+      
       @media (max-width: 640px) {
-        #notex-feedback-button .notex-feedback-text {
-          display: none;
+        #${CONFIG.widgetId} {
+          bottom: 16px;
+          right: 16px;
         }
         
-        #notex-feedback-button {
-          padding: 12px;
+        #${CONFIG.buttonId} {
+          padding: 10px 16px;
+          font-size: 13px;
+          min-width: 100px;
         }
         
-        #notex-feedback-modal {
-          width: 95%;
-          margin: 20px;
+        #${CONFIG.overlayId} {
+          padding: 16px;
         }
         
-        .notex-feedback-actions {
-          flex-direction: column;
+        .notex-modal-header,
+        .notex-modal-body {
+          padding: 20px;
         }
       }
     `;
-
-    // Set button position based on placement
-    switch (config.placement) {
-      case 'left':
-        style.textContent += `#notex-feedback-button { left: 20px; bottom: 20px; }`;
-        break;
-      case 'right':
-        style.textContent += `#notex-feedback-button { right: 20px; bottom: 20px; }`;
-        break;
-      case 'bottom':
-      default:
-        style.textContent += `#notex-feedback-button { left: 50%; bottom: 20px; transform: translateX(-50%); }`;
-        break;
-    }
-
     document.head.appendChild(style);
   }
 
-  // Open modal
-  function openModal() {
-    if (widgetState.isOpen) return;
+  // Create widget HTML
+  function createWidget(settings) {
+    const widget = document.createElement('div');
+    widget.id = CONFIG.widgetId;
     
-    widgetState.isOpen = true;
-    elements.overlay.style.display = 'block';
-    elements.modal.style.display = 'block';
+    const button = document.createElement('button');
+    button.id = CONFIG.buttonId;
+    button.innerHTML = '💬 ' + (settings?.widget_title || 'Feedback');
+    button.style.backgroundColor = settings?.widget_color || '#3B82F6';
     
-    // Focus on first input
-    setTimeout(() => {
-      const firstInput = elements.modal.querySelector('input, textarea');
-      if (firstInput) firstInput.focus();
-    }, 100);
+    widget.appendChild(button);
+    return widget;
+  }
+
+  // Create modal HTML
+  function createModal(settings) {
+    const overlay = document.createElement('div');
+    overlay.id = CONFIG.overlayId;
+    
+    const modal = document.createElement('div');
+    modal.id = CONFIG.modalId;
+    
+    modal.innerHTML = `
+      <div class="notex-modal-header">
+        <button class="notex-close" onclick="closeFeedbackModal()">&times;</button>
+        <h2 class="notex-modal-title">${settings?.widget_title || 'Share your feedback with us!'}</h2>
+        <p class="notex-modal-subtitle">${settings?.greeting_text || 'Welcome, tell us what\'s on your mind'}</p>
+      </div>
+      <div class="notex-modal-body">
+        <form id="notex-feedback-form">
+          <div class="notex-form-group">
+            <label class="notex-label" for="notex-email">Email (optional)</label>
+            <input 
+              type="email" 
+              id="notex-email" 
+              class="notex-input" 
+              placeholder="your@email.com"
+            >
+          </div>
+          <div class="notex-form-group">
+            <label class="notex-label" for="notex-message">Message *</label>
+            <textarea 
+              id="notex-message" 
+              class="notex-textarea" 
+              placeholder="Tell us what you think..."
+              required
+            ></textarea>
+            <div id="notex-message-error" class="notex-error"></div>
+          </div>
+          <button type="submit" class="notex-button" id="notex-submit-btn">
+            Send Feedback
+          </button>
+        </form>
+      </div>
+    `;
+    
+    overlay.appendChild(modal);
+    return overlay;
+  }
+
+  // Show modal
+  function showModal() {
+    const overlay = document.getElementById(CONFIG.overlayId);
+    if (overlay) {
+      overlay.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      
+      // Focus on first input
+      const emailInput = document.getElementById('notex-email');
+      if (emailInput) {
+        setTimeout(() => emailInput.focus(), 100);
+      }
+    }
   }
 
   // Close modal
   function closeModal() {
-    if (!widgetState.isOpen) return;
-    
-    widgetState.isOpen = false;
-    elements.overlay.style.display = 'none';
-    elements.modal.style.display = 'none';
-    
-    // Reset form
-    if (elements.form) {
-      elements.form.reset();
+    const overlay = document.getElementById(CONFIG.overlayId);
+    if (overlay) {
+      overlay.style.display = 'none';
+      document.body.style.overflow = '';
     }
+  }
+
+  // Show success message
+  function showSuccess() {
+    const modal = document.getElementById(CONFIG.modalId);
+    if (modal) {
+      modal.innerHTML = `
+        <div class="notex-success">
+          <div class="notex-success-icon">✅</div>
+          <h3 class="notex-success-title">Thank you!</h3>
+          <p class="notex-success-message">Your feedback has been submitted successfully.</p>
+        </div>
+      `;
+      
+      // Clear the form
+      const messageInput = document.getElementById('notex-message');
+      const emailInput = document.getElementById('notex-email');
+      if (messageInput) messageInput.value = '';
+      if (emailInput) emailInput.value = '';
+      
+      // Show success toast
+      showToast('Feedback submitted successfully!', 'success');
+      
+      setTimeout(() => {
+        closeModal();
+        // Reset modal content
+        initWidget();
+      }, 2000);
+    }
+  }
+
+  // Show toast notification
+  function showToast(message, type = 'success') {
+    // Remove existing toast if any
+    const existingToast = document.getElementById('notex-toast');
+    if (existingToast) {
+      existingToast.remove();
+    }
+    
+    const toast = document.createElement('div');
+    toast.id = 'notex-toast';
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: ${type === 'success' ? '#10b981' : '#ef4444'};
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 10002;
+      font-size: 14px;
+      font-weight: 500;
+      animation: slideInRight 0.3s ease;
+      max-width: 300px;
+    `;
+    
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.style.animation = 'slideOutRight 0.3s ease';
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.remove();
+          }
+        }, 300);
+      }
+    }, 3000);
   }
 
   // Handle form submission
-  async function handleSubmit(event) {
+  async function handleSubmit(event, projectId) {
     event.preventDefault();
     
-    if (widgetState.isSubmitting) return;
+    const submitBtn = document.getElementById('notex-submit-btn');
+    const messageInput = document.getElementById('notex-message');
+    const emailInput = document.getElementById('notex-email');
+    const errorDiv = document.getElementById('notex-message-error');
     
-    widgetState.isSubmitting = true;
+    const message = messageInput.value.trim();
+    const email = emailInput.value.trim();
     
-    const formData = new FormData(event.target);
-    const feedbackData = {
-      user_id: config.userId,
-      client_name: formData.get('name') || null,
-      email: formData.get('email') || null,
-      message: formData.get('message'),
-      category: formData.get('category') || 'general',
-      created_at: new Date().toISOString()
-    };
-
+    // Clear previous errors
+    errorDiv.textContent = '';
+    
+    // Validate message
+    if (!message) {
+      errorDiv.textContent = 'Message is required';
+      messageInput.focus();
+      return;
+    }
+    
+    // Disable submit button
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending...';
+    
     try {
-      // Submit feedback to API
-      const response = await fetch(`${config.apiUrl}/rest/v1/feedback`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': config.supabaseKey,
-          'Authorization': `Bearer ${config.supabaseKey}`
-        },
-        body: JSON.stringify(feedbackData)
-      });
-
-      if (response.ok) {
-        // Show success message
-        elements.modal.innerHTML = `
-          <div class="notex-feedback-success">
-            <h3>Thank You!</h3>
-            <p>Your feedback has been submitted successfully. We appreciate your input!</p>
-          </div>
-        `;
-        
-        // Close modal after 3 seconds
-        setTimeout(() => {
-          closeModal();
-          // Restore form
-          setTimeout(() => {
-            elements.modal.innerHTML = `
-              <div class="notex-feedback-header">
-                <h3>Share Your Feedback</h3>
-                <button class="notex-feedback-close" onclick="window.notexFeedback.closeModal()">×</button>
-              </div>
-              <form class="notex-feedback-form" id="notex-feedback-form">
-                <div class="notex-feedback-field">
-                  <label for="notex-name">Name (optional)</label>
-                  <input type="text" id="notex-name" name="name" placeholder="Your name">
-                </div>
-                <div class="notex-feedback-field">
-                  <label for="notex-email">Email (optional)</label>
-                  <input type="email" id="notex-email" name="email" placeholder="your@email.com">
-                </div>
-                <div class="notex-feedback-field">
-                  <label for="notex-message">Your Feedback *</label>
-                  <textarea id="notex-message" name="message" placeholder="Tell us about your experience..." required rows="4"></textarea>
-                </div>
-                <div class="notex-feedback-field">
-                  <label for="notex-category">Category</label>
-                  <select id="notex-category" name="category">
-                    <option value="general">General Feedback</option>
-                    <option value="bug">Bug Report</option>
-                    <option value="feature">Feature Request</option>
-                    <option value="complaint">Complaint</option>
-                    <option value="praise">Praise</option>
-                  </select>
-                </div>
-                <div class="notex-feedback-actions">
-                  <button type="button" class="notex-feedback-cancel" onclick="window.notexFeedback.closeModal()">Cancel</button>
-                  <button type="submit" class="notex-feedback-submit">Submit Feedback</button>
-                </div>
-              </form>
-            `;
-            elements.form = elements.modal.querySelector('#notex-feedback-form');
-            elements.form.addEventListener('submit', handleSubmit);
-          }, 100);
-        }, 3000);
-      } else {
-        throw new Error('Failed to submit feedback');
-      }
+      await submitFeedback(projectId, email, message);
+      showSuccess();
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      alert('Sorry, there was an error submitting your feedback. Please try again.');
-    } finally {
-      widgetState.isSubmitting = false;
+      // Only show error message for API failures, not validation errors
+      errorDiv.textContent = 'Failed to submit feedback. Please try again.';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send Feedback';
     }
   }
 
-  // Public API
-  window.notexFeedback = {
-    open: openModal,
-    close: closeModal,
-    closeModal: closeModal,
-    openModal: openModal
-  };
+  // Initialize widget
+  async function initWidget() {
+    const projectId = getProjectId();
+    if (!projectId) {
+      console.error('No project ID found. Please add data-project-id to the script tag.');
+      return;
+    }
+    
+    // Remove existing widget if any
+    const existingWidget = document.getElementById(CONFIG.widgetId);
+    if (existingWidget) {
+      existingWidget.remove();
+    }
+    
+    const existingOverlay = document.getElementById(CONFIG.overlayId);
+    if (existingOverlay) {
+      existingOverlay.remove();
+    }
+    
+    // Create styles
+    createStyles();
+    
+    // Fetch settings
+    const settings = await fetchWidgetSettings(projectId);
+    
+    // Create widget
+    const widget = createWidget(settings);
+    document.body.appendChild(widget);
+    
+    // Create modal
+    const modal = createModal(settings);
+    document.body.appendChild(modal);
+    
+    // Add event listeners
+    const button = document.getElementById(CONFIG.buttonId);
+    const form = document.getElementById('notex-feedback-form');
+    
+    if (button) {
+      button.addEventListener('click', showModal);
+    }
+    
+    if (form) {
+      form.addEventListener('submit', (e) => handleSubmit(e, projectId));
+    }
+    
+    // Close modal on overlay click
+    const overlay = document.getElementById(CONFIG.overlayId);
+    if (overlay) {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          closeModal();
+        }
+      });
+    }
+  }
+
+  // Global close function
+  window.closeFeedbackModal = closeModal;
 
   // Initialize when DOM is ready
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', initWidget);
   } else {
-    init();
+    initWidget();
   }
+
 })();

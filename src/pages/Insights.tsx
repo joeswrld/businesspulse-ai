@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useUsageEnforcement } from '@/hooks/useUsageEnforcement';
 import { useUsageTracking } from '@/hooks/useUsageTracking';
 import { useRealtimeFeedback } from '@/hooks/useRealtimeFeedback';
-import { FeedbackBadgeGroup } from '@/components/ui/FeedbackBadge';
 import { toast } from 'sonner';
 import { 
   Brain, 
@@ -36,6 +36,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { FeedbackBadgeGroup } from '@/components/ui/FeedbackBadge';
 
 // Types
 interface Feedback {
@@ -75,6 +76,7 @@ interface GeminiAnalysis {
 
 const Insights: React.FC = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const { checkUsage, enforceUsage } = useUsageEnforcement();
   const { trackUsage } = useUsageTracking();
   
@@ -98,6 +100,19 @@ const Insights: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('analysis');
 
+
+  // Preselect feedback from query param ids
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const idsParam = params.get('ids');
+    if (idsParam) {
+      const ids = idsParam.split(',').filter(Boolean);
+      if (ids.length > 0) {
+        setSelectedFeedbacks(new Set(ids));
+        setActiveTab('analysis');
+      }
+    }
+  }, [location.search]);
 
   // Load analysis history
   const loadAnalysisHistory = useCallback(async () => {
@@ -188,9 +203,30 @@ const Insights: React.FC = () => {
       setAnalysisProgress(0);
 
       // Get selected feedback messages
-      const selectedFeedbackData = feedbacks.filter(f => selectedFeedbacks.has(f.id));
+      const selectedIds = Array.from(selectedFeedbacks);
+      let selectedFeedbackData = feedbacks.filter(f => selectedIds.includes(f.id));
+
+      // If some selected IDs are not in the real-time list, fetch them directly
+      const missingIds = selectedIds.filter(id => !selectedFeedbackData.find(f => f.id === id));
+      if (missingIds.length > 0) {
+        const { data: extra, error: extraErr } = await (supabase as any)
+          .from('feedback')
+          .select('id, message, created_at')
+          .in('id', missingIds);
+        if (!extraErr && Array.isArray(extra)) {
+          const mapped = (extra as any[]).map((e) => ({
+            id: e.id,
+            name: 'Anonymous',
+            message: e.message,
+            timestamp: e.created_at,
+            status: 'new',
+          }));
+          selectedFeedbackData = [...selectedFeedbackData, ...mapped as any];
+        }
+      }
+
       const feedbackText = selectedFeedbackData.map(f => 
-        `[${f.name || 'Anonymous'}] ${f.message}`
+        `[${(f as any).name || 'Anonymous'}] ${f.message}`
       ).join('\n\n');
 
       // Simulate analysis progress

@@ -29,9 +29,9 @@
     <link rel="canonical" href="https://notex.com.ng" />
 
     <!-- Speed up Paystack popup by preconnecting to CDN and loading script early -->
-    <link rel="dns-prefetch" href="https://js.paystack.co" />
-    <link rel="preconnect" href="https://js.paystack.co" crossorigin />
-    <script src="https://js.paystack.co/v1/inline.js" async></script>
+    <!-- Only use the inline JS -->
+<script src="https://js.paystack.co/v1/inline.js"></script>
+
 
     <!-- Wallet conflict handler - temporarily disabled -->
     <!-- <script src="/wallet-conflict-handler.js"></script> -->
@@ -41,7 +41,23 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
 
-    
+    <script>
+      (function() {
+        try {
+          var stored = localStorage.getItem('theme');
+          var mql = window.matchMedia('(prefers-color-scheme: dark)');
+          var shouldDark = stored ? stored === 'dark' : mql.matches;
+          if (shouldDark) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {
+          // no-op
+        }
+      })();
+    </script>
     <!-- NoteX Feedback Widget - Disabled to prevent console errors -->
-    <script src="https://notex.com.ng/feedback-widget.js" data-project-id="NoteX_home"></script>
+    <script src="https://notex.com.ng/widget.js" data-project-id="32ffd49b"></script>
+  </body>
 </html>

@@ -10,11 +10,10 @@ import {
   Settings, 
   Crown,
   Lock,
-  MessageSquare,
-  QrCode,
-  Mail
+  Target,
+  MessageSquare
 } from 'lucide-react';
-import { useNoteXTrial } from '@/contexts/NoteXTrialContext';
+import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 import NoteXTrialCountdown from '@/components/NoteXTrialCountdown';
 
 interface SidebarItem {
@@ -27,7 +26,7 @@ interface SidebarItem {
 
 const NoteXSidebar: React.FC = () => {
   const location = useLocation();
-  const { checkAccess, isTrialExpired, trialStatus } = useNoteXTrial();
+  const { checkAccess, isTrialExpired, trialStatus } = useUnifiedTrial();
 
   const sidebarItems: SidebarItem[] = [
     {
@@ -43,15 +42,9 @@ const NoteXSidebar: React.FC = () => {
       requiresActiveSubscription: false,
     },
     {
-      name: 'QR Forms',
-      href: '/feedback-settings',
-      icon: QrCode,
-      requiresActiveSubscription: false,
-    },
-    {
-      name: 'Email Forms',
-      href: '/feedback-settings',
-      icon: Mail,
+      name: 'Roadmap',
+      href: '/roadmap',
+      icon: Target,
       requiresActiveSubscription: false,
     },
     {
@@ -80,65 +73,56 @@ const NoteXSidebar: React.FC = () => {
     },
   ];
 
+  // UNLOCKED PLATFORM: Never lock any items
   const isItemLocked = (item: SidebarItem): boolean => {
-    // Business plan users never have locked items
-    if (trialStatus.plan === 'business' && trialStatus.isActive) return false;
-    
-    // Trial expired users have locked items
-    if (isTrialExpired()) return true;
-    
+    console.log('🔓 UNLOCKED PLATFORM - No items are locked');
     return false;
   };
 
   const canAccessItem = (item: SidebarItem): boolean => {
-    // Business plan users can access everything
-    if (trialStatus.plan === 'business' && trialStatus.isActive) return true;
-    
-    // Trial users can access everything during trial
-    if (trialStatus.plan === 'free_trial' && trialStatus.isActive && !isTrialExpired()) return true;
-    
-    return false;
+    console.log('🔓 UNLOCKED PLATFORM - All items are accessible');
+    return true;
   };
 
-  // If trial expired, show only upgrade button
-  if (isTrialExpired()) {
-    return (
-      <div className="flex flex-col h-full bg-white border-r border-gray-200">
-        <div className="p-4">
-          <div className="flex items-center justify-center mb-6">
-            <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-              <Lock className="h-5 w-5 text-red-600" />
-            </div>
-          </div>
-          
-          <div className="text-center mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Trial Expired</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Your free trial has ended. Upgrade to the Business Plan to continue using NoteX.
-            </p>
-          </div>
+  // UNLOCKED PLATFORM: Never show trial expired screen
+  // if (isTrialExpired()) {
+  //   return (
+  //     <div className="flex flex-col h-full bg-white border-r border-gray-200">
+  //       <div className="p-4">
+  //         <div className="flex items-center justify-center mb-6">
+  //           <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+  //             <Lock className="h-5 w-5 text-red-600" />
+  //           </div>
+  //         </div>
+  //         
+  //         <div className="text-center mb-6">
+  //           <h3 className="text-lg font-semibold text-gray-900 mb-2">Trial Expired</h3>
+  //           <p className="text-sm text-gray-600 mb-4">
+  //             Your free trial has ended. Upgrade to the Business Plan to continue using NoteX.
+  //           </p>
+  //         </div>
 
-          <Button 
-            asChild
-            className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800"
-            size="lg"
-          >
-            <Link to="/billing">
-              <Crown className="h-5 w-5 mr-2" />
-              Upgrade to Business
-            </Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  //         <Button 
+  //           asChild
+  //           className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800"
+  //           size="lg"
+  //         >
+  //           <Link to="/billing">
+  //             <Crown className="h-5 w-5 mr-2" />
+  //             Upgrade to Business
+  //           </Link>
+  //         </Button>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="flex flex-col h-full bg-white border-r border-gray-200">
-      {/* Trial Status */}
-      <div className="p-4 border-b border-gray-200">
+      {/* Trial Status - DISABLED FOR UNLOCKED PLATFORM */}
+      {/* <div className="p-4 border-b border-gray-200">
         <NoteXTrialCountdown variant="card" showUpgradeButton={true} />
-      </div>
+      </div> */}
 
       {/* Navigation Items */}
       <nav className="flex-1 p-4 space-y-2">
@@ -186,8 +170,8 @@ const NoteXSidebar: React.FC = () => {
         })}
       </nav>
 
-      {/* Upgrade Button for trial users */}
-      {trialStatus.plan === 'free_trial' && trialStatus.isActive && !isTrialExpired() && (
+      {/* Upgrade Button for trial users - DISABLED FOR UNLOCKED PLATFORM */}
+      {/* {trialStatus.plan === 'free_trial' && trialStatus.isActive && !isTrialExpired() && (
         <div className="p-4 border-t border-gray-200">
           <Button 
             asChild
@@ -200,7 +184,7 @@ const NoteXSidebar: React.FC = () => {
             </Link>
           </Button>
         </div>
-      )}
+      )} */}
     </div>
   );
 };

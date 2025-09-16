@@ -23,6 +23,7 @@ const AuthPage = () => {
     companyName: "",
   });
 
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
@@ -41,7 +42,7 @@ const AuthPage = () => {
 
     try {
       console.log("🔐 Attempting authentication...");
-      
+
       if (isLogin) {
         console.log("🔐 Signing in with email:", formData.email);
         
@@ -71,7 +72,7 @@ const AuthPage = () => {
       } else {
         console.log("🔐 Creating account for email:", formData.email);
         
-        const redirectUrl = `${window.location.origin}/`;
+        const redirectUrl = `${window.location.origin}/auth/confirm`;
         
         const { data, error } = await supabase.auth.signUp({
           email: formData.email,
@@ -95,9 +96,31 @@ const AuthPage = () => {
 
         console.log("✅ Sign up successful:", data.user?.email);
 
+        // Create user profile after successful signup
+        if (data.user) {
+          try {
+            const { error: profileError } = await supabase.rpc('create_user_profile_safe', {
+              user_uuid: data.user.id,
+              user_email: data.user.email,
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+              company_name: formData.companyName
+            });
+
+            if (profileError) {
+              console.error("❌ Profile creation failed:", profileError);
+              // Don't fail signup, just log the error
+            } else {
+              console.log("✅ User profile created successfully");
+            }
+          } catch (error) {
+            console.error("❌ Error creating user profile:", error);
+          }
+        }
+
         toast({
           title: "Account created!",
-          description: "Please check your email to verify your account.",
+          description: "Please check your email to verify your account before signing in. Your 8-day free trial will begin after verification.",
         });
       }
     } catch (error: any) {
@@ -199,6 +222,11 @@ const AuthPage = () => {
     setIsLogin(true);
   };
 
+  // Switch between login and signup
+  const handleModeSwitch = () => {
+    setIsLogin(!isLogin);
+  };
+
   // Password reset success view
   if (passwordResetSent) {
     return (
@@ -291,6 +319,7 @@ const AuthPage = () => {
                     required
                   />
                 </div>
+
 
                 <Button 
                   type="submit" 
@@ -520,6 +549,7 @@ const AuthPage = () => {
                 )}
               </div>
 
+
               <Button 
                 type="submit" 
                 className="w-full" 
@@ -559,7 +589,7 @@ const AuthPage = () => {
                 <button
                   type="button"
                   className="text-primary hover:underline font-medium"
-                  onClick={() => setIsLogin(!isLogin)}
+                  onClick={handleModeSwitch}
                 >
                   {isLogin ? "Sign up" : "Sign in"}
                 </button>

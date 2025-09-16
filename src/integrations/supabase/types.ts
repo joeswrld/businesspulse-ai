@@ -166,6 +166,36 @@ export type Database = {
         }
         Relationships: []
       }
+      auth_events: {
+        Row: {
+          created_at: string | null
+          event_data: Json | null
+          event_type: string
+          id: string
+          ip_address: unknown | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       billing: {
         Row: {
           created_at: string | null
@@ -324,191 +354,6 @@ export type Database = {
         }
         Relationships: []
       }
-      feedback: {
-        Row: {
-          category: string | null
-          client_name: string | null
-          created_at: string | null
-          email: string | null
-          id: string
-          message: string
-          metadata: Json | null
-          priority: string | null
-          sentiment: string | null
-          status: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          category?: string | null
-          client_name?: string | null
-          created_at?: string | null
-          email?: string | null
-          id?: string
-          message: string
-          metadata?: Json | null
-          priority?: string | null
-          sentiment?: string | null
-          status?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          category?: string | null
-          client_name?: string | null
-          created_at?: string | null
-          email?: string | null
-          id?: string
-          message?: string
-          metadata?: Json | null
-          priority?: string | null
-          sentiment?: string | null
-          status?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      feedback_notifications: {
-        Row: {
-          feedback_id: string | null
-          id: string
-          message: string
-          metadata: Json | null
-          read_at: string | null
-          sent_at: string | null
-          type: string
-          user_id: string | null
-        }
-        Insert: {
-          feedback_id?: string | null
-          id?: string
-          message: string
-          metadata?: Json | null
-          read_at?: string | null
-          sent_at?: string | null
-          type: string
-          user_id?: string | null
-        }
-        Update: {
-          feedback_id?: string | null
-          id?: string
-          message?: string
-          metadata?: Json | null
-          read_at?: string | null
-          sent_at?: string | null
-          type?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "feedback_notifications_feedback_id_fkey"
-            columns: ["feedback_id"]
-            isOneToOne: false
-            referencedRelation: "feedback"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      feedback_settings: {
-        Row: {
-          brand_color: string | null
-          business_logo: string | null
-          business_name: string | null
-          button_text: string | null
-          created_at: string | null
-          custom_fields: Json | null
-          id: string
-          notify_email: string | null
-          project_id: string | null
-          project_id_locked: boolean | null
-          redirect_url: string | null
-          show_contact_info: boolean | null
-          show_email: boolean | null
-          show_name: boolean | null
-          show_rating: boolean | null
-          theme: string | null
-          title: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          brand_color?: string | null
-          business_logo?: string | null
-          business_name?: string | null
-          button_text?: string | null
-          created_at?: string | null
-          custom_fields?: Json | null
-          id?: string
-          notify_email?: string | null
-          project_id?: string | null
-          project_id_locked?: boolean | null
-          redirect_url?: string | null
-          show_contact_info?: boolean | null
-          show_email?: boolean | null
-          show_name?: boolean | null
-          show_rating?: boolean | null
-          theme?: string | null
-          title?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          brand_color?: string | null
-          business_logo?: string | null
-          business_name?: string | null
-          button_text?: string | null
-          created_at?: string | null
-          custom_fields?: Json | null
-          id?: string
-          notify_email?: string | null
-          project_id?: string | null
-          project_id_locked?: boolean | null
-          redirect_url?: string | null
-          show_contact_info?: boolean | null
-          show_email?: boolean | null
-          show_name?: boolean | null
-          show_rating?: boolean | null
-          theme?: string | null
-          title?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      feedbacks: {
-        Row: {
-          email: string | null
-          id: string
-          message: string
-          name: string | null
-          project_id: string | null
-          status: string | null
-          timestamp: string | null
-          user_id: string | null
-        }
-        Insert: {
-          email?: string | null
-          id?: string
-          message: string
-          name?: string | null
-          project_id?: string | null
-          status?: string | null
-          timestamp?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          email?: string | null
-          id?: string
-          message?: string
-          name?: string | null
-          project_id?: string | null
-          status?: string | null
-          timestamp?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       goals: {
         Row: {
           category: string
@@ -559,21 +404,18 @@ export type Database = {
           analysis_result: Json
           created_at: string | null
           id: string
-          selected_feedback_ids: string[]
           user_id: string | null
         }
         Insert: {
           analysis_result: Json
           created_at?: string | null
           id?: string
-          selected_feedback_ids: string[]
           user_id?: string | null
         }
         Update: {
           analysis_result?: Json
           created_at?: string | null
           id?: string
-          selected_feedback_ids?: string[]
           user_id?: string | null
         }
         Relationships: []
@@ -626,7 +468,6 @@ export type Database = {
       notification_preferences: {
         Row: {
           created_at: string | null
-          feedback_alerts: boolean | null
           id: string
           system_updates: boolean | null
           updated_at: string | null
@@ -635,7 +476,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          feedback_alerts?: boolean | null
           id?: string
           system_updates?: boolean | null
           updated_at?: string | null
@@ -644,7 +484,6 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
-          feedback_alerts?: boolean | null
           id?: string
           system_updates?: boolean | null
           updated_at?: string | null
@@ -719,6 +558,36 @@ export type Database = {
         }
         Relationships: []
       }
+      otp_tokens: {
+        Row: {
+          created_at: string | null
+          expires_at: string
+          id: string
+          token_hash: string
+          token_type: string
+          used_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          token_hash: string
+          token_type: string
+          used_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          token_hash?: string
+          token_type?: string
+          used_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       plans: {
         Row: {
           code: string
@@ -754,6 +623,7 @@ export type Database = {
           company_name: string | null
           created_at: string
           email: string | null
+          email_confirmed: boolean | null
           first_name: string | null
           full_name: string | null
           id: string
@@ -777,6 +647,7 @@ export type Database = {
           company_name?: string | null
           created_at?: string
           email?: string | null
+          email_confirmed?: boolean | null
           first_name?: string | null
           full_name?: string | null
           id?: string
@@ -800,6 +671,7 @@ export type Database = {
           company_name?: string | null
           created_at?: string
           email?: string | null
+          email_confirmed?: boolean | null
           first_name?: string | null
           full_name?: string | null
           id?: string
@@ -841,51 +713,38 @@ export type Database = {
       }
       reports: {
         Row: {
-          created_at: string
-          date_range_end: string | null
-          date_range_start: string | null
-          file_size: number | null
-          file_url: string | null
-          format: string
           id: string
-          insights_included: number | null
-          status: string
-          title: string
-          type: string
-          updated_at: string
           user_id: string
+          title: string
+          feedback_ids: string[]
+          insights_text: string
+          created_at: string
         }
         Insert: {
-          created_at?: string
-          date_range_end?: string | null
-          date_range_start?: string | null
-          file_size?: number | null
-          file_url?: string | null
-          format: string
           id?: string
-          insights_included?: number | null
-          status?: string
-          title: string
-          type: string
-          updated_at?: string
           user_id: string
+          title?: string
+          feedback_ids?: string[]
+          insights_text: string
+          created_at?: string
         }
         Update: {
-          created_at?: string
-          date_range_end?: string | null
-          date_range_start?: string | null
-          file_size?: number | null
-          file_url?: string | null
-          format?: string
           id?: string
-          insights_included?: number | null
-          status?: string
-          title?: string
-          type?: string
-          updated_at?: string
           user_id?: string
+          title?: string
+          feedback_ids?: string[]
+          insights_text?: string
+          created_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "reports_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscription_plans: {
         Row: {
@@ -1182,7 +1041,6 @@ export type Database = {
         Row: {
           analytics_count: number | null
           created_at: string | null
-          feedback_count: number
           id: string
           insights_count: number | null
           month_start: string
@@ -1193,7 +1051,6 @@ export type Database = {
         Insert: {
           analytics_count?: number | null
           created_at?: string | null
-          feedback_count?: number
           id?: string
           insights_count?: number | null
           month_start: string
@@ -1204,7 +1061,6 @@ export type Database = {
         Update: {
           analytics_count?: number | null
           created_at?: string | null
-          feedback_count?: number
           id?: string
           insights_count?: number | null
           month_start?: string
@@ -1218,7 +1074,7 @@ export type Database = {
         Row: {
           analytics_count: number | null
           created_at: string | null
-          feedback_count: number | null
+ | null
           id: string
           insights_count: number | null
           reports_count: number | null
@@ -1229,7 +1085,7 @@ export type Database = {
         Insert: {
           analytics_count?: number | null
           created_at?: string | null
-          feedback_count?: number | null
+ | null
           id: string
           insights_count?: number | null
           reports_count?: number | null
@@ -1240,7 +1096,7 @@ export type Database = {
         Update: {
           analytics_count?: number | null
           created_at?: string | null
-          feedback_count?: number | null
+ | null
           id?: string
           insights_count?: number | null
           reports_count?: number | null
@@ -1322,6 +1178,8 @@ export type Database = {
           id: string
           is_active: boolean | null
           plan: string | null
+          subscription_active: boolean | null
+          subscription_expiry_date: string | null
           trial_end: string | null
           trial_expired: boolean | null
           trial_start: string | null
@@ -1336,6 +1194,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           plan?: string | null
+          subscription_active?: boolean | null
+          subscription_expiry_date?: string | null
           trial_end?: string | null
           trial_expired?: boolean | null
           trial_start?: string | null
@@ -1350,6 +1210,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           plan?: string | null
+          subscription_active?: boolean | null
+          subscription_expiry_date?: string | null
           trial_end?: string | null
           trial_expired?: boolean | null
           trial_start?: string | null
@@ -1421,50 +1283,114 @@ export type Database = {
         }
         Relationships: []
       }
-      widget_settings: {
+      feedback: {
         Row: {
-          ai_auto_tagging: boolean | null
-          anonymous_feedback: boolean | null
-          auto_resolve_after_reply: boolean | null
-          brand_color: string | null
-          created_at: string | null
-          email_notifications: boolean | null
-          greeting_text: string | null
           id: string
-          updated_at: string | null
-          user_id: string
-          widget_location: string | null
-          widget_position: string | null
+          project_id: string
+          email: string | null
+          message: string
+          page_url: string | null
+          browser: string | null
+          created_at: string
         }
         Insert: {
-          ai_auto_tagging?: boolean | null
-          anonymous_feedback?: boolean | null
-          auto_resolve_after_reply?: boolean | null
-          brand_color?: string | null
-          created_at?: string | null
-          email_notifications?: boolean | null
-          greeting_text?: string | null
           id?: string
-          updated_at?: string | null
-          user_id: string
-          widget_location?: string | null
-          widget_position?: string | null
+          project_id: string
+          email?: string | null
+          message: string
+          page_url?: string | null
+          browser?: string | null
+          created_at?: string
         }
         Update: {
-          ai_auto_tagging?: boolean | null
-          anonymous_feedback?: boolean | null
-          auto_resolve_after_reply?: boolean | null
-          brand_color?: string | null
-          created_at?: string | null
-          email_notifications?: boolean | null
-          greeting_text?: string | null
           id?: string
-          updated_at?: string | null
-          user_id?: string
-          widget_location?: string | null
-          widget_position?: string | null
+          project_id?: string
+          email?: string | null
+          message?: string
+          page_url?: string | null
+          browser?: string | null
+          created_at?: string
         }
         Relationships: []
+      }
+      feedback_settings: {
+        Row: {
+          id: string
+          user_id: string
+          project_id: string
+          widget_title: string | null
+          widget_color: string | null
+          greeting_text: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          project_id: string
+          widget_title?: string | null
+          widget_color?: string | null
+          greeting_text?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          project_id?: string
+          widget_title?: string | null
+          widget_color?: string | null
+          greeting_text?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feature_requests: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          status: 'Planned' | 'In Progress' | 'Released'
+          feedback_ids: string[]
+          user_id: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          status?: 'Planned' | 'In Progress' | 'Released'
+          feedback_ids?: string[]
+          user_id: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          status?: 'Planned' | 'In Progress' | 'Released'
+          feedback_ids?: string[]
+          user_id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -1499,17 +1425,20 @@ export type Database = {
           has_access: boolean
           is_active: boolean
           plan: string
+          subscription_active: boolean
+          subscription_expiry_date: string
           trial_end: string
           trial_expired: boolean
+          trial_start: string
         }[]
       }
       clean_expired_invitations: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      create_feedback_settings_for_user: {
-        Args: { user_id_param: string }
-        Returns: undefined
+      confirm_user_email: {
+        Args: { user_uuid: string }
+        Returns: Json
       }
       create_insights_result: {
         Args: {
@@ -1542,9 +1471,23 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: Json
       }
+      create_user_profile_safe: {
+        Args: {
+          company_name?: string
+          first_name?: string
+          last_name?: string
+          user_email: string
+          user_uuid: string
+        }
+        Returns: Json
+      }
       delete_insights_result: {
         Args: { p_result_id: string; p_user_id: string }
         Returns: boolean
+      }
+      delete_user_safe: {
+        Args: { p_user_id: string }
+        Returns: undefined
       }
       detect_urgent_keywords: {
         Args: { message_text: string }
@@ -1563,17 +1506,12 @@ export type Database = {
         Returns: {
           analytics_count: number
           created_at: string
-          feedback_count: number
           insights_count: number
           month_start: string
           reports_count: number
           updated_at: string
           user_id: string
         }[]
-      }
-      ensure_user_feedback_settings: {
-        Args: { user_id_param: string }
-        Returns: undefined
       }
       get_all_project_ids: {
         Args: Record<PropertyKey, never>
@@ -1631,9 +1569,6 @@ export type Database = {
           analytics_count: number
           analytics_limit: number
           analytics_remaining: number
-          feedback_count: number
-          feedback_limit: number
-          feedback_remaining: number
           insights_count: number
           insights_limit: number
           insights_remaining: number
@@ -1651,7 +1586,6 @@ export type Database = {
         Returns: {
           analytics_count: number
           created_at: string
-          feedback_count: number
           insights_count: number
           is_reset: boolean
           month_start: string
@@ -1675,7 +1609,6 @@ export type Database = {
           analytics_reports_count: number
           created_at: string
           detailed_reports_count: number
-          feedback_count: number
           month_start: string
           updated_at: string
           user_id: string
@@ -1685,7 +1618,6 @@ export type Database = {
         Args: { target_month_start: string; user_uuid: string }
         Returns: {
           analytics_count: number
-          feedback_count: number
           insights_count: number
           month_start: string
           reports_count: number
@@ -1707,6 +1639,16 @@ export type Database = {
       test_insights_results_table: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      track_auth_event: {
+        Args: {
+          p_event_data?: Json
+          p_event_type: string
+          p_ip_address?: unknown
+          p_user_agent?: string
+          p_user_id: string
+        }
+        Returns: undefined
       }
       update_user_plan_after_payment: {
         Args: {
@@ -1748,6 +1690,18 @@ export type Database = {
           policies_count: number
           rls_enabled: boolean
           table_name: string
+        }[]
+      }
+      get_or_create_feedback_settings: {
+        Args: { p_user_id: string }
+        Returns: {
+          id: string
+          user_id: string
+          project_id: string
+          widget_title: string | null
+          widget_color: string | null
+          greeting_text: string | null
+          created_at: string
         }[]
       }
     }

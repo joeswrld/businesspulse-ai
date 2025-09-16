@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signup Fix Verification</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        input { padding: 8px; margin: 5px; width: 200px; }
+        .log { background-color: #f8f9fa; padding: 10px; border-radius: 3px; font-family: monospace; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Signup Fix Verification</h1>
+    
+    <div class="test-section info">
+        <h3>Configuration</h3>
+        <p>Supabase URL: <span id="supabase-url">Loading...</span></p>
+        <p>Status: <span id="connection-status">Checking...</span></p>
+    </div>
+
+    <div class="test-section">
+        <h3>Test Signup</h3>
+        <div>
+            <input type="email" id="test-email" placeholder="test@example.com" value="">
+            <input type="password" id="test-password" placeholder="Password" value="testpassword123">
+            <input type="text" id="test-fullname" placeholder="Full Name" value="Test User">
+            <input type="text" id="test-company" placeholder="Company Name" value="Test Company">
+        </div>
+        <div>
+            <button onclick="testSignup()">Test Signup</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>Test Results</h3>
+        <div id="test-results" class="log">Click "Test Signup" to run the test...</div>
+    </div>
+
+    <script>
+        // Initialize Supabase
+        const SUPABASE_URL = 'https://xjbrqeqizpoqdjkiyqzt.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Update UI
+        document.getElementById('supabase-url').textContent = SUPABASE_URL;
+        document.getElementById('test-email').value = `test-${Date.now()}@example.com`;
+        
+        // Test connection
+        async function testConnection() {
+            try {
+                const { data, error } = await supabase.auth.getSession();
+                if (error) {
+                    document.getElementById('connection-status').textContent = 'Error: ' + error.message;
+                    document.getElementById('connection-status').style.color = 'red';
+                } else {
+                    document.getElementById('connection-status').textContent = 'Connected successfully';
+                    document.getElementById('connection-status').style.color = 'green';
+                }
+            } catch (err) {
+                document.getElementById('connection-status').textContent = 'Connection failed: ' + err.message;
+                document.getElementById('connection-status').style.color = 'red';
+            }
+        }
+        
+        // Test signup
+        async function testSignup() {
+            const log = document.getElementById('test-results');
+            const email = document.getElementById('test-email').value;
+            const password = document.getElementById('test-password').value;
+            const fullName = document.getElementById('test-fullname').value;
+            const company = document.getElementById('test-company').value;
+            
+            log.textContent = 'Starting signup test...\n';
+            
+            try {
+                log.textContent += `Testing with email: ${email}\n`;
+                log.textContent += `Full name: ${fullName}\n`;
+                log.textContent += `Company: ${company}\n\n`;
+                
+                const { data, error } = await supabase.auth.signUp({
+                    email: email,
+                    password: password,
+                    options: {
+                        data: {
+                            full_name: fullName,
+                            company_name: company || 'Individual User'
+                        }
+                    }
+                });
+                
+                if (error) {
+                    log.textContent += `❌ Signup failed:\n`;
+                    log.textContent += `Error: ${error.message}\n`;
+                    log.textContent += `Code: ${error.status}\n`;
+                    log.textContent += `Details: ${JSON.stringify(error, null, 2)}\n`;
+                    
+                    // Update email for next test
+                    document.getElementById('test-email').value = `test-${Date.now()}@example.com`;
+                } else {
+                    log.textContent += `✅ Signup successful!\n`;
+                    log.textContent += `User ID: ${data.user?.id}\n`;
+                    log.textContent += `Email: ${data.user?.email}\n`;
+                    log.textContent += `Confirmed: ${data.user?.email_confirmed_at ? 'Yes' : 'No'}\n`;
+                    log.textContent += `Metadata: ${JSON.stringify(data.user?.user_metadata, null, 2)}\n`;
+                    
+                    // Update email for next test
+                    document.getElementById('test-email').value = `test-${Date.now()}@example.com';
+                }
+                
+            } catch (err) {
+                log.textContent += `❌ Test failed with exception:\n`;
+                log.textContent += `${err.message}\n`;
+                log.textContent += `${err.stack}\n`;
+            }
+        }
+        
+        // Clear log
+        function clearLog() {
+            document.getElementById('test-results').textContent = 'Log cleared. Click "Test Signup" to run the test...';
+        }
+        
+        // Initialize
+        testConnection();
+    </script>
+</body>
+</html>

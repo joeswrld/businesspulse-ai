@@ -43,7 +43,7 @@ const TestimonialsSection = () => {
   ];
 
   return (
-    <section className="py-24 bg-muted/30">
+    <section className="py-24 bg-gradient-subtle transition-colors">
       <div className="container mx-auto px-4">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
@@ -62,12 +62,12 @@ const TestimonialsSection = () => {
         {/* Testimonials Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {testimonials.map((testimonial, index) => (
-            <Card key={index} className="bg-background/80 backdrop-blur-sm border-0 shadow-soft hover:shadow-medium transition-all duration-300 group">
+            <Card key={index} className="bg-card/90 backdrop-blur-sm border border-border shadow-soft hover:shadow-medium transition-all duration-300 group">
               <CardContent className="p-6">
                 <div className="space-y-4">
                   {/* Quote Icon */}
-                  <div className="w-10 h-10 bg-primary-light rounded-lg flex items-center justify-center group-hover:bg-primary-light/80 transition-colors">
-                    <Quote className="h-5 w-5 text-primary" />
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-primary-light dark:bg-secondary group-hover:bg-primary-light/80 dark:group-hover:bg-secondary/80 transition-colors">
+                    <Quote className="h-5 w-5 text-primary dark:text-primary-foreground" />
                   </div>
 
                   {/* Rating */}

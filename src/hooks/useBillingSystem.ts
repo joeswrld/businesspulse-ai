@@ -87,8 +87,8 @@ export interface BillingSystemState {
 const PLAN_LIMITS: Record<string, UsageLimits> = {
   trial: {
     feedback: 50,
-    analytics: 5,
-    reports: 2,
+    analytics: 0,
+    reports: 5,
     insights: 5,
     teams: 1,
     export: ['CSV'],
@@ -385,15 +385,20 @@ export function useBillingSystem(): BillingSystemState {
 
   const isSubscriptionActive = useCallback(() => {
     try {
-      // Show cancel button for all paid plans (pro, business) regardless of subscription_status
-      // Also show for active subscriptions
       const currentPlan = billingProfile?.plan;
       const subscriptionStatus = billingProfile?.subscription_status;
       
-      return (
-        subscriptionStatus === 'active' || 
-        currentPlan === 'business'
-      );
+      // Business plan users are active if they have business plan AND active subscription
+      if (currentPlan === 'business') {
+        return subscriptionStatus === 'active' || subscriptionStatus === 'trial';
+      }
+      
+      // Trial users are active if they have trial status
+      if (currentPlan === 'trial') {
+        return subscriptionStatus === 'trial';
+      }
+      
+      return false;
     } catch (error) {
       console.warn('Error checking subscription status:', error);
       return false;

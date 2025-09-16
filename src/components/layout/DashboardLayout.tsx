@@ -16,7 +16,6 @@ import {
   CreditCard,
   Users,
   MessageSquare,
-  SlidersHorizontal,
   Crown,
   Star,
   Zap,
@@ -27,7 +26,12 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useFeedbackNotifications } from "@/hooks/useFeedbackNotifications";
+import TopNav from "@/components/layout/TopNav";
+
+// Mock hook for feedback notifications - replace with actual implementation
+const useFeedbackNotifications = () => {
+  return { newCount: 0 };
+};
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -125,18 +129,17 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     };
   };
 
-  const navigation = [
-    { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Collect Feedback", href: "/feedback", icon: MessageSquare, notificationCount: feedbackNewCount }, 
-    { name: "AI Insights", href: "/insights", icon: Brain },
-    { name: "Reports & Analytics", href: "/reports", icon: FileText },
-    { name: "Business Metrics", href: "/analytics", icon: BarChart3 },
-    { name: "Team Collaboration", href: "/teams", icon: Users,  },
-    { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
-    { name: "Widget Settings", href: "/feedback-settings", icon: SlidersHorizontal },
-    { name: "Account Settings", href: "/settings", icon: Settings },
-    { name: "My Profile", href: "/profile", icon: User },
-  ];
+const navigation = [
+  { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Feedback", href: "/feedback", icon: MessageSquare },
+  { name: "AI Insights", href: "/insights-simple", icon: Brain },
+  { name: "Reports & Analytics", href: "/reports", icon: FileText },
+  { name: "Roadmap", href: "/roadmap", icon: BarChart3 }, // <-- NEW ENTRY
+  { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
+  { name: "Team Collaboration", href: "/teams", icon: Users },
+  { name: "Feedback Settings", href: "/feedback-settings", icon: Settings },
+];
+
 
   const handleSignOut = async () => {
     try {
@@ -164,47 +167,47 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Sidebar */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-50 bg-gradient-to-b from-slate-50 to-white border-r border-slate-200 transform transition-all duration-300 ease-in-out lg:translate-x-0 shadow-xl max-h-screen",
+        "fixed inset-y-0 left-0 z-50 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950 border-r border-slate-200 dark:border-slate-800 transform transition-all duration-300 ease-in-out lg:translate-x-0 shadow-xl max-h-screen",
         sidebarCollapsed ? "w-16" : "w-72",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white/50 backdrop-blur-sm">
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm transition-colors">
             <Link to="/dashboard" className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
                 <img src="/favicon.ico" alt="NoteX" className="h-6 w-6" />
               </div>
               {!sidebarCollapsed && (
                 <div className="transition-opacity duration-300">
-                               <h1 className="text-lg font-bold text-slate-900">NoteX</h1>
-             <p className="text-xs text-slate-500">Turn feedback into growth ✨</p>
+                  <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">NoteX</h1>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Turn feedback into growth ✨</p>
                 </div>
               )}
             </Link>
             <div className="flex items-center space-x-2">
               <button 
-                className="hidden lg:flex p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="hidden lg:flex p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               >
                 {sidebarCollapsed ? (
-                  <ChevronRight className="h-4 w-4 text-slate-600" />
+                  <ChevronRight className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                 ) : (
-                  <ChevronLeft className="h-4 w-4 text-slate-600" />
+                  <ChevronLeft className="h-4 w-4 text-slate-600 dark:text-slate-300" />
                 )}
               </button>
               <button 
-                className="lg:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="lg:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                 onClick={() => setSidebarOpen(false)}
               >
-                <X className="h-5 w-5 text-slate-600" />
+                <X className="h-5 w-5 text-slate-600 dark:text-slate-300" />
               </button>
             </div>
           </div>
 
           {/* User Profile Section */}
           {!loading && user && !sidebarCollapsed && (
-            <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-900 dark:to-slate-950">
               <div className="flex items-center space-x-3 mb-4">
                 <Avatar className="h-12 w-12 border-2 border-white shadow-lg">
                   <AvatarImage src={profile?.avatar_url} />
@@ -213,13 +216,13 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-slate-900 truncate">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
                     {profile?.first_name && profile?.last_name 
                       ? `${profile.first_name} ${profile.last_name}`
                       : user.email?.split('@')[0] || 'User'
                     }
                   </h3>
-                  <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
                 </div>
               </div>
               
@@ -246,7 +249,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
           {/* Collapsed User Avatar */}
           {!loading && user && sidebarCollapsed && (
-            <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-900 dark:to-slate-950">
               <Avatar className="h-10 w-10 border-2 border-white shadow-lg mx-auto">
                 <AvatarImage src={profile?.avatar_url} />
                 <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-semibold text-sm">
@@ -260,7 +263,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
-              const isComingSoon = item.comingSoon;
+              const isComingSoon = false;
               
               return (
                 <div key={item.name} className="relative">
@@ -289,7 +292,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                         sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2.5",
                         isActive
                           ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25"
-                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
+                          : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/60"
                       )}
                       onClick={() => setSidebarOpen(false)}
                       title={sidebarCollapsed ? item.name : undefined}
@@ -298,11 +301,11 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                         "p-1 rounded-lg transition-colors relative",
                         isActive 
                           ? "bg-white/20" 
-                          : "bg-slate-100 group-hover:bg-slate-200"
+                          : "bg-slate-100 dark:bg-slate-800 group-hover:bg-slate-200 dark:group-hover:bg-slate-700"
                       )}>
                         <item.icon className={cn(
                           "h-4 w-4",
-                          isActive ? "text-white" : "text-slate-600"
+                          isActive ? "text-white" : "text-slate-600 dark:text-slate-300"
                         )} />
                         {item.notificationCount && item.notificationCount > 0 && (
                           <Badge 
@@ -339,7 +342,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           </nav>
 
           {/* User Menu */}
-          <div className="p-3 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
+          <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm transition-colors">
             <div className="space-y-1">
              
               
@@ -351,7 +354,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                 )}
                 title={sidebarCollapsed ? "Sign Out" : undefined}
               >
-                <div className="p-1 rounded-lg bg-red-100 group-hover:bg-red-200 transition-colors">
+                <div className="p-1 rounded-lg bg-red-100 dark:bg-red-900/30 group-hover:bg-red-200 dark:group-hover:bg-red-900/40 transition-colors">
                   <LogOut className="h-4 w-4 text-red-600" />
                 </div>
                 {!sidebarCollapsed && <span className="flex-1">Sign Out</span>}
@@ -366,11 +369,14 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
         "min-h-screen bg-background transition-all duration-300",
         sidebarCollapsed ? "lg:pl-16" : "lg:pl-72"
       )}>
+        {/* Top Navigation Bar */}
+        <TopNav />
         {/* Mobile menu button */}
-        <div className="lg:hidden p-4">
+        <div className="lg:hidden px-4 pt-2">
           <button
             className="p-2 -ml-2 hover:bg-slate-100 rounded-lg transition-colors"
             onClick={() => setSidebarOpen(true)}
+            aria-label="Open sidebar"
           >
             <Menu className="h-5 w-5 text-slate-600" />
           </button>

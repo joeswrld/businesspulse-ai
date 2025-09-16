@@ -9,7 +9,7 @@ const HeroSection = () => {
   return (
     <section className="relative pt-16 sm:pt-20 pb-12 sm:pb-16 overflow-hidden">
       {/* Background Gradient */}
-      <div className="absolute inset-0 bg-gradient-subtle"></div>
+      <div className="absolute inset-0 bg-gradient-subtle transition-colors"></div>
       
       <div className="container mx-auto px-3 sm:px-4 relative z-10">
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
@@ -64,7 +64,7 @@ const HeroSection = () => {
               />
               
               {/* Floating Elements */}
-              <div className="absolute top-2 sm:top-4 left-2 sm:left-4 bg-white/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-medium">
+              <div className="absolute top-2 sm:top-4 left-2 sm:left-4 bg-card/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-medium border border-border">
                 <div className="flex items-center space-x-1 sm:space-x-2">
                   <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-success" />
                   <div>
@@ -74,17 +74,17 @@ const HeroSection = () => {
                 </div>
               </div>
               
-              <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-white/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-medium">
+              <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-card/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-medium border border-border">
                 <div className="flex items-center space-x-2">
-                  <Brain className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                  <Brain className="h-4 w-4 sm:h-5 sm:w-5 text-primary dark:text-primary-foreground" />
                   <div>
                     <div className="text-xs font-medium">AI Insights</div>
-                    <div className="text-sm sm:text-lg font-bold text-primary">Live</div>
+                    <div className="text-sm sm:text-lg font-bold text-primary dark:text-primary-foreground">Live</div>
                   </div>
                 </div>
               </div>
               
-              <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-medium">
+              <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2 bg-card/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-medium border border-border">
                 <div className="text-xs font-medium text-center">
                   Real-time Feedback Analytics
                 </div>

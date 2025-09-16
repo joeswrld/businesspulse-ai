@@ -4,44 +4,35 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FeedbackBadgeGroup } from '@/components/ui/FeedbackBadge';
-import { useRealtimeFeedback } from '@/hooks/useRealtimeFeedback';
-import ProtectedPage from '@/components/ProtectedPage';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-// import { checkAndSetupDatabase } from '@/utils/databaseCheck';
+
 import { 
   BarChart3, 
   Users, 
-  TrendingUp, 
-  FileText, 
-  BarChart, 
-  Lightbulb,
+  MessageSquare,
   CheckCircle,
   AlertCircle,
   Clock,
-  Plus,
-  Activity,
-  Zap,
-  Target,
-  ArrowUpRight,
-  ArrowDownRight,
   RefreshCw,
-  MessageSquare,
   Crown,
-  CreditCard,
-  Calendar,
-  Filter,
-  Eye,
-  TrendingDown,
-  Minus,
+  Calendar as CalendarIcon,
+  TrendingUp,
   PieChart,
   LineChart,
   BarChart as BarChartIcon,
-  Download,
-  Settings
+  Activity,
+  Zap,
+  Minus
 } from 'lucide-react';
+
+import OnboardingChecklist from '@/components/OnboardingChecklist';
+import GuidedTour from '@/components/GuidedTour';
+import { useOnboarding } from '@/hooks/useOnboarding';
 
 import {
   BarChart as RechartsBarChart,
@@ -65,98 +56,150 @@ import {
 interface Feedback {
   id: string;
   project_id: string;
-  name: string;
-  email: string;
+  email: string | null;
   message: string;
+  page_url: string | null;
+  browser: string | null;
+  sentiment: 'positive' | 'negative' | 'neutral' | null;
   timestamp: string;
-  status: 'new' | 'reviewed' | 'resolved';
 }
 
-interface UserSubscription {
+interface Insight {
   id: string;
   user_id: string;
-  plan_name: string;
-  plan_type: string;
-  status: string;
-  current_period_start: string;
-  current_period_end: string;
-  trial_end: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface DashboardStats {
-  totalFeedback: number;
-  positiveSentiment: number;
-  negativeSentiment: number;
-  neutralSentiment: number;
-  activeUsers: number;
-  topThemes: Array<{ theme: string; count: number }>;
-  feedbackVolume: Array<{ date: string; count: number }>;
-  sentimentTrend: {
-    currentPeriod: number;
-    previousPeriod: number;
-    change: number;
-    trend: 'up' | 'down' | 'stable';
-  };
-}
-
-interface AIInsight {
+  file_id: string;
+  file_name: string;
   summary: string;
   key_themes: string[];
   suggested_actions: string[];
-  sentiment_overview: string;
+  sentiment: any;
+  performance: any;
+  trends: string[];
+  created_at: string;
+}
+
+interface Profile {
+  id: string;
+  user_id: string | null;
+  email: string | null;
+  full_name: string | null;
+  plan: string | null;
+  trial_end: string | null;
+  created_at: string;
+}
+
+interface DashboardMetrics {
+  totalFeedback: number;
+  positiveFeedback: number;
+  negativeFeedback: number;
+  neutralFeedback: number;
+  activeUsers: number;
+  currentPlan: string;
+}
+
+interface ChartData {
+  date: string;
+  count: number;
+}
+
+interface ThemeData {
+  theme: string;
+  count: number;
+}
+
+interface SentimentData {
+  name: string;
+  value: number;
+  color: string;
 }
 
 export default function Dashboard() {
-  console.log('📱 Dashboard component rendering...');
   const { user } = useAuth();
   
-  // Use real-time feedback hook
-  const { 
-    feedbacks, 
-    counts, 
-    loading: feedbackLoading, 
-    error: feedbackError, 
-    realtimeStatus 
-  } = useRealtimeFeedback();
-  
   // State management
-  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [insights, setInsights] = useState<Insight[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
-  const [sentimentFilter, setSentimentFilter] = useState<'all' | 'positive' | 'negative' | 'neutral'>('all');
-  const [aiInsight, setAiInsight] = useState<AIInsight | null>(null);
-  const [generatingInsight, setGeneratingInsight] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [customDateRange, setCustomDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined
+  });
+  const [showTour, setShowTour] = useState(false);
+  const { isNewUser } = useOnboarding();
 
-  // Load subscription data only (feedback is handled by the hook)
-  const loadSubscriptionData = useCallback(async () => {
+  // Load dashboard data
+  const loadDashboardData = useCallback(async () => {
     if (!user) return;
 
     try {
       setLoading(true);
-      console.log('Loading subscription data for user:', user.id);
-      
-      // Get subscription data
-      const { data: subscriptionData, error: subscriptionError } = await supabase
-        .from('user_subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      setError(null);
 
-      if (subscriptionError && subscriptionError.code !== 'PGRST116') {
-        console.error('Error loading subscription:', subscriptionError);
-        // Don't throw error for subscription, it's optional
+      // Get user's project IDs from feedback_settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('feedback_settings')
+        .select('project_id')
+        .eq('user_id', user.id);
+
+      if (settingsError) {
+        console.error('Error loading feedback settings:', settingsError);
+        throw settingsError;
       }
 
-      console.log('Subscription loaded:', subscriptionData);
-      setSubscription(subscriptionData as any);
+      const projectIds = settingsData?.map(s => s.project_id) || [];
+
+      // Load all data in parallel
+      const [feedbacksResult, insightsResult, profileResult] = await Promise.all([
+        // Load feedbacks
+        projectIds.length > 0 
+          ? supabase
+              .from('feedback')
+              .select('*')
+              .in('project_id', projectIds)
+              .order('created_at', { ascending: false })
+          : Promise.resolve({ data: [], error: null }),
+        
+        // Load insights
+        supabase
+          .from('insights_results')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false }),
+        
+        // Load profile
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+      ]);
+
+      if (feedbacksResult.error) {
+        console.error('Error loading feedbacks:', feedbacksResult.error);
+        throw feedbacksResult.error;
+      }
+
+      if (insightsResult.error) {
+        console.error('Error loading insights:', insightsResult.error);
+        throw insightsResult.error;
+      }
+
+      if (profileResult.error && profileResult.error.code !== 'PGRST116') {
+        console.error('Error loading profile:', profileResult.error);
+        throw profileResult.error;
+      }
+
+      setFeedbacks(feedbacksResult.data || []);
+      setInsights(insightsResult.data || []);
+      setProfile(profileResult.data || null);
 
     } catch (error) {
-      console.error('Error in loadSubscriptionData:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred while loading subscription data');
+      console.error('Error loading dashboard data:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred while loading data');
     } finally {
       setLoading(false);
     }
@@ -165,13 +208,69 @@ export default function Dashboard() {
   // Load data on component mount
   useEffect(() => {
     if (user) {
-      // Load subscription data (feedback is handled by the hook)
-      loadSubscriptionData();
+      loadDashboardData();
     }
-  }, [loadSubscriptionData, user]);
+  }, [loadDashboardData, user]);
 
-  // Analyze sentiment from message content
-  const analyzeSentiment = (message: string): 'positive' | 'negative' | 'neutral' => {
+  // Set up real-time subscriptions
+  useEffect(() => {
+    if (!user) return;
+
+    // Subscribe to feedback changes
+    const feedbackChannel = supabase
+      .channel('dashboard-feedback-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'feedbacks'
+        },
+        (payload) => {
+          console.log('Feedback change received in dashboard:', payload);
+          loadDashboardData(); // Reload all data when feedback changes
+        }
+      )
+      .subscribe();
+
+    // Subscribe to insights changes
+    const insightsChannel = supabase
+      .channel('dashboard-insights-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'insights_results',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Insights change received in dashboard:', payload);
+          loadDashboardData(); // Reload all data when insights change
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(feedbackChannel);
+      supabase.removeChannel(insightsChannel);
+    };
+  }, [user, loadDashboardData]);
+
+  // Refresh data when date range changes
+  useEffect(() => {
+    if (user) {
+      loadDashboardData();
+    }
+  }, [dateRange, customDateRange, loadDashboardData, user]);
+
+  // Get sentiment from database or fallback to analysis
+  const getSentiment = (feedback: Feedback): 'positive' | 'negative' | 'neutral' => {
+    if (feedback.sentiment) {
+      return feedback.sentiment;
+    }
+    
+    // Fallback to client-side analysis if no sentiment in database
     const positiveWords = [
       'great', 'good', 'excellent', 'amazing', 'wonderful', 'fantastic', 'love', 'like', 'happy', 'satisfied',
       'perfect', 'awesome', 'outstanding', 'brilliant', 'superb', 'terrific', 'pleased', 'impressed', 'smooth',
@@ -184,7 +283,7 @@ export default function Dashboard() {
       'useless', 'waste', 'problem', 'issue', 'complaint', 'unhappy', 'dissatisfied', 'poor', 'weak'
     ];
 
-    const messageLower = message.toLowerCase();
+    const messageLower = feedback.message.toLowerCase();
     const positiveCount = positiveWords.filter(word => messageLower.includes(word)).length;
     const negativeCount = negativeWords.filter(word => messageLower.includes(word)).length;
 
@@ -193,235 +292,136 @@ export default function Dashboard() {
     return 'neutral';
   };
 
-  // Extract themes from message content
-  const extractThemes = (message: string): string[] => {
-    const commonThemes = [
-      'user interface', 'ui', 'ux', 'design', 'performance', 'speed', 'loading', 'bug', 'error', 'crash',
-      'mobile', 'responsive', 'navigation', 'search', 'filter', 'dashboard', 'report', 'export', 'import',
-      'notification', 'email', 'login', 'authentication', 'security', 'privacy', 'data', 'storage',
-      'customer support', 'help', 'documentation', 'tutorial', 'onboarding', 'feature', 'functionality',
-      'pricing', 'billing', 'subscription', 'upgrade', 'downgrade', 'integration', 'api', 'webhook'
-    ];
-
-    const messageLower = message.toLowerCase();
-    const foundThemes = commonThemes.filter(theme => messageLower.includes(theme));
+  // Get date range for filtering
+  const getDateRange = (): { start: Date; end: Date } => {
+    const now = new Date();
+    const end = customDateRange.to || now;
+    const start = customDateRange.from || (() => {
+      switch (dateRange) {
+        case '7d': return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        case '30d': return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        case '90d': return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        default: return new Date(0); // All time
+      }
+    })();
     
-    if (foundThemes.length === 0) {
-      const words = messageLower.split(/\s+/).filter(word => word.length > 3);
-      const uniqueWords = [...new Set(words)].slice(0, 3);
-      return uniqueWords.map(word => word.charAt(0).toUpperCase() + word.slice(1));
-    }
-
-    return foundThemes.slice(0, 3);
+    return { start, end };
   };
 
-  // Calculate dashboard stats using real-time counts
-  const dashboardStats = useMemo((): DashboardStats => {
-    console.log('Calculating dashboard stats for', feedbacks.length, 'feedbacks');
+  // Calculate dashboard metrics
+  const dashboardMetrics = useMemo((): DashboardMetrics => {
+    const { start, end } = getDateRange();
     
-    if (feedbacks.length === 0) {
-      console.log('No feedbacks, returning empty stats');
-      return {
-        totalFeedback: counts.total,
-        positiveSentiment: 0,
-        negativeSentiment: 0,
-        neutralSentiment: 0,
-        activeUsers: 0,
-        topThemes: [],
-        feedbackVolume: [],
-        sentimentTrend: { currentPeriod: 0, previousPeriod: 0, change: 0, trend: 'stable' }
-      };
-    }
-
-    // Filter feedbacks based on date range
-    const now = new Date();
+    // Filter feedbacks by date range
     const filteredFeedbacks = feedbacks.filter(feedback => {
-      const feedbackDate = new Date(feedback.timestamp);
-      const diffTime = Math.abs(now.getTime() - feedbackDate.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      switch (dateRange) {
-        case '7d': return diffDays <= 7;
-        case '30d': return diffDays <= 30;
-        case '90d': return diffDays <= 90;
-        default: return true;
-      }
+      const feedbackDate = new Date(feedback.created_at);
+      return feedbackDate >= start && feedbackDate <= end;
     });
 
-    // Calculate sentiment distribution
-    const sentiments = filteredFeedbacks.map(feedback => analyzeSentiment(feedback.message));
+    // Calculate sentiment counts
+    const sentiments = filteredFeedbacks.map(feedback => getSentiment(feedback));
     const positiveCount = sentiments.filter(s => s === 'positive').length;
     const negativeCount = sentiments.filter(s => s === 'negative').length;
     const neutralCount = sentiments.filter(s => s === 'neutral').length;
 
-    // Calculate active users (unique names/emails)
-    const uniqueUsers = new Set();
-    filteredFeedbacks.forEach(feedback => {
-      if (feedback.name) uniqueUsers.add(feedback.name);
-      if (feedback.email) uniqueUsers.add(feedback.email);
+    // Calculate active users (unique emails)
+    const uniqueUsers = new Set(
+      filteredFeedbacks
+        .map(f => f.email)
+        .filter(email => email && email.trim() !== '')
+    );
+
+    return {
+      totalFeedback: filteredFeedbacks.length,
+      positiveFeedback: positiveCount,
+      negativeFeedback: negativeCount,
+      neutralFeedback: neutralCount,
+      activeUsers: uniqueUsers.size,
+      currentPlan: profile?.plan || 'Free Trial'
+    };
+  }, [feedbacks, profile, dateRange, customDateRange]);
+
+  // Calculate chart data
+  const chartData = useMemo((): ChartData[] => {
+    const { start, end } = getDateRange();
+    
+    const filteredFeedbacks = feedbacks.filter(feedback => {
+      const feedbackDate = new Date(feedback.created_at);
+      return feedbackDate >= start && feedbackDate <= end;
     });
 
-    // Extract and count themes
-    const allThemes = filteredFeedbacks.flatMap(feedback => extractThemes(feedback.message));
+    // Group by date
+    const volumeData: Record<string, number> = {};
+    filteredFeedbacks.forEach(feedback => {
+      const date = new Date(feedback.created_at).toISOString().split('T')[0];
+      volumeData[date] = (volumeData[date] || 0) + 1;
+    });
+
+    return Object.entries(volumeData)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, count]) => ({ date, count }));
+  }, [feedbacks, dateRange, customDateRange]);
+
+  // Calculate sentiment data for pie chart
+  const sentimentData = useMemo((): SentimentData[] => {
+    const { start, end } = getDateRange();
+    
+    const filteredFeedbacks = feedbacks.filter(feedback => {
+      const feedbackDate = new Date(feedback.created_at);
+      return feedbackDate >= start && feedbackDate <= end;
+    });
+
+    const sentiments = filteredFeedbacks.map(feedback => getSentiment(feedback));
+    const positiveCount = sentiments.filter(s => s === 'positive').length;
+    const negativeCount = sentiments.filter(s => s === 'negative').length;
+    const neutralCount = sentiments.filter(s => s === 'neutral').length;
+
+    return [
+      { name: 'Positive', value: positiveCount, color: '#10b981' },
+      { name: 'Neutral', value: neutralCount, color: '#f59e0b' },
+      { name: 'Negative', value: negativeCount, color: '#ef4444' }
+    ];
+  }, [feedbacks, dateRange, customDateRange]);
+
+  // Calculate top themes from insights
+  const topThemes = useMemo((): ThemeData[] => {
+    const { start, end } = getDateRange();
+    
+    const filteredInsights = insights.filter(insight => {
+      const insightDate = new Date(insight.created_at);
+      return insightDate >= start && insightDate <= end;
+    });
+
+    // Flatten all themes from insights
+    const allThemes = filteredInsights.flatMap(insight => insight.key_themes || []);
+    
+    // Count theme occurrences
     const themeCounts: Record<string, number> = {};
     allThemes.forEach(theme => {
       themeCounts[theme] = (themeCounts[theme] || 0) + 1;
     });
 
-    const topThemes = Object.entries(themeCounts)
+    return Object.entries(themeCounts)
       .sort(([,a], [,b]) => b - a)
       .slice(0, 5)
       .map(([theme, count]) => ({ theme, count }));
+  }, [insights, dateRange, customDateRange]);
 
-    // Calculate feedback volume over time
-    const volumeData: Record<string, number> = {};
-    filteredFeedbacks.forEach(feedback => {
-      const date = new Date(feedback.timestamp).toISOString().split('T')[0];
-      volumeData[date] = (volumeData[date] || 0) + 1;
-    });
-
-    const feedbackVolume = Object.entries(volumeData)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, count]) => ({ date, count }));
-
-    // Calculate sentiment trend (last 7 days vs previous 7 days)
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+  // Get recent feedback for the feed
+  const recentFeedbacks = useMemo(() => {
+    const { start, end } = getDateRange();
     
-    const currentPeriodFeedbacks = filteredFeedbacks.filter(feedback => 
-      new Date(feedback.timestamp) >= sevenDaysAgo
-    );
-    const previousPeriodFeedbacks = filteredFeedbacks.filter(feedback => {
-      const feedbackDate = new Date(feedback.timestamp);
-      return feedbackDate >= fourteenDaysAgo && feedbackDate < sevenDaysAgo;
-    });
-
-    const currentPeriodPositive = currentPeriodFeedbacks.filter(f => 
-      analyzeSentiment(f.message) === 'positive'
-    ).length;
-    const previousPeriodPositive = previousPeriodFeedbacks.filter(f => 
-      analyzeSentiment(f.message) === 'positive'
-    ).length;
-
-    const currentPeriodTotal = currentPeriodFeedbacks.length;
-    const previousPeriodTotal = previousPeriodFeedbacks.length;
-
-    const currentPeriodPercentage = currentPeriodTotal > 0 
-      ? (currentPeriodPositive / currentPeriodTotal) * 100 
-      : 0;
-    const previousPeriodPercentage = previousPeriodTotal > 0 
-      ? (previousPeriodPositive / previousPeriodTotal) * 100 
-      : 0;
-
-    const change = currentPeriodPercentage - previousPeriodPercentage;
-    const trend: 'up' | 'down' | 'stable' = 
-      Math.abs(change) < 5 ? 'stable' : change > 0 ? 'up' : 'down';
-
-    return {
-      totalFeedback: filteredFeedbacks.length,
-      positiveSentiment: positiveCount,
-      negativeSentiment: negativeCount,
-      neutralSentiment: neutralCount,
-      activeUsers: uniqueUsers.size,
-      topThemes,
-      feedbackVolume,
-      sentimentTrend: {
-        currentPeriod: Math.round(currentPeriodPercentage),
-        previousPeriod: Math.round(previousPeriodPercentage),
-        change: Math.round(change),
-        trend
-      }
-    };
-  }, [feedbacks, dateRange]);
-
-  // Filter feedbacks based on sentiment
-  const filteredFeedbacks = useMemo(() => {
-    if (sentimentFilter === 'all') return feedbacks;
-    return feedbacks.filter(feedback => analyzeSentiment(feedback.message) === sentimentFilter);
-  }, [feedbacks, sentimentFilter]);
-
-  // Generate AI insight using client-side analysis
-  const generateAIInsight = useCallback(async () => {
-    if (!user || feedbacks.length === 0) return;
-
-    setGeneratingInsight(true);
-    try {
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Analyze feedback data client-side
-      const recentFeedbacks = feedbacks.slice(0, 10);
-      const sentiments = recentFeedbacks.map(f => analyzeSentiment(f.message));
-      const themes = recentFeedbacks.flatMap(f => extractThemes(f.message));
-      
-      // Calculate sentiment percentages
-      const positiveCount = sentiments.filter(s => s === 'positive').length;
-      const negativeCount = sentiments.filter(s => s === 'negative').length;
-      const neutralCount = sentiments.filter(s => s === 'neutral').length;
-      const total = sentiments.length;
-      
-      const positivePercent = total > 0 ? Math.round((positiveCount / total) * 100) : 0;
-      const negativePercent = total > 0 ? Math.round((negativeCount / total) * 100) : 0;
-      const neutralPercent = total > 0 ? Math.round((neutralCount / total) * 100) : 0;
-
-      // Count theme frequency
-      const themeCounts: Record<string, number> = {};
-      themes.forEach(theme => {
-        themeCounts[theme] = (themeCounts[theme] || 0) + 1;
-      });
-
-      const topThemes = Object.entries(themeCounts)
-        .sort(([,a], [,b]) => b - a)
-        .slice(0, 5)
-        .map(([theme]) => theme);
-
-      // Generate summary based on data
-      let summary = '';
-      if (positivePercent > 60) {
-        summary = `Your feedback shows overwhelmingly positive sentiment with ${positivePercent}% positive responses. Users are generally satisfied with your product or service.`;
-      } else if (negativePercent > 40) {
-        summary = `There are significant concerns in your feedback with ${negativePercent}% negative responses. Immediate attention to user issues is recommended.`;
-      } else {
-        summary = `Your feedback shows a balanced sentiment distribution. There's room for improvement while maintaining current strengths.`;
-      }
-
-      // Generate suggested actions
-      const suggestedActions = [];
-      if (negativePercent > 30) {
-        suggestedActions.push('Address negative feedback promptly to improve user satisfaction');
-      }
-      if (topThemes.length > 0) {
-        suggestedActions.push(`Focus on improving ${topThemes[0]} based on frequent mentions`);
-      }
-      if (recentFeedbacks.length < 5) {
-        suggestedActions.push('Collect more feedback to get better insights');
-      }
-
-      setAiInsight({
-        summary,
-        key_themes: topThemes,
-        suggested_actions: suggestedActions,
-        sentiment_overview: `Overall sentiment analysis: ${positivePercent}% positive, ${negativePercent}% negative, ${neutralPercent}% neutral`
-      });
-
-    } catch (error) {
-      console.error('Error generating AI insight:', error);
-      toast.error('Failed to generate AI insight');
-    } finally {
-      setGeneratingInsight(false);
-    }
-  }, [user, feedbacks]);
-
-  // Generate insight on mount if feedbacks exist
-  useEffect(() => {
-    if (feedbacks.length > 0 && !aiInsight) {
-      generateAIInsight();
-    }
-  }, [feedbacks, aiInsight, generateAIInsight]);
+    return feedbacks
+      .filter(feedback => {
+        const feedbackDate = new Date(feedback.created_at);
+        return feedbackDate >= start && feedbackDate <= end;
+      })
+      .slice(0, 10); // Show latest 10
+  }, [feedbacks, dateRange, customDateRange]);
 
   // Format date
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toISOString().split('T')[0];
+    return new Date(dateString).toLocaleString();
   };
 
   // Get sentiment badge variant
@@ -434,111 +434,6 @@ export default function Dashboard() {
       default:
         return 'secondary';
     }
-  };
-
-  // Get status badge variant
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'new':
-        return 'secondary';
-      case 'reviewed':
-        return 'default';
-      case 'resolved':
-        return 'outline';
-      default:
-        return 'secondary';
-    }
-  };
-
-  // Get plan display info
-  const getPlanInfo = () => {
-    console.log('🔍 getPlanInfo called with subscription:', subscription);
-    
-    // If no subscription, show Free Trial based on account creation
-    if (!subscription) {
-      console.log('🔍 No subscription, returning default');
-      const createdAt = user?.created_at ? new Date(user.created_at) : null;
-      let daysLeft = 0;
-      if (createdAt) {
-        const trialEnd = new Date(createdAt);
-        trialEnd.setDate(trialEnd.getDate() + 8);
-        const now = new Date();
-        daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-      }
-
-      return {
-        planName: 'Free Trial',
-        planType: 'trial',
-        isTrial: true,
-        daysLeft,
-        upgradeText: 'Upgrade to Pro',
-        upgradeLink: '/billing?plan=pro'
-      };
-    }
-
-    // Derive plan from available fields (plan_name preferred). Fallback to legacy fields.
-    const derivedPlan = (() => {
-      const planName = (subscription as any).plan_name?.toLowerCase?.() || (subscription as any).plan_type?.toLowerCase?.() || '';
-      if (planName.includes('business')) return 'business';
-      if (planName.includes('pro') || planName.includes('premium')) return 'pro';
-      if (planName.includes('trial')) return 'trial';
-      return (subscription as any).plan_type || 'free';
-    })();
-    const planType = derivedPlan;
-    const planName = derivedPlan;
-    const trialEnd = subscription.trial_end || subscription.current_period_end;
-    
-    console.log('🔍 Plan info extracted:', { planName, planType, trialEnd });
-    
-    // Check if user is currently in trial
-    const isTrial = subscription.status === 'trialing' || planName === 'free_trial' || planName === 'free' || planName === 'trial';
-    let daysLeft = 0;
-    if (isTrial && subscription.trial_end) {
-      const trialEnd = new Date(subscription.trial_end);
-      const now = new Date();
-      daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-    }
-
-
-    let upgradeText = '';
-    let upgradeLink = '';
-
-    if (isTrial) {
-      upgradeText = 'Upgrade to Pro';
-      upgradeLink = '/billing?plan=pro';
-    } else if (planName === 'pro') {
-
-      upgradeText = 'Upgrade to Business';
-      upgradeLink = '/billing?plan=business';
-    } else {
-      upgradeText = 'Manage Subscription';
-      upgradeLink = '/billing';
-    }
-
-    // Safely format plan name
-    const formattedPlanName = planName 
-      ? planName.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-      : 'Free Plan';
-
-    console.log('🔍 Returning plan info:', {
-      planName: formattedPlanName,
-      planType,
-      isTrial,
-      daysLeft: Math.max(0, daysLeft),
-      upgradeText,
-      upgradeLink
-    });
-
-    return {
-      planName: isTrial
-        ? 'Free Trial'
-        : formattedPlanName,
-      planType: isTrial ? 'trial' : planType,
-      isTrial,
-      daysLeft,
-      upgradeText,
-      upgradeLink
-    };
   };
 
   if (!user) {
@@ -565,12 +460,6 @@ export default function Dashboard() {
             <RefreshCw className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Loading Dashboard...</h2>
             <p className="text-gray-600 mb-2">Please wait while we fetch your data.</p>
-            <div className="text-sm text-gray-500 space-y-1">
-              <p>• Loading project settings...</p>
-              <p>• Fetching feedback data...</p>
-              <p>• Retrieving subscription info...</p>
-              <p>• Calculating insights...</p>
-            </div>
           </div>
         </div>
       </div>
@@ -585,58 +474,50 @@ export default function Dashboard() {
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Dashboard Error</h2>
             <p className="text-gray-600 mb-4">
-              There was an issue loading your dashboard data. This might be due to:
+              There was an issue loading your dashboard data.
             </p>
-            <ul className="text-sm text-gray-500 mb-4 text-left max-w-md mx-auto">
-              <li>• Network connectivity issues</li>
-              <li>• Database connection problems</li>
-              <li>• Missing project settings</li>
-              <li>• Permission issues</li>
-            </ul>
-            <div className="space-y-2">
-              <Button onClick={() => {
-                setError(null);
-                setLoading(true);
-                window.location.reload();
-              }}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Try Again
-              </Button>
-              <p className="text-xs text-gray-500">Error: {error}</p>
-            </div>
+            <Button onClick={() => {
+              setError(null);
+              setLoading(true);
+              loadDashboardData();
+            }}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+            <p className="text-xs text-gray-500 mt-2">Error: {error}</p>
           </div>
         </div>
       </div>
     );
   }
 
-  const planInfo = getPlanInfo();
-
   return (
-    <ProtectedPage>
-      <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Guided Tour */}
+      <GuidedTour run={showTour} onComplete={() => setShowTour(false)} />
+      
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between" data-tour="dashboard-welcome">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
           <p className="text-gray-600 mt-2">
-            Real-time overview of your feedback and insights
+            Real-time insights into your feedback data
           </p>
-          <div className="flex items-center space-x-4 mt-3">
-            <div className="flex items-center space-x-1 text-sm text-gray-500">
-              <div className={`w-2 h-2 rounded-full ${
-                realtimeStatus === 'connected' ? 'bg-green-500' : 
-                realtimeStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
-              }`}></div>
-              <span className="capitalize">{realtimeStatus}</span>
-            </div>
-            <FeedbackBadgeGroup counts={counts} />
-          </div>
         </div>
         <div className="flex items-center space-x-2">
+          {isNewUser && (
+            <Button
+              variant="outline"
+              onClick={() => setShowTour(true)}
+              className="border-blue-200 text-blue-600 hover:bg-blue-50"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Take Tour
+            </Button>
+          )}
           <Button
             variant="outline"
-            onClick={loadSubscriptionData}
+            onClick={loadDashboardData}
             disabled={loading}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -645,11 +526,22 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Filters Bar */}
+      {/* Onboarding Checklist */}
+      {isNewUser && (
+        <div data-tour="onboarding-checklist">
+          <OnboardingChecklist />
+        </div>
+      )}
+
+      {/* Date Range Filter */}
       <Card className="rounded-xl shadow-lg">
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4 items-center">
-            {/* Date Range Filter */}
+            <div className="flex items-center space-x-2">
+              <CalendarIcon className="h-4 w-4 text-gray-500" />
+              <span className="text-sm font-medium">Date Range:</span>
+            </div>
+            
             <Select value={dateRange} onValueChange={(value: any) => setDateRange(value)}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Date Range" />
@@ -662,28 +554,50 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
 
-            {/* Sentiment Filter */}
-            <Select value={sentimentFilter} onValueChange={(value: any) => setSentimentFilter(value)}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Sentiment" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Sentiments</SelectItem>
-                <SelectItem value="positive">Positive</SelectItem>
-                <SelectItem value="neutral">Neutral</SelectItem>
-                <SelectItem value="negative">Negative</SelectItem>
-              </SelectContent>
-            </Select>
-
-
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-60 justify-start text-left font-normal",
+                    !customDateRange.from && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {customDateRange.from ? (
+                    customDateRange.to ? (
+                      <>
+                        {format(customDateRange.from, "LLL dd, y")} -{" "}
+                        {format(customDateRange.to, "LLL dd, y")}
+                      </>
+                    ) : (
+                      format(customDateRange.from, "LLL dd, y")
+                    )
+                  ) : (
+                    <span>Custom Range</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={customDateRange.from}
+                  selected={customDateRange}
+                  onSelect={(range) => {
+                    setCustomDateRange(range || { from: undefined, to: undefined });
+                    setDatePickerOpen(false);
+                  }}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </CardContent>
       </Card>
 
-      
-
-      {/* Top Row - KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      {/* Key Metrics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6" data-tour="feedback-metrics">
         {/* Total Feedback */}
         <Card className="rounded-xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -691,45 +605,63 @@ export default function Dashboard() {
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.totalFeedback}</div>
+            <div className="text-2xl font-bold">{dashboardMetrics.totalFeedback}</div>
             <p className="text-xs text-muted-foreground">
               {dateRange === 'all' ? 'All time' : `Last ${dateRange}`}
             </p>
           </CardContent>
         </Card>
 
-        {/* Positive Sentiment */}
+        {/* Positive Feedback */}
         <Card className="rounded-xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Positive</CardTitle>
+            <CardTitle className="text-sm font-medium">Positive Feedback</CardTitle>
             <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {dashboardStats.totalFeedback > 0 
-                ? Math.round((dashboardStats.positiveSentiment / dashboardStats.totalFeedback) * 100)
+              {dashboardMetrics.totalFeedback > 0 
+                ? Math.round((dashboardMetrics.positiveFeedback / dashboardMetrics.totalFeedback) * 100)
                 : 0}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {dashboardStats.positiveSentiment} feedbacks
+              {dashboardMetrics.positiveFeedback} feedbacks
             </p>
           </CardContent>
         </Card>
 
-        {/* Negative Sentiment */}
+        {/* Negative Feedback */}
         <Card className="rounded-xl shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Negative</CardTitle>
+            <CardTitle className="text-sm font-medium">Negative Feedback</CardTitle>
             <AlertCircle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              {dashboardStats.totalFeedback > 0 
-                ? Math.round((dashboardStats.negativeSentiment / dashboardStats.totalFeedback) * 100)
+              {dashboardMetrics.totalFeedback > 0 
+                ? Math.round((dashboardMetrics.negativeFeedback / dashboardMetrics.totalFeedback) * 100)
                 : 0}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {dashboardStats.negativeSentiment} feedbacks
+              {dashboardMetrics.negativeFeedback} feedbacks
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Neutral Feedback */}
+        <Card className="rounded-xl shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Neutral Feedback</CardTitle>
+            <Minus className="h-4 w-4 text-gray-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-600">
+              {dashboardMetrics.totalFeedback > 0 
+                ? Math.round((dashboardMetrics.neutralFeedback / dashboardMetrics.totalFeedback) * 100)
+                : 0}%
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {dashboardMetrics.neutralFeedback} feedbacks
             </p>
           </CardContent>
         </Card>
@@ -742,7 +674,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {dashboardStats.activeUsers}
+              {dashboardMetrics.activeUsers}
             </div>
             <p className="text-xs text-muted-foreground">
               Unique feedback providers
@@ -750,40 +682,38 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Plan Status */}
+        {/* Current Plan */}
         <Card className="rounded-xl shadow-lg border-2 border-blue-200 bg-blue-50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Plan Status</CardTitle>
-            {planInfo.planName === 'Business' ? (
-              <Crown className="h-4 w-4 text-yellow-600" />
-            ) : (
-              <CreditCard className="h-4 w-4 text-blue-600" />
-            )}
+            <CardTitle className="text-sm font-medium">Current Plan</CardTitle>
+            <Crown className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold text-blue-900">
-              {planInfo.planName}
+            <div className="text-lg font-bold text-blue-900 mb-2">
+              {dashboardMetrics.currentPlan}
             </div>
-            {planInfo.isTrial && planInfo.daysLeft > 0 && (
-              <p className="text-xs text-blue-700 mt-1">
-                {planInfo.daysLeft} days left
-              </p>
-            )}
+            <div className="text-sm text-blue-700 mb-3">
+              {profile?.trial_end ? (
+                `Trial ends ${format(new Date(profile.trial_end), 'MMM dd, yyyy')}`
+              ) : (
+                'Active subscription'
+              )}
+            </div>
             <Button 
               size="sm" 
-              className="mt-2 w-full text-xs"
+              className="w-full text-xs"
               asChild
             >
-              <a href={planInfo.upgradeLink}>
-                {planInfo.upgradeText}
+              <a href="/billing">
+                {dashboardMetrics.currentPlan === 'Free Trial' ? 'Upgrade Now' : 'Manage Plan'}
               </a>
             </Button>
           </CardContent>
         </Card>
       </div>
 
-      {/* Middle Row - Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" data-tour="feedback-charts">
         {/* Feedback Volume Over Time */}
         <Card className="rounded-xl shadow-lg lg:col-span-2">
           <CardHeader>
@@ -796,9 +726,9 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {dashboardStats.feedbackVolume.length > 0 ? (
+            {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={dashboardStats.feedbackVolume}>
+                <AreaChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis 
                     dataKey="date" 
@@ -831,7 +761,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Sentiment Distribution */}
+        {/* Sentiment Breakdown */}
         <Card className="rounded-xl shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -843,26 +773,18 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {dashboardStats.totalFeedback > 0 ? (
+            {dashboardMetrics.totalFeedback > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsPieChart>
                   <Pie
-                    data={[
-                      { name: 'Positive', value: dashboardStats.positiveSentiment, color: '#10b981' },
-                      { name: 'Neutral', value: dashboardStats.neutralSentiment, color: '#f59e0b' },
-                      { name: 'Negative', value: dashboardStats.negativeSentiment, color: '#ef4444' }
-                    ]}
+                    data={sentimentData}
                     cx="50%"
                     cy="50%"
                     outerRadius={80}
                     dataKey="value"
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
-                    {[
-                      { name: 'Positive', value: dashboardStats.positiveSentiment, color: '#10b981' },
-                      { name: 'Neutral', value: dashboardStats.neutralSentiment, color: '#f59e0b' },
-                      { name: 'Negative', value: dashboardStats.negativeSentiment, color: '#ef4444' }
-                    ].map((entry, index) => (
+                    {sentimentData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -878,9 +800,9 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Bottom Row - Charts and AI Insights */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Top Themes */}
+      {/* Bottom Row - Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top 5 Themes */}
         <Card className="rounded-xl shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -888,13 +810,13 @@ export default function Dashboard() {
               <span>Top 5 Themes</span>
             </CardTitle>
             <CardDescription>
-              Most frequently mentioned themes
+              Most frequently mentioned themes from insights
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {dashboardStats.topThemes.length > 0 ? (
+            {topThemes.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <RechartsBarChart data={dashboardStats.topThemes}>
+                <RechartsBarChart data={topThemes}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="theme" fontSize={12} />
                   <YAxis fontSize={12} />
@@ -904,158 +826,72 @@ export default function Dashboard() {
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-64 text-gray-500">
-                No theme data available
+                <div className="text-center">
+                  <Activity className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                  <p>No theme data available</p>
+                  <p className="text-sm text-gray-400">Generate insights to see themes</p>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* AI Insights Summary */}
-        <Card className="rounded-xl shadow-lg lg:col-span-2">
+        {/* Recent Feedback Feed */}
+        <Card className="rounded-xl shadow-lg" data-tour="recent-feedback">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <Lightbulb className="h-5 w-5 text-yellow-600" />
-              <span>AI Insights Summary</span>
+              <MessageSquare className="h-5 w-5" />
+              <span>Recent Feedback Feed</span>
             </CardTitle>
             <CardDescription>
-              AI-generated analysis of your feedback data
+              Latest feedback entries with sentiment analysis
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {generatingInsight ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="text-center">
-                  <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2 text-blue-600" />
-                  <p className="text-gray-600">Generating insights...</p>
-                </div>
-              </div>
-            ) : aiInsight ? (
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Summary</h4>
-                  <p className="text-sm text-gray-700 leading-relaxed">
-                    {aiInsight.summary}
-                  </p>
-                </div>
-                
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Key Themes</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {aiInsight.key_themes.slice(0, 5).map((theme, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {theme}
-                      </Badge>
-                    ))}
+            {recentFeedbacks.length > 0 ? (
+              <div className="space-y-4 max-h-80 overflow-y-auto">
+                {recentFeedbacks.map((feedback) => (
+                  <div key={feedback.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium text-gray-900">
+                          {feedback.email || 'Anonymous'}
+                        </span>
+                        <Badge variant={getSentimentBadgeVariant(getSentiment(feedback)) as any}>
+                          {getSentiment(feedback)}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center space-x-2 text-sm text-gray-500">
+                        <Clock className="h-4 w-4" />
+                        <span>{formatDate(feedback.created_at)}</span>
+                      </div>
+                    </div>
+                    <p className="text-gray-700 text-sm line-clamp-2">{feedback.message}</p>
+                    {feedback.page_url && (
+                      <p className="text-xs text-gray-500 mt-1 truncate">
+                        From: {feedback.page_url}
+                      </p>
+                    )}
                   </div>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Suggested Actions</h4>
-                  <ul className="text-sm text-gray-700 space-y-1">
-                    {aiInsight.suggested_actions.slice(0, 3).map((action, index) => (
-                      <li key={index} className="flex items-start">
-                        <Target className="h-3 w-3 text-blue-600 mr-2 mt-1 flex-shrink-0" />
-                        {action}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="pt-2 border-t">
-                  <p className="text-xs text-gray-600">
-                    {aiInsight.sentiment_overview}
-                  </p>
-                </div>
+                ))}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <Lightbulb className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No insights available</p>
-                <Button 
-                  size="sm" 
-                  onClick={generateAIInsight}
-                  className="mt-2"
-                >
-                  Generate Insights
+              <div className="text-center py-12">
+                <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                <h3 className="text-xl font-medium text-gray-900 mb-2">
+                  No feedback yet
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Start collecting feedback through your widget to see insights and analytics.
+                </p>
+                <Button variant="outline" asChild>
+                  <a href="/feedback-settings">Configure Widget</a>
                 </Button>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
-
-      {/* Recent Feedback Feed */}
-      <Card className="rounded-xl shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <MessageSquare className="h-5 w-5" />
-            <span>Recent Feedback Feed</span>
-          </CardTitle>
-          <CardDescription>
-            Latest feedback entries with sentiment analysis
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {filteredFeedbacks.length > 0 ? (
-            <div className="space-y-4">
-              {filteredFeedbacks.slice(0, 10).map((feedback) => (
-                <div key={feedback.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-gray-900">
-                        {feedback.name || 'Anonymous'}
-                      </span>
-                      <Badge variant={getSentimentBadgeVariant(analyzeSentiment(feedback.message))}>
-                        {analyzeSentiment(feedback.message)}
-                      </Badge>
-                      <Badge variant={getStatusBadgeVariant(feedback.status)}>
-                        {feedback.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center space-x-2 text-sm text-gray-500">
-                      <Clock className="h-4 w-4" />
-                      <span>{formatDate(feedback.timestamp)}</span>
-                    </div>
-                  </div>
-                  <p className="text-gray-700 text-sm line-clamp-2">{feedback.message}</p>
-                  <div className="flex items-center space-x-2 mt-2">
-                    <Target className="h-4 w-4 text-gray-400" />
-                    <div className="flex flex-wrap gap-1">
-                      {extractThemes(feedback.message).map((theme, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {theme}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            /* Empty State */
-            <div className="text-center py-12">
-              <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-xl font-medium text-gray-900 mb-2">
-                {searchTerm || sentimentFilter !== 'all' ? 'No feedback found' : 'No feedback yet'}
-              </h3>
-              <p className="text-gray-600 mb-4">
-                {searchTerm || sentimentFilter !== 'all' 
-                  ? 'Try adjusting your search or filters.'
-                  : 'Start collecting feedback through your widget to see insights and analytics.'
-                }
-              </p>
-              {!searchTerm && sentimentFilter === 'all' && (
-                <div className="flex justify-center space-x-2">
-                  <Button variant="outline" asChild>
-                    <a href="/feedback-settings">Configure Widget</a>
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      </div>
-    </ProtectedPage>
+    </div>
   );
 }

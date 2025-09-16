@@ -64,7 +64,7 @@ const HowItWorksSection = () => {
   ];
 
   return (
-    <section id="how-it-works" className="py-16 sm:py-20 lg:py-24 bg-background">
+    <section id="how-it-works" className="py-16 sm:py-20 lg:py-24 bg-gradient-subtle transition-colors">
       <div className="container mx-auto px-3 sm:px-4">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
@@ -83,13 +83,13 @@ const HowItWorksSection = () => {
         {/* Steps Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-12 sm:mb-16">
           {steps.map((step, index) => (
-            <Card key={index} className="group hover:shadow-medium transition-all duration-300 border-0 bg-background/80 backdrop-blur-sm relative">
+            <Card key={index} className="group hover:shadow-medium transition-all duration-300 border border-border/60 bg-card/90 backdrop-blur-sm relative">
               <CardContent className="p-4 sm:p-6">
                 <div className="space-y-3 sm:space-y-4">
                   {/* Icon and Badge */}
                   <div className="flex items-start justify-between">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary-light rounded-lg flex items-center justify-center group-hover:bg-primary-light/80 transition-colors">
-                      <step.icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center bg-primary-light dark:bg-secondary hover:bg-primary-light/80 dark:hover:bg-secondary/80 transition-colors">
+                      <step.icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary dark:text-primary-foreground" />
                     </div>
                     <Badge variant="secondary" className="text-xs">
                       {step.badge}
@@ -109,7 +109,7 @@ const HowItWorksSection = () => {
                     <ul className="space-y-1.5 sm:space-y-2">
                       {step.features.map((feature, featureIndex) => (
                         <li key={featureIndex} className="flex items-center space-x-2 text-xs text-muted-foreground">
-                          <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                          <CheckCircle className="h-3 w-3 text-success flex-shrink-0" />
                           <span>{feature}</span>
                         </li>
                       ))}
@@ -121,8 +121,8 @@ const HowItWorksSection = () => {
               {/* Arrow for connection */}
               {index < steps.length - 1 && (
                 <div className="hidden lg:block absolute -right-3 top-1/2 transform -translate-y-1/2 z-10">
-                  <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
-                    <ArrowRight className="h-3 w-3 text-white" />
+                  <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-soft">
+                    <ArrowRight className="h-3 w-3 text-primary-foreground" />
                   </div>
                 </div>
               )}
@@ -131,7 +131,7 @@ const HowItWorksSection = () => {
         </div>
 
         {/* Demo Section */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl sm:rounded-2xl p-6 sm:p-8 md:p-12">
+        <div className="rounded-xl sm:rounded-2xl p-6 sm:p-8 md:p-12 border border-border bg-card transition-colors">
           <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 items-center">
             <div>
               <h3 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3 sm:mb-4">
@@ -143,20 +143,20 @@ const HowItWorksSection = () => {
               
               <div className="space-y-3 sm:space-y-4">
                 <div className="flex items-center space-x-2 sm:space-x-3">
-                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-success/15 rounded-full flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
                   </div>
                   <span className="text-xs sm:text-sm">Setup in under 5 minutes</span>
                 </div>
                 <div className="flex items-center space-x-2 sm:space-x-3">
-                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-success/15 rounded-full flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
                   </div>
                   <span className="text-xs sm:text-sm">Real-time AI analysis</span>
                 </div>
                 <div className="flex items-center space-x-2 sm:space-x-3">
-                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 bg-success/15 rounded-full flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
                   </div>
                   <span className="text-xs sm:text-sm">Beautiful insights dashboard</span>
                 </div>
@@ -171,7 +171,7 @@ const HowItWorksSection = () => {
             
             <div className="relative">
               {/* Main Demo Container */}
-              <div className="bg-white rounded-xl shadow-xl p-4 sm:p-6 border border-gray-100">
+              <div className="bg-card rounded-xl shadow-xl p-4 sm:p-6 border border-border">
                 {/* Widget Preview */}
                 <div className="mb-4 sm:mb-6">
                   <div className="flex items-center justify-between mb-2 sm:mb-3">
@@ -183,15 +183,15 @@ const HowItWorksSection = () => {
                   </div>
                   
                   {/* Widget Interface */}
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 sm:p-4 border border-blue-200">
+                  <div className="rounded-lg p-3 sm:p-4 border border-border bg-background">
                     <div className="flex items-center justify-between mb-2 sm:mb-3">
                       <div className="flex items-center space-x-1 sm:space-x-2">
                         <div className="w-5 h-5 sm:w-6 sm:h-6 bg-blue-500 rounded-full flex items-center justify-center">
                           <MessageSquare className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-white" />
                         </div>
-                        <span className="text-xs sm:text-sm font-medium text-gray-700">How are we doing?</span>
+                        <span className="text-xs sm:text-sm font-medium text-foreground">How are we doing?</span>
                       </div>
-                      <button className="text-gray-400 hover:text-gray-600">
+                      <button className="text-muted-foreground hover:text-foreground">
                         <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -242,27 +242,27 @@ const HowItWorksSection = () => {
                   </div>
                   
                   {/* Dashboard Interface */}
-                  <div className="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-200">
+                  <div className="bg-muted rounded-lg p-3 sm:p-4 border border-border">
                     {/* Stats Row */}
                     <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-4">
-                      <div className="bg-white rounded-lg p-2 sm:p-3 text-center border border-gray-200">
+                      <div className="bg-card rounded-lg p-2 sm:p-3 text-center border border-border">
                         <div className="text-sm sm:text-lg font-bold text-blue-600">4.2</div>
                         <div className="text-xs text-gray-600">Avg Rating</div>
                       </div>
-                      <div className="bg-white rounded-lg p-2 sm:p-3 text-center border border-gray-200">
+                      <div className="bg-card rounded-lg p-2 sm:p-3 text-center border border-border">
                         <div className="text-sm sm:text-lg font-bold text-green-600">87%</div>
                         <div className="text-xs text-gray-600">Satisfaction</div>
                       </div>
-                      <div className="bg-white rounded-lg p-2 sm:p-3 text-center border border-gray-200">
+                      <div className="bg-card rounded-lg p-2 sm:p-3 text-center border border-border">
                         <div className="text-sm sm:text-lg font-bold text-purple-600">1.2k</div>
                         <div className="text-xs text-gray-600">Responses</div>
                       </div>
                     </div>
                     
                     {/* Sentiment Chart */}
-                    <div className="bg-white rounded-lg p-2 sm:p-3 border border-gray-200">
+                    <div className="bg-card rounded-lg p-2 sm:p-3 border border-border">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium text-gray-700">Sentiment Trend</span>
+                        <span className="text-xs font-medium text-foreground">Sentiment Trend</span>
                         <span className="text-xs text-green-600">↗ +12%</span>
                       </div>
                       <div className="flex items-end space-x-0.5 sm:space-x-1 h-12 sm:h-16">
@@ -274,7 +274,7 @@ const HowItWorksSection = () => {
                           />
                         ))}
                       </div>
-                      <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
                         <span>Mon</span>
                         <span>Tue</span>
                         <span>Wed</span>
@@ -289,7 +289,7 @@ const HowItWorksSection = () => {
               </div>
               
               {/* Floating Notification */}
-              <div className="absolute -top-2 sm:-top-3 -right-2 sm:-right-3 bg-white rounded-lg p-2 sm:p-3 shadow-lg border border-gray-200">
+              <div className="absolute -top-2 sm:-top-3 -right-2 sm:-right-3 bg-card rounded-lg p-2 sm:p-3 shadow-lg border border-border">
                 <div className="flex items-center space-x-1 sm:space-x-2">
                   <div className="w-1.5 sm:w-2 h-1.5 sm:h-2 bg-green-500 rounded-full animate-pulse"></div>
                   <span className="text-xs font-medium text-green-600">Live Demo</span>
@@ -297,7 +297,7 @@ const HowItWorksSection = () => {
               </div>
               
               {/* Floating Stats */}
-              <div className="absolute -bottom-2 sm:-bottom-3 -left-2 sm:-left-3 bg-white rounded-lg p-2 sm:p-3 shadow-lg border border-gray-200">
+              <div className="absolute -bottom-2 sm:-bottom-3 -left-2 sm:-left-3 bg-card rounded-lg p-2 sm:p-3 shadow-lg border border-border">
                 <div className="text-center">
                   <div className="text-sm sm:text-lg font-bold text-blue-600">⚡</div>
                   <div className="text-xs text-gray-600">Real-time</div>

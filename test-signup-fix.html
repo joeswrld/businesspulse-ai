@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signup Fix Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .container { background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        input { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; width: 200px; }
+        .log { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Signup Database Error Fix Test</h1>
+    
+    <div class="container info">
+        <h3>📋 Instructions</h3>
+        <p>1. First, apply the database fix by running the SQL script in your Supabase dashboard</p>
+        <p>2. Enter your Supabase credentials below</p>
+        <p>3. Click "Test Signup" to verify the fix works</p>
+    </div>
+
+    <div class="container">
+        <h3>🔑 Supabase Configuration</h3>
+        <div>
+            <label>Supabase URL:</label><br>
+            <input type="text" id="supabaseUrl" placeholder="https://your-project.supabase.co">
+        </div>
+        <div>
+            <label>Supabase Anon Key:</label><br>
+            <input type="text" id="supabaseKey" placeholder="your-anon-key">
+        </div>
+        <button onclick="initializeSupabase()">Initialize Supabase</button>
+    </div>
+
+    <div class="container">
+        <h3>🧪 Test Signup</h3>
+        <div>
+            <label>Test Email:</label><br>
+            <input type="email" id="testEmail" placeholder="test@example.com">
+        </div>
+        <div>
+            <label>Test Password:</label><br>
+            <input type="password" id="testPassword" placeholder="testpassword123">
+        </div>
+        <div>
+            <label>Full Name:</label><br>
+            <input type="text" id="fullName" placeholder="Test User">
+        </div>
+        <div>
+            <label>Company Name:</label><br>
+            <input type="text" id="companyName" placeholder="Test Company">
+        </div>
+        <button onclick="testSignup()">Test Signup</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <div class="container">
+        <h3>📝 Test Results</h3>
+        <div id="log" class="log">Ready to test...\n</div>
+    </div>
+
+    <script>
+        let supabase = null;
+
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            logElement.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = 'Log cleared...\n';
+        }
+
+        function initializeSupabase() {
+            const url = document.getElementById('supabaseUrl').value;
+            const key = document.getElementById('supabaseKey').value;
+
+            if (!url || !key) {
+                log('❌ Please enter both Supabase URL and Anon Key', 'error');
+                return;
+            }
+
+            try {
+                supabase = window.supabase.createClient(url, key);
+                log('✅ Supabase client initialized successfully', 'success');
+            } catch (error) {
+                log(`❌ Failed to initialize Supabase: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSignup() {
+            if (!supabase) {
+                log('❌ Please initialize Supabase first', 'error');
+                return;
+            }
+
+            const email = document.getElementById('testEmail').value || `test-${Date.now()}@example.com`;
+            const password = document.getElementById('testPassword').value || 'testpassword123';
+            const fullName = document.getElementById('fullName').value || 'Test User';
+            const companyName = document.getElementById('companyName').value || 'Test Company';
+
+            log(`🧪 Testing signup with email: ${email}`);
+            log(`📝 Full name: ${fullName}, Company: ${companyName}`);
+
+            try {
+                const { data, error } = await supabase.auth.signUp({
+                    email: email,
+                    password: password,
+                    options: {
+                        data: {
+                            full_name: fullName,
+                            company_name: companyName
+                        }
+                    }
+                });
+
+                if (error) {
+                    log(`❌ Signup failed: ${error.message}`, 'error');
+                    if (error.message.includes('Database error updating user')) {
+                        log('🔧 This indicates the database fix needs to be applied', 'error');
+                    }
+                    return;
+                }
+
+                log('✅ Signup successful!', 'success');
+                log(`👤 User ID: ${data.user?.id}`);
+                log(`📧 Email: ${data.user?.email}`);
+
+                // Check if profile was created
+                const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('user_id', data.user?.id)
+                    .single();
+
+                if (profileError) {
+                    log(`⚠️  Profile not found: ${profileError.message}`, 'error');
+                } else {
+                    log('✅ Profile created successfully!', 'success');
+                    log(`📋 Profile data: ${JSON.stringify(profile, null, 2)}`);
+                }
+
+            } catch (err) {
+                log(`❌ Test failed: ${err.message}`, 'error');
+            }
+        }
+
+        // Auto-fill with common test values
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('testEmail').value = `test-${Date.now()}@example.com`;
+            document.getElementById('testPassword').value = 'testpassword123';
+            document.getElementById('fullName').value = 'Test User';
+            document.getElementById('companyName').value = 'Test Company';
+        });
+    </script>
+</body>
+</html>

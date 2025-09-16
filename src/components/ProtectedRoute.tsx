@@ -1,9 +1,8 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserStatus } from '@/hooks/useUserStatus';
-import LockScreen from './LockScreen';
-import { PaystackPayment } from './PaystackPayment';
+import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
+import PlatformLock from './PlatformLock';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -17,7 +16,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   fallbackPath = '/billing'
 }) => {
   const { user, loading: authLoading } = useAuth();
-  const { status, loading: statusLoading, shouldShowLockScreen } = useUserStatus();
+  const { trialStatus, checkAccess } = useUnifiedTrial();
   const location = useLocation();
 
   // Show loading while auth is loading
@@ -39,8 +38,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <>{children}</>;
   }
 
-  // Show loading while status is loading
-  if (statusLoading || !status) {
+  // Show loading while trial status is loading
+  if (trialStatus.loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -48,33 +47,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Check if user should be locked out
-  const shouldLock = shouldShowLockScreen();
-
-  // If user should be locked, show lock screen
-  if (shouldLock) {
-    const handleUpgrade = (plan: 'business') => {
-      // Trigger Paystack payment flow
-      console.log('Upgrading to plan:', plan);
-      // This will be handled by the PaystackPayment component
-    };
-
-    const handleRetry = () => {
-      // Refresh user status
-      window.location.reload();
-    };
-
-    return (
-      <LockScreen 
-        status={status} 
-        onUpgrade={handleUpgrade}
-        onRetry={handleRetry}
-      />
-    );
-  }
-
-  // User has access, render children
-  return <>{children}</>;
+  // Use PlatformLock component to handle access control
+  return (
+    <PlatformLock>
+      {children}
+    </PlatformLock>
+  );
 };
 
 export default ProtectedRoute;

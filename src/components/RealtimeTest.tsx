@@ -25,7 +25,7 @@ export const RealtimeTest: React.FC = () => {
     try {
       // This would normally be done through the widget, but for testing we can insert directly
       const { data, error } = await (supabase as any)
-        .from('feedbacks')
+        .from('feedback')
         .insert({
           project_id: 'test-project',
           name: 'Test User',
@@ -48,7 +48,7 @@ export const RealtimeTest: React.FC = () => {
   const updateFeedbackStatus = async (feedbackId: string, newStatus: 'new' | 'reviewed' | 'resolved') => {
     try {
       const { error } = await (supabase as any)
-        .from('feedbacks')
+        .from('feedback')
         .update({ status: newStatus })
         .eq('id', feedbackId);
 

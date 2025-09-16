@@ -39,6 +39,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUnifiedAuthFlow } from "@/hooks/useUnifiedAuthFlow";
 
 interface UserProfile {
   id: string;
@@ -76,6 +77,7 @@ interface NotificationPreferences {
 
 const Settings = () => {
   const { user } = useAuth();
+  const { deleteAccount } = useUnifiedAuthFlow();
   
   // State management
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -453,24 +455,23 @@ const Settings = () => {
     }
   };
 
-  // Delete account
+  // Delete account - Safe implementation
   const handleDeleteAccount = async () => {
     if (!user) return;
 
     setDeletingAccount(true);
     try {
-      // Call Supabase Edge Function to delete user and cascade delete data
-      const { error } = await supabase.functions.invoke('delete-user-account', {
-        body: { userId: user.id }
-      });
-
-      if (error) throw error;
-
-      toast.success('Account deleted successfully');
-      // User will be redirected to auth page
+      console.log('🗑️ Starting account deletion process for:', user.email);
+      
+      // Call the unified auth flow delete function
+      await deleteAccount();
+      
+      console.log('✅ Account deletion completed successfully');
+      // User will be redirected to auth page by the unified auth flow
     } catch (error) {
-      console.error('Error deleting account:', error);
-      toast.error('Failed to delete account. Please contact support.');
+      console.error('❌ Error deleting account:', error);
+      toast.error('Failed to delete account. Please contact support if this issue persists.');
+      // Error handling is done in the unified auth flow
     } finally {
       setDeletingAccount(false);
       setShowDeleteModal(false);
