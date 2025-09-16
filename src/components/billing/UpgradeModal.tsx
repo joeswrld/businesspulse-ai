@@ -67,8 +67,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
         'All export formats',
         'Priority phone support',
         'Unlimited data retention',
-        'API access',
-        'Custom integrations',
+        'Custom Forms integrations',
         'Advanced analytics'
       ],
       planCode: 'PLN_esryg99ztsy9xc8',

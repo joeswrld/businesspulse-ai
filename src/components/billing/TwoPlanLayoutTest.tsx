@@ -46,12 +46,11 @@ const TwoPlanLayoutTest: React.FC<TwoPlanLayoutTestProps> = ({
         'Unlimited analytics reports',
         'Unlimited detailed reports',
         'Unlimited team members',
-        'All export formats (CSV, PDF, Excel, API)',
-        'Priority support (Email, Chat, Phone)',
+        'All export formats (CSV, PDF, Excel)',
+        'Priority support (Email, Chat)',
         'Unlimited data retention',
-        'API access',
         'Predictive analytics',
-        'Custom integrations'
+        'Custom Form integrations'
       ],
       popular: true
     }

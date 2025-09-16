@@ -86,13 +86,12 @@ const SimpleBillingPage: React.FC = () => {
         'Enterprise Analytics: Unlimited',
         'Reports: Unlimited',
         'Team Members: Unlimited',
-        'Export Formats: CSV, PDF, Excel, API',
+        'Export Formats: CSV, PDF, Excel',
         'Support: Email, Chat, Phone, Priority',
         'Data Retention: Unlimited retention',
         'Priority Support: Yes',
-        'API Access: Yes',
         'Predictive Analytics: Yes',
-        'Custom Integrations: Yes'
+        'Custom widget Integrations: Yes'
       ],
       popular: false,
       current: false,
@@ -490,13 +489,13 @@ const SimpleBillingPage: React.FC = () => {
                       <td className="p-3">Export Formats</td>
                       <td className="text-center p-3">CSV</td>
                       <td className="text-center p-3">CSV, PDF, Excel</td>
-                      <td className="text-center p-3">CSV, PDF, Excel, API</td>
+                      <td className="text-center p-3">CSV, PDF, Excel</td>
                     </tr>
                     <tr className="border-b">
                       <td className="p-3">Support</td>
                       <td className="text-center p-3">Email</td>
                       <td className="text-center p-3">Email, Chat</td>
-                      <td className="text-center p-3">Email, Chat, Phone, Priority</td>
+                      <td className="text-center p-3">Email, Chat, Priority</td>
                     </tr>
                     <tr className="border-b">
                       <td className="p-3">Data Retention</td>

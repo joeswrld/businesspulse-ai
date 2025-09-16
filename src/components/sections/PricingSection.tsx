@@ -41,10 +41,10 @@ const PricingSection = () => {
         "Advanced Analytics → Comprehensive sentiment & trend analysis",
         "Reports → Unlimited reports with advanced analytics",
         "Team Members → Coming Soon",
-        "Export Data → CSV, PDF, Excel, API formats",
-        "Priority Support → Email, Chat, Phone",
+        "Export Data → CSV, PDF",
+        "Priority Support → Email, Chat",
         "Predictive Analytics → AI-powered trend projection",
-        "API Access → Full integration capabilities",
+        "Widget Access → Full widget integration capabilities",
         "Data Retention → Unlimited",
       ],
       buttonText: "Start Free Trial",
@@ -184,12 +184,12 @@ const PricingSection = () => {
                   <tr>
                     <td className="py-3 px-4 font-medium">Export Formats</td>
                     <td className="text-center py-3 px-4">CSV</td>
-                    <td className="text-center py-3 px-4">CSV, PDF, Excel, API</td>
+                    <td className="text-center py-3 px-4">CSV, PDF, Excel</td>
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-medium">Support</td>
                     <td className="text-center py-3 px-4">Email</td>
-                    <td className="text-center py-3 px-4">Email, Chat, Phone</td>
+                    <td className="text-center py-3 px-4">Email, Chat</td>
                   </tr>
                   
                 </tbody>

@@ -87,10 +87,10 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
       duration: '30 days',
       features: [
         'Unlimited usage across all features',
-        'Priority phone support',
-        'API access for integrations',
+        'Priority email support',
+        'Widget access for integrations',
         'Predictive analytics',
-        'Custom integrations',
+        'Custom Feedback form',
         'Unlimited data retention'
       ]
     }

@@ -82,7 +82,6 @@ const BillingPage: React.FC = () => {
         'Dedicated support',
         'Custom integrations',
         'Advanced team management',
-        'API access'
       ],
       planCode: 'PLN_esryg99ztsy9xc8'
     }

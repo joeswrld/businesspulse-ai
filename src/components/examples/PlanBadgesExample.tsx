@@ -46,7 +46,7 @@ export function PlanBadgesExample() {
         color: 'bg-amber-100 text-amber-800 border-amber-300',
         icon: <Zap className="h-3 w-3" />
       },
-      features: ['Team collaboration', 'Advanced analytics', 'API access', 'Dedicated support', 'Custom integrations']
+      features: ['Team collaboration', 'Advanced analytics', 'Dedicated support', 'Custom integrations']
     },
     {
       name: 'Enterprise Plan',

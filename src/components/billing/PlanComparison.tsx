@@ -52,13 +52,12 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
         { name: 'Advanced Analytics', limit: -1, unit: 'unlimited' },
         { name: 'Reports', limit: -1, unit: 'unlimited' },
         { name: 'Team Members', limit: -1, unit: 'unlimited' },
-        { name: 'Export Formats', limit: ['CSV', 'PDF', 'Excel', 'API'], unit: 'formats' },
+        { name: 'Export Formats', limit: ['CSV', 'PDF', 'Excel'], unit: 'formats' },
         { name: 'Support', limit: ['Email', 'Chat', 'Phone', 'Priority'], unit: 'channels' },
         { name: 'Data Retention', limit: 'Unlimited', unit: 'retention' },
         { name: 'Priority Support', limit: true, unit: 'feature' },
-        { name: 'API Access', limit: true, unit: 'feature' },
         { name: 'Predictive Analytics', limit: true, unit: 'feature' },
-        { name: 'Custom Integrations', limit: true, unit: 'feature' }
+        { name: 'Custom Widget Integrations', limit: true, unit: 'feature' }
       ],
       popular: true,
       comingSoon: false
