@@ -58,10 +58,10 @@ const CTASection = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4" >
               <Button 
                 size="xl" 
-                className="bg-primary text-white hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-primary/80 dark:focus-visible:ring-offset-primary/60 shadow-large font-semibold"
+                className="bg-primary  hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-primary/80 dark:focus-visible:ring-offset-primary/60 shadow-large font-semibold"
                 asChild
               >
-                <Link to="/auth">
+                <Link to="/signup">
                   Start Your 8-Day Free Trial
                   <ArrowRight className="h-5 w-5 ml-2" />
                 </Link>

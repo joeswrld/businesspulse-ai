@@ -66,7 +66,7 @@ const BillingPage: React.FC = () => {
         'Advanced analytics',
         'Priority support',
         'Custom reports',
-        'Team collaboration'
+        'Team collaboration (Coming soon)',
       ],
       planCode: 'PLN_4z2wpgmw41z2k7r'
     },
@@ -80,8 +80,8 @@ const BillingPage: React.FC = () => {
         'Unlimited AI insights',
         'Enterprise analytics',
         'Dedicated support',
-        'Custom integrations',
-        'Advanced team management',
+        'Custom widget and feedback integrations',
+        'Advanced team management (Coming soon)',
       ],
       planCode: 'PLN_esryg99ztsy9xc8'
     }

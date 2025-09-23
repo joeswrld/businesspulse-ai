@@ -217,7 +217,7 @@ const Integrations = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200">
+      <div className="bg-gradient-to-r    ">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center space-x-4 mb-6">
             <Button variant="ghost" size="sm" asChild>
@@ -251,7 +251,7 @@ const Integrations = () => {
             <div key={categoryIndex}>
               <div className="flex items-center space-x-3 mb-8">
                 <div className="w-10 h-10 bg-primary-light rounded-lg flex items-center justify-center">
-                  <category.icon className="h-5 w-5 text-primary" />
+                  <category.icon className="h-5 w-5 text-primary dark:text-primary-foreground" />
                 </div>
                 <h2 className="text-2xl font-bold">{category.category}</h2>
               </div>
@@ -374,7 +374,7 @@ const Integrations = () => {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8">
+          <div className="bg-gradient-to-br   rounded-2xl p-8">
             <div className="space-y-6">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -409,7 +409,7 @@ const Integrations = () => {
       </div>
 
       {/* CTA Section */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 py-16">
+      <div className="bg-gradient-to-r   py-16">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Integrate?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">

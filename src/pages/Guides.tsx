@@ -38,7 +38,7 @@ const Guides = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200">
+      <div className="bg-gradient-to-r  ">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center space-x-4 mb-6">
             <Button variant="ghost" size="sm" asChild>
@@ -99,7 +99,7 @@ const Guides = () => {
       </div>
 
       {/* CTA Section */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 py-16">
+      <div className="bg-gradient-to-r  py-16">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Need More Help?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">

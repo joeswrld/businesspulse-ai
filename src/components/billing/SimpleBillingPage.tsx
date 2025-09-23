@@ -68,7 +68,7 @@ const SimpleBillingPage: React.FC = () => {
         'Support: Email, Chat',
         'Data Retention: 12 months retention',
         'Priority Support: No',
-        'API Access: No'
+        'Widget Access: No'
       ],
       popular: true,
       current: true,
@@ -322,7 +322,7 @@ const SimpleBillingPage: React.FC = () => {
                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <Settings className="h-5 w-5 text-gray-600" />
                   <div>
-                    <p className="font-medium">API Access: No</p>
+                    <p className="font-medium">Widget Access: No</p>
                   </div>
                 </div>
               </div>

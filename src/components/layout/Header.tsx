@@ -72,7 +72,7 @@ const Header = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
             <img src="/favicon.ico" alt="NoteX" className="h-6 w-6 sm:h-8 sm:w-8" />
-            <span className="font-bold text-base sm:text-lg">NoteX</span>
+            <span className="font-bold text-base sm:text-lg"></span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -97,7 +97,7 @@ const Header = () => {
               onClick={toggleTheme}
               aria-label="Toggle theme"
             >
-              {theme === "dark" ? (
+              {theme === "light" ? (
                 <Sun className="h-5 w-5 text-foreground" />
               ) : (
                 <Moon className="h-5 w-5 text-foreground" />

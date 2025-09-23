@@ -6,7 +6,7 @@ const Footer = () => {
   const navigation = {
     product: [
       { name: "Dashboard", href: "/dashboard" },
-      { name: "Analytics", href: "/analytics" },
+      { name: "Reports", href: "/reports" },
       { name: "Feedback", href: "/feedback" },
     ],
     company: [

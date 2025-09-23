@@ -31,7 +31,7 @@ const Community = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200">
+      <div className="bg-gradient-to-r ">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center space-x-4 mb-6">
             <Button variant="ghost" size="sm" asChild>
@@ -64,7 +64,7 @@ const Community = () => {
             <Card key={index} className="hover:shadow-medium transition-all duration-300">
               <CardContent className="p-6">
                 <div className="w-12 h-12 bg-primary-light rounded-lg flex items-center justify-center mb-4">
-                  <platform.icon className="h-6 w-6 text-primary" />
+                  <platform.icon className="h-6 w-6 text-primary dark:text-primary-foreground" />
                 </div>
                 <h3 className="font-semibold text-xl mb-2">{platform.name}</h3>
                 <p className="text-muted-foreground mb-4">{platform.description}</p>
@@ -82,7 +82,7 @@ const Community = () => {
       </div>
 
       {/* CTA Section */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 py-16">
+      <div className="bg-gradient-to-r  py-16">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Connect?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">

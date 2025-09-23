@@ -30,8 +30,8 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
         { name: 'AI Insights', limit: 5, unit: 'insights' },
         { name: 'Reports / Basic Analytics', limit: 5, unit: 'reports' },
         { name: 'Team Members (Coming soon)', limit: 1, unit: 'member' },
-        { name: 'Export Formats', limit: ['CSV'], unit: 'formats' },
-        { name: 'Support', limit: ['Email'], unit: 'channels' },
+        { name: 'Export Formats', limit: ['CSV', 'PDF'], unit: 'formats' },
+        { name: 'Support', limit: ['Email', 'Chat' , 'Phone'], unit: 'channels' },
         { name: 'Data Retention', limit: '8 days', unit: 'retention' }
       ],
       popular: false,
@@ -48,25 +48,13 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
       features: [
         { name: 'Feedback Collection', limit: -1, unit: 'unlimited' },
         { name: 'AI Insights', limit: -1, unit: 'unlimited' },
-<<<<<<< HEAD
-        { name: 'Advanced Analytics', limit: -1, unit: 'unlimited' },
-        { name: 'Reports', limit: -1, unit: 'unlimited' },
-        { name: 'Team Members', limit: -1, unit: 'unlimited' },
-        { name: 'Export Formats', limit: ['CSV', 'PDF', 'Excel'], unit: 'formats' },
-        { name: 'Support', limit: ['Email', 'Chat', 'Phone', 'Priority'], unit: 'channels' },
-        { name: 'Data Retention', limit: 'Unlimited', unit: 'retention' },
-        { name: 'Priority Support', limit: true, unit: 'feature' },
-        { name: 'Predictive Analytics', limit: true, unit: 'feature' },
-        { name: 'Custom Widget Integrations', limit: true, unit: 'feature' }
-=======
         { name: 'Reports / Advanced Analytics', limit: -1, unit: 'unlimited' },
         { name: 'Team Members (Coming soon)', limit: -1, unit: 'unlimited' },
         { name: 'Export Formats', limit: ['CSV', 'PDF', 'Excel'], unit: 'formats' },
-        { name: 'Support', limit: ['Email'], unit: 'channels' },
+        { name: 'Support', limit: ['Email', 'Chat', 'Phone'], unit: 'channels' },
         { name: 'Data Retention', limit: 'Unlimited', unit: 'retention' },
         { name: 'Priority Support', limit: true, unit: 'feature' },
         { name: 'Predictive Analytics', limit: true, unit: 'feature' },
->>>>>>> b9df94dbef7c4db977b55eca447ab13c1efa6f66
       ],
   
       popular: true,

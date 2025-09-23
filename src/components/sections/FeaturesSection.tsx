@@ -82,7 +82,7 @@ const FeaturesSection = () => {
                   {/* Icon and Badge */}
                   <div className="flex items-start justify-between">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center bg-primary-light dark:bg-secondary group-hover:bg-primary-light/80 dark:group-hover:bg-secondary/80 transition-colors">
-                      <feature.icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary dark:text-primary-foreground" />
+                      <feature.icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary dark:text-primary" />
                     </div>
                     <Badge variant="secondary" className="text-xs">
                       {feature.badge}
@@ -115,7 +115,7 @@ const FeaturesSection = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
               <Button size="lg" asChild>
-                <Link to="/auth">Start Your Free Trial ✨</Link>
+                <Link to="/signup">Start Your Free Trial ✨</Link>
               </Button>
             </div>
           </div>

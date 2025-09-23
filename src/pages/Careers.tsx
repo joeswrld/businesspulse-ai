@@ -150,7 +150,7 @@ const Careers = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200">
+      <div className="bg-gradient-to-r    ">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center space-x-4 mb-6">
             <Button variant="ghost" size="sm" asChild>
@@ -191,7 +191,7 @@ const Careers = () => {
             <Card key={index} className="border-0 bg-background/80 backdrop-blur-sm">
               <CardContent className="p-6 text-center">
                 <div className="w-12 h-12 bg-primary-light rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <value.icon className="h-6 w-6 text-primary" />
+                  <value.icon className="h-6 w-6 text-primary dark:text-primary-foreground" />
                 </div>
                 <h3 className="font-semibold text-lg mb-2">{value.title}</h3>
                 <p className="text-sm text-muted-foreground">{value.description}</p>
@@ -217,7 +217,7 @@ const Careers = () => {
                 <CardContent className="p-6">
                   <div className="flex items-start space-x-4">
                     <div className="w-10 h-10 bg-primary-light rounded-lg flex items-center justify-center flex-shrink-0">
-                      <benefit.icon className="h-5 w-5 text-primary" />
+                      <benefit.icon className="h-5 w-5 text-primary dark:text-primary-foreground" />
                     </div>
                     <div>
                       <h3 className="font-semibold text-lg mb-2">{benefit.title}</h3>
@@ -332,7 +332,7 @@ const Careers = () => {
       </div>
 
       {/* CTA Section */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 py-16">
+      <div className="bg-gradient-to-r   py-16">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Join Us?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">

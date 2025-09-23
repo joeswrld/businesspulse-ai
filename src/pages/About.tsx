@@ -72,7 +72,7 @@ const About = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200">
+      <div className="bg-gradient-to-r   ">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center space-x-4 mb-6">
             <Button variant="ghost" size="sm" asChild>
@@ -105,7 +105,7 @@ const About = () => {
           {stats.map((stat, index) => (
             <div key={index} className="text-center">
               <div className="w-16 h-16 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-4">
-                <stat.icon className="h-8 w-8 text-primary" />
+                <stat.icon className="h-8 w-8 text-primary dark:text-primary-foreground" />
               </div>
               <div className="text-3xl font-bold gradient-text mb-2">{stat.value}</div>
               <div className="text-sm text-muted-foreground">{stat.label}</div>
@@ -138,7 +138,7 @@ const About = () => {
               </div>
             </div>
           </div>
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8">
+          <div className="bg-gradient-to-br   rounded-2xl p-8">
             <div className="space-y-6">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -185,9 +185,9 @@ const About = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {values.map((value, index) => (
               <Card key={index} className="border-0 bg-background/80 backdrop-blur-sm">
-                <CardContent className="p-6 text-center">
+                <CardContent className="p-6 text-center ">
                   <div className="w-12 h-12 bg-primary-light rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <value.icon className="h-6 w-6 text-primary" />
+                    <value.icon className="h-6 w-6 text-primary dark:text-primary-foreground" />
                   </div>
                   <h3 className="font-semibold text-lg mb-2">{value.title}</h3>
                   <p className="text-sm text-muted-foreground">{value.description}</p>
@@ -201,7 +201,7 @@ const About = () => {
       
 
       {/* CTA Section */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 py-16">
+      <div className="bg-gradient-to-r   py-16">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Join Us?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
@@ -210,7 +210,7 @@ const About = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" asChild>
-              <Link to="/auth">Start Your Free Trial ✨</Link>
+              <Link to="/signup">Start Your Free Trial ✨</Link>
             </Button>
             <Button variant="outline" size="lg" asChild>
               <Link to="/testimonials">See Success Stories</Link>

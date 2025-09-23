@@ -41,8 +41,8 @@ export const AuthFlow: React.FC<AuthFlowProps> = ({ mode }) => {
         return
       }
 
-      if (password.length < 6) {
-        setError('Password must be at least 6 characters')
+      if (password.length < 8) {
+        setError('Password must be at least 8 characters')
         return
       }
 
@@ -258,7 +258,7 @@ export const AuthFlow: React.FC<AuthFlowProps> = ({ mode }) => {
                   />
                 </div>
                 {mode === 'signup' && (
-                  <p className="text-xs text-gray-500">Password must be at least 6 characters</p>
+                  <p className="text-xs text-gray-500">Password must be at least 8 characters</p>
                 )}
               </div>
             )}

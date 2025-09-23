@@ -75,7 +75,7 @@ const Press = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200">
+      <div className="bg-gradient-to-r ">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center space-x-4 mb-6">
             <Button variant="ghost" size="sm" asChild>
@@ -191,7 +191,7 @@ const Press = () => {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8">
+          <div className="bg-gradient-to-br   rounded-2xl p-8">
             <h3 className="font-semibold text-lg mb-4">What's Included</h3>
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
@@ -242,7 +242,7 @@ const Press = () => {
       </div>
 
       {/* CTA Section */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 py-16">
+      <div className="bg-gradient-to-r   py-16">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Stay Updated</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">

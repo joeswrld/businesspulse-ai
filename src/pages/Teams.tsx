@@ -24,7 +24,7 @@ const Teams: React.FC = () => {
       {/* Coming Soon Content */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Team Collaboration */}
-        <Card className="border-2 border-dashed border-muted-foreground/20">
+        <Card className="border-2 border-dashed border-muted/20">
           <CardHeader>
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -118,11 +118,11 @@ const Teams: React.FC = () => {
       </div>
 
       {/* Coming Soon Message */}
-      <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+      <Card className="bg-gradient-to-r">
         <CardContent className="text-center py-12">
           <div className="flex items-center justify-center mb-4">
             <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-              <Sparkles className="h-8 w-8 text-white" />
+              <Sparkles className="h-8 w-8" />
             </div>
           </div>
           <h3 className="text-2xl font-bold mb-2">Teams Feature Coming Soon!</h3>
@@ -131,11 +131,11 @@ const Teams: React.FC = () => {
             Get ready for real-time collaboration, team analytics, and seamless project management.
           </p>
           <div className="flex items-center justify-center space-x-4">
-            <Badge variant="outline" className="bg-white">
+            <Badge variant="outline" className="">
               <Rocket className="h-3 w-3 mr-1" />
               Q1 2026
             </Badge>
-            <Badge variant="outline" className="bg-white">
+            <Badge variant="outline" className="">
               <Users className="h-3 w-3 mr-1" />
               Beta Access
             </Badge>

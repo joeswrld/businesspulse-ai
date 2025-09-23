@@ -61,7 +61,7 @@ const Templates = lazy(() => import("./pages/Templates"));
 const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 // const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
-
+const TeamInvitation = lazy(() => import("./pages/DashboardEnhanced"));
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -250,7 +250,7 @@ const App = () => (
                     <Billing />
                   </DashboardLayout>
                 </Suspense>
-              </AuthGuard>
+                </AuthGuard>
             } />
             {/* <Route path="/teams/invite/:token" element={
               <Suspense fallback={<LoadingSpinner />}>

@@ -162,7 +162,7 @@ const HelpCenter = () => {
       title: "Email Support",
       description: "Get help via email within 24 hours",
       action: "Send Email",
-      href: "mailto:support@notex.com"
+      href: "mailto:admin@notex.com.ng"
     },
     {
       icon: MessageSquare,
@@ -176,7 +176,7 @@ const HelpCenter = () => {
       title: "Phone Support",
       description: "Call us for urgent issues (Business plan)",
       action: "Call Now",
-      href: "tel:+1-555-0123"
+      href: "tel:+2349135375819"
     }
   ];
 
@@ -191,7 +191,7 @@ const HelpCenter = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200">
+      <div className="bg-gradient-to-r  ">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center space-x-4 mb-6">
             <Button variant="ghost" size="sm" asChild>
@@ -266,7 +266,7 @@ const HelpCenter = () => {
                 >
                   <div className="flex items-center space-x-4">
                     <div className="w-10 h-10 bg-primary-light rounded-lg flex items-center justify-center">
-                      <category.icon className="h-5 w-5 text-primary" />
+                      <category.icon className="h-5 w-5 text-primary dark:text-primary-foreground " />
                     </div>
                     <div>
                       <h3 className="font-semibold text-lg">{category.title}</h3>
@@ -326,7 +326,7 @@ const HelpCenter = () => {
               <Card key={index} className="border-0 bg-background/80 backdrop-blur-sm">
                 <CardContent className="p-6 text-center">
                   <div className="w-12 h-12 bg-primary-light rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <method.icon className="h-6 w-6 text-primary" />
+                    <method.icon className="h-6 w-6 text-primary dark:text-primary-foreground" />
                   </div>
                   <h3 className="font-semibold text-lg mb-2">{method.title}</h3>
                   <p className="text-sm text-muted-foreground mb-4">{method.description}</p>
@@ -341,7 +341,7 @@ const HelpCenter = () => {
       </div>
 
       {/* CTA Section */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 py-16">
+      <div className="bg-gradient-to-r   py-16">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
@@ -350,7 +350,7 @@ const HelpCenter = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" asChild>
-              <Link to="/auth">Start Your Free Trial ✨</Link>
+              <Link to="/signup">Start Your Free Trial ✨</Link>
             </Button>
             <Button variant="outline" size="lg" asChild>
               <Link to="/testimonials">See Success Stories</Link>

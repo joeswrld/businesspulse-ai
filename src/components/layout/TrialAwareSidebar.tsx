@@ -3,12 +3,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Home, 
-  BarChart3, 
-  Brain, 
-  FileText, 
-  Settings, 
+import {
+  Home,
+  BarChart3,
+  Brain,
+  FileText,
+  Settings,
   Crown,
   Lock,
   Clock,
@@ -84,7 +84,7 @@ const TrialAwareSidebar: React.FC = () => {
               <AlertTriangle className="h-5 w-5 text-red-600" />
             </div>
           </div>
-          
+
           <div className="text-center mb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Trial Expired</h3>
             <p className="text-sm text-gray-600 mb-4">
@@ -92,7 +92,7 @@ const TrialAwareSidebar: React.FC = () => {
             </p>
           </div>
 
-          <Button 
+          <Button
             asChild
             className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800"
             size="lg"
@@ -139,8 +139,8 @@ const TrialAwareSidebar: React.FC = () => {
                     isActive
                       ? 'bg-blue-50 text-blue-700 border border-blue-200'
                       : canAccess
-                      ? 'hover:bg-gray-50 text-gray-700'
-                      : 'text-gray-400 cursor-not-allowed'
+                        ? 'hover:bg-gray-50 text-gray-700'
+                        : 'text-gray-400 cursor-not-allowed'
                   )}
                   onClick={(e) => {
                     if (!canAccess) {
@@ -163,7 +163,7 @@ const TrialAwareSidebar: React.FC = () => {
       {/* Upgrade Button */}
       {!trialStatus.isActive && (
         <div className="p-4 border-t border-gray-200">
-          <Button 
+          <Button
             asChild
             className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800"
             size="lg"

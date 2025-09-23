@@ -354,10 +354,7 @@ const navigation = [
                 )}
                 title={sidebarCollapsed ? "Sign Out" : undefined}
               >
-                <div className="p-1 rounded-lg bg-red-100 dark:bg-red-900/30 group-hover:bg-red-200 dark:group-hover:bg-red-900/40 transition-colors">
-                  <LogOut className="h-4 w-4 text-red-600" />
-                </div>
-                {!sidebarCollapsed && <span className="flex-1">Sign Out</span>}
+                
               </button>
             </div>
           </div>

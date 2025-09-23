@@ -103,7 +103,7 @@ const Partners = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200">
+      <div className="bg-gradient-to-r  ">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center space-x-4 mb-6">
             <Button variant="ghost" size="sm" asChild>
@@ -144,7 +144,7 @@ const Partners = () => {
             <Card key={index} className="hover:shadow-medium transition-all duration-300">
               <CardContent className="p-6">
                 <div className="w-12 h-12 bg-primary-light rounded-lg flex items-center justify-center mb-4">
-                  <program.icon className="h-6 w-6 text-primary" />
+                  <program.icon className="h-6 w-6 text-primary dark:text-primary-foreground" />
                 </div>
                 <h3 className="font-semibold text-xl mb-3">{program.title}</h3>
                 <p className="text-muted-foreground mb-6">{program.description}</p>
@@ -211,7 +211,7 @@ const Partners = () => {
             <Card key={index} className="border-0 bg-background/80 backdrop-blur-sm">
               <CardContent className="p-6 text-center">
                 <div className="w-12 h-12 bg-primary-light rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <benefit.icon className="h-6 w-6 text-primary" />
+                  <benefit.icon className="h-6 w-6 text-primary dark:text-primary-foreground" />
                 </div>
                 <h3 className="font-semibold text-lg mb-2">{benefit.title}</h3>
                 <p className="text-sm text-muted-foreground">{benefit.description}</p>
@@ -232,7 +232,7 @@ const Partners = () => {
               </p>
               <div className="space-y-6">
                 <div className="flex items-start space-x-4">
-                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-semibold text-sm dark:text-primary-foreground">
                     1
                   </div>
                   <div>
@@ -243,7 +243,7 @@ const Partners = () => {
                   </div>
                 </div>
                 <div className="flex items-start space-x-4">
-                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-semibold text-sm dark:text-primary-foreground">
                     2
                   </div>
                   <div>
@@ -254,7 +254,7 @@ const Partners = () => {
                   </div>
                 </div>
                 <div className="flex items-start space-x-4">
-                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-semibold text-sm dark:text-primary-foreground">
                     3
                   </div>
                   <div>
@@ -265,7 +265,7 @@ const Partners = () => {
                   </div>
                 </div>
                 <div className="flex items-start space-x-4">
-                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                  <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-semibold text-sm dark:text-primary-foreground">
                     4
                   </div>
                   <div>
@@ -278,7 +278,7 @@ const Partners = () => {
               </div>
             </div>
             
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8">
+            <div className="bg-gradient-to-br   rounded-2xl p-8">
               <h3 className="font-semibold text-xl mb-4">Ready to Get Started?</h3>
               <p className="text-muted-foreground mb-6">
                 Join our partner program and start earning revenue while helping businesses 
@@ -300,7 +300,7 @@ const Partners = () => {
       </div>
 
       {/* CTA Section */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 py-16">
+      <div className="bg-gradient-to-r   py-16">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Partner?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">

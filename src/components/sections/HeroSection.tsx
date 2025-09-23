@@ -36,7 +36,7 @@ const HeroSection = () => {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <Button variant="hero" size="lg" className="w-full sm:w-auto" asChild>
-                <Link to="/auth">Start Collecting Feedback ✨ <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 ml-2" /></Link>
+                <Link to="/signup">Start Collecting Feedback ✨ <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 ml-2" /></Link>
               </Button>
             </div>
 
@@ -76,10 +76,10 @@ const HeroSection = () => {
               
               <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-card/90 backdrop-blur-sm rounded-lg p-2 sm:p-3 shadow-medium border border-border">
                 <div className="flex items-center space-x-2">
-                  <Brain className="h-4 w-4 sm:h-5 sm:w-5 text-primary dark:text-primary-foreground" />
+                  <Brain className="h-4 w-4 sm:h-5 sm:w-5 text-primary dark:text-primary" />
                   <div>
                     <div className="text-xs font-medium">AI Insights</div>
-                    <div className="text-sm sm:text-lg font-bold text-primary dark:text-primary-foreground">Live</div>
+                    <div className="text-sm sm:text-lg font-bold text-primary dark:text-primary">Live</div>
                   </div>
                 </div>
               </div>
@@ -93,7 +93,7 @@ const HeroSection = () => {
           </div>
         </div>
       </div>
-    </section>
+    </section> 
   );
 };
 

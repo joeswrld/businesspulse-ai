@@ -67,7 +67,7 @@ const TestimonialsSection = () => {
                 <div className="space-y-4">
                   {/* Quote Icon */}
                   <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-primary-light dark:bg-secondary group-hover:bg-primary-light/80 dark:group-hover:bg-secondary/80 transition-colors">
-                    <Quote className="h-5 w-5 text-primary dark:text-primary-foreground" />
+                    <Quote className="h-5 w-5 text-primary dark:text-primary" />
                   </div>
 
                   {/* Rating */}

@@ -292,11 +292,11 @@ NoteX Team
   // Check if user is authenticated
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen  flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <Lock className="h-6 w-6 text-gray-600" />
+            <div className="mx-auto w-12 h-12  rounded-full flex items-center justify-center mb-4  text-primary dark:text-primary-foreground">
+              <Lock className="h-5 w-5 sm:h-6 sm:w-6 text-primary dark:text-primary" />
             </div>
             <CardTitle className="text-xl">Authentication Required</CardTitle>
             <CardDescription>

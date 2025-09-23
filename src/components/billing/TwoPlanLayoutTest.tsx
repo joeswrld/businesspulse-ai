@@ -27,9 +27,10 @@ const TwoPlanLayoutTest: React.FC<TwoPlanLayoutTestProps> = ({
         '10 analytics reports',
         '5 detailed reports',
         '1 team member',
-        'CSV export only',
-        'Email support',
-        '8 days data retention'
+        'CSV and PDF export',
+        'Email, Chat and Phone support',
+        '8 days data retention',        
+        'Custom Form integrations'
       ],
       popular: false
     },

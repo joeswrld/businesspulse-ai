@@ -43,7 +43,7 @@ const CookiePolicy = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200">
+      <div className="bg-gradient-to-r ">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center space-x-4 mb-6">
             <Button variant="ghost" size="sm" asChild>
@@ -116,7 +116,7 @@ const CookiePolicy = () => {
               </p>
               <div className="space-y-4 mb-8">
                 <div className="flex items-start space-x-3">
-                  <Settings className="h-5 w-5 text-primary mt-0.5" />
+                  <Settings className="h-5 w-5 text-primary  mt-0.5" />
                   <div>
                     <h3 className="font-semibold">Browser Settings</h3>
                     <p className="text-sm text-muted-foreground">
@@ -141,7 +141,7 @@ const CookiePolicy = () => {
               </Button>
             </div>
             
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8">
+            <div className="bg-gradient-to-br   rounded-2xl p-8">
               <h3 className="font-semibold text-xl mb-4">Important Notice</h3>
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">

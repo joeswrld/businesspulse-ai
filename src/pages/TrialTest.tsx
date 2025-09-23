@@ -20,7 +20,7 @@ const TrialTest: React.FC = () => {
   const { 
     trialStatus, 
     refreshTrialStatus, 
-    upgradeToBusiness, 
+    upgradeToBusiness,
     checkAccess, 
     isTrialExpired,
     getDaysLeft 

@@ -271,7 +271,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
                 </div>
                 <h4 className="font-medium text-gray-900 mb-2">Advanced Features</h4>
                 <p className="text-sm text-gray-600">
-                  Access to advanced analytics, API, and custom integrations.
+                  Access to advanced analytics, Widget, and custom Feedback forms integrations.
                 </p>
               </div>
             </div>

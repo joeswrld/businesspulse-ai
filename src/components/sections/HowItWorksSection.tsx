@@ -89,7 +89,7 @@ const HowItWorksSection = () => {
                   {/* Icon and Badge */}
                   <div className="flex items-start justify-between">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center bg-primary-light dark:bg-secondary hover:bg-primary-light/80 dark:hover:bg-secondary/80 transition-colors">
-                      <step.icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary dark:text-primary-foreground" />
+                      <step.icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary dark:text-primary" />
                     </div>
                     <Badge variant="secondary" className="text-xs">
                       {step.badge}
@@ -164,7 +164,7 @@ const HowItWorksSection = () => {
               
               <div className="mt-6 sm:mt-8">
                 <Button size="lg" asChild>
-                  <Link to="/auth">Start Your Free Trial ✨</Link>
+                  <Link to="/signup">Start Your Free Trial ✨</Link>
                 </Button>
               </div>
             </div>
@@ -175,7 +175,7 @@ const HowItWorksSection = () => {
                 {/* Widget Preview */}
                 <div className="mb-4 sm:mb-6">
                   <div className="flex items-center justify-between mb-2 sm:mb-3">
-                    <h4 className="text-xs sm:text-sm font-semibold text-gray-700">Feedback Widget</h4>
+                    <h4 className="text-xs sm:text-sm font-semibold ">Feedback Widget</h4>
                     <div className="flex items-center space-x-1 sm:space-x-2">
                       <div className="w-1.5 sm:w-2 h-1.5 sm:h-2 bg-green-500 rounded-full animate-pulse"></div>
                       <span className="text-xs text-green-600 font-medium">Live</span>

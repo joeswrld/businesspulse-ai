@@ -126,7 +126,6 @@ const Signup = () => {
           </Link>
           <div className="flex items-center space-x-2">
             <img src="/favicon.ico" alt="NoteX" className="h-6 w-6" />
-            <span className="font-semibold text-lg">NoteX</span>
           </div>
         </div>
       </div>
@@ -136,7 +135,7 @@ const Signup = () => {
         <Card className="w-full max-w-md shadow-large">
           <CardHeader className="text-center space-y-2">
             <div className="w-12 h-12 bg-primary-light rounded-full flex items-center justify-center mx-auto">
-              <Building2 className="h-6 w-6 text-primary" />
+              <Building2 className="h-6 w-6 text-primary dark:text-primary-foreground" />
             </div>
             <h1 className="text-2xl font-bold">Start your free trial</h1>
             <p className="text-muted-foreground">

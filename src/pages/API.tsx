@@ -152,7 +152,7 @@ const API = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200">
+      <div className="bg-gradient-to-r   border-b ">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center space-x-4 mb-6">
             <Button variant="ghost" size="sm" asChild>
@@ -259,7 +259,7 @@ console.log(feedbacks);`}
               <Card key={index} className="border-0 bg-background/80 backdrop-blur-sm">
                 <CardContent className="p-6 text-center">
                   <div className="w-12 h-12 bg-primary-light rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <feature.icon className="h-6 w-6 text-primary" />
+                    <feature.icon className="h-6 w-6 text-primary dark:text-primary-foreground" />
                   </div>
                   <h3 className="font-semibold text-lg mb-2">{feature.title}</h3>
                   <p className="text-sm text-muted-foreground">{feature.description}</p>
@@ -334,7 +334,7 @@ console.log(feedbacks);`}
                         >
                           {endpoint.method}
                         </Badge>
-                        <code className="text-sm font-mono bg-slate-100 px-2 py-1 rounded">
+                        <code className="text-sm font-mono  px-2 py-1 rounded">
                           {endpoint.path}
                         </code>
                       </div>
@@ -409,7 +409,7 @@ console.log(feedbacks);`}
       </div>
 
       {/* CTA Section */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 py-16">
+      <div className="bg-gradient-to-r  to-indigo-50 py-16">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Build?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">

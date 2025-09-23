@@ -140,7 +140,7 @@ const Testimonials = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200">
+      <div className="">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center space-x-4 mb-6">
             <Button variant="ghost" size="sm" asChild>
@@ -190,28 +190,10 @@ const Testimonials = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col md:flex-row gap-4 mb-8">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search testimonials..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+           
           </div>
           <div className="flex items-center space-x-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <select
-              value={selectedIndustry}
-              onChange={(e) => setSelectedIndustry(e.target.value)}
-              className="px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {industries.map((industry) => (
-                <option key={industry.value} value={industry.value}>
-                  {industry.label}
-                </option>
-              ))}
-            </select>
+            
           </div>
         </div>
 
@@ -223,7 +205,7 @@ const Testimonials = () => {
                 <div className="space-y-4">
                   {/* Quote Icon */}
                   <div className="w-10 h-10 bg-primary-light rounded-lg flex items-center justify-center group-hover:bg-primary-light/80 transition-colors">
-                    <Quote className="h-5 w-5 text-primary" />
+                    <Quote className="h-5 w-5 text-primary dark:text-primary-foreground" />
                   </div>
 
                   {/* Rating */}
@@ -269,7 +251,7 @@ const Testimonials = () => {
             Start collecting feedback today and see how NoteX can transform your business.
           </p>
           <Button size="lg" asChild>
-            <Link to="/auth">Start Your Free Trial ✨</Link>
+            <Link to="/signup">Start Your Free Trial ✨</Link>
           </Button>
         </div>
       </div>

@@ -81,8 +81,7 @@ export default function TopNav({ className }: TopNavProps) {
       <div className="h-14 md:h-16 px-3 md:px-6 flex items-center justify-between">
         {/* Left: Logo / Brand */}
         <Link to={user ? "/dashboard" : "/"} className="flex items-center gap-2 min-w-0">
-          <img src="/favicon.ico" alt="NoteX" className="h-6 w-6 md:h-8 md:w-8 rounded" />
-          <span className="font-semibold text-sm md:text-base truncate">NoteX</span>
+        
         </Link>
 
         {/* Right: Theme toggle + Avatar */}

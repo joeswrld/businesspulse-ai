@@ -9,7 +9,7 @@ const PricingSection = () => {
     {
       name: "Free Trial",
       price: "₦0",
-      period: "8 days",
+      period: "8 /days",
       description: "Perfect for testing our feedback platform",
       icon: Zap,
       badge: "Start Here",
@@ -20,8 +20,10 @@ const PricingSection = () => {
         "Basic Analytics → Sentiment analysis dashboard",
         "Reports → Up to 2 basic reports",
         "Team Members → Coming Soon",
-        "Export Data → CSV format",
+        "Export Data → CSV, PDF format",
         "Data Retention → 8 days",
+        "Priority Support → Email, Chat, Phone",
+        "Widget Access → Full widget integration capabilities",
       ],
       buttonText: "Start Free Trial",
       buttonVariant: "hero" as const,
@@ -42,7 +44,7 @@ const PricingSection = () => {
         "Reports → Unlimited reports with advanced analytics",
         "Team Members → Coming Soon",
         "Export Data → CSV, PDF",
-        "Priority Support → Email, Chat",
+        "Priority Support → Email, Chat, Phone",
         "Predictive Analytics → AI-powered trend projection",
         "Widget Access → Full widget integration capabilities",
         "Data Retention → Unlimited",
@@ -93,7 +95,7 @@ const PricingSection = () => {
               <CardHeader className="text-center pb-2">
                 {/* Icon */}
                 <div className="w-12 h-12 mx-auto mb-4 rounded-xl flex items-center justify-center bg-primary-light dark:bg-secondary">
-                  <plan.icon className="h-6 w-6 text-primary dark:text-primary-foreground" />
+                  <plan.icon className="h-6 w-6 text-primary dark:text-primary" />
                 </div>
 
                 {/* Plan Name & Badge */}
@@ -132,7 +134,7 @@ const PricingSection = () => {
                 {/* CTA Button */}
                 <Button variant={plan.buttonVariant} size="lg"
                   className="w-full" asChild>
-              <Link to="/auth">Start Free Trial</Link>
+              <Link to="/signup">Start Free Trial</Link>
             </Button>
               </CardContent>
               
@@ -183,13 +185,13 @@ const PricingSection = () => {
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-medium">Export Formats</td>
-                    <td className="text-center py-3 px-4">CSV</td>
-                    <td className="text-center py-3 px-4">CSV, PDF, Excel</td>
+                    <td className="text-center py-3 px-4">CSV, PDF</td>
+                    <td className="text-center py-3 px-4">CSV, PDF</td>
                   </tr>
                   <tr>
                     <td className="py-3 px-4 font-medium">Support</td>
-                    <td className="text-center py-3 px-4">Email</td>
                     <td className="text-center py-3 px-4">Email, Chat</td>
+                    <td className="text-center py-3 px-4">Email, Chat, Phone</td>
                   </tr>
                   
                 </tbody>
@@ -209,7 +211,7 @@ const PricingSection = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button variant="hero" size="lg" asChild>
-                <Link to="/auth">Start Your Free Trial ✨</Link>
+                <Link to="/signup">Start Your Free Trial ✨</Link>
               </Button>
             </div>
           </div>

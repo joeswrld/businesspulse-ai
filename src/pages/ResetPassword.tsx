@@ -131,7 +131,6 @@ const ResetPassword = () => {
             </button>
             <div className="flex items-center space-x-2">
               <img src="/favicon.ico" alt="NoteX" className="h-6 w-6" />
-              <span className="font-semibold text-lg">NoteX</span>
             </div>
           </div>
         </div>
@@ -140,7 +139,7 @@ const ResetPassword = () => {
           <Card className="w-full max-w-md shadow-large">
             <CardHeader className="text-center space-y-4">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                <CheckCircle className="h-8 w-8 text-green-600" />
+                <CheckCircle className="h-8 w-8 text-green-600 text-muted-foreground" />
               </div>
               <h1 className="text-2xl font-bold">Check your email</h1>
               <p className="text-muted-foreground">
@@ -180,7 +179,6 @@ const ResetPassword = () => {
             </button>
             <div className="flex items-center space-x-2">
               <img src="/favicon.ico" alt="NoteX" className="h-6 w-6" />
-              <span className="font-semibold text-lg">NoteX</span>
             </div>
           </div>
         </div>
@@ -189,7 +187,7 @@ const ResetPassword = () => {
           <Card className="w-full max-w-md shadow-large">
             <CardHeader className="text-center space-y-2">
               <div className="w-12 h-12 bg-primary-light rounded-full flex items-center justify-center mx-auto">
-                <Lock className="h-6 w-6 text-primary" />
+                <Lock className="h-6 w-6 text-primary dark:text-primary-foreground" />
               </div>
               <h1 className="text-2xl font-bold">Set new password</h1>
               <p className="text-muted-foreground">
@@ -270,7 +268,6 @@ const ResetPassword = () => {
           </Link>
           <div className="flex items-center space-x-2">
             <img src="/favicon.ico" alt="NoteX" className="h-6 w-6" />
-            <span className="font-semibold text-lg">NoteX</span>
           </div>
         </div>
       </div>
@@ -280,7 +277,7 @@ const ResetPassword = () => {
         <Card className="w-full max-w-md shadow-large">
           <CardHeader className="text-center space-y-2">
             <div className="w-12 h-12 bg-primary-light rounded-full flex items-center justify-center mx-auto">
-              <Mail className="h-6 w-6 text-primary" />
+              <Mail className="h-6 w-6 text-primary dark:text-primary-foreground" />
             </div>
             <h1 className="text-2xl font-bold">Reset your password</h1>
             <p className="text-muted-foreground">

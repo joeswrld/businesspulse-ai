@@ -101,7 +101,7 @@ const PrivacyPolicy = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200">
+      <div className="bg-gradient-to-r   border-slate-200">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center space-x-4 mb-6">
             <Button variant="ghost" size="sm" asChild>
@@ -138,7 +138,7 @@ const PrivacyPolicy = () => {
             <Card key={index} className="border-0 bg-background/80 backdrop-blur-sm">
               <CardContent className="p-6 text-center">
                 <div className="w-12 h-12 bg-primary-light rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <item.icon className="h-6 w-6 text-primary" />
+                  <item.icon className="h-6 w-6 text-primary dark:text-primary-foreground" />
                 </div>
                 <h3 className="font-semibold text-lg mb-2">{item.title}</h3>
                 <p className="text-sm text-muted-foreground">{item.description}</p>
@@ -178,7 +178,7 @@ const PrivacyPolicy = () => {
           </div>
 
           {/* Updates Section */}
-          <div className="bg-blue-50 rounded-2xl p-8">
+          <div className=" rounded-2xl p-8">
             <h2 className="text-2xl font-bold mb-4">Policy Updates</h2>
             <p className="text-muted-foreground mb-4">
               We may update this Privacy Policy from time to time to reflect changes in our practices 
@@ -193,7 +193,7 @@ const PrivacyPolicy = () => {
       </div>
 
       {/* CTA Section */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 py-16">
+      <div className="bg-gradient-to-r   py-16">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Questions About Privacy?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
@@ -202,7 +202,7 @@ const PrivacyPolicy = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" asChild>
-              <Link to="/auth">Start Your Free Trial ✨</Link>
+              <Link to="/signup">Start Your Free Trial ✨</Link>
             </Button>
           </div>
         </div>

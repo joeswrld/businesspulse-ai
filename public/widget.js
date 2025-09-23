@@ -79,7 +79,7 @@
       #${CONFIG.widgetId} {
         position: fixed;
         bottom: 20px;
-        right: 20px;
+        left: 20px;
         z-index: 10000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       }
@@ -341,7 +341,7 @@
     
     const button = document.createElement('button');
     button.id = CONFIG.buttonId;
-    button.innerHTML = '💬 ' + (settings?.widget_title || 'Feedback');
+    button.innerHTML = (settings?.widget_title || 'We love Your Feedback') + '   💕';
     button.style.backgroundColor = settings?.widget_color || '#3B82F6';
     
     widget.appendChild(button);
@@ -365,12 +365,13 @@
       <div class="notex-modal-body">
         <form id="notex-feedback-form">
           <div class="notex-form-group">
-            <label class="notex-label" for="notex-email">Email (optional)</label>
+            <label class="notex-label" for="notex-email">Email</label>
             <input 
-              type="email" 
+              type="email *" 
               id="notex-email" 
               class="notex-input" 
               placeholder="your@email.com"
+              @ required
             >
           </div>
           <div class="notex-form-group">
@@ -378,7 +379,7 @@
             <textarea 
               id="notex-message" 
               class="notex-textarea" 
-              placeholder="Tell us what you think..."
+              placeholder="Tell us what you think about are product..."
               required
             ></textarea>
             <div id="notex-message-error" class="notex-error"></div>
@@ -386,6 +387,7 @@
           <button type="submit" class="notex-button" id="notex-submit-btn">
             Send Feedback
           </button>
+          
         </form>
       </div>
     `;
