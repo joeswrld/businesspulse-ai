@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Check, X, Crown, Zap, Star, Sparkles, ArrowRight, Infinity } from 'lucide-react';
-import { getPlanLimits, getPlanPricing } from '@/hooks/useBillingSystem';
+import { getPlanPricing } from '@/hooks/useBillingSystem';
 
 interface PlanComparisonProps {
   currentPlan: 'trial' | 'business';
@@ -26,13 +26,10 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
       currency: 'NGN',
       period: '8 days',
       features: [
-        { name: 'Feedback Collection', limit: 50, unit: 'responses' },
-        { name: 'AI Insights', limit: 5, unit: 'insights' },
-        { name: 'Reports / Basic Analytics', limit: 5, unit: 'reports' },
-        { name: 'Team Members (Coming soon)', limit: 1, unit: 'member' },
-        { name: 'Export Formats', limit: ['CSV', 'PDF'], unit: 'formats' },
-        { name: 'Support', limit: ['Email', 'Chat' , 'Phone'], unit: 'channels' },
-        { name: 'Data Retention', limit: '8 days', unit: 'retention' }
+        { name: 'Core Platform Access', limit: true, unit: 'feature' },
+        { name: 'Basic Support', limit: ['Email'], unit: 'channels' },
+        { name: 'Data Retention', limit: '8 days', unit: 'retention' },
+        { name: 'Account Management', limit: true, unit: 'feature' }
       ],
       popular: false,
       comingSoon: false
@@ -46,15 +43,12 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
       currency: 'NGN',
       period: '30 days',
       features: [
-        { name: 'Feedback Collection', limit: -1, unit: 'unlimited' },
-        { name: 'AI Insights', limit: -1, unit: 'unlimited' },
-        { name: 'Reports / Advanced Analytics', limit: -1, unit: 'unlimited' },
-        { name: 'Team Members (Coming soon)', limit: -1, unit: 'unlimited' },
-        { name: 'Export Formats', limit: ['CSV', 'PDF', 'Excel'], unit: 'formats' },
-        { name: 'Support', limit: ['Email', 'Chat', 'Phone'], unit: 'channels' },
+        { name: 'Full Platform Access', limit: true, unit: 'feature' },
+        { name: 'Advanced Support', limit: ['Email', 'Chat', 'Phone'], unit: 'channels' },
         { name: 'Data Retention', limit: 'Unlimited', unit: 'retention' },
+        { name: 'Account Management', limit: true, unit: 'feature' },
         { name: 'Priority Support', limit: true, unit: 'feature' },
-        { name: 'Predictive Analytics', limit: true, unit: 'feature' },
+        { name: 'Advanced Features', limit: true, unit: 'feature' },
       ],
   
       popular: true,
@@ -100,7 +94,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
           <h2 className="text-3xl font-bold text-gray-900">Choose Your Plan</h2>
         </div>
         <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-          Free plan has a 30-day rolling period with limits: 50 Feedback, 5 Insights, 5 Reports. Upgrade to Business for unlimited features.
+          Start with a free trial to explore NoteX. Upgrade to Business for full access to all features and priority support.
         </p>
       </div>
 
@@ -315,7 +309,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
               What happens when my trial expires?
             </h4>
             <p className="text-sm text-gray-700">
-              When your trial expires, you'll need to upgrade to Pro or Business to continue using advanced features. No automatic downgrade to a free plan.
+              When your trial expires, you'll need to upgrade to Business to continue using the platform. No automatic downgrade to a free plan.
             </p>
           </div>
           
