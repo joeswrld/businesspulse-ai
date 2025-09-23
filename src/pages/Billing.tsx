@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   useBillingSystem, 
-  getPlanLimits, 
   formatCurrency, 
   formatDate, 
   getPlanDisplayName, 
@@ -11,61 +10,44 @@ import {
 } from '@/hooks/useBillingSystem';
 import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 
-import PlanStatusDisplay from '@/components/PlanStatusDisplay';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import {
   Download,
   Calendar,
-  Users,
-  MessageSquare,
-  BarChart3,
-  FileText,
-  Brain,
   AlertTriangle,
   CheckCircle,
   XCircle,
   Clock,
   Loader2,
   Crown,
-  Zap,
-  Shield,
-  TrendingUp,
   DollarSign,
   Receipt,
   RefreshCw,
   AlertCircle,
   Lock,
-  Unlock,
-  Star,
-  ArrowRight,
-  Check,
-  X,
-  Infinity,
-  Play,
   CreditCard,
   CalendarDays,
   Timer,
-  Sparkles,
-  Target,
   Activity,
-  Settings,
-  Bell,
-  HelpCircle
+  User,
+  Mail,
+  CreditCard as CreditCardIcon,
+  Building2,
+  Phone,
+  MapPin,
+  Shield,
+  Check,
+  X
 } from 'lucide-react';
 import PaystackPayment from '@/components/PaystackPayment';
-import PlanComparison from '@/components/billing/PlanComparison';
-import UsageOverview from '@/components/billing/UsageOverview';
 
 type UpgradePlan = 'business' | null;
-
 
 // Helper function to calculate subscription end date
 const calculateSubscriptionEndDate = (billingProfile: any, currentPlan: string) => {
@@ -137,9 +119,7 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
 
 const BillingPage: React.FC = () => {
   const { user } = useAuth();
-
- const { trialStatus, refreshTrialStatus, upgradeToBusiness, getDaysLeft, isTrialExpired } = useUnifiedTrial();
-
+  const { trialStatus, refreshTrialStatus, upgradeToBusiness, getDaysLeft, isTrialExpired } = useUnifiedTrial();
 
   const {
     billingProfile,
@@ -285,21 +265,20 @@ NoteX Team
     };
   };
 
-  // Get plan limits
-  const planLimits = getPlanLimits(currentPlan);
+  // Get plan pricing
   const planPricing = getPlanPricing(currentPlan);
 
   // Check if user is authenticated
   if (!user) {
     return (
-      <div className="min-h-screen  flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-lg">
           <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12  rounded-full flex items-center justify-center mb-4  text-primary dark:text-primary-foreground">
-              <Lock className="h-5 w-5 sm:h-6 sm:w-6 text-primary dark:text-primary" />
+            <div className="mx-auto w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mb-4">
+              <Lock className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
             </div>
-            <CardTitle className="text-xl">Authentication Required</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-xl text-gray-900 dark:text-gray-100">Authentication Required</CardTitle>
+            <CardDescription className="text-gray-600 dark:text-gray-400">
               Please log in to view your billing information
             </CardDescription>
           </CardHeader>
@@ -310,7 +289,7 @@ NoteX Team
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="space-y-8">
             <div className="flex items-center justify-between">
@@ -321,16 +300,16 @@ NoteX Team
               <Skeleton className="h-10 w-32" />
             </div>
             
-            <div className="grid gap-6 md:grid-cols-2">
-              {[1, 2].map((i) => (
-                <Card key={i} className="border-0 shadow-sm">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="border-0 shadow-lg">
                   <CardHeader className="pb-4">
                     <Skeleton className="h-6 w-32 mb-2" />
                     <Skeleton className="h-4 w-48" />
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {[1, 2, 3, 4, 5].map((j) => (
+                      {[1, 2, 3, 4].map((j) => (
                         <div key={j} className="flex justify-between items-center">
                           <Skeleton className="h-4 w-24" />
                           <Skeleton className="h-4 w-12" />
@@ -349,14 +328,14 @@ NoteX Team
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-lg">
           <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <AlertTriangle className="h-6 w-6 text-red-600" />
+            <div className="mx-auto w-12 h-12 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mb-4">
+              <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
             </div>
-            <CardTitle className="text-xl text-red-900">Error Loading Billing</CardTitle>
-            <CardDescription className="text-red-700">{error}</CardDescription>
+            <CardTitle className="text-xl text-red-900 dark:text-red-100">Error Loading Billing</CardTitle>
+            <CardDescription className="text-red-700 dark:text-red-300">{error}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={refreshData} className="w-full">
@@ -374,15 +353,15 @@ NoteX Team
   const statusDisplay = getSubscriptionStatusDisplay(billingProfile, currentPlan, trialStatus.trialExpired, isPaymentPastDue, isInGracePeriod);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Billing & Subscription</h1>
-              <p className="text-gray-600 mt-1">
-                Manage your subscription, track usage, and view billing history
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Billing & Subscription</h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                Manage your subscription and view billing history
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -391,7 +370,7 @@ NoteX Team
                 size="sm"
                 onClick={refreshData}
                 disabled={refreshing}
-                className="text-gray-600 hover:text-gray-800"
+                className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                 Refresh
@@ -402,9 +381,9 @@ NoteX Team
 
         {/* Critical Alerts */}
         {isTrialExpired() && (
-          <Alert className="mb-6 border-red-200 bg-red-50">
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">
+          <Alert className="mb-6 border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
+            <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <AlertDescription className="text-red-800 dark:text-red-200">
               <strong>Trial Expired!</strong> Your free trial has ended. Upgrade to Business to continue using advanced features.
               <div className="mt-3 flex gap-2">
                 <Button size="sm" onClick={() => handleUpgradeClick('business')} className="bg-red-600 hover:bg-red-700">
@@ -416,241 +395,291 @@ NoteX Team
         )}
 
         {isPaymentPastDue && !isInGracePeriod && (
-          <Alert className="mb-6 border-red-200 bg-red-50">
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">
+          <Alert className="mb-6 border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
+            <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <AlertDescription className="text-red-800 dark:text-red-200">
               <strong>Payment Failed!</strong> Your payment method has failed. Please contact support to resolve this issue.
             </AlertDescription>
           </Alert>
         )}
 
         {isPaymentPastDue && isInGracePeriod && (
-          <Alert className="mb-6 border-orange-200 bg-orange-50">
-            <Clock className="h-4 w-4 text-orange-600" />
-            <AlertDescription className="text-orange-800">
+          <Alert className="mb-6 border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800">
+            <Clock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            <AlertDescription className="text-orange-800 dark:text-orange-200">
               <strong>Payment Due!</strong> Your payment has failed, but you have {gracePeriodDaysLeft} days to resolve this before your account is suspended. Please contact support.
             </AlertDescription>
           </Alert>
         )}
 
-
-        {/* Current Plan Overview */}
-        <Card className="mb-8 border-0 shadow-sm">
-          <CardHeader className="pb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl">
-                  <Crown className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-2xl font-bold text-gray-900">
-                    {getPlanDisplayName(currentPlan)}
-                  </CardTitle>
-                  <CardDescription className="text-gray-600 text-base">
-                    {statusDisplay.description}
-                  </CardDescription>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Badge className={`${statusDisplay.color} px-4 py-2 text-sm font-medium border`}>
-                  <div className="flex items-center gap-2">
-                    {statusDisplay.icon}
-                    {statusDisplay.label}
+        {/* Main Content Grid */}
+        <div className="grid gap-8 lg:grid-cols-3">
+          
+          {/* Billing Information */}
+          <div className="lg:col-span-1">
+            <Card className="shadow-lg border-0">
+              <CardHeader className="pb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                    <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   </div>
-                </Badge>
-                {refreshing && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Plan Price */}
-              <div className="text-center p-6 bg-gray-50 rounded-xl border border-gray-200">
-                <div className="flex items-center justify-center mb-3">
-                  <DollarSign className="h-6 w-6 text-gray-600" />
-                </div>
-                <div className="text-3xl font-bold text-gray-900 mb-2">
-                  {planPricing.price === 0 ? 'Free' : formatCurrency(planPricing.price, planPricing.currency)}
-                </div>
-                <div className="text-sm text-gray-600">per {planPricing.period}</div>
-              </div>
-              
-              {/* Trial Days or Next Billing */}
-              {trialStatus.plan === 'free_trial' && !isTrialExpired() && (
-                <div className="text-center p-6 bg-blue-50 rounded-xl border border-blue-200">
-                  <div className="flex items-center justify-center mb-3">
-                    <Timer className="h-6 w-6 text-blue-600" />
+                  <div>
+                    <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100">Billing Information</CardTitle>
+                    <CardDescription className="text-gray-600 dark:text-gray-400">
+                      Your account details
+                    </CardDescription>
                   </div>
-                  <div className="text-3xl font-bold text-blue-900 mb-2">{getDaysLeft()}</div>
-                  <div className="text-sm text-blue-600">trial days left</div>
                 </div>
-              )}
-              
-              {trialStatus.plan === 'business' && trialStatus.subscriptionActive && (
-                <div className="text-center p-6 bg-green-50 rounded-xl border border-green-200">
-                  <div className="flex items-center justify-center mb-3">
-                    <CalendarDays className="h-6 w-6 text-green-600" />
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100">Email</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">{user.email}</div>
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-green-900 mb-2">{getDaysLeft()}</div>
-                  <div className="text-sm text-green-600">days active</div>
-                </div>
-              )}
-
-              {/* Grace Period */}
-              {isPaymentPastDue && isInGracePeriod && (
-                <div className="text-center p-6 bg-orange-50 rounded-xl border border-orange-200">
-                  <div className="flex items-center justify-center mb-3">
-                    <AlertTriangle className="h-6 w-6 text-orange-600" />
+                  
+                  <div className="flex items-center gap-3">
+                    <User className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100">Account ID</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 font-mono">{user.id.slice(0, 8)}...</div>
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-orange-900 mb-2">{gracePeriodDaysLeft}</div>
-                  <div className="text-sm text-orange-600">grace period days</div>
-                </div>
-              )}
 
-              {/* Plan Status */}
-              <div className="text-center p-6 bg-purple-50 rounded-xl border border-purple-200">
-                <div className="flex items-center justify-center mb-3">
-                  <Activity className="h-6 w-6 text-purple-600" />
-                </div>
-                <div className="text-lg font-bold text-purple-900 mb-2 capitalize">
-                  {billingProfile?.subscription_status || 'trial'}
-                </div>
-                <div className="text-sm text-purple-600">subscription status</div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-                {trialStatus.plan === 'free_trial' && !isTrialExpired() && (
-                  <Button 
-                    onClick={() => handleUpgradeClick('business')} 
-                    className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white px-6 py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200"
-                  >
-                    <Crown className="h-5 w-5 mr-2" />
-                    Upgrade to Business
-                  </Button>
-                )}
-                
-                {trialStatus.plan === 'business' && trialStatus.subscriptionActive && (
-                  <Button 
-                    variant="outline" 
-                    onClick={handleCancelSubscription} 
-                    disabled={cancelling}
-                    className="border-2 border-red-200 text-red-700 hover:bg-red-50 px-6 py-3 rounded-lg font-medium transition-all duration-200"
-                  >
-                    {cancelling ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <X className="h-5 w-5 mr-2" />}
-                    Cancel Subscription
-                  </Button>
-                )}
-                
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-
-        {/* Billing Usage Section */}
-        <UsageOverview
-  userId={user.id}
-  onUpgrade={() => handleUpgradeClick('business')}
-  refreshKey={currentPlan} // <-- add this line
-/>
-
-        {/* Plan Comparison */}
-        <div className="mb-8">
-          <PlanComparison 
-            currentPlan={currentPlan}
-            onUpgrade={(plan) => handleUpgradeClick(plan)}
-          />
-        </div>
-
-        {/* Transaction History */}
-        <Card className="border-0 shadow-sm">
-          <CardHeader className="pb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Receipt className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <CardTitle className="text-xl font-bold text-gray-900">Transaction History</CardTitle>
-                <CardDescription className="text-gray-600">
-                  Your payment and subscription history
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {transactions.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="p-4 bg-gray-100 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
-                  <Receipt className="h-10 w-10 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No transactions yet</h3>
-                <p className="text-gray-600 max-w-md mx-auto">
-                  Your transaction history will appear here once you make your first payment.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {transactions.map((transaction) => {
-                  const statusDisplay = getStatusDisplay(transaction.status);
-                  return (
-                    <div key={transaction.id} className="p-6 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow duration-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className={`p-3 rounded-lg ${
-                            transaction.status === 'success' ? 'bg-green-100' : 
-                            transaction.status === 'pending' ? 'bg-yellow-100' : 'bg-red-100'
-                          }`}>
-                            {statusDisplay.icon}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-gray-900 text-lg">
-                              {transaction.description || 'Subscription Payment'}
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              {formatDate(transaction.created_at)}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <div className="text-xl font-bold text-gray-900">
-                              {formatCurrency(transaction.amount, transaction.currency)}
-                            </div>
-                            <Badge 
-                              variant={transaction.status === 'success' ? 'default' : 
-                                     transaction.status === 'pending' ? 'secondary' : 'destructive'}
-                              className="text-xs"
-                            >
-                              {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-                            </Badge>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => downloadReceipt(transaction)}
-                            disabled={transaction.status !== 'success'}
-                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Receipt
-                          </Button>
-                        </div>
+                  {billingProfile?.paystack_customer_id && (
+                    <div className="flex items-center gap-3">
+                      <CreditCardIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">Payment Method</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Paystack Customer</div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  )}
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Account Status</span>
+                    <Badge className={`${statusDisplay.color} px-3 py-1 text-xs font-medium border`}>
+                      <div className="flex items-center gap-1">
+                        {statusDisplay.icon}
+                        {statusDisplay.label}
+                      </div>
+                    </Badge>
+                  </div>
+                  
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {statusDisplay.description}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Current Plan & Transaction History */}
+          <div className="lg:col-span-2 space-y-8">
+            
+            {/* Current Plan */}
+            <Card className="shadow-lg border-0">
+              <CardHeader className="pb-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl">
+                      <Crown className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                        {getPlanDisplayName(currentPlan)}
+                      </CardTitle>
+                      <CardDescription className="text-gray-600 dark:text-gray-400 text-base">
+                        {statusDisplay.description}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {refreshing && <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                  {/* Plan Price */}
+                  <div className="text-center p-6 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-center mb-3">
+                      <DollarSign className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                    </div>
+                    <div className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                      {planPricing.price === 0 ? 'Free' : formatCurrency(planPricing.price, planPricing.currency)}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">per {planPricing.period}</div>
+                  </div>
+                  
+                  {/* Trial Days or Next Billing */}
+                  {trialStatus.plan === 'free_trial' && !isTrialExpired() && (
+                    <div className="text-center p-6 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center justify-center mb-3">
+                        <Timer className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="text-3xl font-bold text-blue-900 dark:text-blue-100 mb-2">{getDaysLeft()}</div>
+                      <div className="text-sm text-blue-600 dark:text-blue-400">trial days left</div>
+                    </div>
+                  )}
+                  
+                  {trialStatus.plan === 'business' && trialStatus.subscriptionActive && (
+                    <div className="text-center p-6 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
+                      <div className="flex items-center justify-center mb-3">
+                        <CalendarDays className="h-6 w-6 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div className="text-3xl font-bold text-green-900 dark:text-green-100 mb-2">{getDaysLeft()}</div>
+                      <div className="text-sm text-green-600 dark:text-green-400">days active</div>
+                    </div>
+                  )}
+
+                  {/* Grace Period */}
+                  {isPaymentPastDue && isInGracePeriod && (
+                    <div className="text-center p-6 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800">
+                      <div className="flex items-center justify-center mb-3">
+                        <AlertTriangle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <div className="text-3xl font-bold text-orange-900 dark:text-orange-100 mb-2">{gracePeriodDaysLeft}</div>
+                      <div className="text-sm text-orange-600 dark:text-orange-400">grace period days</div>
+                    </div>
+                  )}
+
+                  {/* Plan Status */}
+                  <div className="text-center p-6 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+                    <div className="flex items-center justify-center mb-3">
+                      <Activity className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div className="text-lg font-bold text-purple-900 dark:text-purple-100 mb-2 capitalize">
+                      {billingProfile?.subscription_status || 'trial'}
+                    </div>
+                    <div className="text-sm text-purple-600 dark:text-purple-400">subscription status</div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+                    {trialStatus.plan === 'free_trial' && !isTrialExpired() && (
+                      <Button 
+                        onClick={() => handleUpgradeClick('business')} 
+                        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200"
+                      >
+                        <Crown className="h-5 w-5 mr-2" />
+                        Upgrade to Business
+                      </Button>
+                    )}
+                    
+                    {trialStatus.plan === 'business' && trialStatus.subscriptionActive && (
+                      <Button 
+                        variant="outline" 
+                        onClick={handleCancelSubscription} 
+                        disabled={cancelling}
+                        className="border-2 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-6 py-3 rounded-lg font-medium transition-all duration-200"
+                      >
+                        {cancelling ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <X className="h-5 w-5 mr-2" />}
+                        Cancel Subscription
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Transaction History */}
+            <Card className="shadow-lg border-0">
+              <CardHeader className="pb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                    <Receipt className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl font-bold text-gray-900 dark:text-gray-100">Transaction History</CardTitle>
+                    <CardDescription className="text-gray-600 dark:text-gray-400">
+                      Your payment and subscription history
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {transactions.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                      <Receipt className="h-10 w-10 text-gray-400 dark:text-gray-500" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No transactions yet</h3>
+                    <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+                      Your transaction history will appear here once you make your first payment.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {transactions.map((transaction) => {
+                      const statusDisplay = getStatusDisplay(transaction.status);
+                      return (
+                        <div key={transaction.id} className="p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-sm transition-shadow duration-200">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className={`p-3 rounded-lg ${
+                                transaction.status === 'success' ? 'bg-green-100 dark:bg-green-900/20' : 
+                                transaction.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/20' : 'bg-red-100 dark:bg-red-900/20'
+                              }`}>
+                                {statusDisplay.icon}
+                              </div>
+                              <div>
+                                <div className="font-semibold text-gray-900 dark:text-gray-100 text-lg">
+                                  {transaction.description || 'Subscription Payment'}
+                                </div>
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                  {formatDate(transaction.created_at)}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                                  {formatCurrency(transaction.amount, transaction.currency)}
+                                </div>
+                                <Badge 
+                                  variant={transaction.status === 'success' ? 'default' : 
+                                         transaction.status === 'pending' ? 'secondary' : 'destructive'}
+                                  className="text-xs"
+                                >
+                                  {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                                </Badge>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => downloadReceipt(transaction)}
+                                disabled={transaction.status !== 'success'}
+                                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Receipt
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
         {/* Upgrade Plan Modal */}
         {upgradePlanModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
               <PaystackPayment
                 plan={upgradePlanModal}
                 planName="Business"
@@ -666,7 +695,7 @@ NoteX Team
                     
                     // Refresh billing data
                     await refreshData();
-                     await refreshTrialStatus(); // <-- add this line
+                    await refreshTrialStatus();
                     
                     console.log('Upgrade completed successfully');
                   } catch (e: any) {
