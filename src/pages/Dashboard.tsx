@@ -499,8 +499,8 @@ export default function Dashboard() {
             {/* Header */}
             <div className="flex items-center justify-between" data-tour="dashboard-welcome">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
-                    <p className="text-gray-600 mt-2">
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-primary-foreground ">Analytics Dashboard</h1>
+                    <p className="text-gray-600 dark:text-primary-foreground mt-2">
                         Real-time insights into your feedback data
                     </p>
                 </div>
