@@ -45,9 +45,9 @@ const CSATForm: React.FC = () => {
 const { data, error } = await supabase
   .from('feedback_settings')
   .select('id, project_id')
-  .eq('project_id', projectId) // ✅ match with project_id
-  .eq('is_active', true)
-  .single();
+  .eq('project_id', projectId)
+  .maybeSingle();
+
 
 
       if (error) {
