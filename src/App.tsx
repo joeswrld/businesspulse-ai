@@ -23,6 +23,9 @@ const LoadingSpinner = () => (
   </div>
 );
 
+// Import Billing page directly (no lazy loading)
+import Billing from "./pages/Billing";
+
 // Lazy load pages
 const Index = lazy(() => import("./pages/Index"));
 const Signup = lazy(() => import("./pages/Signup"));
@@ -37,7 +40,6 @@ const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Teams = lazy(() => import("./pages/Teams"));
 const Profile = lazy(() => import("./pages/Profile"));
-const Billing = lazy(() => import("./pages/Billing"));
 const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
 const Feedback = lazy(() => import("./pages/Feedback"));
 const Roadmap = lazy(() => import("./pages/Roadmap"));
@@ -245,12 +247,10 @@ const App = () => (
             } />
             <Route path="/billing" element={
               <AuthGuard requireEmailConfirmation={true} requireActiveSubscription={false}>
-                <Suspense fallback={<LoadingSpinner />}>
-                  <DashboardLayout>
-                    <Billing />
-                  </DashboardLayout>
-                </Suspense>
-                </AuthGuard>
+                <DashboardLayout>
+                  <Billing />
+                </DashboardLayout>
+              </AuthGuard>
             } />
             {/* <Route path="/teams/invite/:token" element={
               <Suspense fallback={<LoadingSpinner />}>
