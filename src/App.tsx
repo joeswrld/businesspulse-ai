@@ -25,6 +25,7 @@ const LoadingSpinner = () => (
 
 // Import Billing page directly (no lazy loading)
 import Billing from "./pages/Billing";
+import CSATForm from "./pages/CSATForm";
 
 // Lazy load pages
 const Index = lazy(() => import("./pages/Index"));
@@ -42,7 +43,6 @@ const Teams = lazy(() => import("./pages/Teams"));
 const Profile = lazy(() => import("./pages/Profile"));
 const FeedbackSettings = lazy(() => import("./pages/FeedbackSettings"));
 const Feedback = lazy(() => import("./pages/Feedback"));
-const CSATForm = lazy(() => import("./pages/CSATForm"));
 const ProductFeedbackForm = lazy(() => import("./pages/ProductFeedbackForm"));
 const Roadmap = lazy(() => import("./pages/Roadmap"));
 const Widget = lazy(() => import("./pages/Widget"));
