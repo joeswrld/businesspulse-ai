@@ -11,12 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle, AlertCircle, Star, MessageSquare } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-interface ProjectValidation {
-  is_valid: boolean;
-  error_message: string;
-  is_available: boolean;
-  taken_by_email: string;
-  taken_by_user_id: string;
+interface ProjectRecord {
+  id: string;
 }
 
 const CSATForm: React.FC = () => {
@@ -26,6 +22,7 @@ const CSATForm: React.FC = () => {
   
   const [isValidating, setIsValidating] = useState(true);
   const [isValid, setIsValid] = useState(false);
+  const [projectRecord, setProjectRecord] = useState<ProjectRecord | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
@@ -42,36 +39,36 @@ const CSATForm: React.FC = () => {
 
   const validateProject = async () => {
     if (!projectId) return;
-    
     try {
       setIsValidating(true);
-      
-      // Use the validate_project_id function
+      // Validate directly against projects table using the public client
       const { data, error } = await supabase
-        .rpc('validate_project_id', {
-          current_user_id: '', // No user context needed for public forms
-          project_id_param: projectId
-        });
+        .from('projects')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
 
       if (error) {
         console.error('Validation error:', error);
-        setValidationError('Failed to validate project ID');
+        setValidationError('This project link is invalid or expired.');
+        setIsValid(false);
         return;
       }
 
-      if (data && data.length > 0) {
-        const validation = data[0] as ProjectValidation;
-        if (validation.is_valid) {
-          setIsValid(true);
-        } else {
-          setValidationError(validation.error_message || 'Invalid Project ID');
-        }
+      if (data) {
+        setProjectRecord({ id: data.id });
+        setIsValid(true);
+        setValidationError('');
       } else {
-        setValidationError('Invalid Project ID');
+        setIsValid(false);
+        setValidationError('This project link is invalid or expired.');
       }
     } catch (error) {
       console.error('Error validating project:', error);
-      setValidationError('Failed to validate project ID');
+      setIsValid(false);
+      setValidationError('This project link is invalid or expired.');
     } finally {
       setIsValidating(false);
     }
@@ -92,14 +89,28 @@ const CSATForm: React.FC = () => {
     setIsSubmitting(true);
 
     try {
+      if (!projectRecord?.id) {
+        throw new Error('Invalid project.');
+      }
+
+      const metadata = {
+        form_type: 'csat',
+        page_url: window.location.href,
+        browser: navigator.userAgent,
+        comments: comments || null,
+        rating: rating ? Number(rating) : null
+      } as const;
+
+      const content = `CSAT Rating: ${rating}/5${comments ? `\n\nComments: ${comments}` : ''}`;
+
       const { error } = await supabase
-        .from('feedback')
+        .from('feedbacks')
         .insert({
-          project_id: projectId!,
-          email: email.trim() || null,
-          message: `CSAT Rating: ${rating}/5${comments ? `\n\nComments: ${comments}` : ''}`,
-          page_url: window.location.href,
-          browser: navigator.userAgent
+          project_id: projectRecord.id,
+          user_email: email.trim() || null,
+          content,
+          sentiment: null,
+          metadata
         });
 
       if (error) {
@@ -141,9 +152,9 @@ const CSATForm: React.FC = () => {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <CardTitle className="text-xl">Invalid Project ID</CardTitle>
+            <CardTitle className="text-xl">Invalid or Expired Link</CardTitle>
             <CardDescription>
-              {validationError || 'The project ID you provided is not valid.'}
+              {validationError || 'This project link is invalid or expired.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -166,22 +177,17 @@ const CSATForm: React.FC = () => {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <CardTitle className="text-xl">Thank You!</CardTitle>
+            <CardTitle className="text-xl">Thank you for your feedback!</CardTitle>
             <CardDescription>
-              Your customer satisfaction feedback has been submitted successfully.
+              Your response was recorded successfully.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button 
-              onClick={() => {
-                setRating('');
-                setEmail('');
-                setComments('');
-                setIsSubmitted(false);
-              }} 
+              onClick={() => window.close()} 
               className="w-full"
             >
-              Submit Another Response
+              Close Tab
             </Button>
           </CardContent>
         </Card>
