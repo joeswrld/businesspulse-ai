@@ -12,6 +12,18 @@ serve(async (req) => {
   }
 
   try {
+    // Get authorization header
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
     const { subscription_id } = await req.json()
 
     if (!subscription_id) {
@@ -60,22 +72,59 @@ serve(async (req) => {
       )
     }
 
-    // Initialize Supabase client
+    // Initialize Supabase client with authorization
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabase = createClient(
+      supabaseUrl,
+      supabaseServiceKey,
+      { 
+        global: { 
+          headers: { 
+            Authorization: authHeader 
+          } 
+        } 
+      }
+    )
 
-    // Update subscription status (webhook will handle the final update)
-    const { error: updateError } = await supabase
-      .from('user_subscriptions')
-      .update({ 
-        status: 'canceling',
+    // Validate the user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Update billing profile to cancelled status
+    const { error: billingError } = await supabase
+      .from('billing_profiles')
+      .update({
+        subscription_status: 'cancelled',
         updated_at: new Date().toISOString()
       })
-      .eq('plan_code', subscription_id)
+      .eq('id', user.id)
 
-    if (updateError) {
-      console.error('Error updating subscription status:', updateError)
+    if (billingError) {
+      console.error('Error updating billing profile:', billingError)
+    }
+
+    // Update user subscription status
+    const { error: subscriptionError } = await supabase
+      .from('user_subscriptions')
+      .update({ 
+        status: 'cancelled',
+        cancel_at_period_end: true,
+        canceled_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', user.id)
+
+    if (subscriptionError) {
+      console.error('Error updating subscription status:', subscriptionError)
     }
 
     return new Response(
