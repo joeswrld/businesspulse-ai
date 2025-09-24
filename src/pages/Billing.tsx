@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
 import { usePaystack } from '@/hooks/usePaystack';
@@ -69,14 +69,14 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
   if (currentPlan === 'trial') {
     if (isTrialExpired) {
       return {
-        color: 'bg-red-50 text-red-700 border-red-200',
+        color: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800',
         icon: <XCircle className="h-4 w-4" />,
         label: 'Trial Expired',
         description: 'Your free trial has ended'
       };
     } else {
       return {
-        color: 'bg-blue-50 text-blue-700 border-blue-200',
+        color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800',
         icon: <Clock className="h-4 w-4" />,
         label: 'Free Trial',
         description: 'Enjoying your free trial'
@@ -87,14 +87,14 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
   if (isPaymentPastDue) {
     if (isInGracePeriod) {
       return {
-        color: 'bg-orange-50 text-orange-700 border-orange-200',
+        color: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800',
         icon: <AlertTriangle className="h-4 w-4" />,
         label: 'Payment Due',
         description: 'Payment failed - grace period active'
       };
     } else {
       return {
-        color: 'bg-red-50 text-red-700 border-red-200',
+        color: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800',
         icon: <XCircle className="h-4 w-4" />,
         label: 'Payment Failed',
         description: 'Account suspended due to failed payment'
@@ -104,7 +104,7 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
   
   if (billingProfile?.subscription_status === 'active') {
     return {
-      color: 'bg-green-50 text-green-700 border-green-200',
+      color: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800',
       icon: <CheckCircle className="h-4 w-4" />,
       label: 'Active',
       description: 'Subscription is active and up to date'
@@ -112,7 +112,7 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
   }
   
   return {
-    color: 'bg-gray-50 text-gray-700 border-gray-200',
+    color: 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700',
     icon: <Clock className="h-4 w-4" />,
     label: 'Inactive',
     description: 'No active subscription'
@@ -130,6 +130,7 @@ const BillingPage: React.FC = () => {
   const [showConfigError, setShowConfigError] = useState(false);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   // Load transactions
   const loadTransactions = async () => {
@@ -158,7 +159,7 @@ const BillingPage: React.FC = () => {
   };
 
   // Load transactions on mount
-  React.useEffect(() => {
+  useEffect(() => {
     loadTransactions();
   }, [user]);
 
@@ -268,24 +269,24 @@ NoteX Team
   // Get current plan display info using subscription hook
   const getCurrentPlanDisplay = () => {
     const planName = subscription?.plan === 'business' ? 'Business Plan' : 'Free Trial';
-    let color = 'bg-gray-50 text-gray-700 border-gray-200';
+    let color = 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
     let statusLabel = '';
 
     if (subscription?.plan === 'trial') {
-      color = 'bg-blue-50 text-blue-700 border-blue-200';
+      color = 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800';
       if (subscription?.isTrialExpired) {
         statusLabel = ' - Expired';
-        color = 'bg-red-50 text-red-700 border-red-200';
+        color = 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
       } else {
         statusLabel = ` - ${subscription?.daysLeft || 0} days left`;
       }
     } else if (subscription?.plan === 'business') {
       if (subscription?.isActive) {
-        color = 'bg-green-50 text-green-700 border-green-200';
+        color = 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800';
         statusLabel = ' - Active';
       } else {
         statusLabel = ' - Inactive';
-        color = 'bg-orange-50 text-orange-700 border-orange-200';
+        color = 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800';
       }
     }
 
@@ -317,6 +318,7 @@ NoteX Team
     );
   }
 
+  // Show loading state
   if (subscription?.loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -417,7 +419,7 @@ NoteX Team
             <AlertDescription className="text-orange-800 dark:text-orange-200">
               <strong>Connection Issue:</strong> {subscription.error}. Some features may not be available.
               <div className="mt-3 flex gap-2">
-                <Button size="sm" onClick={subscription?.refreshStatus} variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-100">
+                <Button size="sm" onClick={subscription?.refreshStatus} variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-900/20">
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Retry
                 </Button>
@@ -433,7 +435,7 @@ NoteX Team
             <AlertDescription className="text-red-800 dark:text-red-200">
               <strong>Trial Expired!</strong> Your free trial has ended. Upgrade to Business to continue using advanced features.
               <div className="mt-3 flex gap-2">
-                <Button size="sm" onClick={() => handleUpgradeClick('business')} className="bg-red-600 hover:bg-red-700">
+                <Button size="sm" onClick={() => handleUpgradeClick('business')} className="bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600">
                   Upgrade to Business
                 </Button>
               </div>
@@ -494,7 +496,7 @@ NoteX Team
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Account Status</span>
-                    <Badge className={`${currentPlanDisplay.color} px-3 py-1 text-xs font-medium border`}>
+                    <div className={`${currentPlanDisplay.color} px-3 py-1 text-xs font-medium border rounded-full inline-flex items-center`}>
                       <div className="flex items-center gap-1">
                         {subscription?.plan === 'business' && subscription?.isActive ? (
                           <CheckCircle className="h-4 w-4" />
@@ -505,7 +507,7 @@ NoteX Team
                         )}
                         {currentPlanDisplay.label}
                       </div>
-                    </Badge>
+                    </div>
                   </div>
                   
                   <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -694,13 +696,15 @@ NoteX Team
                                 <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
                                   {formatCurrency(transaction.amount, transaction.currency)}
                                 </div>
-                                <Badge 
-                                  variant={transaction.status === 'success' ? 'default' : 
-                                         transaction.status === 'pending' ? 'secondary' : 'destructive'}
-                                  className="text-xs"
+                                <div 
+                                  className={`text-xs px-2 py-1 rounded-full ${
+                                    transaction.status === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300' : 
+                                    transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300' : 
+                                    'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
+                                  }`}
                                 >
                                   {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-                                </Badge>
+                                </div>
                               </div>
                               <Button
                                 variant="ghost"
