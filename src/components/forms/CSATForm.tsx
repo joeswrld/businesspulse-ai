@@ -4,220 +4,220 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Star, Send, Loader2, Heart } from 'lucide-react';
-import { useFeedbackSubmission, FeedbackSubmissionData } from '@/hooks/useFeedbackSubmission';
-import { useProjectId } from '@/hooks/useProjectId';
+import { useFeedbackForms } from '@/hooks/useFeedbackForms';
+import { Loader2, Star, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface CSATFormProps {
-  projectId?: string;
   title?: string;
-  greetingText?: string;
-  color?: string;
+  description?: string;
   onSuccess?: (data: any) => void;
-  className?: string;
+  onError?: (error: string) => void;
 }
 
 const CSATForm: React.FC<CSATFormProps> = ({
-  projectId: propProjectId,
   title = "Customer Satisfaction Survey",
-  greetingText = "How satisfied are you with our service?",
-  color = "#3B82F6",
+  description = "Help us improve by sharing your experience",
   onSuccess,
-  className = ""
+  onError
 }) => {
-  const [email, setEmail] = useState('');
-  const [message, setMessage] = useState('');
-  const [rating, setRating] = useState<number | null>(null);
-  const [hoveredRating, setHoveredRating] = useState<number | null>(null);
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [formData, setFormData] = useState({
+    email: '',
+    message: '',
+    rating: 0
+  });
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [inlineError, setInlineError] = useState<string | null>(null);
 
-  const { projectId: detectedProjectId, isValidating, isValid, error: projectError } = useProjectId();
-  const { submitFeedback, isSubmitting } = useFeedbackSubmission();
+  const { submitFeedback, isSubmitting, isValidating, projectId, isValid, error: projectIdError } = useFeedbackForms();
 
-  // Use prop projectId if provided, otherwise use detected one
-  const finalProjectId = propProjectId || detectedProjectId;
+  const handleRatingClick = (rating: number) => {
+    setFormData(prev => ({ ...prev, rating }));
+    setInlineError(null);
+  };
 
-  const handleRatingClick = (selectedRating: number) => {
-    setRating(selectedRating);
+  const handleRatingHover = (rating: number) => {
+    setHoveredRating(rating);
+  };
+
+  const handleRatingLeave = () => {
+    setHoveredRating(0);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setInlineError(null);
 
-    if (!finalProjectId) {
+    // Client-side validation
+    if (!formData.message.trim()) {
+      setInlineError('Please tell us about your experience');
       return;
     }
 
-    if (!rating || !message.trim()) {
+    if (formData.rating === 0) {
+      setInlineError('Please select a rating');
       return;
     }
 
-    const submissionData: FeedbackSubmissionData = {
-      projectId: finalProjectId,
-      email: email.trim() || undefined,
-      message: message.trim(),
-      rating: rating,
-      formType: 'csat'
-    };
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setInlineError('Please enter a valid email address');
+      return;
+    }
 
-    const result = await submitFeedback(submissionData);
+    const result = await submitFeedback(formData, 'csat');
 
     if (result.success) {
-      setIsSubmitted(true);
+      setShowSuccess(true);
       onSuccess?.(result.data);
+      // Reset form after a short delay
+      setTimeout(() => {
+        setFormData({ email: '', message: '', rating: 0 });
+        setShowSuccess(false);
+      }, 2000);
+    } else {
+      setInlineError(result.error || 'Failed to submit feedback');
+      onError?.(result.error || 'Failed to submit feedback');
     }
   };
 
-  // Loading state
+  const handleInputChange = (field: keyof typeof formData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (inlineError) setInlineError(null);
+  };
+
+  // Show loading state while validating project ID
   if (isValidating) {
     return (
-      <Card className={`w-full max-w-md ${className}`}>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin" />
+      <Card className="w-full max-w-2xl mx-auto">
+        <CardContent className="p-8">
+          <div className="flex items-center justify-center space-x-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Validating project...</span>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  // Error state
-  if (!isValid || !finalProjectId) {
+  // Show error if project ID is invalid
+  if (!isValid || !projectId) {
     return (
-      <Card className={`w-full max-w-md ${className}`}>
-        <CardHeader>
-          <CardTitle className="text-center text-red-600">Invalid Project</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-center text-gray-600 mb-4">
-            {projectError || 'This project link is invalid or expired.'}
-          </p>
-          <Button 
-            onClick={() => window.location.reload()} 
-            variant="outline" 
-            className="w-full"
-          >
-            Try Again
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Success state
-  if (isSubmitted) {
-    return (
-      <Card className={`w-full max-w-md ${className}`}>
-        <CardHeader>
-          <div className="text-center">
-            <Heart className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <CardTitle className="text-green-600">Thank you! 🎉</CardTitle>
+      <Card className="w-full max-w-2xl mx-auto border-red-200">
+        <CardContent className="p-8">
+          <div className="flex items-center space-x-2 text-red-600">
+            <AlertCircle className="h-6 w-6" />
+            <div>
+              <h3 className="font-semibold">Invalid Project</h3>
+              <p className="text-sm text-red-500">{projectIdError}</p>
+            </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-center text-gray-600 mb-4">
-            Your feedback has been submitted successfully. We appreciate your input!
-          </p>
-          <Button 
-            onClick={() => {
-              setIsSubmitted(false);
-              setEmail('');
-              setMessage('');
-              setRating(null);
-            }} 
-            className="w-full"
-            style={{ backgroundColor: color }}
-          >
-            Submit Another Response
-          </Button>
         </CardContent>
       </Card>
     );
   }
 
-  // Main form
   return (
-    <Card className={`w-full max-w-md ${className}`}>
+    <Card className="w-full max-w-2xl mx-auto">
       <CardHeader className="text-center">
-        <CardTitle className="text-xl font-semibold" style={{ color }}>
-          {title}
-        </CardTitle>
-        <p className="text-sm text-gray-600">{greetingText}</p>
+        <CardTitle className="text-2xl font-bold text-gray-900">{title}</CardTitle>
+        <p className="text-gray-600">{description}</p>
       </CardHeader>
       
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Rating Section */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Overall Satisfaction *</Label>
-            <div className="flex justify-center space-x-2">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => handleRatingClick(star)}
-                  onMouseEnter={() => setHoveredRating(star)}
-                  onMouseLeave={() => setHoveredRating(null)}
-                  className="focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
-                >
-                  <Star
-                    className={`h-8 w-8 transition-colors ${
-                      star <= (hoveredRating || rating || 0)
-                        ? 'text-yellow-400 fill-current'
-                        : 'text-gray-300'
+        {showSuccess ? (
+          <div className="text-center py-8">
+            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-green-700 mb-2">Thank you!</h3>
+            <p className="text-green-600">Your feedback has been submitted successfully.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Rating Section */}
+            <div className="space-y-3">
+              <Label className="text-base font-medium">How satisfied are you with our service? *</Label>
+              <div className="flex justify-center space-x-2">
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <button
+                    key={rating}
+                    type="button"
+                    onClick={() => handleRatingClick(rating)}
+                    onMouseEnter={() => handleRatingHover(rating)}
+                    onMouseLeave={handleRatingLeave}
+                    className={`p-2 rounded-full transition-all duration-200 ${
+                      (hoveredRating >= rating || formData.rating >= rating)
+                        ? 'text-yellow-400 scale-110'
+                        : 'text-gray-300 hover:text-yellow-300'
                     }`}
-                  />
-                </button>
-              ))}
+                  >
+                    <Star 
+                      className={`h-8 w-8 ${
+                        (hoveredRating >= rating || formData.rating >= rating)
+                          ? 'fill-current'
+                          : ''
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>Very Dissatisfied</span>
+                <span>Very Satisfied</span>
+              </div>
             </div>
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Very Dissatisfied</span>
-              <span>Very Satisfied</span>
+
+            {/* Email Field */}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email (optional)</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="your.email@example.com"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                className="w-full"
+              />
             </div>
-          </div>
 
-          {/* Email */}
-          <div className="space-y-2">
-            <Label htmlFor="email">Email (optional)</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="your@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full"
-            />
-          </div>
+            {/* Message Field */}
+            <div className="space-y-2">
+              <Label htmlFor="message">Tell us about your experience *</Label>
+              <Textarea
+                id="message"
+                placeholder="What did you like? What could we improve?"
+                value={formData.message}
+                onChange={(e) => handleInputChange('message', e.target.value)}
+                rows={4}
+                className="w-full resize-none"
+                required
+              />
+            </div>
 
-          {/* Message */}
-          <div className="space-y-2">
-            <Label htmlFor="message">Tell us more about your experience *</Label>
-            <Textarea
-              id="message"
-              placeholder="What did you like or dislike? How can we improve?"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={4}
-              className="w-full resize-none"
-              required
-            />
-          </div>
-
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            disabled={!rating || !message.trim() || isSubmitting}
-            className="w-full flex items-center space-x-2"
-            style={{ backgroundColor: color }}
-          >
-            {isSubmitting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
+            {/* Error Message */}
+            {inlineError && (
+              <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm">{inlineError}</span>
+              </div>
             )}
-            <span>{isSubmitting ? 'Submitting...' : 'Submit Feedback'}</span>
-          </Button>
-        </form>
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              disabled={isSubmitting || !formData.message.trim() || formData.rating === 0}
+              className="w-full"
+              size="lg"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit Feedback'
+              )}
+            </Button>
+          </form>
+        )}
       </CardContent>
     </Card>
   );

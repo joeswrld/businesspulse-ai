@@ -47,7 +47,9 @@ import NotFound from "./pages/NotFound";
 // const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
 import TeamInvitation from "./pages/DashboardEnhanced";
 import Billing from "./pages/Billing";
-import CSATForm from "./pages/CSATForm";
+import CSATFormPage from "./pages/CSATFormPage";
+import ProductFeedbackFormPage from "./pages/ProductFeedbackFormPage";
+import FeedbackTest from "./pages/FeedbackTest";
 
 const queryClient = new QueryClient();
 
@@ -83,8 +85,9 @@ const App = () => (
           <Route path="/cookie-policy" element={<CookiePolicy />} />
 
           {/* 📋 FEEDBACK FORMS (public, no auth) */}
-          <Route path="/feedback/:projectId/csat" element={<CSATForm />} />
-          <Route path="/feedback/:projectId/product" element={<ProductFeedbackForm />} />
+          <Route path="/feedback/:projectId/csat" element={<CSATFormPage />} />
+          <Route path="/feedback/:projectId/product" element={<ProductFeedbackFormPage />} />
+          <Route path="/feedback-test" element={<FeedbackTest />} />
 
           {/* 🔒 PROTECTED ROUTES */}
           <Route

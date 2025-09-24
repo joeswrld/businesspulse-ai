@@ -19,6 +19,13 @@ interface FeedbackEntry {
   user_email: string | null
   content: string
   sentiment: 'positive' | 'negative' | 'neutral' | null
+  metadata: {
+    form_type?: 'csat' | 'product'
+    page_url?: string
+    browser?: any
+    rating?: number
+    session_id?: string
+  } | null
   created_at: string
 }
 
@@ -105,7 +112,7 @@ const Feedback: React.FC = () => {
       
       const { data, error } = await supabase
         .from('feedbacks')
-        .select('id, project_id, user_email, content, sentiment, created_at')
+        .select('id, project_id, user_email, content, sentiment, metadata, created_at')
         .eq('project_id', project.id)
         .order('created_at', { ascending: false })
 
@@ -364,10 +371,11 @@ const Feedback: React.FC = () => {
                   <TableRow className="bg-gray-50">
                     <TableHead className="font-semibold text-gray-900">Message</TableHead>
                     <TableHead className="font-semibold text-gray-900">Email</TableHead>
+                    <TableHead className="font-semibold text-gray-900">Type</TableHead>
+                    <TableHead className="font-semibold text-gray-900">Rating</TableHead>
                     <TableHead className="font-semibold text-gray-900">Sentiment</TableHead>
                     <TableHead className="font-semibold text-gray-900">Date</TableHead>
                     <TableHead className="font-semibold text-gray-900">Session</TableHead>
-                    <TableHead className="font-semibold text-gray-900">Project ID</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -393,6 +401,24 @@ const Feedback: React.FC = () => {
                         )}
                       </TableCell>
                       <TableCell>
+                        <Badge 
+                          variant={entry.metadata?.form_type === 'csat' ? 'default' : 'secondary'}
+                          className={entry.metadata?.form_type === 'csat' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}
+                        >
+                          {entry.metadata?.form_type === 'csat' ? 'CSAT' : entry.metadata?.form_type === 'product' ? 'Product' : 'General'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {entry.metadata?.rating ? (
+                          <div className="flex items-center space-x-1">
+                            <span className="text-lg font-semibold text-yellow-600">{entry.metadata.rating}</span>
+                            <span className="text-sm text-gray-500">/5</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <SentimentBadge sentiment={entry.sentiment} />
                       </TableCell>
                       <TableCell>
@@ -402,14 +428,15 @@ const Feedback: React.FC = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-gray-500">
-                          N/A
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700">
-                          {project?.project_id || entry.project_id}
-                        </code>
+                        {entry.metadata?.session_id ? (
+                          <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700">
+                            {entry.metadata.session_id.substring(0, 8)}...
+                          </code>
+                        ) : (
+                          <Badge variant="outline" className="text-gray-500">
+                            N/A
+                          </Badge>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
