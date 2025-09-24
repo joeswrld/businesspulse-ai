@@ -288,9 +288,9 @@ const App = () => (
               </AuthGuard>
             } />
             <Route path="/feedback/:projectId/csat" element={
-              <Suspense fallback={<LoadingSpinner />}>
+              
                 <CSATForm />
-              </Suspense>
+              
             } />
             <Route path="/feedback/:projectId/product" element={
               <Suspense fallback={<LoadingSpinner />}>
