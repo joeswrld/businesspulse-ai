@@ -16,11 +16,15 @@ import SessionReplayPlayer from '@/components/SessionReplayPlayer'
 interface FeedbackEntry {
   id: string
   project_id: string
-  email: string | null
-  message: string
+  user_email: string | null
+  content: string
   sentiment: 'positive' | 'negative' | 'neutral' | null
-  session_id: string | null
   created_at: string
+}
+
+interface ProjectSelection {
+  id: string // UUID used in feedbacks.project_id
+  project_id: string // external human-facing id
 }
 
 const Feedback: React.FC = () => {
@@ -32,7 +36,7 @@ const Feedback: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterEmail, setFilterEmail] = useState('all')
   const [filterSentiment, setFilterSentiment] = useState('all')
-  const [projectId, setProjectId] = useState<string | null>(null)
+  const [project, setProject] = useState<ProjectSelection | null>(null)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [showSessionReplay, setShowSessionReplay] = useState(false)
 
@@ -43,7 +47,7 @@ const Feedback: React.FC = () => {
   }, [user?.id])
 
   useEffect(() => {
-    if (projectId) {
+    if (project?.id) {
       loadFeedback()
       
       // Set up real-time subscription for feedback updates
@@ -55,7 +59,7 @@ const Feedback: React.FC = () => {
             event: '*',
             schema: 'public',
             table: 'feedbacks',
-            filter: `project_id=eq.${projectId}`
+            filter: `project_id=eq.${project.id}`
           },
           (payload) => {
             console.log('Feedback change received:', payload)
@@ -68,20 +72,25 @@ const Feedback: React.FC = () => {
         supabase.removeChannel(channel)
       }
     }
-  }, [projectId])
+  }, [project?.id])
 
   const loadProjectId = async () => {
     try {
+      // Load first project for this user
       const { data, error } = await supabase
-        .rpc('get_or_create_feedback_settings', { p_user_id: user?.id! })
-      
+        .from('projects')
+        .select('id, project_id')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
       if (error) {
         console.error('Error loading project ID:', error)
         return
       }
 
-      if (data && data.length > 0) {
-        setProjectId(data[0].project_id)
+      if (data) {
+        setProject({ id: data.id, project_id: data.project_id })
       }
     } catch (error) {
       console.error('Error loading project ID:', error)
@@ -89,15 +98,15 @@ const Feedback: React.FC = () => {
   }
 
   const loadFeedback = async () => {
-    if (!projectId) return
+    if (!project?.id) return
 
     try {
       setLoading(true)
       
       const { data, error } = await supabase
-        .from('feedback')
-        .select('*')
-        .eq('project_id', projectId)
+        .from('feedbacks')
+        .select('id, project_id, user_email, content, sentiment, created_at')
+        .eq('project_id', project.id)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -110,7 +119,7 @@ const Feedback: React.FC = () => {
         return
       }
 
-      setFeedback(data || [])
+      setFeedback((data as unknown as FeedbackEntry[]) || [])
     } catch (error) {
       console.error('Error loading feedback:', error)
       toast({
@@ -130,12 +139,12 @@ const Feedback: React.FC = () => {
   }
 
   const filteredFeedback = feedback.filter(entry => {
-    const matchesSearch = entry.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (entry.email && entry.email.toLowerCase().includes(searchTerm.toLowerCase()))
+    const matchesSearch = entry.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (entry.user_email && entry.user_email.toLowerCase().includes(searchTerm.toLowerCase()))
     
     const matchesEmailFilter = filterEmail === 'all' || 
-                              (filterEmail === 'with_email' && entry.email) ||
-                              (filterEmail === 'without_email' && !entry.email)
+                              (filterEmail === 'with_email' && entry.user_email) ||
+                              (filterEmail === 'without_email' && !entry.user_email)
     
     const matchesSentimentFilter = filterSentiment === 'all' || 
                                   (filterSentiment === 'positive' && entry.sentiment === 'positive') ||
@@ -325,7 +334,7 @@ const Feedback: React.FC = () => {
         <CardHeader>
           <CardTitle className="text-lg flex items-center space-x-2">
             <MessageSquare className="h-5 w-5" />
-            <span>Feedback Entries</span>
+            <span>Feedback Entries {project ? `(Project: ${project.project_id})` : ''}</span>
             <Badge variant="outline" className="ml-2">
               {filteredFeedback.length} of {feedback.length}
             </Badge>
@@ -367,15 +376,15 @@ const Feedback: React.FC = () => {
                       <TableCell className="max-w-md">
                         <div className="bg-gray-50 rounded-lg p-3">
                           <p className="text-sm text-gray-900 line-clamp-3">
-                            {entry.message}
+                            {entry.content}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell>
-                        {entry.email ? (
+                        {entry.user_email ? (
                           <div className="flex items-center space-x-2">
                             <Mail className="h-4 w-4 text-gray-400" />
-                            <span className="text-sm text-gray-900">{entry.email}</span>
+                            <span className="text-sm text-gray-900">{entry.user_email}</span>
                           </div>
                         ) : (
                           <Badge variant="outline" className="text-gray-600">
@@ -393,25 +402,13 @@ const Feedback: React.FC = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {entry.session_id ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewSessionReplay(entry.session_id!)}
-                            className="flex items-center space-x-1"
-                          >
-                            <Play className="h-3 w-3" />
-                            <span>Replay</span>
-                          </Button>
-                        ) : (
-                          <Badge variant="outline" className="text-gray-500">
-                            No Session
-                          </Badge>
-                        )}
+                        <Badge variant="outline" className="text-gray-500">
+                          N/A
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700">
-                          {entry.project_id}
+                          {project?.project_id || entry.project_id}
                         </code>
                       </TableCell>
                     </TableRow>
@@ -429,10 +426,10 @@ const Feedback: React.FC = () => {
           <DialogHeader>
             <DialogTitle>Session Replay</DialogTitle>
           </DialogHeader>
-          {selectedSessionId && projectId && (
+          {selectedSessionId && project?.project_id && (
             <SessionReplayPlayer
               sessionId={selectedSessionId}
-              projectId={projectId}
+              projectId={project.project_id}
               onClose={handleCloseSessionReplay}
             />
           )}
