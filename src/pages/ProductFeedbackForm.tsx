@@ -58,41 +58,43 @@ const ProductFeedbackForm: React.FC = () => {
     }
   }, [projectId]);
 
-  const validateProject = async () => {
-    if (!projectId) return;
-    try {
-      setIsValidating(true);
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('project_id', projectId)
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
+ const validateProject = async () => {
+  if (!projectId) return;
+  try {
+    setIsValidating(true);
 
-      if (error) {
-        console.error('Validation error:', error);
-        setIsValid(false);
-        setValidationError('This project link is invalid or expired.');
-        return;
-      }
+    // Query the feedback_settings table instead of projects
+const { data, error } = await supabase
+  .from('feedback_settings')
+  .select('id, project_id')
+  .eq('project_id', projectId)
+  .maybeSingle();
 
-      if (data) {
-        setProjectRecord({ id: data.id });
-        setIsValid(true);
-        setValidationError('');
-      } else {
-        setIsValid(false);
-        setValidationError('This project link is invalid or expired.');
-      }
-    } catch (error) {
-      console.error('Error validating project:', error);
+
+
+    if (error) {
+      console.error('Validation error:', error);
       setIsValid(false);
       setValidationError('This project link is invalid or expired.');
-    } finally {
-      setIsValidating(false);
+      return;
     }
-  };
+
+    if (data) {
+      setProjectRecord({ id: data.project_id }); // Use project_id here
+      setIsValid(true);
+      setValidationError('');
+    } else {
+      setIsValid(false);
+      setValidationError('This project link is invalid or expired.');
+    }
+  } catch (error) {
+    console.error('Error validating project:', error);
+    setIsValid(false);
+    setValidationError('This project link is invalid or expired.');
+  } finally {
+    setIsValidating(false);
+  }
+};
 
   const handleFeatureChange = (feature: string, checked: boolean) => {
     if (checked) {
@@ -137,15 +139,16 @@ ${feedback}`;
         areas: features
       } as const;
 
-      const { error } = await supabase
-        .from('feedbacks')
-        .insert({
-          project_id: projectRecord.id,
-          user_email: email.trim() || null,
-          content: feedbackMessage,
-          sentiment: null,
-          metadata
-        });
+const { error } = await supabase
+  .from('feedbacks')
+  .insert({
+    project_id: projectId, // ✅ use the actual project_id from URL
+    user_email: email.trim() || null,
+    content,
+    sentiment: null,
+    metadata
+  });
+
 
       if (error) {
         console.error('Error submitting feedback:', error);
