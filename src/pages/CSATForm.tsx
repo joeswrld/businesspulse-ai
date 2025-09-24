@@ -96,22 +96,18 @@ const { data, error } = await supabase
     const message = `CSAT Rating: ${rating}/5${comments ? `\n\nComments: ${comments}` : ''}`;
 
     const { data, error } = await supabase
-      .from("feedback")
-      .insert([
-        {
-          project_id: String(projectId),        // project_id column
-          user_email: email?.trim() || null,    // user_email column
-          message: message,                     // <-- use 'message', not 'content'
-          sentiment: null,                      // optional
-          session_id: crypto.randomUUID(),      // session tracking
-          metadata: {
-            form_type: 'csat',
-            page_url: window.location.href,
-            browser: navigator.userAgent,
-            rating: rating ? Number(rating) : null
-          }
-        }
-      ]);
+  .from("feedback")
+  .insert([
+    {
+      project_id: String(projectId),
+      user_email: email?.trim() || null,
+      message: message,
+      sentiment: null,
+      session_id: crypto.randomUUID(),
+      // metadata: {...} <-- REMOVE this
+    }
+  ]);
+
 
     if (error) {
       console.error("Error submitting feedback:", error.message, error.details);
