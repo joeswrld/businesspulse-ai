@@ -93,27 +93,25 @@ const { data, error } = await supabase
         throw new Error('Invalid project.');
       }
 
-      const metadata = {
-        form_type: 'csat',
-        page_url: window.location.href,
-        browser: navigator.userAgent,
-        comments: comments || null,
-        rating: rating ? Number(rating) : null
-      } as const;
-
       const content = `CSAT Rating: ${rating}/5${comments ? `\n\nComments: ${comments}` : ''}`;
 
-     const { data, error } = await supabase
-  .from("feedback")
-  .insert([
-    {
-      project_id: String(projectId),   // ensure it's text
-      email: email?.trim() || null,    // match column name
-      message: feedback,               // match column name
-      sentiment: null,                 // optional
-      session_id: crypto.randomUUID()  // optional tracking
-    }
-  ]);
+      const { data, error } = await supabase
+        .from("feedbacks")
+        .insert([
+          {
+            project_id: String(projectId),   // project_id as text
+            user_email: email?.trim() || null,    // user_email column
+            content: content,               // content column
+            sentiment: null,                 // optional sentiment
+            session_id: crypto.randomUUID(),  // session tracking
+            metadata: {
+              form_type: 'csat',
+              page_url: window.location.href,
+              browser: navigator.userAgent,
+              rating: rating ? Number(rating) : null
+            }
+          }
+        ]);
 
 if (error) {
   console.error("Error submitting feedback:", error.message, error.details);
