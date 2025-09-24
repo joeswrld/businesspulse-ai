@@ -41,7 +41,7 @@ const CSATForm: React.FC = () => {
     try {
       // Validate projectId against projects table
       const { data, error } = await supabase
-        .from('projects')
+        .from('feedback-settings')
         .select('project_id')
         .eq('project_id', projectId)
         .maybeSingle();
