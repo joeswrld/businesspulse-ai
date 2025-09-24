@@ -9,64 +9,55 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle, AlertCircle, Star, MessageSquare } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface ProjectRecord {
-  id: string;
+  project_id: string;
 }
 
 const CSATForm: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [isValidating, setIsValidating] = useState(true);
   const [isValid, setIsValid] = useState(false);
   const [projectRecord, setProjectRecord] = useState<ProjectRecord | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
-  
+
   const [rating, setRating] = useState<string>('');
   const [email, setEmail] = useState('');
   const [comments, setComments] = useState('');
 
   useEffect(() => {
-    if (projectId) {
-      validateProject();
-    }
+    if (projectId) validateProject();
   }, [projectId]);
 
   const validateProject = async () => {
     if (!projectId) return;
+    setIsValidating(true);
+
     try {
-      setIsValidating(true);
-      // Validate directly against projects table using the public client
-const { data, error } = await supabase
-  .from('feedback_settings')
-  .select('id, project_id')
-  .eq('project_id', projectId)
-  .maybeSingle();
+      // Validate projectId against projects table
+      const { data, error } = await supabase
+        .from('projects')
+        .select('project_id')
+        .eq('project_id', projectId)
+        .maybeSingle();
 
-
-
-      if (error) {
-        console.error('Validation error:', error);
-        setValidationError('This project link is invalid or expired.');
-        setIsValid(false);
-        return;
-      }
+      if (error) throw error;
 
       if (data) {
-        setProjectRecord({ id: data.id });
+        setProjectRecord({ project_id: data.project_id });
         setIsValid(true);
         setValidationError('');
       } else {
         setIsValid(false);
         setValidationError('This project link is invalid or expired.');
       }
-    } catch (error) {
-      console.error('Error validating project:', error);
+    } catch (err) {
+      console.error('Error validating project:', err);
       setIsValid(false);
       setValidationError('This project link is invalid or expired.');
     } finally {
@@ -76,7 +67,7 @@ const { data, error } = await supabase
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!rating) {
       toast({
         title: 'Rating Required',
@@ -86,51 +77,49 @@ const { data, error } = await supabase
       return;
     }
 
+    if (!projectRecord?.project_id) {
+      toast({
+        title: 'Invalid Project',
+        description: 'Cannot submit feedback for this project.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      if (!projectRecord?.id) {
-        throw new Error('Invalid project.');
-      }
+      const message = `CSAT Rating: ${rating}/5${comments ? `\n\nComments: ${comments}` : ''}`;
 
-      const content = `CSAT Rating: ${rating}/5${comments ? `\n\nComments: ${comments}` : ''}`;
-
-      const { data, error } = await supabase
-        .from("feedback")
+      const { error } = await supabase
+        .from('feedback')
         .insert([
           {
-            project_id: String(projectId),   // project_id as text
-            user_email: email?.trim() || null,    // user_email column
-            content: content,               // content column
-            sentiment: null,                 // optional sentiment
-            session_id: crypto.randomUUID(),  // session tracking
-            metadata: {
-              form_type: 'csat',
-              page_url: window.location.href,
-              browser: navigator.userAgent,
-              rating: rating ? Number(rating) : null
-            }
+            project_id: projectRecord.project_id,
+            email: email?.trim() || null,
+            message,
+            sentiment: null,
+            session_id: crypto.randomUUID()
           }
         ]);
 
-if (error) {
-  console.error("Error submitting feedback:", error.message, error.details);
-  toast({
-    title: "Error",
-    description: error.message || "Failed to submit feedback. Please try again.",
-    variant: "destructive",
-  });
-  return;
-}
+      if (error) {
+        console.error('Error submitting feedback:', error);
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to submit feedback.',
+          variant: 'destructive'
+        });
+        return;
+      }
 
-setIsSubmitted(true);
-toast({
-  title: "Thank you!",
-  description: "Your feedback has been submitted successfully.",
-});
-
-    } catch (error) {
-      console.error('Failed to submit feedback:', error);
+      setIsSubmitted(true);
+      toast({
+        title: 'Thank you!',
+        description: 'Your feedback has been submitted successfully.'
+      });
+    } catch (err) {
+      console.error('Submit failed:', err);
       toast({
         title: 'Error',
         description: 'Failed to submit feedback. Please try again.',
@@ -144,10 +133,8 @@ toast({
   if (isValidating) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Validating project...</p>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="text-muted-foreground mt-4">Validating project...</p>
       </div>
     );
   }
@@ -159,16 +146,10 @@ toast({
           <CardHeader className="text-center">
             <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
             <CardTitle className="text-xl">Invalid or Expired Link</CardTitle>
-            <CardDescription>
-              {validationError || 'This project link is invalid or expired.'}
-            </CardDescription>
+            <CardDescription>{validationError}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
-              onClick={() => navigate('/')} 
-              className="w-full"
-              variant="outline"
-            >
+            <Button onClick={() => navigate('/')} className="w-full" variant="outline">
               Go Home
             </Button>
           </CardContent>
@@ -184,15 +165,10 @@ toast({
           <CardHeader className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
             <CardTitle className="text-xl">Thank you for your feedback! 🎉</CardTitle>
-            <CardDescription>
-              Your response was recorded successfully.
-            </CardDescription>
+            <CardDescription>Your response was recorded successfully.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
-              onClick={() => window.close()} 
-              className="w-full"
-            >
+            <Button onClick={() => window.close()} className="w-full">
               Close Tab
             </Button>
           </CardContent>
@@ -209,17 +185,12 @@ toast({
             <MessageSquare className="h-8 w-8 text-primary mr-2" />
             <CardTitle className="text-2xl">Customer Satisfaction Survey</CardTitle>
           </div>
-          <CardDescription>
-            Help us improve by sharing your experience
-          </CardDescription>
+          <CardDescription>Help us improve by sharing your experience</CardDescription>
         </CardHeader>
-        
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
-              <Label className="text-base font-medium">
-                How satisfied are you with our service? *
-              </Label>
+              <Label className="text-base font-medium">How satisfied are you with our service? *</Label>
               <RadioGroup value={rating} onValueChange={setRating} className="flex justify-center">
                 <div className="flex space-x-2">
                   {[1, 2, 3, 4, 5].map((value) => (
@@ -228,18 +199,12 @@ toast({
                         htmlFor={`rating-${value}`}
                         className="flex flex-col items-center cursor-pointer hover:opacity-80 transition-opacity"
                       >
-                        <RadioGroupItem
-                          value={value.toString()}
-                          id={`rating-${value}`}
-                          className="sr-only"
-                        />
-                        <div className="w-12 h-12 rounded-full border-2 border-muted-foreground/25 flex items-center justify-center hover:border-primary transition-colors">
-                          <Star 
+                        <RadioGroupItem value={value.toString()} id={`rating-${value}`} className="sr-only" />
+                        <div className={`w-12 h-12 rounded-full border-2 border-muted-foreground/25 flex items-center justify-center hover:border-primary transition-colors`}>
+                          <Star
                             className={`h-6 w-6 ${
-                              rating && parseInt(rating) >= value 
-                                ? 'fill-yellow-400 text-yellow-400' 
-                                : 'text-muted-foreground'
-                            }`} 
+                              rating && parseInt(rating) >= value ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'
+                            }`}
                           />
                         </div>
                         <span className="text-sm text-muted-foreground mt-1">{value}</span>
@@ -248,7 +213,6 @@ toast({
                   ))}
                 </div>
               </RadioGroup>
-              
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Very Dissatisfied</span>
                 <span>Very Satisfied</span>
@@ -278,16 +242,10 @@ toast({
               />
             </div>
 
-            <Button 
-              type="submit" 
-              disabled={!rating || isSubmitting}
-              className="w-full"
-              size="lg"
-            >
+            <Button type="submit" disabled={!rating || isSubmitting} className="w-full" size="lg">
               {isSubmitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Submitting...
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Submitting...
                 </>
               ) : (
                 'Submit Feedback'
