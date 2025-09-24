@@ -133,26 +133,34 @@ ${wouldRecommend !== null ? `Would Recommend: ${wouldRecommend ? 'Yes' : 'No'}` 
 ${features.length > 0 ? `Areas: ${features.join(', ')}` : ''}
 ${feedback}`;
 
-      const { error } = await supabase.from('feedbacks').insert([
-        {
-          project_id: projectRecord.id,
-          email: email.trim() || null,
-          message: feedbackMessage,
-          sentiment: null,
-          session_id: crypto.randomUUID(),
-        },
-      ]);
+      const { data, error } = await supabase
+  .from("feedback")
+  .insert([
+    {
+      project_id: String(projectId),   // ensure it's text
+      email: email?.trim() || null,    // match column name
+      message: feedback,               // match column name
+      sentiment: null,                 // optional
+      session_id: crypto.randomUUID()  // optional tracking
+    }
+  ]);
 
-      if (error) {
-        console.error('Error submitting feedback:', error);
-        throw error;
-      }
+if (error) {
+  console.error("Error submitting feedback:", error.message, error.details);
+  toast({
+    title: "Error",
+    description: error.message || "Failed to submit feedback. Please try again.",
+    variant: "destructive",
+  });
+  return;
+}
 
-      setIsSubmitted(true);
-      toast({
-        title: 'Thank you!',
-        description: 'Your product feedback has been submitted successfully.',
-      });
+setIsSubmitted(true);
+toast({
+  title: "Thank you!",
+  description: "Your feedback has been submitted successfully.",
+});
+
     } catch (error) {
       console.error('Failed to submit feedback:', error);
       toast({
