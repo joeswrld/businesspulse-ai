@@ -42,12 +42,13 @@ const CSATForm: React.FC = () => {
     try {
       setIsValidating(true);
       // Validate directly against projects table using the public client
-         const { data, error } = await supabase
+const { data, error } = await supabase
   .from('feedback_settings')
-  .select('id')
-  .eq('id', projectId) // <-- projectId is the row id in feedback_settings
+  .select('id, project_id')
+  .eq('project_id', projectId) // ✅ match with project_id
   .eq('is_active', true)
   .single();
+
 
       if (error) {
         console.error('Validation error:', error);
@@ -102,15 +103,16 @@ const CSATForm: React.FC = () => {
 
       const content = `CSAT Rating: ${rating}/5${comments ? `\n\nComments: ${comments}` : ''}`;
 
-      const { error } = await supabase
-        .from('feedbacks')
-        .insert({
-          project_id: projectRecord.id,
-          user_email: email.trim() || null,
-          content,
-          sentiment: null,
-          metadata
-        });
+     const { error } = await supabase
+  .from('feedbacks')
+  .insert({
+    project_id: projectId, // ✅ use the actual project_id from URL
+    user_email: email.trim() || null,
+    content,
+    sentiment: null,
+    metadata
+  });
+
 
       if (error) {
         console.error('Error submitting feedback:', error);
