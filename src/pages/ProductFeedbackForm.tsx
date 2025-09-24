@@ -211,7 +211,7 @@ ${feedback}`;
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <CardTitle className="text-xl">Thank you for your feedback!</CardTitle>
+            <CardTitle className="text-xl">Thank you for your feedback! 🎉</CardTitle>
             <CardDescription>
               Your response was recorded successfully.
             </CardDescription>
