@@ -43,7 +43,7 @@ const CSATForm: React.FC = () => {
       setIsValidating(true);
       // Validate directly against projects table using the public client
       const { data, error } = await supabase
-        .from('projects')
+        .from('feedback_settings')
         .select('id')
         .eq('project_id', projectId)
         .eq('is_active', true)
