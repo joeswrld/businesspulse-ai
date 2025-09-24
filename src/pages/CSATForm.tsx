@@ -96,7 +96,7 @@ const { data, error } = await supabase
       const content = `CSAT Rating: ${rating}/5${comments ? `\n\nComments: ${comments}` : ''}`;
 
       const { data, error } = await supabase
-        .from("feedbacks")
+        .from("feedback")
         .insert([
           {
             project_id: String(projectId),   // project_id as text
