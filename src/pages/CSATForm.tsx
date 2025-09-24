@@ -75,71 +75,71 @@ const { data, error } = await supabase
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!rating) {
+  e.preventDefault();
+
+  if (!rating) {
+    toast({
+      title: 'Rating Required',
+      description: 'Please select a satisfaction rating',
+      variant: 'destructive'
+    });
+    return;
+  }
+
+  setIsSubmitting(true);
+
+  try {
+    if (!projectRecord?.id) {
+      throw new Error('Invalid project.');
+    }
+
+    const message = `CSAT Rating: ${rating}/5${comments ? `\n\nComments: ${comments}` : ''}`;
+
+    const { data, error } = await supabase
+      .from("feedback")
+      .insert([
+        {
+          project_id: String(projectId),        // project_id column
+          user_email: email?.trim() || null,    // user_email column
+          message: message,                     // <-- use 'message', not 'content'
+          sentiment: null,                      // optional
+          session_id: crypto.randomUUID(),      // session tracking
+          metadata: {
+            form_type: 'csat',
+            page_url: window.location.href,
+            browser: navigator.userAgent,
+            rating: rating ? Number(rating) : null
+          }
+        }
+      ]);
+
+    if (error) {
+      console.error("Error submitting feedback:", error.message, error.details);
       toast({
-        title: 'Rating Required',
-        description: 'Please select a satisfaction rating',
-        variant: 'destructive'
+        title: "Error",
+        description: error.message || "Failed to submit feedback. Please try again.",
+        variant: "destructive",
       });
       return;
     }
 
-    setIsSubmitting(true);
+    setIsSubmitted(true);
+    toast({
+      title: "Thank you!",
+      description: "Your feedback has been submitted successfully.",
+    });
 
-    try {
-      if (!projectRecord?.id) {
-        throw new Error('Invalid project.');
-      }
-
-      const content = `CSAT Rating: ${rating}/5${comments ? `\n\nComments: ${comments}` : ''}`;
-
-      const { data, error } = await supabase
-        .from("feedback")
-        .insert([
-          {
-            project_id: String(projectId),   // project_id as text
-            user_email: email?.trim() || null,    // user_email column
-            content: content,               // content column
-            sentiment: null,                 // optional sentiment
-            session_id: crypto.randomUUID(),  // session tracking
-            metadata: {
-              form_type: 'csat',
-              page_url: window.location.href,
-              browser: navigator.userAgent,
-              rating: rating ? Number(rating) : null
-            }
-          }
-        ]);
-
-if (error) {
-  console.error("Error submitting feedback:", error.message, error.details);
-  toast({
-    title: "Error",
-    description: error.message || "Failed to submit feedback. Please try again.",
-    variant: "destructive",
-  });
-  return;
-}
-
-setIsSubmitted(true);
-toast({
-  title: "Thank you!",
-  description: "Your feedback has been submitted successfully.",
-});
-
-    } catch (error) {
-      console.error('Failed to submit feedback:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to submit feedback. Please try again.',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  } catch (error) {
+    console.error('Failed to submit feedback:', error);
+    toast({
+      title: 'Error',
+      description: 'Failed to submit feedback. Please try again.',
+      variant: 'destructive'
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   if (isValidating) {
     return (
