@@ -95,18 +95,18 @@ const { data, error } = await supabase
 
     const message = `CSAT Rating: ${rating}/5${comments ? `\n\nComments: ${comments}` : ''}`;
 
-    const { data, error } = await supabase
+  const { data, error } = await supabase
   .from("feedback")
   .insert([
     {
       project_id: String(projectId),
-      user_email: email?.trim() || null,
+      email: email?.trim() || null,   // <-- use 'email' here
       message: message,
       sentiment: null,
       session_id: crypto.randomUUID(),
-      // metadata: {...} <-- REMOVE this
     }
   ]);
+
 
 
     if (error) {
