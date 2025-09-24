@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/hooks/useSubscription';
+import { usePaystack } from '@/hooks/usePaystack';
+import { supabase } from '@/integrations/supabase/client';
 import { 
-  useBillingSystem, 
   formatCurrency, 
   formatDate, 
   getPlanDisplayName, 
   getPlanPrice, 
   getPlanPricing 
 } from '@/hooks/useBillingSystem';
-import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -119,29 +120,46 @@ const getSubscriptionStatusDisplay = (billingProfile: any, currentPlan: string, 
 
 const BillingPage: React.FC = () => {
   const { user } = useAuth();
-  const { trialStatus, refreshTrialStatus, upgradeToBusiness, getDaysLeft, isTrialExpired } = useUnifiedTrial();
-
-  const {
-    billingProfile,
-    transactions,
-    loading,
-    error,
-    refreshing,
-    currentPlan,
-    isSubscriptionActive,
-    isPaymentPastDue,
-    nextBillingDate,
-    isInGracePeriod,
-    gracePeriodDaysLeft,
-    refreshData,
-    cancelSubscription,
-    upgradePlan
-  } = useBillingSystem();
+  const subscription = useSubscription();
+  const paystack = usePaystack();
   
   // State
   const [cancelling, setCancelling] = useState(false);
   const [upgradePlanModal, setUpgradePlanModal] = useState<UpgradePlan>(null);
   const [showConfigError, setShowConfigError] = useState(false);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
+
+  // Load transactions
+  const loadTransactions = async () => {
+    if (!user) return;
+    
+    setLoadingTransactions(true);
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('Error loading transactions:', error);
+        setTransactions([]);
+      } else {
+        setTransactions(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading transactions:', error);
+      setTransactions([]);
+    } finally {
+      setLoadingTransactions(false);
+    }
+  };
+
+  // Load transactions on mount
+  React.useEffect(() => {
+    loadTransactions();
+  }, [user]);
 
   // Handle subscription cancellation
   const handleCancelSubscription = async () => {
@@ -155,7 +173,8 @@ const BillingPage: React.FC = () => {
 
     setCancelling(true);
     try {
-      await cancelSubscription();
+      await subscription.cancelSubscription();
+      await loadTransactions(); // Refresh transactions after cancellation
     } catch (error) {
       console.error('Failed to cancel subscription:', error);
       toast.error('Failed to cancel subscription: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -175,6 +194,25 @@ const BillingPage: React.FC = () => {
     }
     
     setUpgradePlanModal(plan);
+  };
+
+  // Handle successful payment
+  const handlePaymentSuccess = async ({ reference, plan }: { reference: string; plan: string }) => {
+    try {
+      console.log('Payment successful, upgrading to business...');
+      toast.success(`🎉 Welcome to Business! Your subscription has been activated.`);
+      setUpgradePlanModal(null);
+      
+      // Refresh subscription status
+      await subscription.refreshStatus();
+      
+      // Refresh transactions
+      await loadTransactions();
+      
+      console.log('Upgrade completed successfully');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to activate subscription');
+    }
   };
 
   // Download transaction receipt
@@ -226,36 +264,27 @@ NoteX Team
     }
   };
 
-  // Get current plan display info using unified trial system
+  // Get current plan display info using subscription hook
   const getCurrentPlanDisplay = () => {
-    const planName = trialStatus.plan === 'business' ? 'Business Plan' : 'Free Trial';
+    const planName = subscription.plan === 'business' ? 'Business Plan' : 'Free Trial';
     let color = 'bg-gray-50 text-gray-700 border-gray-200';
     let statusLabel = '';
 
-    if (trialStatus.plan === 'free_trial') {
+    if (subscription.plan === 'trial') {
       color = 'bg-blue-50 text-blue-700 border-blue-200';
-      if (isTrialExpired()) {
+      if (subscription.isTrialExpired) {
         statusLabel = ' - Expired';
+        color = 'bg-red-50 text-red-700 border-red-200';
       } else {
-        statusLabel = ` - ${getDaysLeft()} days left`;
+        statusLabel = ` - ${subscription.daysLeft} days left`;
       }
-    } else if (trialStatus.plan === 'business') {
-      color = 'bg-green-50 text-green-700 border-green-200';
-      if (trialStatus.subscriptionActive) {
-        statusLabel = ` - Active for ${getDaysLeft()} days`;
+    } else if (subscription.plan === 'business') {
+      if (subscription.isActive) {
+        color = 'bg-green-50 text-green-700 border-green-200';
+        statusLabel = ' - Active';
       } else {
         statusLabel = ' - Inactive';
         color = 'bg-orange-50 text-orange-700 border-orange-200';
-      }
-    }
-
-    if (isPaymentPastDue) {
-      if (isInGracePeriod) {
-        statusLabel = ` - Payment Due (${gracePeriodDaysLeft} days grace)`;
-        color = 'bg-orange-50 text-orange-700 border-orange-200';
-      } else {
-        statusLabel = ' - Payment Failed';
-        color = 'bg-red-50 text-red-700 border-red-200';
       }
     }
 
@@ -266,7 +295,7 @@ NoteX Team
   };
 
   // Get plan pricing
-  const planPricing = getPlanPricing(currentPlan);
+  const planPricing = getPlanPricing(subscription.plan);
 
   // Check if user is authenticated
   if (!user) {
@@ -287,7 +316,7 @@ NoteX Team
     );
   }
 
-  if (loading) {
+  if (subscription.loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -326,7 +355,7 @@ NoteX Team
     );
   }
 
-  if (error) {
+  if (subscription.error) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-lg">
@@ -335,10 +364,10 @@ NoteX Team
               <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
             </div>
             <CardTitle className="text-xl text-red-900 dark:text-red-100">Error Loading Billing</CardTitle>
-            <CardDescription className="text-red-700 dark:text-red-300">{error}</CardDescription>
+            <CardDescription className="text-red-700 dark:text-red-300">{subscription.error}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={refreshData} className="w-full">
+            <Button onClick={subscription.refreshStatus} className="w-full">
               <RefreshCw className="h-4 w-4 mr-2" />
               Try Again
             </Button>
@@ -348,9 +377,8 @@ NoteX Team
     );
   }
 
-  // Calculate subscription end date
-  const subscriptionEndDate = calculateSubscriptionEndDate(billingProfile, currentPlan);
-  const statusDisplay = getSubscriptionStatusDisplay(billingProfile, currentPlan, trialStatus.trialExpired, isPaymentPastDue, isInGracePeriod);
+  // Get current plan display
+  const currentPlanDisplay = getCurrentPlanDisplay();
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -368,11 +396,11 @@ NoteX Team
               <Button
                 variant="outline"
                 size="sm"
-                onClick={refreshData}
-                disabled={refreshing}
+                onClick={subscription.refreshStatus}
+                disabled={subscription.loading}
                 className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 mr-2 ${subscription.loading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
             </div>
@@ -380,7 +408,7 @@ NoteX Team
         </div>
 
         {/* Critical Alerts */}
-        {isTrialExpired() && (
+        {subscription.isTrialExpired && (
           <Alert className="mb-6 border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
             <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
             <AlertDescription className="text-red-800 dark:text-red-200">
@@ -390,24 +418,6 @@ NoteX Team
                   Upgrade to Business
                 </Button>
               </div>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {isPaymentPastDue && !isInGracePeriod && (
-          <Alert className="mb-6 border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
-            <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
-            <AlertDescription className="text-red-800 dark:text-red-200">
-              <strong>Payment Failed!</strong> Your payment method has failed. Please contact support to resolve this issue.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {isPaymentPastDue && isInGracePeriod && (
-          <Alert className="mb-6 border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800">
-            <Clock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-            <AlertDescription className="text-orange-800 dark:text-orange-200">
-              <strong>Payment Due!</strong> Your payment has failed, but you have {gracePeriodDaysLeft} days to resolve this before your account is suspended. Please contact support.
             </AlertDescription>
           </Alert>
         )}
@@ -449,7 +459,7 @@ NoteX Team
                     </div>
                   </div>
 
-                  {billingProfile?.paystack_customer_id && (
+                  {subscription.subscriptionId && (
                     <div className="flex items-center gap-3">
                       <CreditCardIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                       <div>
@@ -465,16 +475,27 @@ NoteX Team
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Account Status</span>
-                    <Badge className={`${statusDisplay.color} px-3 py-1 text-xs font-medium border`}>
+                    <Badge className={`${currentPlanDisplay.color} px-3 py-1 text-xs font-medium border`}>
                       <div className="flex items-center gap-1">
-                        {statusDisplay.icon}
-                        {statusDisplay.label}
+                        {subscription.plan === 'business' && subscription.isActive ? (
+                          <CheckCircle className="h-4 w-4" />
+                        ) : subscription.plan === 'trial' && !subscription.isTrialExpired ? (
+                          <Clock className="h-4 w-4" />
+                        ) : (
+                          <XCircle className="h-4 w-4" />
+                        )}
+                        {currentPlanDisplay.label}
                       </div>
                     </Badge>
                   </div>
                   
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {statusDisplay.description}
+                    {subscription.plan === 'business' && subscription.isActive 
+                      ? 'Your Business subscription is active and up to date'
+                      : subscription.plan === 'trial' && !subscription.isTrialExpired
+                      ? `Enjoying your free trial - ${subscription.daysLeft} days remaining`
+                      : 'No active subscription'
+                    }
                   </div>
                 </div>
               </CardContent>
@@ -494,15 +515,20 @@ NoteX Team
                     </div>
                     <div>
                       <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                        {getPlanDisplayName(currentPlan)}
+                        {getPlanDisplayName(subscription.plan)}
                       </CardTitle>
                       <CardDescription className="text-gray-600 dark:text-gray-400 text-base">
-                        {statusDisplay.description}
+                        {subscription.plan === 'business' && subscription.isActive 
+                          ? 'Your Business subscription is active and up to date'
+                          : subscription.plan === 'trial' && !subscription.isTrialExpired
+                          ? `Enjoying your free trial - ${subscription.daysLeft} days remaining`
+                          : 'No active subscription'
+                        }
                       </CardDescription>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    {refreshing && <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />}
+                    {subscription.loading && <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />}
                   </div>
                 </div>
               </CardHeader>
@@ -520,34 +546,30 @@ NoteX Team
                   </div>
                   
                   {/* Trial Days or Next Billing */}
-                  {trialStatus.plan === 'free_trial' && !isTrialExpired() && (
+                  {subscription.plan === 'trial' && !subscription.isTrialExpired && (
                     <div className="text-center p-6 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
                       <div className="flex items-center justify-center mb-3">
                         <Timer className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                       </div>
-                      <div className="text-3xl font-bold text-blue-900 dark:text-blue-100 mb-2">{getDaysLeft()}</div>
+                      <div className="text-3xl font-bold text-blue-900 dark:text-blue-100 mb-2">{subscription.daysLeft}</div>
                       <div className="text-sm text-blue-600 dark:text-blue-400">trial days left</div>
                     </div>
                   )}
                   
-                  {trialStatus.plan === 'business' && trialStatus.subscriptionActive && (
+                  {subscription.plan === 'business' && subscription.isActive && (
                     <div className="text-center p-6 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
                       <div className="flex items-center justify-center mb-3">
                         <CalendarDays className="h-6 w-6 text-green-600 dark:text-green-400" />
                       </div>
-                      <div className="text-3xl font-bold text-green-900 dark:text-green-100 mb-2">{getDaysLeft()}</div>
-                      <div className="text-sm text-green-600 dark:text-green-400">days active</div>
-                    </div>
-                  )}
-
-                  {/* Grace Period */}
-                  {isPaymentPastDue && isInGracePeriod && (
-                    <div className="text-center p-6 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800">
-                      <div className="flex items-center justify-center mb-3">
-                        <AlertTriangle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                      <div className="text-3xl font-bold text-green-900 dark:text-green-100 mb-2">
+                        {subscription.nextBillingDate ? 
+                          Math.ceil((new Date(subscription.nextBillingDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 
+                          'Active'
+                        }
                       </div>
-                      <div className="text-3xl font-bold text-orange-900 dark:text-orange-100 mb-2">{gracePeriodDaysLeft}</div>
-                      <div className="text-sm text-orange-600 dark:text-orange-400">grace period days</div>
+                      <div className="text-sm text-green-600 dark:text-green-400">
+                        {subscription.nextBillingDate ? 'days until renewal' : 'subscription active'}
+                      </div>
                     </div>
                   )}
 
@@ -557,7 +579,7 @@ NoteX Team
                       <Activity className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                     </div>
                     <div className="text-lg font-bold text-purple-900 dark:text-purple-100 mb-2 capitalize">
-                      {billingProfile?.subscription_status || 'trial'}
+                      {subscription.isActive ? 'active' : 'inactive'}
                     </div>
                     <div className="text-sm text-purple-600 dark:text-purple-400">subscription status</div>
                   </div>
@@ -566,22 +588,24 @@ NoteX Team
                 {/* Action Buttons */}
                 <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
                   <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-                    {trialStatus.plan === 'free_trial' && !isTrialExpired() && (
+                    {/* Show Upgrade button for trial users or expired trials */}
+                    {(subscription.plan === 'trial' && !subscription.isTrialExpired) || subscription.isTrialExpired ? (
                       <Button 
                         onClick={() => handleUpgradeClick('business')} 
-                        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200"
+                        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700"
                       >
                         <Crown className="h-5 w-5 mr-2" />
                         Upgrade to Business
                       </Button>
-                    )}
+                    ) : null}
                     
-                    {trialStatus.plan === 'business' && trialStatus.subscriptionActive && (
+                    {/* Show Cancel button for active business subscriptions */}
+                    {subscription.plan === 'business' && subscription.isActive && (
                       <Button 
                         variant="outline" 
                         onClick={handleCancelSubscription} 
                         disabled={cancelling}
-                        className="border-2 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-6 py-3 rounded-lg font-medium transition-all duration-200"
+                        className="border-2 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:border-red-300 dark:hover:border-red-700"
                       >
                         {cancelling ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <X className="h-5 w-5 mr-2" />}
                         Cancel Subscription
@@ -608,7 +632,12 @@ NoteX Team
                 </div>
               </CardHeader>
               <CardContent>
-                {transactions.length === 0 ? (
+                {loadingTransactions ? (
+                  <div className="text-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+                    <p className="text-gray-600 dark:text-gray-400">Loading transactions...</p>
+                  </div>
+                ) : transactions.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
                       <Receipt className="h-10 w-10 text-gray-400 dark:text-gray-500" />
@@ -684,24 +713,7 @@ NoteX Team
                 plan={upgradePlanModal}
                 planName="Business"
                 planPrice={getPlanPrice(upgradePlanModal)}
-                onSuccess={async ({ reference, plan: paidPlan }) => {
-                  try {
-                    console.log('Payment successful, upgrading to business...');
-                    toast.success(`🎉 Welcome to Business! Your subscription has been activated.`);
-                    setUpgradePlanModal(null);
-                    
-                    // Upgrade to business immediately
-                    await upgradeToBusiness();
-                    
-                    // Refresh billing data
-                    await refreshData();
-                    await refreshTrialStatus();
-                    
-                    console.log('Upgrade completed successfully');
-                  } catch (e: any) {
-                    toast.error(e?.message || 'Failed to activate subscription');
-                  }
-                }}
+                onSuccess={handlePaymentSuccess}
                 onCancel={() => setUpgradePlanModal(null)}
               />
             </div>
