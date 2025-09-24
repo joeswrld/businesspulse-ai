@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
 import { usePaystack } from '@/hooks/usePaystack';
 import { supabase } from '@/integrations/supabase/client';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { 
   formatCurrency, 
   formatDate, 
@@ -266,20 +267,20 @@ NoteX Team
 
   // Get current plan display info using subscription hook
   const getCurrentPlanDisplay = () => {
-    const planName = subscription.plan === 'business' ? 'Business Plan' : 'Free Trial';
+    const planName = subscription?.plan === 'business' ? 'Business Plan' : 'Free Trial';
     let color = 'bg-gray-50 text-gray-700 border-gray-200';
     let statusLabel = '';
 
-    if (subscription.plan === 'trial') {
+    if (subscription?.plan === 'trial') {
       color = 'bg-blue-50 text-blue-700 border-blue-200';
-      if (subscription.isTrialExpired) {
+      if (subscription?.isTrialExpired) {
         statusLabel = ' - Expired';
         color = 'bg-red-50 text-red-700 border-red-200';
       } else {
-        statusLabel = ` - ${subscription.daysLeft} days left`;
+        statusLabel = ` - ${subscription?.daysLeft || 0} days left`;
       }
-    } else if (subscription.plan === 'business') {
-      if (subscription.isActive) {
+    } else if (subscription?.plan === 'business') {
+      if (subscription?.isActive) {
         color = 'bg-green-50 text-green-700 border-green-200';
         statusLabel = ' - Active';
       } else {
@@ -295,7 +296,7 @@ NoteX Team
   };
 
   // Get plan pricing
-  const planPricing = getPlanPricing(subscription.plan);
+  const planPricing = getPlanPricing(subscription?.plan || 'trial');
 
   // Check if user is authenticated
   if (!user) {
@@ -316,7 +317,7 @@ NoteX Team
     );
   }
 
-  if (subscription.loading) {
+  if (subscription?.loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -355,34 +356,36 @@ NoteX Team
     );
   }
 
-  if (subscription.error) {
-    return (
+  // Show error alert but continue rendering the page
+  const showErrorAlert = subscription.error;
+
+  // Get current plan display
+  const currentPlanDisplay = getCurrentPlanDisplay();
+
+  return (
+    <ErrorBoundary fallback={
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-lg">
           <CardHeader className="text-center">
             <div className="mx-auto w-12 h-12 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mb-4">
               <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
             </div>
-            <CardTitle className="text-xl text-red-900 dark:text-red-100">Error Loading Billing</CardTitle>
-            <CardDescription className="text-red-700 dark:text-red-300">{subscription.error}</CardDescription>
+            <CardTitle className="text-xl text-red-900 dark:text-red-100">Billing System Error</CardTitle>
+            <CardDescription className="text-red-700 dark:text-red-300">
+              There was an issue loading your billing information. Please try refreshing the page.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={subscription.refreshStatus} className="w-full">
+            <Button onClick={() => window.location.reload()} className="w-full">
               <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
+              Refresh Page
             </Button>
           </CardContent>
         </Card>
       </div>
-    );
-  }
-
-  // Get current plan display
-  const currentPlanDisplay = getCurrentPlanDisplay();
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    }>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -396,19 +399,35 @@ NoteX Team
               <Button
                 variant="outline"
                 size="sm"
-                onClick={subscription.refreshStatus}
-                disabled={subscription.loading}
+                onClick={subscription?.refreshStatus}
+                disabled={subscription?.loading}
                 className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${subscription.loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 mr-2 ${subscription?.loading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
             </div>
           </div>
         </div>
 
+        {/* Error Alert */}
+        {showErrorAlert && (
+          <Alert className="mb-6 border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800">
+            <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            <AlertDescription className="text-orange-800 dark:text-orange-200">
+              <strong>Connection Issue:</strong> {subscription.error}. Some features may not be available.
+              <div className="mt-3 flex gap-2">
+                <Button size="sm" onClick={subscription?.refreshStatus} variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-100">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Critical Alerts */}
-        {subscription.isTrialExpired && (
+        {subscription?.isTrialExpired && (
           <Alert className="mb-6 border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
             <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
             <AlertDescription className="text-red-800 dark:text-red-200">
@@ -447,7 +466,7 @@ NoteX Team
                     <Mail className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                     <div>
                       <div className="text-sm font-medium text-gray-900 dark:text-gray-100">Email</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">{user.email}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">{user?.email || 'Not available'}</div>
                     </div>
                   </div>
                   
@@ -455,7 +474,7 @@ NoteX Team
                     <User className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                     <div>
                       <div className="text-sm font-medium text-gray-900 dark:text-gray-100">Account ID</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400 font-mono">{user.id.slice(0, 8)}...</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 font-mono">{user?.id?.slice(0, 8) || 'N/A'}...</div>
                     </div>
                   </div>
 
@@ -477,9 +496,9 @@ NoteX Team
                     <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Account Status</span>
                     <Badge className={`${currentPlanDisplay.color} px-3 py-1 text-xs font-medium border`}>
                       <div className="flex items-center gap-1">
-                        {subscription.plan === 'business' && subscription.isActive ? (
+                        {subscription?.plan === 'business' && subscription?.isActive ? (
                           <CheckCircle className="h-4 w-4" />
-                        ) : subscription.plan === 'trial' && !subscription.isTrialExpired ? (
+                        ) : subscription?.plan === 'trial' && !subscription?.isTrialExpired ? (
                           <Clock className="h-4 w-4" />
                         ) : (
                           <XCircle className="h-4 w-4" />
@@ -490,10 +509,10 @@ NoteX Team
                   </div>
                   
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {subscription.plan === 'business' && subscription.isActive 
+                    {subscription?.plan === 'business' && subscription?.isActive 
                       ? 'Your Business subscription is active and up to date'
-                      : subscription.plan === 'trial' && !subscription.isTrialExpired
-                      ? `Enjoying your free trial - ${subscription.daysLeft} days remaining`
+                      : subscription?.plan === 'trial' && !subscription?.isTrialExpired
+                      ? `Enjoying your free trial - ${subscription?.daysLeft || 0} days remaining`
                       : 'No active subscription'
                     }
                   </div>
@@ -515,20 +534,20 @@ NoteX Team
                     </div>
                     <div>
                       <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                        {getPlanDisplayName(subscription.plan)}
+                        {getPlanDisplayName(subscription?.plan || 'trial')}
                       </CardTitle>
                       <CardDescription className="text-gray-600 dark:text-gray-400 text-base">
-                        {subscription.plan === 'business' && subscription.isActive 
+                        {subscription?.plan === 'business' && subscription?.isActive 
                           ? 'Your Business subscription is active and up to date'
-                          : subscription.plan === 'trial' && !subscription.isTrialExpired
-                          ? `Enjoying your free trial - ${subscription.daysLeft} days remaining`
+                          : subscription?.plan === 'trial' && !subscription?.isTrialExpired
+                          ? `Enjoying your free trial - ${subscription?.daysLeft || 0} days remaining`
                           : 'No active subscription'
                         }
                       </CardDescription>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    {subscription.loading && <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />}
+                    {subscription?.loading && <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />}
                   </div>
                 </div>
               </CardHeader>
@@ -546,29 +565,29 @@ NoteX Team
                   </div>
                   
                   {/* Trial Days or Next Billing */}
-                  {subscription.plan === 'trial' && !subscription.isTrialExpired && (
+                  {subscription?.plan === 'trial' && !subscription?.isTrialExpired && (
                     <div className="text-center p-6 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
                       <div className="flex items-center justify-center mb-3">
                         <Timer className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                       </div>
-                      <div className="text-3xl font-bold text-blue-900 dark:text-blue-100 mb-2">{subscription.daysLeft}</div>
+                      <div className="text-3xl font-bold text-blue-900 dark:text-blue-100 mb-2">{subscription?.daysLeft || 0}</div>
                       <div className="text-sm text-blue-600 dark:text-blue-400">trial days left</div>
                     </div>
                   )}
                   
-                  {subscription.plan === 'business' && subscription.isActive && (
+                  {subscription?.plan === 'business' && subscription?.isActive && (
                     <div className="text-center p-6 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
                       <div className="flex items-center justify-center mb-3">
                         <CalendarDays className="h-6 w-6 text-green-600 dark:text-green-400" />
                       </div>
                       <div className="text-3xl font-bold text-green-900 dark:text-green-100 mb-2">
-                        {subscription.nextBillingDate ? 
+                        {subscription?.nextBillingDate ? 
                           Math.ceil((new Date(subscription.nextBillingDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 
                           'Active'
                         }
                       </div>
                       <div className="text-sm text-green-600 dark:text-green-400">
-                        {subscription.nextBillingDate ? 'days until renewal' : 'subscription active'}
+                        {subscription?.nextBillingDate ? 'days until renewal' : 'subscription active'}
                       </div>
                     </div>
                   )}
@@ -579,7 +598,7 @@ NoteX Team
                       <Activity className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                     </div>
                     <div className="text-lg font-bold text-purple-900 dark:text-purple-100 mb-2 capitalize">
-                      {subscription.isActive ? 'active' : 'inactive'}
+                      {subscription?.isActive ? 'active' : 'inactive'}
                     </div>
                     <div className="text-sm text-purple-600 dark:text-purple-400">subscription status</div>
                   </div>
@@ -589,7 +608,7 @@ NoteX Team
                 <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
                   <div className="flex flex-col sm:flex-row flex-wrap gap-3">
                     {/* Show Upgrade button for trial users or expired trials */}
-                    {(subscription.plan === 'trial' && !subscription.isTrialExpired) || subscription.isTrialExpired ? (
+                    {(subscription?.plan === 'trial' && !subscription?.isTrialExpired) || subscription?.isTrialExpired ? (
                       <Button 
                         onClick={() => handleUpgradeClick('business')} 
                         className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium shadow-sm hover:shadow-md transition-all duration-200 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700"
@@ -600,7 +619,7 @@ NoteX Team
                     ) : null}
                     
                     {/* Show Cancel button for active business subscriptions */}
-                    {subscription.plan === 'business' && subscription.isActive && (
+                    {subscription?.plan === 'business' && subscription?.isActive && (
                       <Button 
                         variant="outline" 
                         onClick={handleCancelSubscription} 
@@ -719,9 +738,11 @@ NoteX Team
             </div>
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 };
 
 export default BillingPage;
+export { BillingPage as Billing };
