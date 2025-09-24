@@ -42,13 +42,12 @@ const CSATForm: React.FC = () => {
     try {
       setIsValidating(true);
       // Validate directly against projects table using the public client
-      const { data, error } = await supabase
-        .from('feedback_settings')
-        .select('id')
-        .eq('project_id', projectId)
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
+         const { data, error } = await supabase
+  .from('feedback_settings')
+  .select('id')
+  .eq('id', projectId) // <-- projectId is the row id in feedback_settings
+  .eq('is_active', true)
+  .single();
 
       if (error) {
         console.error('Validation error:', error);
