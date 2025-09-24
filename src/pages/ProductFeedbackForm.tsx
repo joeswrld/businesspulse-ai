@@ -134,16 +134,25 @@ ${features.length > 0 ? `Areas: ${features.join(', ')}` : ''}
 ${feedback}`;
 
       const { data, error } = await supabase
-  .from("feedback")
-  .insert([
-    {
-      project_id: String(projectId),   // ensure it's text
-      email: email?.trim() || null,    // match column name
-      message: feedback,               // match column name
-      sentiment: null,                 // optional
-      session_id: crypto.randomUUID()  // optional tracking
-    }
-  ]);
+        .from("feedbacks")
+        .insert([
+          {
+            project_id: String(projectId),   // project_id as text
+            user_email: email?.trim() || null,    // user_email column
+            content: feedbackMessage,        // content column
+            sentiment: null,                 // optional sentiment
+            session_id: crypto.randomUUID(),  // session tracking
+            metadata: {
+              form_type: 'product_feedback',
+              feedback_type: feedbackType,
+              rating: rating ? Number(rating) : null,
+              would_recommend: wouldRecommend,
+              features: features,
+              page_url: window.location.href,
+              browser: navigator.userAgent
+            }
+          }
+        ]);
 
 if (error) {
   console.error("Error submitting feedback:", error.message, error.details);
