@@ -50,6 +50,8 @@ import Billing from "./pages/Billing";
 import CSATFormPage from "./pages/CSATFormPage";
 import ProductFeedbackFormPage from "./pages/ProductFeedbackFormPage";
 import FeedbackTest from "./pages/FeedbackTest";
+// In your router setup
+import { CSATForm, ProductFeedbackForm } from './path/to/fixed-forms';
 
 const queryClient = new QueryClient();
 
@@ -88,7 +90,8 @@ const App = () => (
           <Route path="/feedback/:projectId/csat" element={<CSATFormPage />} />
           <Route path="/feedback/:projectId/product" element={<ProductFeedbackFormPage />} />
           <Route path="/feedback-test" element={<FeedbackTest />} />
-
+           <Route path="/feedback/:projectId/csat" element={<CSATForm />} />
+            <Route path="/feedback/:projectId/product" element={<ProductFeedbackForm />} />
           {/* 🔒 PROTECTED ROUTES */}
           <Route
             path="/*"
