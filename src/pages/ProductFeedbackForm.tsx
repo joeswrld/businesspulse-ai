@@ -127,57 +127,53 @@ const ProductFeedbackForm: React.FC = () => {
     setIsSubmitting(true);
 
     try {
+      // Format the feedback message to include all the details
       const feedbackMessage = `Product Feedback - Type: ${feedbackType}
 ${rating ? `Rating: ${rating}/5` : ''}
 ${wouldRecommend !== null ? `Would Recommend: ${wouldRecommend ? 'Yes' : 'No'}` : ''}
 ${features.length > 0 ? `Areas: ${features.join(', ')}` : ''}
+
+Feedback:
 ${feedback}`;
 
-      const { data, error } = await supabase
+      // ✅ FIXED: Only use columns that exist in the database schema
+      const { error } = await supabase
         .from("feedback")
         .insert([
           {
-            project_id: projectRecord.id,   // Use internal UUID
-            email: email?.trim() || null,    // email column
-            message: feedbackMessage,        // message column
-            metadata: {
-              form_type: 'product',
-              feedback_type: feedbackType,
-              rating: rating ? Number(rating) : null,
-              would_recommend: wouldRecommend,
-              features: features,
-              page_url: window.location.href,
-              browser: navigator.userAgent,
-              session_id: crypto.randomUUID()
-            }
+            project_id: projectRecord.id,     // Internal UUID
+            email: email?.trim() || null,     // Email column (nullable)
+            message: feedbackMessage,         // Message column
+            sentiment: null                   // Sentiment column (nullable)
+            // ❌ REMOVED: metadata (doesn't exist in schema)
           }
         ]);
 
-if (error) {
-  console.error("Error submitting feedback:", error.message, error.details);
-  
-  let errorMessage = 'Failed to submit feedback.';
-  if (error.code === '23503') {
-    errorMessage = 'Invalid project reference. Please check your project link.';
-  } else if (error.code === '23505') {
-    errorMessage = 'Duplicate feedback detected. Please try again.';
-  } else if (error.message) {
-    errorMessage = error.message;
-  }
-  
-  toast({
-    title: "Error",
-    description: errorMessage,
-    variant: "destructive",
-  });
-  return;
-}
+      if (error) {
+        console.error("Error submitting feedback:", error.message, error.details);
+        
+        let errorMessage = 'Failed to submit feedback.';
+        if (error.code === '23503') {
+          errorMessage = 'Invalid project reference. Please check your project link.';
+        } else if (error.code === '23505') {
+          errorMessage = 'Duplicate feedback detected. Please try again.';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        return;
+      }
 
-setIsSubmitted(true);
-toast({
-  title: "Thank you!",
-  description: "Your feedback has been submitted successfully.",
-});
+      setIsSubmitted(true);
+      toast({
+        title: "Thank you!",
+        description: "Your feedback has been submitted successfully.",
+      });
 
     } catch (error) {
       console.error('Failed to submit feedback:', error);
