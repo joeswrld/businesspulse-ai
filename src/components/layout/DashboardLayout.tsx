@@ -28,10 +28,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import TopNav from "@/components/layout/TopNav";
 
-// Mock hook for feedback notifications - replace with actual implementation
-const useFeedbackNotifications = () => {
-  return { newCount: 0 };
-};
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -42,7 +38,6 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
-  const { newCount: feedbackNewCount } = useFeedbackNotifications();
 
 
   // Load user data
@@ -131,13 +126,11 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
 const navigation = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Feedback", href: "/feedback", icon: MessageSquare },
   { name: "AI Insights", href: "/insights-simple", icon: Brain },
   { name: "Reports & Analytics", href: "/reports", icon: FileText },
   { name: "Roadmap", href: "/roadmap", icon: BarChart3 }, // <-- NEW ENTRY
   { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
   { name: "Team Collaboration", href: "/teams", icon: Users },
-  { name: "Feedback Settings", href: "/feedback-settings", icon: Settings },
 ];
 
 
