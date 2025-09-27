@@ -1,185 +1,171 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffect, useState } from 'react'
+import { supabase } from '@/integrations/supabase/client'
+import { useAuth } from '@/contexts/AuthContext'
 
-interface Feedback {
-  id: string;
-  project_id: string;
-  email: string | null;
-  message: string;
-  sentiment: 'positive' | 'negative' | 'neutral' | null;
-  metadata: any;
-  created_at: string;
-}
-
-interface FeedbackCounts {
-  total: number;
-  new: number;
-  reviewed: number;
-  resolved: number;
+interface FeedbackEntry {
+  id: string
+  project_id: string
+  user_email: string | null
+  content: string
+  sentiment: 'positive' | 'negative' | 'neutral' | null
+  metadata: {
+    form_type?: 'csat' | 'product'
+    page_url?: string
+    browser?: any
+    rating?: number
+    session_id?: string
+  } | null
+  created_at: string
 }
 
 export const useRealtimeFeedback = () => {
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
-  const [counts, setCounts] = useState<FeedbackCounts>({
-    total: 0,
-    new: 0,
-    reviewed: 0,
-    resolved: 0
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [realtimeStatus, setRealtimeStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
-  const { user } = useAuth();
+  const { user } = useAuth()
+  const [feedback, setFeedback] = useState<FeedbackEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const loadFeedbacks = async () => {
-    if (!user) return;
+  // Load initial feedback
+  const loadFeedback = async () => {
+    if (!user?.id) return
 
     try {
-      setLoading(true);
-      setError(null);
+      setLoading(true)
+      setError(null)
 
-      // First get the user's project IDs from feedback_settings
+      // First, get the user's project settings
       const { data: settingsData, error: settingsError } = await supabase
         .from('feedback_settings')
         .select('id')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .single()
 
       if (settingsError) {
-        console.error('Error fetching feedback settings:', settingsError);
-        setError(settingsError.message);
-        return;
+        console.error('Error loading project settings:', settingsError)
+        setError('Failed to load project settings')
+        return
       }
 
-      if (!settingsData || settingsData.length === 0) {
-        setFeedbacks([]);
-        setCounts({ total: 0, new: 0, reviewed: 0, resolved: 0 });
-        return;
+      if (!settingsData) {
+        setFeedback([])
+        return
       }
 
-      const projectIds = settingsData.map(s => s.id);
-
-      // Fetch feedbacks from the feedback table using project IDs
+      // Then load feedback for that project
       const { data: feedbackData, error: feedbackError } = await supabase
-        .from('feedback')
-        .select('*')
-        .in('project_id', projectIds)
-        .order('created_at', { ascending: false });
+        .from('feedback') // ✅ Fixed table name (singular)
+        .select('id, project_id, user_email, content, sentiment, metadata, created_at')
+        .eq('project_id', settingsData.id)
+        .order('created_at', { ascending: false })
 
       if (feedbackError) {
-        console.error('Error fetching feedbacks:', feedbackError);
-        setError(feedbackError.message);
-        return;
+        console.error('Error loading feedback:', feedbackError)
+        setError('Failed to load feedback')
+        return
       }
 
-      const feedbacks = feedbackData || [];
-      setFeedbacks(feedbacks);
-
-      // Calculate counts based on sentiment
-      const positiveCount = feedbacks.filter(f => f.sentiment === 'positive').length;
-      const negativeCount = feedbacks.filter(f => f.sentiment === 'negative').length;
-      const neutralCount = feedbacks.filter(f => f.sentiment === 'neutral').length;
-      const unknownCount = feedbacks.filter(f => !f.sentiment).length;
-
-      setCounts({
-        total: feedbacks.length,
-        new: unknownCount, // Treat unknown sentiment as new
-        reviewed: positiveCount + negativeCount + neutralCount,
-        resolved: 0 // No resolved status in new schema
-      });
-
+      setFeedback((feedbackData as unknown as FeedbackEntry[]) || [])
     } catch (err) {
-      console.error('Error in loadFeedbacks:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error in loadFeedback:', err)
+      setError('Failed to load feedback')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
+
+  // Refresh function for manual refresh
+  const refreshFeedback = async () => {
+    await loadFeedback()
+  }
 
   useEffect(() => {
-    if (!user) {
-      setFeedbacks([]);
-      setCounts({ total: 0, new: 0, reviewed: 0, resolved: 0 });
-      setLoading(false);
-      setRealtimeStatus('disconnected');
-      return;
+    if (!user?.id) {
+      setFeedback([])
+      setLoading(false)
+      return
     }
 
-    // Initial load
-    loadFeedbacks();
+    // Load initial feedback
+    loadFeedback()
 
     // Set up real-time subscription
-    setRealtimeStatus('connecting');
-    
-    // Get project IDs for real-time subscription
-    const { data: settingsData } = await supabase
-      .from('feedback_settings')
-      .select('id')
-      .eq('user_id', user.id);
+    const setupRealtimeSubscription = async () => {
+      try {
+        // Get project IDs for real-time subscription
+        const { data: settingsData, error: settingsError } = await supabase
+          .from('feedback_settings')
+          .select('id')
+          .eq('user_id', user.id)
+          .single()
 
-    if (settingsData && settingsData.length > 0) {
-      const projectIds = settingsData.map(s => s.id);
-      
-      const channel = supabase
-        .channel('feedback-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'feedback',
-            filter: `project_id=in.(${projectIds.join(',')})`
-          },
-          (payload) => {
-            console.log('Feedback real-time update:', payload);
-            
-            if (payload.eventType === 'INSERT') {
-              setFeedbacks(prev => [payload.new as Feedback, ...prev]);
-              setCounts(prev => ({
-                ...prev,
-                total: prev.total + 1,
-                new: prev.new + (!payload.new.sentiment ? 1 : 0),
-                reviewed: prev.reviewed + (payload.new.sentiment ? 1 : 0)
-              }));
-            } else if (payload.eventType === 'UPDATE') {
-              setFeedbacks(prev => prev.map(item => 
-                item.id === payload.new.id ? payload.new as Feedback : item
-              ));
-              // Recalculate counts for sentiment changes
-              loadFeedbacks();
-            } else if (payload.eventType === 'DELETE') {
-              setFeedbacks(prev => prev.filter(item => item.id !== payload.old.id));
-              setCounts(prev => ({
-                ...prev,
-                total: Math.max(0, prev.total - 1)
-              }));
+        if (settingsError || !settingsData) {
+          console.error('Error getting project for subscription:', settingsError)
+          return
+        }
+
+        // Set up real-time subscription for feedback updates
+        const channel = supabase
+          .channel('feedback-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'feedback', // ✅ Fixed table name (singular)
+              filter: `project_id=eq.${settingsData.id}`
+            },
+            (payload) => {
+              console.log('Feedback change received:', payload)
+              
+              // Handle different types of changes
+              if (payload.eventType === 'INSERT') {
+                const newFeedback = payload.new as FeedbackEntry
+                setFeedback(prev => [newFeedback, ...prev])
+              } else if (payload.eventType === 'UPDATE') {
+                const updatedFeedback = payload.new as FeedbackEntry
+                setFeedback(prev => 
+                  prev.map(item => 
+                    item.id === updatedFeedback.id ? updatedFeedback : item
+                  )
+                )
+              } else if (payload.eventType === 'DELETE') {
+                const deletedId = payload.old.id
+                setFeedback(prev => prev.filter(item => item.id !== deletedId))
+              } else {
+                // For any other changes, reload all feedback
+                loadFeedback()
+              }
             }
-          }
-        )
-        .subscribe((status) => {
-          console.log('Realtime subscription status:', status);
-          if (status === 'SUBSCRIBED') {
-            setRealtimeStatus('connected');
-          } else if (status === 'CHANNEL_ERROR') {
-            setRealtimeStatus('disconnected');
-          }
-        });
+          )
+          .subscribe()
 
-      return () => {
-        supabase.removeChannel(channel);
-        setRealtimeStatus('disconnected');
-      };
-    } else {
-      setRealtimeStatus('disconnected');
+        // Return cleanup function
+        return () => {
+          supabase.removeChannel(channel)
+        }
+      } catch (err) {
+        console.error('Error setting up real-time subscription:', err)
+      }
     }
-  }, [user]);
+
+    // ✅ FIXED: Now properly handling the async function in useEffect
+    let cleanup: (() => void) | undefined
+
+    setupRealtimeSubscription().then((cleanupFn) => {
+      cleanup = cleanupFn
+    })
+
+    // Cleanup function
+    return () => {
+      if (cleanup) {
+        cleanup()
+      }
+    }
+  }, [user?.id])
 
   return {
-    feedbacks,
-    counts,
+    feedback,
     loading,
     error,
-    realtimeStatus,
-    loadFeedbacks
-  };
-};
+    refreshFeedback
+  }
+}
