@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -21,23 +20,16 @@ import {
   Download,
   RefreshCw,
   Calendar as CalendarIcon,
-  TrendingUp,
-  Users,
   ThumbsUp,
-  ThumbsDown,
-  Minus,
-  Eye,
   Clock,
   AlertCircle,
-  CheckCircle,
   BarChart3,
-  PieChart,
   LineChart
 } from 'lucide-react';
 
 import {
-  BarChart as RechartsBarChart,
-  Bar,
+  AreaChart,
+  Area,
   PieChart as RechartsPieChart,
   Cell,
   Pie,
@@ -45,12 +37,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
-  ResponsiveContainer,
-  LineChart as RechartsLineChart,
-  Line,
-  AreaChart,
-  Area
+  ResponsiveContainer
 } from 'recharts';
 
 // Types
@@ -60,12 +47,7 @@ interface Feedback {
   user_email: string | null;
   content: string;
   sentiment: string | null;
-  metadata: {
-    email?: string;
-    page_url?: string;
-    user_agent?: string;
-    [key: string]: any;
-  };
+  metadata: any;
   created_at: string;
 }
 
@@ -109,7 +91,7 @@ export default function Feedback() {
       setLoading(true);
       setError(null);
 
-      // Get user's project IDs
+      // First, check if projects table exists and get user's projects
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('id')
@@ -117,53 +99,108 @@ export default function Feedback() {
 
       if (projectsError) {
         console.error('Error loading projects:', projectsError);
+        
+        // If projects table doesn't exist or user has no projects, create a default project
+        if (projectsError.code === '42P01' || projectsError.message?.includes('relation "projects" does not exist')) {
+          // Handle case where projects table doesn't exist
+          console.log('Projects table does not exist, using fallback');
+          setFeedbacks([]);
+          setStats({
+            totalFeedback: 0,
+            averageRating: 0,
+            customerSatisfactionCount: 0,
+            productFeedbackCount: 0,
+            ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+            recentFeedback: []
+          });
+          return;
+        }
         throw projectsError;
       }
 
-      const projectIds = projectsData?.map(p => p.id) || [];
+      let projectIds = projectsData?.map(p => p.id) || [];
+
+      // If no projects exist, create a default one
+      if (projectIds.length === 0) {
+        const defaultProject = {
+          user_id: user.id,
+          name: 'Default Project',
+          project_id: `proj-${Date.now()}`
+        };
+
+        try {
+          const { data: newProject, error: createError } = await supabase
+            .from('projects')
+            .insert(defaultProject)
+            .select('id')
+            .single();
+
+          if (createError) {
+            console.error('Error creating default project:', createError);
+          } else if (newProject) {
+            projectIds = [newProject.id];
+          }
+        } catch (createError) {
+          console.error('Failed to create default project:', createError);
+          // Continue without projects
+        }
+      }
 
       if (projectIds.length === 0) {
         setFeedbacks([]);
-        setStats(null);
+        setStats({
+          totalFeedback: 0,
+          averageRating: 0,
+          customerSatisfactionCount: 0,
+          productFeedbackCount: 0,
+          ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+          recentFeedback: []
+        });
         return;
       }
 
-      // Load feedbacks
+      // Load feedback
       const { data: feedbacksData, error: feedbacksError } = await supabase
-        .from('feedbacks')
-        .select(`
-          id,
-          project_id,
-          user_email,
-          content,
-          sentiment,
-          metadata,
-          created_at
-        `)
+        .from('feedback')
+        .select('*')
         .in('project_id', projectIds)
         .order('created_at', { ascending: false });
 
       if (feedbacksError) {
-        console.error('Error loading feedbacks:', feedbacksError);
+        console.error('Error loading feedback:', feedbacksError);
+        
+        // If feedback table doesn't exist, return empty state
+        if (feedbacksError.code === '42P01' || feedbacksError.message?.includes('relation "feedback" does not exist')) {
+          console.log('Feedback table does not exist, showing empty state');
+          setFeedbacks([]);
+          setStats({
+            totalFeedback: 0,
+            averageRating: 0,
+            customerSatisfactionCount: 0,
+            productFeedbackCount: 0,
+            ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+            recentFeedback: []
+          });
+          return;
+        }
         throw feedbacksError;
       }
 
-      setFeedbacks(feedbacksData || []);
+      const feedbacksList = feedbacksData || [];
+      setFeedbacks(feedbacksList);
 
       // Calculate stats
-      const feedbacksList = feedbacksData || [];
       const totalFeedback = feedbacksList.length;
       
-      // Calculate sentiment-based stats since we don't have rating/form_type
+      // Calculate sentiment-based stats
       const positiveCount = feedbacksList.filter(f => f.sentiment === 'positive').length;
       const negativeCount = feedbacksList.filter(f => f.sentiment === 'negative').length;
       const neutralCount = feedbacksList.filter(f => f.sentiment === 'neutral').length;
       
-      // Use sentiment as a proxy for rating (positive = 5, neutral = 3, negative = 1)
+      // Use sentiment as a proxy for rating
       const averageRating = totalFeedback > 0 ? 
         (positiveCount * 5 + neutralCount * 3 + negativeCount * 1) / totalFeedback : 0;
       
-      // For now, treat all feedback as product feedback since we don't have form_type
       const customerSatisfactionCount = 0;
       const productFeedbackCount = totalFeedback;
       
@@ -210,7 +247,7 @@ export default function Feedback() {
         {
           event: '*',
           schema: 'public',
-          table: 'feedbacks'
+          table: 'feedback'
         },
         (payload) => {
           console.log('Feedback change received:', payload);
@@ -228,19 +265,14 @@ export default function Feedback() {
   const filteredFeedbacks = useMemo(() => {
     let filtered = feedbacks;
 
-    // Filter by form type (currently all feedback is product feedback)
-    if (filters.formType !== 'all') {
-      // For now, all feedback is treated as product feedback
-      if (filters.formType === 'customer_satisfaction') {
-        filtered = []; // No customer satisfaction feedback yet
-      }
-      // product_feedback shows all feedback
-    }
-
-    // Filter by rating (currently no rating data available)
-    if (filters.rating !== 'all') {
-      // No rating data available yet, so this filter doesn't apply
-      filtered = [];
+    // Filter by search query
+    if (filters.searchQuery) {
+      const query = filters.searchQuery.toLowerCase();
+      filtered = filtered.filter(f => 
+        f.content.toLowerCase().includes(query) ||
+        (f.user_email && f.user_email.toLowerCase().includes(query)) ||
+        (f.metadata?.email && f.metadata.email.toLowerCase().includes(query))
+      );
     }
 
     // Filter by date range
@@ -251,16 +283,6 @@ export default function Feedback() {
         const toDate = filters.dateRange.to || new Date();
         return feedbackDate >= fromDate && feedbackDate <= toDate;
       });
-    }
-
-    // Filter by search query
-    if (filters.searchQuery) {
-      const query = filters.searchQuery.toLowerCase();
-      filtered = filtered.filter(f => 
-        f.content.toLowerCase().includes(query) ||
-        (f.user_email && f.user_email.toLowerCase().includes(query)) ||
-        (f.metadata?.email && f.metadata.email.toLowerCase().includes(query))
-      );
     }
 
     return filtered;
@@ -275,10 +297,12 @@ export default function Feedback() {
 
   // Chart data
   const chartData = useMemo(() => {
-    const { start, end } = getDateRange();
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
     const filteredByDate = feedbacks.filter(feedback => {
       const feedbackDate = new Date(feedback.created_at);
-      return feedbackDate >= start && feedbackDate <= end;
+      return feedbackDate >= thirtyDaysAgo && feedbackDate <= now;
     });
 
     // Group by date
@@ -293,24 +317,16 @@ export default function Feedback() {
       .map(([date, count]) => ({ date, count }));
   }, [feedbacks]);
 
-  const getDateRange = (): { start: Date; end: Date } => {
-    const now = new Date();
-    const end = filters.dateRange.to || now;
-    const start = filters.dateRange.from || new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    return { start, end };
-  };
-
   // Export functionality
   const exportToCSV = () => {
     const csvContent = [
-      ['Date', 'Content', 'Email', 'Sentiment', 'Page URL', 'User Agent'].join(','),
+      ['Date', 'Content', 'Email', 'Sentiment', 'Page URL'].join(','),
       ...filteredFeedbacks.map(f => [
         new Date(f.created_at).toLocaleDateString(),
         `"${f.content.replace(/"/g, '""')}"`,
         f.user_email || f.metadata?.email || '',
         f.sentiment || '',
-        f.metadata?.page_url || '',
-        f.metadata?.user_agent || ''
+        f.metadata?.page_url || ''
       ].join(','))
     ].join('\n');
 
@@ -321,14 +337,6 @@ export default function Feedback() {
     a.download = `feedback-export-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
-  };
-
-  // Get sentiment badge variant
-  const getSentimentBadgeVariant = (rating: number | null) => {
-    if (!rating) return 'secondary';
-    if (rating >= 4) return 'default';
-    if (rating <= 2) return 'destructive';
-    return 'secondary';
   };
 
   if (!user) {
@@ -427,40 +435,40 @@ export default function Feedback() {
                 {stats.averageRating > 0 ? stats.averageRating.toFixed(1) : 'N/A'}
               </div>
               <p className="text-xs text-muted-foreground">
-                Out of 5 stars
+                Based on sentiment
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Customer Satisfaction</CardTitle>
+              <CardTitle className="text-sm font-medium">Positive Feedback</CardTitle>
               <ThumbsUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.customerSatisfactionCount}</div>
+              <div className="text-2xl font-bold">{stats.ratingDistribution[5]}</div>
               <p className="text-xs text-muted-foreground">
-                Satisfaction surveys
+                Positive sentiment
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Product Feedback</CardTitle>
+              <CardTitle className="text-sm font-medium">Recent Feedback</CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.productFeedbackCount}</div>
+              <div className="text-2xl font-bold">{stats.recentFeedback.length}</div>
               <p className="text-xs text-muted-foreground">
-                Product feedback forms
+                Last 5 entries
               </p>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Filters */}
+      {/* Simple Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -469,38 +477,7 @@ export default function Feedback() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Form Type</label>
-              <Select value={filters.formType} onValueChange={(value) => setFilters(prev => ({ ...prev, formType: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="customer_satisfaction">Customer Satisfaction</SelectItem>
-                  <SelectItem value="product_feedback">Product Feedback</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Rating</label>
-              <Select value={filters.rating} onValueChange={(value) => setFilters(prev => ({ ...prev, rating: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Ratings" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Ratings</SelectItem>
-                  <SelectItem value="5">5 Stars</SelectItem>
-                  <SelectItem value="4">4 Stars</SelectItem>
-                  <SelectItem value="3">3 Stars</SelectItem>
-                  <SelectItem value="2">2 Stars</SelectItem>
-                  <SelectItem value="1">1 Star</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Date Range</label>
               <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
@@ -566,11 +543,8 @@ export default function Feedback() {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <LineChart className="h-5 w-5" />
-              <span>Feedback Volume Over Time</span>
+              <span>Feedback Volume (Last 30 Days)</span>
             </CardTitle>
-            <CardDescription>
-              Daily feedback count for the selected period
-            </CardDescription>
           </CardHeader>
           <CardContent>
             {chartData.length > 0 ? (
@@ -600,42 +574,43 @@ export default function Feedback() {
               <div className="flex items-center justify-center h-64 text-gray-500">
                 <div className="text-center">
                   <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                  <p>No volume data available</p>
+                  <p>No data available</p>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Rating Distribution */}
+        {/* Sentiment Distribution */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <PieChart className="h-5 w-5" />
-              <span>Rating Distribution</span>
+              <BarChart3 className="h-5 w-5" />
+              <span>Sentiment Distribution</span>
             </CardTitle>
-            <CardDescription>
-              Distribution of star ratings
-            </CardDescription>
           </CardHeader>
           <CardContent>
-            {stats && stats.ratingDistribution && Object.values(stats.ratingDistribution).some(count => count > 0) ? (
+            {stats && Object.values(stats.ratingDistribution).some(count => count > 0) ? (
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsPieChart>
                   <Pie
-                    data={Object.entries(stats.ratingDistribution).map(([rating, count]) => ({
-                      name: `${rating} Star${rating !== '1' ? 's' : ''}`,
-                      value: count,
-                      rating: parseInt(rating)
-                    }))}
+                    data={[
+                      { name: 'Positive', value: stats.ratingDistribution[5], color: '#10b981' },
+                      { name: 'Neutral', value: stats.ratingDistribution[3], color: '#f59e0b' },
+                      { name: 'Negative', value: stats.ratingDistribution[1], color: '#ef4444' }
+                    ].filter(item => item.value > 0)}
                     cx="50%"
                     cy="50%"
                     outerRadius={80}
                     dataKey="value"
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
-                    {Object.entries(stats.ratingDistribution).map(([rating, count], index) => (
-                      <Cell key={`cell-${index}`} fill={`hsl(${120 + (parseInt(rating) - 1) * 20}, 70%, 50%)`} />
+                    {[
+                      { name: 'Positive', value: stats.ratingDistribution[5], color: '#10b981' },
+                      { name: 'Neutral', value: stats.ratingDistribution[3], color: '#f59e0b' },
+                      { name: 'Negative', value: stats.ratingDistribution[1], color: '#ef4444' }
+                    ].filter(item => item.value > 0).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -645,7 +620,7 @@ export default function Feedback() {
               <div className="flex items-center justify-center h-64 text-gray-500">
                 <div className="text-center">
                   <Star className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                  <p>No rating data available</p>
+                  <p>No data available</p>
                 </div>
               </div>
             )}
@@ -671,11 +646,11 @@ export default function Feedback() {
                 <div key={feedback.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center space-x-2">
-                      <Badge variant="secondary">
-                        Product Feedback
-                      </Badge>
                       {feedback.sentiment && (
-                        <Badge variant={feedback.sentiment === 'positive' ? 'default' : feedback.sentiment === 'negative' ? 'destructive' : 'secondary'}>
+                        <Badge variant={
+                          feedback.sentiment === 'positive' ? 'default' : 
+                          feedback.sentiment === 'negative' ? 'destructive' : 'secondary'
+                        }>
                           {feedback.sentiment}
                         </Badge>
                       )}
@@ -692,9 +667,6 @@ export default function Feedback() {
                     )}
                     {feedback.metadata?.page_url && (
                       <span>Page: {feedback.metadata.page_url}</span>
-                    )}
-                    {feedback.metadata?.user_agent && (
-                      <span>Browser: {feedback.metadata.user_agent}</span>
                     )}
                   </div>
                 </div>
@@ -737,12 +709,12 @@ export default function Feedback() {
                 No feedback found
               </h3>
               <p className="text-gray-600 mb-4">
-                {filters.formType !== 'all' || filters.rating !== 'all' || filters.searchQuery || filters.dateRange.from || filters.dateRange.to
+                {filters.searchQuery || filters.dateRange.from || filters.dateRange.to
                   ? 'Try adjusting your filters to see more results.'
                   : 'Start collecting feedback through your widget to see insights and analytics.'
                 }
               </p>
-              {(filters.formType !== 'all' || filters.rating !== 'all' || filters.searchQuery || filters.dateRange.from || filters.dateRange.to) && (
+              {(filters.searchQuery || filters.dateRange.from || filters.dateRange.to) && (
                 <Button 
                   variant="outline" 
                   onClick={() => setFilters({
