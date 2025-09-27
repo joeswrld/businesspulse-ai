@@ -35,35 +35,61 @@ const CSATForm: React.FC = () => {
   }, [projectId]);
 
   const validateProject = async () => {
-    if (!projectId) return;
-    setIsValidating(true);
+  if (!projectId) {
+    setValidationError('No project ID provided in URL');
+    setIsValid(false);
+    setIsValidating(false);
+    return;
+  }
 
-    try {
-      // Validate projectId and get internal UUID from feedback_settings
-      const { data, error } = await supabase
-        .from('feedback_settings')
-        .select('id, project_id')
-        .eq('project_id', projectId)
-        .maybeSingle();
+  setIsValidating(true);
+  console.log('Validating project ID:', projectId); // Debug log
 
-      if (error) throw error;
+  try {
+    // First, check if feedback_settings table has any data
+    const { data: allSettings, error: debugError } = await supabase
+      .from('feedback_settings')
+      .select('id, project_id, user_id')
+      .limit(10);
 
-      if (data) {
-        setProjectRecord({ project_id: data.id }); // Use internal UUID
-        setIsValid(true);
-        setValidationError('');
-      } else {
-        setIsValid(false);
-        setValidationError('This project link is invalid or expired.');
-      }
-    } catch (err) {
-      console.error('Error validating project:', err);
-      setIsValid(false);
-      setValidationError('This project link is invalid or expired.');
-    } finally {
-      setIsValidating(false);
+    if (debugError) {
+      console.error('Debug query error:', debugError);
+    } else {
+      console.log('Available feedback_settings:', allSettings); // Debug log
     }
-  };
+
+    // Now try to find the specific project
+    const { data, error } = await supabase
+      .from('feedback_settings')
+      .select('id, project_id')
+      .eq('project_id', projectId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Validation error:', error);
+      throw error;
+    }
+
+    console.log('Project validation result:', data); // Debug log
+
+    if (data) {
+      setProjectRecord({ project_id: data.id }); // Use internal UUID
+      setIsValid(true);
+      setValidationError('');
+      console.log('✅ Project validated successfully'); // Debug log
+    } else {
+      setIsValid(false);
+      setValidationError(`Project "${projectId}" not found. Available projects: ${allSettings?.map(s => s.project_id).join(', ') || 'None'}`);
+      console.log('❌ Project not found'); // Debug log
+    }
+  } catch (err) {
+    console.error('Error validating project:', err);
+    setIsValid(false);
+    setValidationError('This project link is invalid or expired.');
+  } finally {
+    setIsValidating(false);
+  }
+};
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
