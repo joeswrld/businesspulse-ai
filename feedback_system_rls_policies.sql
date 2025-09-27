@@ -1,62 +1,111 @@
 -- ============================================================================
--- FEEDBACK SYSTEM RLS POLICIES
+-- FEEDBACK SYSTEM RLS POLICIES - CLEAN VERSION
 -- ============================================================================
--- This file contains Row Level Security policies for the feedback system
--- to ensure users can only access their own data.
 
--- Enable RLS on all tables
+DO $$
+BEGIN
+    -- Add user_id to feedback_settings if missing
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'feedback_settings' 
+          AND column_name = 'user_id' 
+          AND table_schema = 'public'
+    ) THEN
+        ALTER TABLE public.feedback_settings 
+        ADD COLUMN user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE;
+
+        UPDATE public.feedback_settings fs
+        SET user_id = p.user_id
+        FROM public.projects p
+        WHERE p.id = fs.project_id;
+
+        ALTER TABLE public.feedback_settings 
+        ALTER COLUMN user_id SET NOT NULL;
+
+        RAISE NOTICE 'Added user_id column to feedback_settings';
+    END IF;
+
+    -- Add user_id to subscriptions if missing
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'subscriptions') THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'subscriptions' 
+              AND column_name = 'user_id'
+        ) THEN
+            ALTER TABLE public.subscriptions 
+            ADD COLUMN user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE;
+            RAISE NOTICE 'Added user_id column to subscriptions';
+        END IF;
+    END IF;
+
+    -- Add user_id to profiles if needed
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'profiles') THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'profiles' 
+              AND column_name = 'user_id'
+        ) THEN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'profiles' AND column_name = 'id'
+            ) THEN
+                RAISE NOTICE 'Profiles table uses id instead of user_id';
+            ELSE
+                ALTER TABLE public.profiles 
+                ADD COLUMN user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE;
+                RAISE NOTICE 'Added user_id column to profiles';
+            END IF;
+        END IF;
+    END IF;
+END $$;
+
+-- ============================================================================
+-- ENABLE RLS
+-- ============================================================================
 ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feedback_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================================
--- PROJECTS TABLE POLICIES
+-- PROJECTS POLICIES
 -- ============================================================================
-
--- Users can only view their own projects
 DROP POLICY IF EXISTS "Users can view own projects" ON public.projects;
 CREATE POLICY "Users can view own projects" ON public.projects
   FOR SELECT USING (user_id = auth.uid());
 
--- Users can only insert their own projects
 DROP POLICY IF EXISTS "Users can insert own projects" ON public.projects;
 CREATE POLICY "Users can insert own projects" ON public.projects
   FOR INSERT WITH CHECK (user_id = auth.uid());
 
--- Users can only update their own projects
 DROP POLICY IF EXISTS "Users can update own projects" ON public.projects;
 CREATE POLICY "Users can update own projects" ON public.projects
   FOR UPDATE USING (user_id = auth.uid());
 
--- Users can only delete their own projects
 DROP POLICY IF EXISTS "Users can delete own projects" ON public.projects;
 CREATE POLICY "Users can delete own projects" ON public.projects
   FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================================
--- FEEDBACK TABLE POLICIES
+-- FEEDBACK POLICIES
 -- ============================================================================
-
--- Users can only view feedback for their own projects
 DROP POLICY IF EXISTS "Users can view own feedback" ON public.feedback;
 CREATE POLICY "Users can view own feedback" ON public.feedback
   FOR SELECT USING (
     project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
   );
 
--- Anyone can insert feedback (for public forms)
 DROP POLICY IF EXISTS "Anyone can insert feedback" ON public.feedback;
 CREATE POLICY "Anyone can insert feedback" ON public.feedback
   FOR INSERT WITH CHECK (true);
 
--- Users can only update feedback for their own projects
 DROP POLICY IF EXISTS "Users can update own feedback" ON public.feedback;
 CREATE POLICY "Users can update own feedback" ON public.feedback
   FOR UPDATE USING (
     project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
   );
 
--- Users can only delete feedback for their own projects
 DROP POLICY IF EXISTS "Users can delete own feedback" ON public.feedback;
 CREATE POLICY "Users can delete own feedback" ON public.feedback
   FOR DELETE USING (
@@ -64,66 +113,42 @@ CREATE POLICY "Users can delete own feedback" ON public.feedback
   );
 
 -- ============================================================================
--- FEEDBACK_SETTINGS TABLE POLICIES
+-- FEEDBACK SETTINGS POLICIES
 -- ============================================================================
-
--- Users can only view settings for their own projects
 DROP POLICY IF EXISTS "Users can view own settings" ON public.feedback_settings;
 CREATE POLICY "Users can view own settings" ON public.feedback_settings
-  FOR SELECT USING (
-    project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
-  );
+  FOR SELECT USING (user_id = auth.uid());
 
--- Users can only insert settings for their own projects
 DROP POLICY IF EXISTS "Users can insert own settings" ON public.feedback_settings;
 CREATE POLICY "Users can insert own settings" ON public.feedback_settings
-  FOR INSERT WITH CHECK (
-    user_id = auth.uid() AND
-    project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
-  );
+  FOR INSERT WITH CHECK (user_id = auth.uid());
 
--- Users can only update settings for their own projects
 DROP POLICY IF EXISTS "Users can update own settings" ON public.feedback_settings;
 CREATE POLICY "Users can update own settings" ON public.feedback_settings
-  FOR UPDATE USING (
-    user_id = auth.uid() AND
-    project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
-  );
+  FOR UPDATE USING (user_id = auth.uid());
 
--- Users can only delete settings for their own projects
 DROP POLICY IF EXISTS "Users can delete own settings" ON public.feedback_settings;
 CREATE POLICY "Users can delete own settings" ON public.feedback_settings
-  FOR DELETE USING (
-    user_id = auth.uid() AND
-    project_id IN (SELECT id FROM public.projects WHERE user_id = auth.uid())
-  );
+  FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================================
--- SUBSCRIPTIONS TABLE POLICIES (if not already exists)
+-- SUBSCRIPTIONS POLICIES
 -- ============================================================================
-
--- Enable RLS on subscriptions table if it exists
 DO $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'subscriptions' AND table_schema = 'public') THEN
-        ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
-        
-        -- Users can only view their own subscriptions
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'subscriptions') THEN
         DROP POLICY IF EXISTS "Users can view own subscriptions" ON public.subscriptions;
         CREATE POLICY "Users can view own subscriptions" ON public.subscriptions
           FOR SELECT USING (user_id = auth.uid());
-        
-        -- Users can only insert their own subscriptions
+
         DROP POLICY IF EXISTS "Users can insert own subscriptions" ON public.subscriptions;
         CREATE POLICY "Users can insert own subscriptions" ON public.subscriptions
           FOR INSERT WITH CHECK (user_id = auth.uid());
-        
-        -- Users can only update their own subscriptions
+
         DROP POLICY IF EXISTS "Users can update own subscriptions" ON public.subscriptions;
         CREATE POLICY "Users can update own subscriptions" ON public.subscriptions
           FOR UPDATE USING (user_id = auth.uid());
-        
-        -- Users can only delete their own subscriptions
+
         DROP POLICY IF EXISTS "Users can delete own subscriptions" ON public.subscriptions;
         CREATE POLICY "Users can delete own subscriptions" ON public.subscriptions
           FOR DELETE USING (user_id = auth.uid());
@@ -131,62 +156,85 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- PROFILES TABLE POLICIES (if not already exists)
+-- PROFILES POLICIES
 -- ============================================================================
-
--- Enable RLS on profiles table if it exists
 DO $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'profiles' AND table_schema = 'public') THEN
-        ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-        
-        -- Users can only view their own profile
-        DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
-        CREATE POLICY "Users can view own profile" ON public.profiles
-          FOR SELECT USING (user_id = auth.uid());
-        
-        -- Users can only insert their own profile
-        DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
-        CREATE POLICY "Users can insert own profile" ON public.profiles
-          FOR INSERT WITH CHECK (user_id = auth.uid());
-        
-        -- Users can only update their own profile
-        DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
-        CREATE POLICY "Users can update own profile" ON public.profiles
-          FOR UPDATE USING (user_id = auth.uid());
-        
-        -- Users can only delete their own profile
-        DROP POLICY IF EXISTS "Users can delete own profile" ON public.profiles;
-        CREATE POLICY "Users can delete own profile" ON public.profiles
-          FOR DELETE USING (user_id = auth.uid());
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'profiles') THEN
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'profiles' AND column_name = 'user_id'
+        ) THEN
+            -- Profiles table uses user_id
+            DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+            CREATE POLICY "Users can view own profile" ON public.profiles
+              FOR SELECT USING (user_id = auth.uid());
+
+            DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+            CREATE POLICY "Users can insert own profile" ON public.profiles
+              FOR INSERT WITH CHECK (user_id = auth.uid());
+
+            DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+            CREATE POLICY "Users can update own profile" ON public.profiles
+              FOR UPDATE USING (user_id = auth.uid());
+
+            DROP POLICY IF EXISTS "Users can delete own profile" ON public.profiles;
+            CREATE POLICY "Users can delete own profile" ON public.profiles
+              FOR DELETE USING (user_id = auth.uid());
+        ELSE
+            -- Profiles table uses id
+            DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+            CREATE POLICY "Users can view own profile" ON public.profiles
+              FOR SELECT USING (id = auth.uid());
+
+            DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+            CREATE POLICY "Users can insert own profile" ON public.profiles
+              FOR INSERT WITH CHECK (id = auth.uid());
+
+            DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+            CREATE POLICY "Users can update own profile" ON public.profiles
+              FOR UPDATE USING (id = auth.uid());
+
+            DROP POLICY IF EXISTS "Users can delete own profile" ON public.profiles;
+            CREATE POLICY "Users can delete own profile" ON public.profiles
+              FOR DELETE USING (id = auth.uid());
+        END IF;
     END IF;
 END $$;
 
 -- ============================================================================
--- VERIFICATION QUERIES
+-- INDEXES FOR PERFORMANCE
 -- ============================================================================
+CREATE INDEX IF NOT EXISTS idx_projects_user_id ON public.projects(user_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_project_id ON public.feedback(project_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_settings_user_id ON public.feedback_settings(user_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_settings_project_id ON public.feedback_settings(project_id);
 
--- Verify RLS is enabled
-SELECT 
-    schemaname,
-    tablename,
-    rowsecurity as rls_enabled
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'subscriptions') THEN
+        CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON public.subscriptions(user_id);
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'profiles') THEN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'user_id') THEN
+            CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON public.profiles(user_id);
+        ELSE
+            CREATE INDEX IF NOT EXISTS idx_profiles_id ON public.profiles(id);
+        END IF;
+    END IF;
+END $$;
+
+-- ============================================================================
+-- VERIFICATION
+-- ============================================================================
+SELECT schemaname, tablename, rowsecurity 
 FROM pg_tables 
 WHERE schemaname = 'public' 
-  AND tablename IN ('projects', 'feedback', 'feedback_settings', 'subscriptions', 'profiles')
-ORDER BY tablename;
+  AND tablename IN ('projects','feedback','feedback_settings','subscriptions','profiles');
 
--- Verify policies exist
-SELECT 
-    schemaname,
-    tablename,
-    policyname,
-    permissive,
-    roles,
-    cmd,
-    qual,
-    with_check
+SELECT schemaname, tablename, policyname, cmd, qual, with_check 
 FROM pg_policies 
 WHERE schemaname = 'public' 
-  AND tablename IN ('projects', 'feedback', 'feedback_settings', 'subscriptions', 'profiles')
+  AND tablename IN ('projects','feedback','feedback_settings','subscriptions','profiles')
 ORDER BY tablename, policyname;
