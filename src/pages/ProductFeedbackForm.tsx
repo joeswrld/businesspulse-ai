@@ -76,14 +76,14 @@ const ProductFeedbackForm: React.FC = () => {
     try {
       // Debug: Check what projects exist
       const { data: allProjects } = await supabase
-        .from('projects')
+        .from('feedback_settings')
         .select('id, project_id');
       
       console.log('📋 Available projects:', allProjects?.map(p => p.project_id));
 
       // Try to find the specific project by project_id (text field)
       const { data, error } = await supabase
-        .from('projects')
+        .from('feedback_settings')
         .select('id, project_id')
         .eq('project_id', projectId)
         .maybeSingle();
@@ -158,7 +158,7 @@ ${feedback}`;
 
       // ✅ FIXED: Use correct table name and column names
       const { error } = await supabase
-        .from("feedbacks")
+        .from("feedback")
         .insert([
           {
             project_id: projectRecord.id,     // Internal UUID
