@@ -3,96 +3,123 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle, AlertCircle, Star, MessageSquare } from 'lucide-react';
 
-interface ProjectRecord {
-  project_id: string;
+interface CustomerSatisfactionFormProps {
+  projectId?: string;
+  previewMode?: boolean;
+  onSubmitted?: (data: any) => void;
 }
 
-const CSATForm: React.FC = () => {
-  const { projectId } = useParams<{ projectId: string }>();
+interface FeedbackSettings {
+  id: string;
+  project_id: string;
+  widget_title: string;
+  widget_color: string;
+  greeting_text: string;
+  customer_satisfaction_enabled: boolean;
+}
+
+const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
+  projectId: propProjectId,
+  previewMode = false,
+  onSubmitted
+}) => {
+  const { projectId: urlProjectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [isValidating, setIsValidating] = useState(true);
-  const [isValid, setIsValid] = useState(false);
-  const [projectRecord, setProjectRecord] = useState<ProjectRecord | null>(null);
+  const projectId = propProjectId || urlProjectId;
+
+  const [isValidating, setIsValidating] = useState(!previewMode);
+  const [isValid, setIsValid] = useState(previewMode);
+  const [settings, setSettings] = useState<FeedbackSettings | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
 
-  const [rating, setRating] = useState<string>('');
+  const [rating, setRating] = useState<number | null>(null);
   const [email, setEmail] = useState('');
   const [comments, setComments] = useState('');
 
   useEffect(() => {
-    if (projectId) validateProject();
-  }, [projectId]);
+    if (projectId && !previewMode) {
+      validateProject();
+    } else if (previewMode) {
+      // For preview mode, set dummy settings
+      setSettings({
+        id: 'preview',
+        project_id: projectId || 'preview',
+        widget_title: 'Customer Satisfaction Survey',
+        widget_color: '#3B82F6',
+        greeting_text: 'How satisfied are you with our service?',
+        customer_satisfaction_enabled: true
+      });
+    }
+  }, [projectId, previewMode]);
 
   const validateProject = async () => {
-  if (!projectId) {
-    setValidationError('No project ID provided in URL');
-    setIsValid(false);
-    setIsValidating(false);
-    return;
-  }
-
-  setIsValidating(true);
-  console.log('Validating project ID:', projectId); // Debug log
-
-  try {
-    // First, check if projects table has any data
-    const { data: allProjects, error: debugError } = await supabase
-      .from('feedback_settings')
-      .select('id, project_id')
-      .limit(10);
-
-    if (debugError) {
-      console.error('Debug query error:', debugError);
-    } else {
-      console.log('Available projects:', allProjects); // Debug log
-    }
-
-    // Now try to find the specific project by project_id (text field)
-    const { data, error } = await supabase
-      .from('feedback_settings')
-      .select('id, project_id')
-      .eq('project_id', projectId)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Validation error:', error);
-      throw error;
-    }
-
-    console.log('Project validation result:', data); // Debug log
-
-    if (data) {
-      setProjectRecord({ project_id: data.id }); // Use internal UUID
-      setIsValid(true);
-      setValidationError('');
-      console.log('✅ Project validated successfully'); // Debug log
-    } else {
+    if (!projectId) {
+      setValidationError('No project ID provided in URL');
       setIsValid(false);
-      setValidationError(`Project "${projectId}" not found. Available projects: ${allProjects?.map(p => p.project_id).join(', ') || 'None'}`);
-      console.log('❌ Project not found'); // Debug log
+      setIsValidating(false);
+      return;
     }
-  } catch (err) {
-    console.error('Error validating project:', err);
-    setIsValid(false);
-    setValidationError('This project link is invalid or expired.');
-  } finally {
-    setIsValidating(false);
-  }
-};
+
+    setIsValidating(true);
+    console.log('Validating project ID:', projectId);
+
+    try {
+      const { data, error } = await supabase
+        .from('feedback_settings')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('customer_satisfaction_enabled', true)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Validation error:', error);
+        throw error;
+      }
+
+      if (data) {
+        setSettings(data);
+        setIsValid(true);
+        setValidationError('');
+        console.log('✅ Project validated successfully');
+      } else {
+        setIsValid(false);
+        setValidationError(`Customer satisfaction survey is not enabled for this project.`);
+        console.log('❌ Project not found or survey disabled');
+      }
+    } catch (err) {
+      console.error('Error validating project:', err);
+      setIsValid(false);
+      setValidationError('This project link is invalid or expired.');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleRatingClick = (selectedRating: number) => {
+    setRating(selectedRating);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (previewMode) {
+      toast({
+        title: 'Preview Mode',
+        description: 'This is a preview. Feedback will not be submitted.',
+        variant: 'default'
+      });
+      return;
+    }
 
     if (!rating) {
       toast({
@@ -103,10 +130,10 @@ const CSATForm: React.FC = () => {
       return;
     }
 
-    if (!projectRecord?.project_id) {
+    if (!settings?.id) {
       toast({
         title: 'Invalid Project',
-        description: 'Cannot submit feedback for this project. Please check your project link.',
+        description: 'Cannot submit feedback for this project.',
         variant: 'destructive'
       });
       return;
@@ -115,25 +142,33 @@ const CSATForm: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const message = `CSAT Rating: ${rating}/5${comments ? `\n\nComments: ${comments}` : ''}`;
+      // Get the project's internal UUID for the feedback table
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('project_id', projectId)
+        .single();
 
-      // ✅ FIXED: Use correct table name and column names
+      if (projectError || !projectData) {
+        throw new Error('Project not found');
+      }
+
+      const feedbackData = {
+        project_id: projectData.id,
+        form_type: 'customer_satisfaction',
+        message: comments.trim() || `Customer satisfaction rating: ${rating}/5`,
+        rating: rating,
+        metadata: {
+          email: email.trim() || null,
+          page_url: window.location.href,
+          user_agent: navigator.userAgent,
+          timestamp: new Date().toISOString()
+        }
+      };
+
       const { error } = await supabase
         .from('feedback')
-        .insert([
-          {
-            project_id: projectRecord.project_id, // Internal UUID
-            user_email: email?.trim() || null,    // Correct column name
-            content: message,                     // Correct column name
-            sentiment: null,                      // Sentiment column (nullable)
-            metadata: {                           // Add metadata
-              form_type: 'csat',
-              rating: parseInt(rating),
-              page_url: window.location.href,
-              timestamp: new Date().toISOString()
-            }
-          }
-        ]);
+        .insert([feedbackData]);
 
       if (error) {
         console.error('Error submitting feedback:', error);
@@ -141,8 +176,6 @@ const CSATForm: React.FC = () => {
         let errorMessage = 'Failed to submit feedback.';
         if (error.code === '23503') {
           errorMessage = 'Invalid project reference. Please check your project link.';
-        } else if (error.code === '23505') {
-          errorMessage = 'Duplicate feedback detected. Please try again.';
         } else if (error.message) {
           errorMessage = error.message;
         }
@@ -156,6 +189,9 @@ const CSATForm: React.FC = () => {
       }
 
       setIsSubmitted(true);
+      if (onSubmitted) {
+        onSubmitted(feedbackData);
+      }
       toast({
         title: 'Thank you!',
         description: 'Your feedback has been submitted successfully.'
@@ -175,19 +211,21 @@ const CSATForm: React.FC = () => {
   if (isValidating) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <p className="text-muted-foreground mt-4">Validating project...</p>
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading survey...</p>
+        </div>
       </div>
     );
   }
 
-  if (!isValid) {
+  if (!isValid && !previewMode) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <CardTitle className="text-xl">Invalid or Expired Link</CardTitle>
+            <CardTitle className="text-xl">Survey Not Available</CardTitle>
             <CardDescription>{validationError}</CardDescription>
           </CardHeader>
           <CardContent>
@@ -200,18 +238,18 @@ const CSATForm: React.FC = () => {
     );
   }
 
-  if (isSubmitted) {
+  if (isSubmitted && !previewMode) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
             <CardTitle className="text-xl">Thank you for your feedback! 🎉</CardTitle>
-            <CardDescription>Your response was recorded successfully.</CardDescription>
+            <CardDescription>Your satisfaction rating has been recorded.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={() => window.close()} className="w-full">
-              Close Tab
+              Close
             </Button>
           </CardContent>
         </Card>
@@ -219,43 +257,72 @@ const CSATForm: React.FC = () => {
     );
   }
 
+  const containerClass = previewMode 
+    ? "w-full" 
+    : "min-h-screen bg-background flex items-center justify-center p-4";
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className={containerClass}>
       <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center mb-4">
-            <MessageSquare className="h-8 w-8 text-primary mr-2" />
-            <CardTitle className="text-2xl">Customer Satisfaction Survey</CardTitle>
+            <MessageSquare 
+              className="h-8 w-8 mr-2" 
+              style={{ color: settings?.widget_color || '#3B82F6' }}
+            />
+            <CardTitle className="text-2xl">
+              {settings?.widget_title || 'Customer Satisfaction Survey'}
+            </CardTitle>
           </div>
-          <CardDescription>Help us improve by sharing your experience</CardDescription>
+          <CardDescription>
+            {settings?.greeting_text || 'How satisfied are you with our service?'}
+          </CardDescription>
+          {previewMode && (
+            <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
+              Preview Mode - Form will not submit
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
-              <Label className="text-base font-medium">How satisfied are you with our service? *</Label>
-              <RadioGroup value={rating} onValueChange={setRating} className="flex justify-center">
+              <Label className="text-base font-medium">
+                How satisfied are you with our service? *
+              </Label>
+              <div className="flex justify-center">
                 <div className="flex space-x-2">
                   {[1, 2, 3, 4, 5].map((value) => (
-                    <div key={value} className="flex flex-col items-center">
-                      <Label
-                        htmlFor={`rating-${value}`}
-                        className="flex flex-col items-center cursor-pointer hover:opacity-80 transition-opacity"
-                      >
-                        <RadioGroupItem value={value.toString()} id={`rating-${value}`} className="sr-only" />
-                        <div className={`w-12 h-12 rounded-full border-2 border-muted-foreground/25 flex items-center justify-center hover:border-primary transition-colors`}>
-                          <Star
-                            className={`h-6 w-6 ${
-                              rating && parseInt(rating) >= value ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'
-                            }`}
-                          />
-                        </div>
-                        <span className="text-sm text-muted-foreground mt-1">{value}</span>
-                      </Label>
-                    </div>
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => handleRatingClick(value)}
+                      className="flex flex-col items-center cursor-pointer hover:opacity-80 transition-all p-2 rounded-lg hover:bg-gray-50"
+                    >
+                      <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        rating && rating >= value 
+                          ? `border-2` 
+                          : 'border-gray-300'
+                      }`} style={{
+                        borderColor: rating && rating >= value ? settings?.widget_color || '#3B82F6' : undefined,
+                        backgroundColor: rating && rating >= value ? `${settings?.widget_color || '#3B82F6'}15` : undefined
+                      }}>
+                        <Star
+                          className={`h-6 w-6 transition-colors ${
+                            rating && rating >= value 
+                              ? 'fill-current' 
+                              : 'text-gray-400'
+                          }`}
+                          style={{ 
+                            color: rating && rating >= value ? settings?.widget_color || '#3B82F6' : undefined 
+                          }}
+                        />
+                      </div>
+                      <span className="text-sm text-muted-foreground mt-1">{value}</span>
+                    </button>
                   ))}
                 </div>
-              </RadioGroup>
-              <div className="flex justify-between text-xs text-muted-foreground">
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground px-4">
                 <span>Very Dissatisfied</span>
                 <span>Very Satisfied</span>
               </div>
@@ -270,6 +337,9 @@ const CSATForm: React.FC = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">
+                We'll only use this to follow up if needed
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -284,11 +354,24 @@ const CSATForm: React.FC = () => {
               />
             </div>
 
-            <Button type="submit" disabled={!rating || isSubmitting} className="w-full" size="lg">
+            <Button 
+              type="submit" 
+              disabled={!rating || isSubmitting || previewMode} 
+              className="w-full" 
+              size="lg"
+              style={{ 
+                backgroundColor: !rating || isSubmitting || previewMode 
+                  ? undefined 
+                  : settings?.widget_color || '#3B82F6' 
+              }}
+            >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Submitting...
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Submitting...
                 </>
+              ) : previewMode ? (
+                'Preview Mode - Cannot Submit'
               ) : (
                 'Submit Feedback'
               )}
@@ -300,4 +383,4 @@ const CSATForm: React.FC = () => {
   );
 };
 
-export default CSATForm;
+export default CustomerSatisfactionForm;
