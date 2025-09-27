@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -25,7 +26,10 @@ import {
   AlertCircle,
   CheckCircle,
   ExternalLink,
-  Code
+  Code,
+  Plus,
+  Upload,
+  X
 } from 'lucide-react';
 
 // Types
@@ -43,8 +47,8 @@ interface Project {
   id: string;
   name: string;
   user_id: string;
-  project_id: string;
-  settings?: any;
+  logo_url?: string;
+  created_at: string;
 }
 
 export default function FeedbackSettings() {
@@ -57,16 +61,21 @@ export default function FeedbackSettings() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+  
+  // Create Project Modal State
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectLogo, setNewProjectLogo] = useState<File | null>(null);
+  const [creating, setCreating] = useState(false);
 
-  // Load user projects and settings
-  const loadData = useCallback(async () => {
+  // Load user projects
+  const loadProjects = useCallback(async () => {
     if (!user) return;
 
     try {
       setLoading(true);
       setError(null);
 
-      // Check if projects table exists
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('*')
@@ -78,172 +87,215 @@ export default function FeedbackSettings() {
         
         // Handle case where projects table doesn't exist
         if (projectsError.code === '42P01' || projectsError.message?.includes('relation "projects" does not exist')) {
-          console.log('Projects table does not exist, creating fallback project');
-          
-          // Create a fallback project structure
-          const fallbackProject: Project = {
-            id: `fallback-${user.id}`,
-            name: 'My Project',
-            user_id: user.id,
-            project_id: `proj-${Date.now()}`,
-            settings: {
-              widget_title: 'We love your feedback!',
-              widget_color: '#3B82F6',
-              greeting_text: 'Help us improve by sharing your thoughts'
-            }
-          };
-          
-          setProjects([fallbackProject]);
-          setSelectedProject(fallbackProject.id);
-          
-          const feedbackSettings: FeedbackSettings = {
-            id: fallbackProject.id,
-            user_id: fallbackProject.user_id,
-            project_id: fallbackProject.project_id,
-            widget_title: fallbackProject.settings.widget_title,
-            widget_color: fallbackProject.settings.widget_color,
-            greeting_text: fallbackProject.settings.greeting_text,
-            created_at: new Date().toISOString()
-          };
-          setSettings(feedbackSettings);
+          console.log('Projects table does not exist');
+          setProjects([]);
           return;
         }
         throw projectsError;
       }
 
-      let currentProjects = projectsData || [];
-
-      // If no projects exist, create a default project
-      if (currentProjects.length === 0) {
-        const defaultProject = {
-          user_id: user.id,
-          name: 'My Project',
-          project_id: `proj-${Date.now()}`,
-          settings: {
-            widget_title: 'We love your feedback!',
-            widget_color: '#3B82F6',
-            greeting_text: 'Help us improve by sharing your thoughts'
-          }
-        };
-
-        try {
-          const { data: newProject, error: createProjectError } = await supabase
-            .from('projects')
-            .insert(defaultProject)
-            .select()
-            .single();
-
-          if (createProjectError) {
-            console.error('Error creating default project:', createProjectError);
-            throw createProjectError;
-          }
-
-          currentProjects = [newProject];
-        } catch (createError) {
-          console.error('Failed to create project, using fallback:', createError);
-          // Use fallback project if creation fails
-          const fallbackProject: Project = {
-            id: `fallback-${user.id}`,
-            name: 'My Project',
-            user_id: user.id,
-            project_id: `proj-${Date.now()}`,
-            settings: defaultProject.settings
-          };
-          currentProjects = [fallbackProject];
-        }
-      }
-
+      const currentProjects = projectsData || [];
       setProjects(currentProjects);
 
-      if (currentProjects.length > 0) {
-        const firstProject = currentProjects[0];
-        setSelectedProject(firstProject.id);
-
-        // Extract settings from project
-        const projectSettings = firstProject.settings || {};
-        const feedbackSettings: FeedbackSettings = {
-          id: firstProject.id,
-          user_id: firstProject.user_id,
-          project_id: firstProject.project_id || firstProject.id,
-          widget_title: projectSettings.widget_title || 'We love your feedback!',
-          widget_color: projectSettings.widget_color || '#3B82F6',
-          greeting_text: projectSettings.greeting_text || 'Help us improve by sharing your thoughts',
-          created_at: new Date().toISOString()
-        };
-        setSettings(feedbackSettings);
+      // Auto-select first project if available
+      if (currentProjects.length > 0 && !selectedProject) {
+        setSelectedProject(currentProjects[0].id);
       }
 
     } catch (error) {
-      console.error('Error loading data:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred while loading data');
+      console.error('Error loading projects:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred while loading projects');
     } finally {
       setLoading(false);
+    }
+  }, [user, selectedProject]);
+
+  // Load feedback settings for selected project
+  const loadFeedbackSettings = useCallback(async (projectId: string) => {
+    if (!user || !projectId) return;
+
+    try {
+      // Try to load existing settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('feedback_settings')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (settingsError && settingsError.code !== 'PGRST116') {
+        console.error('Error loading settings:', settingsError);
+        
+        // Handle case where feedback_settings table doesn't exist
+        if (settingsError.code === '42P01' || settingsError.message?.includes('relation "feedback_settings" does not exist')) {
+          console.log('feedback_settings table does not exist, creating fallback');
+          const fallbackSettings: FeedbackSettings = {
+            id: `fallback-${projectId}`,
+            user_id: user.id,
+            project_id: projectId,
+            widget_title: 'We love your feedback!',
+            widget_color: '#3B82F6',
+            greeting_text: 'Help us improve by sharing your thoughts',
+            created_at: new Date().toISOString()
+          };
+          setSettings(fallbackSettings);
+          return;
+        }
+      }
+
+      if (settingsData) {
+        setSettings(settingsData);
+      } else {
+        // Create default settings if none exist
+        const defaultSettings = {
+          project_id: projectId,
+          user_id: user.id,
+          widget_title: 'We love your feedback!',
+          widget_color: '#3B82F6',
+          greeting_text: 'Help us improve by sharing your thoughts'
+        };
+
+        try {
+          const { data: newSettings, error: createError } = await supabase
+            .from('feedback_settings')
+            .insert(defaultSettings)
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('Error creating default settings:', createError);
+            // Use fallback settings
+            const fallbackSettings: FeedbackSettings = {
+              id: `fallback-${projectId}`,
+              user_id: user.id,
+              project_id: projectId,
+              widget_title: defaultSettings.widget_title,
+              widget_color: defaultSettings.widget_color,
+              greeting_text: defaultSettings.greeting_text,
+              created_at: new Date().toISOString()
+            };
+            setSettings(fallbackSettings);
+          } else {
+            setSettings(newSettings);
+          }
+        } catch (createError) {
+          console.error('Failed to create settings, using fallback:', createError);
+          const fallbackSettings: FeedbackSettings = {
+            id: `fallback-${projectId}`,
+            user_id: user.id,
+            project_id: projectId,
+            widget_title: defaultSettings.widget_title,
+            widget_color: defaultSettings.widget_color,
+            greeting_text: defaultSettings.greeting_text,
+            created_at: new Date().toISOString()
+          };
+          setSettings(fallbackSettings);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading feedback settings:', error);
+      toast.error('Failed to load settings for this project');
     }
   }, [user]);
 
   // Load data on component mount
   useEffect(() => {
     if (user) {
-      loadData();
+      loadProjects();
     }
-  }, [loadData, user]);
+  }, [loadProjects, user]);
 
   // Load settings when project changes
   useEffect(() => {
     if (selectedProject && user) {
-      loadProjectSettings(selectedProject);
+      loadFeedbackSettings(selectedProject);
     }
-  }, [selectedProject, user]);
+  }, [selectedProject, loadFeedbackSettings, user]);
 
-  const loadProjectSettings = async (projectId: string) => {
-    const project = projects.find(p => p.id === projectId);
-    if (!project) return;
+  // Create new project
+  const createProject = async () => {
+    if (!user || !newProjectName.trim()) {
+      toast.error('Project name is required');
+      return;
+    }
 
     try {
-      // If it's a fallback project, just use its settings
-      if (projectId.startsWith('fallback-')) {
-        const projectSettings = project.settings || {};
-        const feedbackSettings: FeedbackSettings = {
-          id: project.id,
-          user_id: project.user_id,
-          project_id: project.project_id,
-          widget_title: projectSettings.widget_title || 'We love your feedback!',
-          widget_color: projectSettings.widget_color || '#3B82F6',
-          greeting_text: projectSettings.greeting_text || 'Help us improve by sharing your thoughts',
-          created_at: new Date().toISOString()
-        };
-        setSettings(feedbackSettings);
-        return;
+      setCreating(true);
+
+      let logoUrl = null;
+      
+      // Upload logo if provided
+      if (newProjectLogo) {
+        const fileExt = newProjectLogo.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('project-logos')
+          .upload(fileName, newProjectLogo);
+
+        if (uploadError) {
+          console.error('Error uploading logo:', uploadError);
+          toast.error('Failed to upload logo, but project will be created without it');
+        } else {
+          const { data: { publicUrl } } = supabase.storage
+            .from('project-logos')
+            .getPublicUrl(fileName);
+          logoUrl = publicUrl;
+        }
       }
 
-      // For real projects, load from database
-      const { data: projectData, error: projectError } = await supabase
+      // Create project
+      const projectData = {
+        user_id: user.id,
+        name: newProjectName.trim(),
+        logo_url: logoUrl
+      };
+
+      const { data: newProject, error: projectError } = await supabase
         .from('projects')
-        .select('*')
-        .eq('id', projectId)
+        .insert(projectData)
+        .select()
         .single();
 
-      if (projectError && projectError.code !== 'PGRST116') {
-        console.error('Error loading project:', projectError);
-        return;
+      if (projectError) {
+        console.error('Error creating project:', projectError);
+        throw projectError;
       }
 
-      if (projectData) {
-        const projectSettings = projectData.settings || {};
-        const feedbackSettings: FeedbackSettings = {
-          id: projectData.id,
-          user_id: projectData.user_id,
-          project_id: projectData.project_id || projectData.id,
-          widget_title: projectSettings.widget_title || 'We love your feedback!',
-          widget_color: projectSettings.widget_color || '#3B82F6',
-          greeting_text: projectSettings.greeting_text || 'Help us improve by sharing your thoughts',
-          created_at: new Date().toISOString()
-        };
-        setSettings(feedbackSettings);
+      // Create default feedback settings for the new project
+      const defaultSettings = {
+        project_id: newProject.id,
+        user_id: user.id,
+        widget_title: 'We love your feedback!',
+        widget_color: '#3B82F6',
+        greeting_text: 'Help us improve by sharing your thoughts'
+      };
+
+      try {
+        await supabase
+          .from('feedback_settings')
+          .insert(defaultSettings);
+      } catch (settingsError) {
+        console.error('Error creating default settings:', settingsError);
+        // Continue even if settings creation fails
       }
+
+      // Refresh projects and select the new one
+      await loadProjects();
+      setSelectedProject(newProject.id);
+
+      // Reset modal state
+      setShowCreateModal(false);
+      setNewProjectName('');
+      setNewProjectLogo(null);
+
+      toast.success('Project created successfully!');
+
     } catch (error) {
-      console.error('Error loading project settings:', error);
-      toast.error('Failed to load settings for this project');
+      console.error('Error creating project:', error);
+      toast.error('Failed to create project. Please try again.');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -254,9 +306,9 @@ export default function FeedbackSettings() {
     try {
       setSaving(true);
 
-      // If it's a fallback project, just show success (can't save to database)
-      if (selectedProject.startsWith('fallback-')) {
-        toast.success('Settings saved locally!');
+      // If it's a fallback settings, just show success (can't save to database)
+      if (settings.id.startsWith('fallback-')) {
+        toast.success('Settings saved locally! Note: Database not available.');
         return;
       }
 
@@ -267,9 +319,9 @@ export default function FeedbackSettings() {
       };
 
       const { error } = await supabase
-        .from('projects')
-        .update({ settings: settingsToSave })
-        .eq('id', selectedProject);
+        .from('feedback_settings')
+        .update(settingsToSave)
+        .eq('id', settings.id);
 
       if (error) {
         console.error('Error saving settings:', error);
@@ -324,6 +376,24 @@ export default function FeedbackSettings() {
     };
   };
 
+  // Handle logo file selection
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File size must be less than 5MB');
+        return;
+      }
+      setNewProjectLogo(file);
+    }
+  };
+
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -362,29 +432,9 @@ export default function FeedbackSettings() {
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Error Loading Settings</h2>
             <p className="text-gray-600 mb-4">{error}</p>
-            <Button onClick={loadData}>
+            <Button onClick={loadProjects}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Try Again
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (projects.length === 0) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <Globe className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">No Projects Found</h2>
-            <p className="text-gray-600 mb-4">
-              Creating a default project for you...
-            </p>
-            <Button onClick={loadData}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Retry
             </Button>
           </div>
         </div>
@@ -423,25 +473,50 @@ export default function FeedbackSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            <Label htmlFor="project-select">Project</Label>
-            <Select value={selectedProject} onValueChange={setSelectedProject}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a project" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {projects.length === 0 ? (
+            // No projects state
+            <div className="text-center py-8">
+              <Globe className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Projects Found</h3>
+              <p className="text-gray-600 mb-4">
+                Create your first project to start collecting feedback
+              </p>
+              <Button onClick={() => setShowCreateModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Project
+              </Button>
+            </div>
+          ) : (
+            // Projects exist - show dropdown
+            <div className="flex items-center space-x-2">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="project-select">Project</Label>
+                <Select value={selectedProject} onValueChange={setSelectedProject}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="pt-6">
+                <Button variant="outline" onClick={() => setShowCreateModal(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Project
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {settings && (
+      {/* Settings Tabs - Only show if project is selected */}
+      {settings && selectedProject && (
         <Tabs defaultValue="widget" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="widget">Widget Customization</TabsTrigger>
@@ -674,6 +749,7 @@ export default function FeedbackSettings() {
                           placeholder="Share your feedback with us..."
                           rows={3}
                           className="text-sm"
+                          readOnly
                         />
                       </div>
                     </div>
@@ -690,6 +766,69 @@ export default function FeedbackSettings() {
           </TabsContent>
         </Tabs>
       )}
-    </div>
-  );
-}
+
+      {/* Create Project Modal */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create New Project</DialogTitle>
+            <DialogDescription>
+              Create a new project to start collecting feedback from your users.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="project-name">Project Name *</Label>
+              <Input
+                id="project-name"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder="Enter project name..."
+                disabled={creating}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="project-logo">Logo (Optional)</Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="project-logo"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  disabled={creating}
+                  className="flex-1"
+                />
+                {newProjectLogo && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setNewProjectLogo(null)}
+                    disabled={creating}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              {newProjectLogo && (
+                <p className="text-xs text-gray-500">
+                  Selected: {newProjectLogo.name}
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateModal(false)} disabled={creating}>
+              Cancel
+            </Button>
+            <Button onClick={createProject} disabled={creating || !newProjectName.trim()}>
+              {creating ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Project
+                </>
+              )}
