@@ -60,8 +60,61 @@ const ProductFeedbackForm: React.FC = () => {
     }
   }, [projectId]);
 
+  // ✅ FIXED: Complete validateProject function with proper debugging
   const validateProject = async () => {
-  if (!projectId)
+    if (!projectId) {
+      console.error('❌ No projectId in URL params');
+      setValidationError('No project ID provided in URL');
+      setIsValid(false);
+      setIsValidating(false);
+      return;
+    }
+
+    setIsValidating(true);
+    console.log('🔍 Validating project ID:', projectId);
+
+    try {
+      // Debug: Check what projects exist
+      const { data: allProjects } = await supabase
+        .from('feedback_settings')
+        .select('project_id');
+      
+      console.log('📋 Available projects:', allProjects?.map(p => p.project_id));
+
+      // Try to find the specific project
+      const { data, error } = await supabase
+        .from('feedback_settings')
+        .select('id, project_id')
+        .eq('project_id', projectId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('❌ Supabase error:', error);
+        throw error;
+      }
+
+      console.log('🎯 Project query result:', data);
+
+      if (data) {
+        setProjectRecord({ id: data.id });
+        setIsValid(true);
+        setValidationError('');
+        console.log('✅ Project validated successfully');
+      } else {
+        setIsValid(false);
+        const availableProjects = allProjects?.map(p => p.project_id).join(', ') || 'None';
+        setValidationError(`Project "${projectId}" not found. Available: ${availableProjects}`);
+        console.log('❌ Project not found');
+      }
+    } catch (err) {
+      console.error('💥 Validation failed:', err);
+      setIsValid(false);
+      setValidationError('This project link is invalid or expired.');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
   const handleFeatureChange = (feature: string, checked: boolean) => {
     if (checked) {
       setFeatures([...features, feature]);
