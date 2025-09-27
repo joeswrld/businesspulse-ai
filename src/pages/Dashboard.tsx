@@ -88,6 +88,22 @@ interface Profile {
     created_at: string;
 }
 
+interface Subscription {
+    id: string;
+    user_id: string;
+    status: string;
+    plan: string;
+    trial_end: string | null;
+    created_at: string;
+}
+
+interface Project {
+    id: string;
+    name: string;
+    user_id: string;
+    created_at: string;
+}
+
 interface DashboardMetrics {
     totalFeedback: number;
     positiveFeedback: number;
@@ -120,6 +136,8 @@ export default function Dashboard() {
     const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
     const [insights, setInsights] = useState<Insight[]>([]);
     const [profile, setProfile] = useState<Profile | null>(null);
+    const [subscription, setSubscription] = useState<Subscription | null>(null);
+    const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
@@ -139,29 +157,33 @@ export default function Dashboard() {
             setLoading(true);
             setError(null);
 
-            // Get user's project IDs from feedback_settings
-            const { data: settingsData, error: settingsError } = await supabase
-                .from('feedback_settings')
-                .select('project_id')
-                .eq('user_id', user.id);
-
-            if (settingsError) {
-                console.error('Error loading feedback settings:', settingsError);
-                throw settingsError;
-            }
-
-            const projectIds = settingsData?.map(s => s.project_id) || [];
-
             // Load all data in parallel
-            const [feedbacksResult, insightsResult, profileResult] = await Promise.all([
-                // Load feedbacks
-                projectIds.length > 0
-                    ? supabase
-                        .from('feedback')
-                        .select('*')
-                        .in('project_id', projectIds)
-                        .order('created_at', { ascending: false })
-                    : Promise.resolve({ data: [], error: null }),
+            const [projectsResult, feedbacksResult, insightsResult, profileResult, subscriptionResult] = await Promise.all([
+                // Load user's projects
+                supabase
+                    .from('projects')
+                    .select('id, name, user_id, created_at')
+                    .eq('user_id', user.id),
+
+                // Load feedbacks for user's projects
+                supabase
+                    .from('projects')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .then(async (projectsData) => {
+                        if (projectsData.error) throw projectsData.error;
+                        const projectIds = projectsData.data?.map(p => p.id) || [];
+                        
+                        if (projectIds.length === 0) {
+                            return { data: [], error: null };
+                        }
+
+                        return supabase
+                            .from('feedback')
+                            .select('*')
+                            .in('project_id', projectIds)
+                            .order('created_at', { ascending: false });
+                    }),
 
                 // Load insights
                 supabase
@@ -174,9 +196,21 @@ export default function Dashboard() {
                 supabase
                     .from('profiles')
                     .select('*')
-                    .eq('id', user.id)
-                    .single()
+                    .eq('user_id', user.id)
+                    .single(),
+
+                // Load subscription data
+                supabase
+                    .from('subscriptions')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .maybeSingle()
             ]);
+
+            if (projectsResult.error) {
+                console.error('Error loading projects:', projectsResult.error);
+                throw projectsResult.error;
+            }
 
             if (feedbacksResult.error) {
                 console.error('Error loading feedbacks:', feedbacksResult.error);
@@ -193,9 +227,16 @@ export default function Dashboard() {
                 throw profileResult.error;
             }
 
+            if (subscriptionResult.error && subscriptionResult.error.code !== 'PGRST116') {
+                console.error('Error loading subscription:', subscriptionResult.error);
+                throw subscriptionResult.error;
+            }
+
             setFeedbacks(feedbacksResult.data || []);
             setInsights(insightsResult.data || []);
             setProfile(profileResult.data || null);
+            setSubscription(subscriptionResult.data || null);
+            setProjects(projectsResult.data || []);
 
         } catch (error) {
             console.error('Error loading dashboard data:', error);
@@ -224,7 +265,7 @@ export default function Dashboard() {
                 {
                     event: '*',
                     schema: 'public',
-                    table: 'feedbacks'
+                    table: 'feedback'
                 },
                 (payload) => {
                     console.log('Feedback change received in dashboard:', payload);
@@ -263,6 +304,58 @@ export default function Dashboard() {
             loadDashboardData();
         }
     }, [dateRange, customDateRange, loadDashboardData, user]);
+
+    // Get subscription status
+    const getSubscriptionStatus = (subscription: Subscription | null, profile: Profile | null) => {
+        // No subscription record → Free Trial (8 days)
+        if (!subscription) {
+            return {
+                plan: 'Free Trial',
+                status: 'trialing',
+                daysLeft: 8,
+                message: 'Free Trial - 8 days remaining'
+            };
+        }
+
+        const now = new Date();
+        const trialEnd = subscription.trial_end ? new Date(subscription.trial_end) : null;
+
+        // Trialing and trial not expired
+        if (subscription.status === 'trialing' && trialEnd && trialEnd > now) {
+            const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            return {
+                plan: 'Free Trial',
+                status: 'trialing',
+                daysLeft,
+                message: `Free Trial - ${daysLeft} days remaining`
+            };
+        }
+
+        // Active subscription
+        if (subscription.status === 'active') {
+            const planName = subscription.plan === 'business' ? 'Business Plan' : 'Pro Plan';
+            return {
+                plan: planName,
+                status: 'active',
+                message: `${planName} — Active`
+            };
+        }
+
+        // Canceled or expired
+        if (['canceled', 'expired', 'past_due'].includes(subscription.status)) {
+            return {
+                plan: 'Trial Expired',
+                status: 'expired',
+                message: 'Trial Expired — Please Upgrade'
+            };
+        }
+
+        return {
+            plan: 'Unknown',
+            status: 'unknown',
+            message: 'Status Unknown'
+        };
+    };
 
     // Get sentiment from database or fallback to analysis
     const getSentiment = (feedback: Feedback): 'positive' | 'negative' | 'neutral' => {
@@ -331,15 +424,17 @@ export default function Dashboard() {
                 .filter(email => email && email.trim() !== '')
         );
 
+        const subscriptionStatus = getSubscriptionStatus(subscription, profile);
+
         return {
             totalFeedback: filteredFeedbacks.length,
             positiveFeedback: positiveCount,
             negativeFeedback: negativeCount,
             neutralFeedback: neutralCount,
             activeUsers: uniqueUsers.size,
-            currentPlan: profile?.plan || 'Free Trial'
+            currentPlan: subscriptionStatus.plan
         };
-    }, [feedbacks, profile, dateRange, customDateRange]);
+    }, [feedbacks, profile, subscription, dateRange, customDateRange]);
 
     // Calculate chart data
     const chartData = useMemo((): ChartData[] => {
@@ -683,7 +778,7 @@ export default function Dashboard() {
                 </Card>
 
                 {/* Current Plan */}
-                <Card className="rounded-xl shadow-lg border-2   ">
+                <Card className="rounded-xl shadow-lg border-2">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Current Plan</CardTitle>
                         <Crown className="h-4 w-4 text-blue-600" />
@@ -693,11 +788,7 @@ export default function Dashboard() {
                             {dashboardMetrics.currentPlan}
                         </div>
                         <div className="text-sm text-blue-700 mb-3">
-                            {profile?.trial_end ? (
-                                `Trial ends ${format(new Date(profile.trial_end), 'MMM dd, yyyy')}`
-                            ) : (
-                                'Active subscription'
-                            )}
+                            {getSubscriptionStatus(subscription, profile).message}
                         </div>
                         <Button
                             size="sm"

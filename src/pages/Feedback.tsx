@@ -57,11 +57,10 @@ import {
 interface Feedback {
   id: string;
   project_id: string;
-  user_id: string | null;
-  form_type: 'customer_satisfaction' | 'product_feedback';
+  email: string | null;
   message: string;
-  rating: number | null;
-  metadata: any;
+  page_url: string | null;
+  browser: string | null;
   created_at: string;
 }
 
@@ -127,7 +126,15 @@ export default function Feedback() {
       // Load feedbacks
       const { data: feedbacksData, error: feedbacksError } = await supabase
         .from('feedback')
-        .select('*')
+        .select(`
+          id,
+          project_id,
+          email,
+          message,
+          page_url,
+          browser,
+          created_at
+        `)
         .in('project_id', projectIds)
         .order('created_at', { ascending: false });
 
@@ -141,14 +148,15 @@ export default function Feedback() {
       // Calculate stats
       const feedbacksList = feedbacksData || [];
       const totalFeedback = feedbacksList.length;
-      const ratings = feedbacksList.filter(f => f.rating).map(f => f.rating!);
-      const averageRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0;
-      const customerSatisfactionCount = feedbacksList.filter(f => f.form_type === 'customer_satisfaction').length;
-      const productFeedbackCount = feedbacksList.filter(f => f.form_type === 'product_feedback').length;
+      
+      // Since the current feedback table doesn't have rating/form_type, we'll use basic stats
+      const averageRating = 0; // Will be calculated when rating data is available
+      const customerSatisfactionCount = 0; // Will be calculated when form_type data is available
+      const productFeedbackCount = totalFeedback; // All feedback is product feedback for now
       
       const ratingDistribution: { [key: number]: number } = {};
       for (let i = 1; i <= 5; i++) {
-        ratingDistribution[i] = ratings.filter(r => r === i).length;
+        ratingDistribution[i] = 0; // Will be populated when rating data is available
       }
 
       setStats({
@@ -204,15 +212,19 @@ export default function Feedback() {
   const filteredFeedbacks = useMemo(() => {
     let filtered = feedbacks;
 
-    // Filter by form type
+    // Filter by form type (currently all feedback is product feedback)
     if (filters.formType !== 'all') {
-      filtered = filtered.filter(f => f.form_type === filters.formType);
+      // For now, all feedback is treated as product feedback
+      if (filters.formType === 'customer_satisfaction') {
+        filtered = []; // No customer satisfaction feedback yet
+      }
+      // product_feedback shows all feedback
     }
 
-    // Filter by rating
+    // Filter by rating (currently no rating data available)
     if (filters.rating !== 'all') {
-      const ratingValue = parseInt(filters.rating);
-      filtered = filtered.filter(f => f.rating === ratingValue);
+      // No rating data available yet, so this filter doesn't apply
+      filtered = [];
     }
 
     // Filter by date range
@@ -230,7 +242,7 @@ export default function Feedback() {
       const query = filters.searchQuery.toLowerCase();
       filtered = filtered.filter(f => 
         f.message.toLowerCase().includes(query) ||
-        (f.metadata?.email && f.metadata.email.toLowerCase().includes(query))
+        (f.email && f.email.toLowerCase().includes(query))
       );
     }
 
@@ -274,13 +286,13 @@ export default function Feedback() {
   // Export functionality
   const exportToCSV = () => {
     const csvContent = [
-      ['Date', 'Type', 'Rating', 'Message', 'Email'].join(','),
+      ['Date', 'Message', 'Email', 'Page URL', 'Browser'].join(','),
       ...filteredFeedbacks.map(f => [
         new Date(f.created_at).toLocaleDateString(),
-        f.form_type,
-        f.rating || '',
         `"${f.message.replace(/"/g, '""')}"`,
-        f.metadata?.email || ''
+        f.email || '',
+        f.page_url || '',
+        f.browser || ''
       ].join(','))
     ].join('\n');
 
@@ -641,15 +653,9 @@ export default function Feedback() {
                 <div key={feedback.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center space-x-2">
-                      <Badge variant={getSentimentBadgeVariant(feedback.rating) as any}>
-                        {feedback.form_type === 'customer_satisfaction' ? 'Satisfaction' : 'Product'}
+                      <Badge variant="secondary">
+                        Product Feedback
                       </Badge>
-                      {feedback.rating && (
-                        <div className="flex items-center space-x-1">
-                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          <span className="text-sm font-medium">{feedback.rating}</span>
-                        </div>
-                      )}
                     </div>
                     <div className="flex items-center space-x-2 text-sm text-gray-500">
                       <Clock className="h-4 w-4" />
@@ -657,11 +663,17 @@ export default function Feedback() {
                     </div>
                   </div>
                   <p className="text-gray-700 text-sm mb-2">{feedback.message}</p>
-                  {feedback.metadata?.email && (
-                    <p className="text-xs text-gray-500">
-                      From: {feedback.metadata.email}
-                    </p>
-                  )}
+                  <div className="flex items-center space-x-4 text-xs text-gray-500">
+                    {feedback.email && (
+                      <span>From: {feedback.email}</span>
+                    )}
+                    {feedback.page_url && (
+                      <span>Page: {feedback.page_url}</span>
+                    )}
+                    {feedback.browser && (
+                      <span>Browser: {feedback.browser}</span>
+                    )}
+                  </div>
                 </div>
               ))}
 

@@ -39,16 +39,12 @@ import {
 // Types
 interface FeedbackSettings {
   id: string;
+  user_id: string;
   project_id: string;
-  customer_satisfaction_enabled: boolean;
-  product_feedback_enabled: boolean;
-  widget_title: string;
-  widget_color: string;
-  greeting_text: string;
-  widget_position: string;
-  show_branding: boolean;
+  widget_title: string | null;
+  widget_color: string | null;
+  greeting_text: string | null;
   created_at: string;
-  updated_at: string;
 }
 
 interface Project {
@@ -88,10 +84,34 @@ export default function FeedbackSettings() {
         throw projectsError;
       }
 
-      setProjects(projectsData || []);
+      let currentProjects = projectsData || [];
 
-      if (projectsData && projectsData.length > 0) {
-        const firstProject = projectsData[0];
+      // If no projects exist, create a default project
+      if (currentProjects.length === 0) {
+        const defaultProject = {
+          user_id: user.id,
+          name: 'My Project',
+          project_id: `proj_${Date.now()}` // Generate unique ID
+        };
+
+        const { data: newProject, error: createProjectError } = await supabase
+          .from('projects')
+          .insert(defaultProject)
+          .select()
+          .single();
+
+        if (createProjectError) {
+          console.error('Error creating default project:', createProjectError);
+          throw createProjectError;
+        }
+
+        currentProjects = [newProject];
+      }
+
+      setProjects(currentProjects);
+
+      if (currentProjects.length > 0) {
+        const firstProject = currentProjects[0];
         setSelectedProject(firstProject.id);
 
         // Load settings for the first project
@@ -110,15 +130,12 @@ export default function FeedbackSettings() {
           setSettings(settingsData);
         } else {
           // Create default settings
-          const defaultSettings: Omit<FeedbackSettings, 'id' | 'created_at' | 'updated_at'> = {
+          const defaultSettings: Omit<FeedbackSettings, 'id' | 'created_at'> = {
+            user_id: user.id,
             project_id: firstProject.id,
-            customer_satisfaction_enabled: true,
-            product_feedback_enabled: true,
             widget_title: 'We love your feedback!',
             widget_color: '#3B82F6',
-            greeting_text: 'Help us improve by sharing your thoughts',
-            widget_position: 'bottom-right',
-            show_branding: true
+            greeting_text: 'Help us improve by sharing your thoughts'
           };
 
           const { data: newSettings, error: createError } = await supabase
@@ -175,15 +192,12 @@ export default function FeedbackSettings() {
         setSettings(settingsData);
       } else {
         // Create default settings for this project
-        const defaultSettings: Omit<FeedbackSettings, 'id' | 'created_at' | 'updated_at'> = {
+        const defaultSettings: Omit<FeedbackSettings, 'id' | 'created_at'> = {
+          user_id: user.id,
           project_id: projectId,
-          customer_satisfaction_enabled: true,
-          product_feedback_enabled: true,
           widget_title: 'We love your feedback!',
           widget_color: '#3B82F6',
-          greeting_text: 'Help us improve by sharing your thoughts',
-          widget_position: 'bottom-right',
-          show_branding: true
+          greeting_text: 'Help us improve by sharing your thoughts'
         };
 
         const { data: newSettings, error: createError } = await supabase
@@ -216,8 +230,8 @@ export default function FeedbackSettings() {
         .from('feedback_settings')
         .upsert({
           ...settings,
-          project_id: selectedProject,
-          updated_at: new Date().toISOString()
+          user_id: user.id,
+          project_id: selectedProject
         });
 
       if (error) {
@@ -390,67 +404,12 @@ export default function FeedbackSettings() {
       </Card>
 
       {settings && (
-        <Tabs defaultValue="forms" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="forms">Form Management</TabsTrigger>
+        <Tabs defaultValue="widget" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="widget">Widget Customization</TabsTrigger>
             <TabsTrigger value="integration">Integration</TabsTrigger>
             <TabsTrigger value="preview">Preview</TabsTrigger>
           </TabsList>
-
-          {/* Form Management */}
-          <TabsContent value="forms" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <MessageSquare className="h-5 w-5" />
-                  <span>Form Management</span>
-                </CardTitle>
-                <CardDescription>
-                  Enable or disable different types of feedback forms
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Customer Satisfaction Form */}
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <Star className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">Customer Satisfaction Form</h3>
-                      <p className="text-sm text-gray-500">
-                        5-star rating with optional comments
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={settings.customer_satisfaction_enabled}
-                    onCheckedChange={(checked) => updateSetting('customer_satisfaction_enabled', checked)}
-                  />
-                </div>
-
-                {/* Product Feedback Form */}
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Bug className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">Product Feedback Form</h3>
-                      <p className="text-sm text-gray-500">
-                        Bug reports, feature requests, and general feedback
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={settings.product_feedback_enabled}
-                    onCheckedChange={(checked) => updateSetting('product_feedback_enabled', checked)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           {/* Widget Customization */}
           <TabsContent value="widget" className="space-y-6">
@@ -509,39 +468,6 @@ export default function FeedbackSettings() {
                     />
                   </div>
 
-                  {/* Widget Position */}
-                  <div className="space-y-2">
-                    <Label htmlFor="widget-position">Widget Position</Label>
-                    <Select
-                      value={settings.widget_position}
-                      onValueChange={(value) => updateSetting('widget_position', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="bottom-right">Bottom Right</SelectItem>
-                        <SelectItem value="bottom-left">Bottom Left</SelectItem>
-                        <SelectItem value="top-right">Top Right</SelectItem>
-                        <SelectItem value="top-left">Top Left</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Show Branding */}
-                  <div className="space-y-2">
-                    <Label htmlFor="show-branding">Show Branding</Label>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="show-branding"
-                        checked={settings.show_branding}
-                        onCheckedChange={(checked) => updateSetting('show_branding', checked)}
-                      />
-                      <span className="text-sm text-gray-500">
-                        Show "Powered by NoteX" in the widget
-                      </span>
-                    </div>
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -702,57 +628,24 @@ export default function FeedbackSettings() {
 
                     {/* Form Preview */}
                     <div className="space-y-4">
-                      {settings.customer_satisfaction_enabled && (
-                        <div className="p-4 border rounded-lg">
-                          <h4 className="font-medium mb-2 flex items-center">
-                            <Star className="h-4 w-4 mr-2 text-yellow-500" />
-                            Customer Satisfaction
-                          </h4>
-                          <div className="flex items-center space-x-1 mb-3">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star key={star} className="h-5 w-5 text-gray-300" />
-                            ))}
-                          </div>
-                          <Textarea
-                            placeholder="Tell us more about your experience (optional)"
-                            rows={3}
-                            className="text-sm"
-                          />
-                        </div>
-                      )}
-
-                      {settings.product_feedback_enabled && (
-                        <div className="p-4 border rounded-lg">
-                          <h4 className="font-medium mb-2 flex items-center">
-                            <Bug className="h-4 w-4 mr-2 text-blue-500" />
-                            Product Feedback
-                          </h4>
-                          <Select>
-                            <SelectTrigger className="mb-3">
-                              <SelectValue placeholder="Select feedback type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="bug">Bug Report</SelectItem>
-                              <SelectItem value="feature">Feature Request</SelectItem>
-                              <SelectItem value="general">General Feedback</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Textarea
-                            placeholder="Describe your feedback in detail"
-                            rows={3}
-                            className="text-sm"
-                          />
-                        </div>
-                      )}
+                      <div className="p-4 border rounded-lg">
+                        <h4 className="font-medium mb-2 flex items-center">
+                          <MessageSquare className="h-4 w-4 mr-2 text-blue-500" />
+                          Feedback Form
+                        </h4>
+                        <Textarea
+                          placeholder="Share your feedback with us..."
+                          rows={3}
+                          className="text-sm"
+                        />
+                      </div>
                     </div>
 
-                    {settings.show_branding && (
-                      <div className="text-center mt-4 pt-4 border-t">
-                        <p className="text-xs text-gray-500">
-                          Powered by <span className="font-medium">NoteX</span>
-                        </p>
-                      </div>
-                    )}
+                    <div className="text-center mt-4 pt-4 border-t">
+                      <p className="text-xs text-gray-500">
+                        Powered by <span className="font-medium">NoteX</span>
+                      </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
