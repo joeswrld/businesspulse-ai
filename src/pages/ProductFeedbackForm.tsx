@@ -76,14 +76,14 @@ const ProductFeedbackForm: React.FC = () => {
     try {
       // Debug: Check what projects exist
       const { data: allProjects } = await supabase
-        .from('feedback_settings')
-        .select('project_id');
+        .from('projects')
+        .select('id, project_id');
       
       console.log('📋 Available projects:', allProjects?.map(p => p.project_id));
 
-      // Try to find the specific project
+      // Try to find the specific project by project_id (text field)
       const { data, error } = await supabase
-        .from('feedback_settings')
+        .from('projects')
         .select('id, project_id')
         .eq('project_id', projectId)
         .maybeSingle();
@@ -156,16 +156,24 @@ ${features.length > 0 ? `Areas: ${features.join(', ')}` : ''}
 Feedback:
 ${feedback}`;
 
-      // ✅ FIXED: Only use columns that exist in the database schema
+      // ✅ FIXED: Use correct table name and column names
       const { error } = await supabase
-        .from("feedback")
+        .from("feedbacks")
         .insert([
           {
             project_id: projectRecord.id,     // Internal UUID
-            email: email?.trim() || null,     // Email column (nullable)
-            message: feedbackMessage,         // Message column
-            sentiment: null                   // Sentiment column (nullable)
-            // ❌ REMOVED: metadata (doesn't exist in schema)
+            user_email: email?.trim() || null, // Correct column name
+            content: feedbackMessage,         // Correct column name
+            sentiment: null,                  // Sentiment column (nullable)
+            metadata: {                       // Add metadata
+              form_type: 'product',
+              feedback_type: feedbackType,
+              rating: rating || null,
+              would_recommend: wouldRecommend,
+              features: features,
+              page_url: window.location.href,
+              timestamp: new Date().toISOString()
+            }
           }
         ]);
 
