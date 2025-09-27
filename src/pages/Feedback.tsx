@@ -5,33 +5,31 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { SentimentBadge } from '@/components/ui/SentimentBadge'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, RefreshCw, Search, MessageSquare, Mail, Calendar, Filter, TrendingUp, TrendingDown, Minus, Eye, Play } from 'lucide-react'
+import { Loader2, RefreshCw, Search, MessageSquare, Mail, Calendar, Filter, Star, ThumbsUp, ThumbsDown, Minus } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import SessionReplayPlayer from '@/components/SessionReplayPlayer'
 
 interface FeedbackEntry {
   id: string
   project_id: string
-  user_email: string | null
-  content: string
-  sentiment: 'positive' | 'negative' | 'neutral' | null
+  form_type: 'customer_satisfaction' | 'product_feedback'
+  message: string
+  rating: number | null
   metadata: {
-    form_type?: 'csat' | 'product'
+    email?: string
     page_url?: string
-    browser?: any
-    rating?: number
-    session_id?: string
+    user_agent?: string
+    feedback_type?: string
+    features?: string[]
   } | null
   created_at: string
 }
 
-interface ProjectSelection {
-  id: string // UUID used in feedback.project_id
-  project_id: string // external human-facing id
+interface Project {
+  id: string
+  project_id: string
+  name: string
 }
 
 const Feedback: React.FC = () => {
@@ -41,15 +39,13 @@ const Feedback: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterEmail, setFilterEmail] = useState('all')
-  const [filterSentiment, setFilterSentiment] = useState('all')
-  const [project, setProject] = useState<ProjectSelection | null>(null)
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
-  const [showSessionReplay, setShowSessionReplay] = useState(false)
+  const [filterFormType, setFilterFormType] = useState('all')
+  const [filterRating, setFilterRating] = useState('all')
+  const [project, setProject] = useState<Project | null>(null)
 
   useEffect(() => {
     if (user?.id) {
-      loadProjectId()
+      loadProject()
     }
   }, [user?.id])
 
@@ -59,7 +55,7 @@ const Feedback: React.FC = () => {
       
       // Set up real-time subscription for feedback updates
       const channel = supabase
-        .channel('feedback-changes')
+        .channel('feedback-realtime')
         .on(
           'postgres_changes',
           {
@@ -69,8 +65,21 @@ const Feedback: React.FC = () => {
             filter: `project_id=eq.${project.id}`
           },
           (payload) => {
-            console.log('Feedback change received:', payload)
-            loadFeedback() // Reload all feedback when any change occurs
+            console.log('Real-time feedback update:', payload)
+            
+            if (payload.eventType === 'INSERT') {
+              setFeedback(prev => [payload.new as FeedbackEntry, ...prev])
+              toast({
+                title: 'New Feedback Received!',
+                description: `New ${payload.new.form_type?.replace('_', ' ')} feedback received`,
+              })
+            } else if (payload.eventType === 'UPDATE') {
+              setFeedback(prev => prev.map(item => 
+                item.id === payload.new.id ? payload.new as FeedbackEntry : item
+              ))
+            } else if (payload.eventType === 'DELETE') {
+              setFeedback(prev => prev.filter(item => item.id !== payload.old.id))
+            }
           }
         )
         .subscribe()
@@ -81,26 +90,37 @@ const Feedback: React.FC = () => {
     }
   }, [project?.id])
 
-  const loadProjectId = async () => {
+  const loadProject = async () => {
     try {
-      // Load first project for this user
       const { data, error } = await supabase
         .from('projects')
-        .select('id, project_id')
+        .select('id, project_id, name')
+        .eq('user_id', user?.id)
         .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle()
 
       if (error) {
-        console.error('Error loading project ID:', error)
+        console.error('Error loading project:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to load project information',
+          variant: 'destructive'
+        })
         return
       }
 
       if (data) {
-        setProject({ id: data.id, project_id: data.project_id })
+        setProject(data)
+      } else {
+        toast({
+          title: 'No Project Found',
+          description: 'Please create a project first',
+          variant: 'destructive'
+        })
       }
     } catch (error) {
-      console.error('Error loading project ID:', error)
+      console.error('Error loading project:', error)
     }
   }
 
@@ -112,7 +132,7 @@ const Feedback: React.FC = () => {
       
       const { data, error } = await supabase
         .from('feedback')
-        .select('id, project_id, user_email, content, sentiment, metadata, created_at')
+        .select('*')
         .eq('project_id', project.id)
         .order('created_at', { ascending: false })
 
@@ -126,7 +146,8 @@ const Feedback: React.FC = () => {
         return
       }
 
-      setFeedback((data as unknown as FeedbackEntry[]) || [])
+      console.log('Loaded feedback:', data)
+      setFeedback(data as FeedbackEntry[] || [])
     } catch (error) {
       console.error('Error loading feedback:', error)
       toast({
@@ -146,43 +167,61 @@ const Feedback: React.FC = () => {
   }
 
   const filteredFeedback = feedback.filter(entry => {
-    const matchesSearch = entry.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (entry.user_email && entry.user_email.toLowerCase().includes(searchTerm.toLowerCase()))
+    const matchesSearch = entry.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (entry.metadata?.email && entry.metadata.email.toLowerCase().includes(searchTerm.toLowerCase()))
     
-    const matchesEmailFilter = filterEmail === 'all' || 
-                              (filterEmail === 'with_email' && entry.user_email) ||
-                              (filterEmail === 'without_email' && !entry.user_email)
+    const matchesFormType = filterFormType === 'all' || entry.form_type === filterFormType
     
-    const matchesSentimentFilter = filterSentiment === 'all' || 
-                                  (filterSentiment === 'positive' && entry.sentiment === 'positive') ||
-                                  (filterSentiment === 'negative' && entry.sentiment === 'negative') ||
-                                  (filterSentiment === 'neutral' && entry.sentiment === 'neutral') ||
-                                  (filterSentiment === 'unknown' && !entry.sentiment)
+    const matchesRating = filterRating === 'all' || 
+                         (filterRating === 'high' && entry.rating && entry.rating >= 4) ||
+                         (filterRating === 'medium' && entry.rating && entry.rating === 3) ||
+                         (filterRating === 'low' && entry.rating && entry.rating <= 2) ||
+                         (filterRating === 'no_rating' && !entry.rating)
     
-    return matchesSearch && matchesEmailFilter && matchesSentimentFilter
+    return matchesSearch && matchesFormType && matchesRating
   })
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString()
   }
 
-  const handleViewSessionReplay = (sessionId: string) => {
-    setSelectedSessionId(sessionId)
-    setShowSessionReplay(true)
+  const renderRating = (rating: number | null) => {
+    if (!rating) return <span className="text-gray-400">-</span>
+    
+    return (
+      <div className="flex items-center space-x-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Star
+            key={star}
+            className={`h-4 w-4 ${
+              star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+            }`}
+          />
+        ))}
+        <span className="ml-1 text-sm font-medium">{rating}/5</span>
+      </div>
+    )
   }
 
-  const handleCloseSessionReplay = () => {
-    setShowSessionReplay(false)
-    setSelectedSessionId(null)
+  const getFormTypeBadge = (formType: string) => {
+    switch (formType) {
+      case 'customer_satisfaction':
+        return <Badge className="bg-blue-100 text-blue-800">Customer Satisfaction</Badge>
+      case 'product_feedback':
+        return <Badge className="bg-green-100 text-green-800">Product Feedback</Badge>
+      default:
+        return <Badge variant="outline">General</Badge>
+    }
   }
 
-  // Calculate sentiment counts
-  const sentimentCounts = {
+  // Calculate stats
+  const stats = {
     total: feedback.length,
-    positive: feedback.filter(f => f.sentiment === 'positive').length,
-    negative: feedback.filter(f => f.sentiment === 'negative').length,
-    neutral: feedback.filter(f => f.sentiment === 'neutral').length,
-    unknown: feedback.filter(f => !f.sentiment).length
+    customerSatisfaction: feedback.filter(f => f.form_type === 'customer_satisfaction').length,
+    productFeedback: feedback.filter(f => f.form_type === 'product_feedback').length,
+    avgRating: feedback.filter(f => f.rating).length > 0 
+      ? (feedback.reduce((sum, f) => sum + (f.rating || 0), 0) / feedback.filter(f => f.rating).length).toFixed(1)
+      : 'N/A'
   }
 
   if (loading) {
@@ -205,9 +244,9 @@ const Feedback: React.FC = () => {
             <MessageSquare className="h-6 w-6 text-blue-600" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Feedback Management</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Feedback Dashboard</h1>
             <p className="text-gray-600 mt-1">
-              Monitor and analyze customer feedback with sentiment insights
+              {project ? `Project: ${project.name || project.project_id}` : 'Monitor customer feedback in real-time'}
             </p>
           </div>
         </div>
@@ -221,17 +260,31 @@ const Feedback: React.FC = () => {
         </Button>
       </div>
 
-      {/* Sentiment Stats Cards */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="rounded-xl shadow-lg border-0 bg-gradient-to-br from-blue-50 to-blue-100">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-blue-600 mb-1">Total Feedback</p>
-                <p className="text-3xl font-bold text-blue-900">{sentimentCounts.total}</p>
+                <p className="text-3xl font-bold text-blue-900">{stats.total}</p>
               </div>
               <div className="p-3 bg-blue-200 rounded-full">
                 <MessageSquare className="h-6 w-6 text-blue-700" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl shadow-lg border-0 bg-gradient-to-br from-purple-50 to-purple-100">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-purple-600 mb-1">Customer Satisfaction</p>
+                <p className="text-3xl font-bold text-purple-900">{stats.customerSatisfaction}</p>
+              </div>
+              <div className="p-3 bg-purple-200 rounded-full">
+                <ThumbsUp className="h-6 w-6 text-purple-700" />
               </div>
             </div>
           </CardContent>
@@ -241,48 +294,25 @@ const Feedback: React.FC = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-600 mb-1">Positive</p>
-                <p className="text-3xl font-bold text-green-900">{sentimentCounts.positive}</p>
-                <p className="text-xs text-green-700">
-                  {sentimentCounts.total > 0 ? Math.round((sentimentCounts.positive / sentimentCounts.total) * 100) : 0}%
-                </p>
+                <p className="text-sm font-medium text-green-600 mb-1">Product Feedback</p>
+                <p className="text-3xl font-bold text-green-900">{stats.productFeedback}</p>
               </div>
               <div className="p-3 bg-green-200 rounded-full">
-                <TrendingUp className="h-6 w-6 text-green-700" />
+                <ThumbsDown className="h-6 w-6 text-green-700" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-xl shadow-lg border-0 bg-gradient-to-br from-red-50 to-red-100">
+        <Card className="rounded-xl shadow-lg border-0 bg-gradient-to-br from-yellow-50 to-yellow-100">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-red-600 mb-1">Negative</p>
-                <p className="text-3xl font-bold text-red-900">{sentimentCounts.negative}</p>
-                <p className="text-xs text-red-700">
-                  {sentimentCounts.total > 0 ? Math.round((sentimentCounts.negative / sentimentCounts.total) * 100) : 0}%
-                </p>
+                <p className="text-sm font-medium text-yellow-600 mb-1">Average Rating</p>
+                <p className="text-3xl font-bold text-yellow-900">{stats.avgRating}</p>
               </div>
-              <div className="p-3 bg-red-200 rounded-full">
-                <TrendingDown className="h-6 w-6 text-red-700" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-xl shadow-lg border-0 bg-gradient-to-br from-gray-50 to-gray-100">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Neutral</p>
-                <p className="text-3xl font-bold text-gray-900">{sentimentCounts.neutral}</p>
-                <p className="text-xs text-gray-700">
-                  {sentimentCounts.total > 0 ? Math.round((sentimentCounts.neutral / sentimentCounts.total) * 100) : 0}%
-                </p>
-              </div>
-              <div className="p-3 bg-gray-200 rounded-full">
-                <Minus className="h-6 w-6 text-gray-700" />
+              <div className="p-3 bg-yellow-200 rounded-full">
+                <Star className="h-6 w-6 text-yellow-700" />
               </div>
             </div>
           </CardContent>
@@ -309,27 +339,27 @@ const Feedback: React.FC = () => {
               />
             </div>
             
-            <Select value={filterEmail} onValueChange={setFilterEmail}>
+            <Select value={filterFormType} onValueChange={setFilterFormType}>
               <SelectTrigger className="h-11 rounded-lg border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                <SelectValue placeholder="Filter by email" />
+                <SelectValue placeholder="Filter by form type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All feedback</SelectItem>
-                <SelectItem value="with_email">With email</SelectItem>
-                <SelectItem value="without_email">Without email</SelectItem>
+                <SelectItem value="all">All Forms</SelectItem>
+                <SelectItem value="customer_satisfaction">Customer Satisfaction</SelectItem>
+                <SelectItem value="product_feedback">Product Feedback</SelectItem>
               </SelectContent>
             </Select>
 
-            <Select value={filterSentiment} onValueChange={setFilterSentiment}>
+            <Select value={filterRating} onValueChange={setFilterRating}>
               <SelectTrigger className="h-11 rounded-lg border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                <SelectValue placeholder="Filter by sentiment" />
+                <SelectValue placeholder="Filter by rating" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All sentiments</SelectItem>
-                <SelectItem value="positive">Positive</SelectItem>
-                <SelectItem value="negative">Negative</SelectItem>
-                <SelectItem value="neutral">Neutral</SelectItem>
-                <SelectItem value="unknown">Unknown</SelectItem>
+                <SelectItem value="all">All Ratings</SelectItem>
+                <SelectItem value="high">High (4-5 stars)</SelectItem>
+                <SelectItem value="medium">Medium (3 stars)</SelectItem>
+                <SelectItem value="low">Low (1-2 stars)</SelectItem>
+                <SelectItem value="no_rating">No Rating</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -341,7 +371,7 @@ const Feedback: React.FC = () => {
         <CardHeader>
           <CardTitle className="text-lg flex items-center space-x-2">
             <MessageSquare className="h-5 w-5" />
-            <span>Feedback Entries {project ? `(Project: ${project.project_id})` : ''}</span>
+            <span>Feedback Entries</span>
             <Badge variant="outline" className="ml-2">
               {filteredFeedback.length} of {feedback.length}
             </Badge>
@@ -353,12 +383,12 @@ const Feedback: React.FC = () => {
               <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">No feedback found</h3>
               <p className="text-gray-600 mb-4">
-                {searchTerm || filterEmail !== 'all' || filterSentiment !== 'all'
+                {searchTerm || filterFormType !== 'all' || filterRating !== 'all'
                   ? 'No feedback matches your current filters. Try adjusting your search criteria.'
                   : 'Feedback from your widget will appear here once customers start sharing their thoughts.'
                 }
               </p>
-              {!searchTerm && filterEmail === 'all' && filterSentiment === 'all' && (
+              {!searchTerm && filterFormType === 'all' && filterRating === 'all' && (
                 <Button variant="outline" asChild>
                   <a href="/feedback-settings">Configure Widget</a>
                 </Button>
@@ -369,30 +399,34 @@ const Feedback: React.FC = () => {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold text-gray-900">Form Type</TableHead>
                     <TableHead className="font-semibold text-gray-900">Message</TableHead>
-                    <TableHead className="font-semibold text-gray-900">Email</TableHead>
-                    <TableHead className="font-semibold text-gray-900">Type</TableHead>
                     <TableHead className="font-semibold text-gray-900">Rating</TableHead>
-                    <TableHead className="font-semibold text-gray-900">Sentiment</TableHead>
+                    <TableHead className="font-semibold text-gray-900">Email</TableHead>
                     <TableHead className="font-semibold text-gray-900">Date</TableHead>
-                    <TableHead className="font-semibold text-gray-900">Session</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredFeedback.map((entry) => (
                     <TableRow key={entry.id} className="hover:bg-gray-50 transition-colors">
+                      <TableCell>
+                        {getFormTypeBadge(entry.form_type)}
+                      </TableCell>
                       <TableCell className="max-w-md">
                         <div className="bg-gray-50 rounded-lg p-3">
                           <p className="text-sm text-gray-900 line-clamp-3">
-                            {entry.content}
+                            {entry.message}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell>
-                        {entry.user_email ? (
+                        {renderRating(entry.rating)}
+                      </TableCell>
+                      <TableCell>
+                        {entry.metadata?.email ? (
                           <div className="flex items-center space-x-2">
                             <Mail className="h-4 w-4 text-gray-400" />
-                            <span className="text-sm text-gray-900">{entry.user_email}</span>
+                            <span className="text-sm text-gray-900">{entry.metadata.email}</span>
                           </div>
                         ) : (
                           <Badge variant="outline" className="text-gray-600">
@@ -401,42 +435,10 @@ const Feedback: React.FC = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge 
-                          variant={entry.metadata?.form_type === 'csat' ? 'default' : 'secondary'}
-                          className={entry.metadata?.form_type === 'csat' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}
-                        >
-                          {entry.metadata?.form_type === 'csat' ? 'CSAT' : entry.metadata?.form_type === 'product' ? 'Product' : 'General'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {entry.metadata?.rating ? (
-                          <div className="flex items-center space-x-1">
-                            <span className="text-lg font-semibold text-yellow-600">{entry.metadata.rating}</span>
-                            <span className="text-sm text-gray-500">/5</span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <SentimentBadge sentiment={entry.sentiment} />
-                      </TableCell>
-                      <TableCell>
                         <div className="flex items-center space-x-2 text-sm text-gray-600">
                           <Calendar className="h-4 w-4" />
                           <span>{formatDate(entry.created_at)}</span>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {entry.metadata?.session_id ? (
-                          <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700">
-                            {entry.metadata.session_id.substring(0, 8)}...
-                          </code>
-                        ) : (
-                          <Badge variant="outline" className="text-gray-500">
-                            N/A
-                          </Badge>
-                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -446,22 +448,6 @@ const Feedback: React.FC = () => {
           )}
         </CardContent>
       </Card>
-
-      {/* Session Replay Dialog */}
-      <Dialog open={showSessionReplay} onOpenChange={setShowSessionReplay}>
-        <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Session Replay</DialogTitle>
-          </DialogHeader>
-          {selectedSessionId && project?.project_id && (
-            <SessionReplayPlayer
-              sessionId={selectedSessionId}
-              projectId={project.project_id}
-              onClose={handleCloseSessionReplay}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
