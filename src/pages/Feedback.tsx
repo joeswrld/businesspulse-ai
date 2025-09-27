@@ -16,8 +16,8 @@ import SessionReplayPlayer from '@/components/SessionReplayPlayer'
 interface FeedbackEntry {
   id: string
   project_id: string
-  user_email: string | null
-  content: string
+  email: string | null
+  message: string
   sentiment: 'positive' | 'negative' | 'neutral' | null
   metadata: {
     form_type?: 'csat' | 'product'
@@ -65,7 +65,7 @@ const Feedback: React.FC = () => {
           {
             event: '*',
             schema: 'public',
-            table: 'feedbacks',
+            table: 'feedback',
             filter: `project_id=eq.${project.id}`
           },
           (payload) => {
@@ -111,8 +111,8 @@ const Feedback: React.FC = () => {
       setLoading(true)
       
       const { data, error } = await supabase
-        .from('feedbacks')
-        .select('id, project_id, user_email, content, sentiment, metadata, created_at')
+        .from('feedback')
+        .select('id, project_id, email, message, sentiment, metadata, created_at')
         .eq('project_id', project.id)
         .order('created_at', { ascending: false })
 
@@ -146,12 +146,12 @@ const Feedback: React.FC = () => {
   }
 
   const filteredFeedback = feedback.filter(entry => {
-    const matchesSearch = entry.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (entry.user_email && entry.user_email.toLowerCase().includes(searchTerm.toLowerCase()))
+    const matchesSearch = entry.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (entry.email && entry.email.toLowerCase().includes(searchTerm.toLowerCase()))
     
     const matchesEmailFilter = filterEmail === 'all' || 
-                              (filterEmail === 'with_email' && entry.user_email) ||
-                              (filterEmail === 'without_email' && !entry.user_email)
+                              (filterEmail === 'with_email' && entry.email) ||
+                              (filterEmail === 'without_email' && !entry.email)
     
     const matchesSentimentFilter = filterSentiment === 'all' || 
                                   (filterSentiment === 'positive' && entry.sentiment === 'positive') ||
@@ -384,15 +384,15 @@ const Feedback: React.FC = () => {
                       <TableCell className="max-w-md">
                         <div className="bg-gray-50 rounded-lg p-3">
                           <p className="text-sm text-gray-900 line-clamp-3">
-                            {entry.content}
+                            {entry.message}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell>
-                        {entry.user_email ? (
+                        {entry.email ? (
                           <div className="flex items-center space-x-2">
                             <Mail className="h-4 w-4 text-gray-400" />
-                            <span className="text-sm text-gray-900">{entry.user_email}</span>
+                            <span className="text-sm text-gray-900">{entry.email}</span>
                           </div>
                         ) : (
                           <Badge variant="outline" className="text-gray-600">

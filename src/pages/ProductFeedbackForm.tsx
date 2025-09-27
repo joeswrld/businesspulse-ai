@@ -79,7 +79,7 @@ const ProductFeedbackForm: React.FC = () => {
       }
 
       if (data) {
-        setProjectRecord({ id: data.project_id });
+        setProjectRecord({ id: data.id }); // Use internal UUID
         setIsValid(true);
         setValidationError('');
       } else {
@@ -118,7 +118,7 @@ const ProductFeedbackForm: React.FC = () => {
     if (!projectRecord?.id) {
       toast({
         title: 'Invalid Project',
-        description: 'This project could not be found.',
+        description: 'This project could not be found. Please check your project link.',
         variant: 'destructive',
       });
       return;
@@ -134,31 +134,40 @@ ${features.length > 0 ? `Areas: ${features.join(', ')}` : ''}
 ${feedback}`;
 
       const { data, error } = await supabase
-        .from("feedbacks")
+        .from("feedback")
         .insert([
           {
-            project_id: String(projectId),   // project_id as text
-            user_email: email?.trim() || null,    // user_email column
-            content: feedbackMessage,        // content column
-            sentiment: null,                 // optional sentiment
-            session_id: crypto.randomUUID(),  // session tracking
+            project_id: projectRecord.id,   // Use internal UUID
+            email: email?.trim() || null,    // email column
+            message: feedbackMessage,        // message column
             metadata: {
-              form_type: 'product_feedback',
+              form_type: 'product',
               feedback_type: feedbackType,
               rating: rating ? Number(rating) : null,
               would_recommend: wouldRecommend,
               features: features,
               page_url: window.location.href,
-              browser: navigator.userAgent
+              browser: navigator.userAgent,
+              session_id: crypto.randomUUID()
             }
           }
         ]);
 
 if (error) {
   console.error("Error submitting feedback:", error.message, error.details);
+  
+  let errorMessage = 'Failed to submit feedback.';
+  if (error.code === '23503') {
+    errorMessage = 'Invalid project reference. Please check your project link.';
+  } else if (error.code === '23505') {
+    errorMessage = 'Duplicate feedback detected. Please try again.';
+  } else if (error.message) {
+    errorMessage = error.message;
+  }
+  
   toast({
     title: "Error",
-    description: error.message || "Failed to submit feedback. Please try again.",
+    description: errorMessage,
     variant: "destructive",
   });
   return;

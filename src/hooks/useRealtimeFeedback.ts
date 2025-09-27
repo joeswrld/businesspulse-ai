@@ -1,153 +1,171 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffect, useState } from 'react'
+import { supabase } from '@/integrations/supabase/client'
+import { useAuth } from '@/contexts/AuthContext'
 
-interface Feedback {
-  id: string;
-  project_id: string;
-  name: string;
-  email: string;
-  message: string;
-  timestamp: string;
-  status: 'new' | 'reviewed' | 'resolved';
-}
-
-interface FeedbackCounts {
-  total: number;
-  new: number;
-  reviewed: number;
-  resolved: number;
+interface FeedbackEntry {
+  id: string
+  project_id: string
+  user_email: string | null
+  content: string
+  sentiment: 'positive' | 'negative' | 'neutral' | null
+  metadata: {
+    form_type?: 'csat' | 'product'
+    page_url?: string
+    browser?: any
+    rating?: number
+    session_id?: string
+  } | null
+  created_at: string
 }
 
 export const useRealtimeFeedback = () => {
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
-  const [counts, setCounts] = useState<FeedbackCounts>({
-    total: 0,
-    new: 0,
-    reviewed: 0,
-    resolved: 0
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [realtimeStatus, setRealtimeStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
-  const { user } = useAuth();
+  const { user } = useAuth()
+  const [feedback, setFeedback] = useState<FeedbackEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const loadFeedbacks = async () => {
-    if (!user) return;
+  // Load initial feedback
+  const loadFeedback = async () => {
+    if (!user?.id) return
 
     try {
-      setLoading(true);
-      setError(null);
+      setLoading(true)
+      setError(null)
 
-      // Fetch feedbacks from the feedback table
-      const { data: feedbackData, error: feedbackError } = await supabase
-        .from('feedback')
-        .select('*')
+      // First, get the user's project settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('feedback_settings')
+        .select('id')
         .eq('user_id', user.id)
-        .order('timestamp', { ascending: false });
+        .single()
 
-      if (feedbackError) {
-        console.error('Error fetching feedbacks:', feedbackError);
-        setError(feedbackError.message);
-        return;
+      if (settingsError) {
+        console.error('Error loading project settings:', settingsError)
+        setError('Failed to load project settings')
+        return
       }
 
-      const feedbacks = feedbackData || [];
-      setFeedbacks(feedbacks);
+      if (!settingsData) {
+        setFeedback([])
+        return
+      }
 
-      // Calculate counts
-      const newCount = feedbacks.filter(f => f.status === 'new').length;
-      const reviewedCount = feedbacks.filter(f => f.status === 'reviewed').length;
-      const resolvedCount = feedbacks.filter(f => f.status === 'resolved').length;
+      // Then load feedback for that project
+      const { data: feedbackData, error: feedbackError } = await supabase
+        .from('feedback') // ✅ Fixed table name (singular)
+        .select('id, project_id, user_email, content, sentiment, metadata, created_at')
+        .eq('project_id', settingsData.id)
+        .order('created_at', { ascending: false })
 
-      setCounts({
-        total: feedbacks.length,
-        new: newCount,
-        reviewed: reviewedCount,
-        resolved: resolvedCount
-      });
+      if (feedbackError) {
+        console.error('Error loading feedback:', feedbackError)
+        setError('Failed to load feedback')
+        return
+      }
 
+      setFeedback((feedbackData as unknown as FeedbackEntry[]) || [])
     } catch (err) {
-      console.error('Error in loadFeedbacks:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error in loadFeedback:', err)
+      setError('Failed to load feedback')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
+
+  // Refresh function for manual refresh
+  const refreshFeedback = async () => {
+    await loadFeedback()
+  }
 
   useEffect(() => {
-    if (!user) {
-      setFeedbacks([]);
-      setCounts({ total: 0, new: 0, reviewed: 0, resolved: 0 });
-      setLoading(false);
-      setRealtimeStatus('disconnected');
-      return;
+    if (!user?.id) {
+      setFeedback([])
+      setLoading(false)
+      return
     }
 
-    // Initial load
-    loadFeedbacks();
+    // Load initial feedback
+    loadFeedback()
 
     // Set up real-time subscription
-    setRealtimeStatus('connecting');
-    
-    const channel = supabase
-      .channel('feedback-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'feedback',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          console.log('Feedback real-time update:', payload);
-          
-          if (payload.eventType === 'INSERT') {
-            setFeedbacks(prev => [payload.new as Feedback, ...prev]);
-            setCounts(prev => ({
-              ...prev,
-              total: prev.total + 1,
-              new: prev.new + (payload.new.status === 'new' ? 1 : 0),
-              reviewed: prev.reviewed + (payload.new.status === 'reviewed' ? 1 : 0),
-              resolved: prev.resolved + (payload.new.status === 'resolved' ? 1 : 0)
-            }));
-          } else if (payload.eventType === 'UPDATE') {
-            setFeedbacks(prev => prev.map(item => 
-              item.id === payload.new.id ? payload.new as Feedback : item
-            ));
-            // Recalculate counts for status changes
-            loadFeedbacks();
-          } else if (payload.eventType === 'DELETE') {
-            setFeedbacks(prev => prev.filter(item => item.id !== payload.old.id));
-            setCounts(prev => ({
-              ...prev,
-              total: Math.max(0, prev.total - 1)
-            }));
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          setRealtimeStatus('connected');
-        } else if (status === 'CHANNEL_ERROR') {
-          setRealtimeStatus('disconnected');
-        }
-      });
+    const setupRealtimeSubscription = async () => {
+      try {
+        // Get project IDs for real-time subscription
+        const { data: settingsData, error: settingsError } = await supabase
+          .from('feedback_settings')
+          .select('id')
+          .eq('user_id', user.id)
+          .single()
 
+        if (settingsError || !settingsData) {
+          console.error('Error getting project for subscription:', settingsError)
+          return
+        }
+
+        // Set up real-time subscription for feedback updates
+        const channel = supabase
+          .channel('feedback-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'feedback', // ✅ Fixed table name (singular)
+              filter: `project_id=eq.${settingsData.id}`
+            },
+            (payload) => {
+              console.log('Feedback change received:', payload)
+              
+              // Handle different types of changes
+              if (payload.eventType === 'INSERT') {
+                const newFeedback = payload.new as FeedbackEntry
+                setFeedback(prev => [newFeedback, ...prev])
+              } else if (payload.eventType === 'UPDATE') {
+                const updatedFeedback = payload.new as FeedbackEntry
+                setFeedback(prev => 
+                  prev.map(item => 
+                    item.id === updatedFeedback.id ? updatedFeedback : item
+                  )
+                )
+              } else if (payload.eventType === 'DELETE') {
+                const deletedId = payload.old.id
+                setFeedback(prev => prev.filter(item => item.id !== deletedId))
+              } else {
+                // For any other changes, reload all feedback
+                loadFeedback()
+              }
+            }
+          )
+          .subscribe()
+
+        // Return cleanup function
+        return () => {
+          supabase.removeChannel(channel)
+        }
+      } catch (err) {
+        console.error('Error setting up real-time subscription:', err)
+      }
+    }
+
+    // ✅ FIXED: Now properly handling the async function in useEffect
+    let cleanup: (() => void) | undefined
+
+    setupRealtimeSubscription().then((cleanupFn) => {
+      cleanup = cleanupFn
+    })
+
+    // Cleanup function
     return () => {
-      supabase.removeChannel(channel);
-      setRealtimeStatus('disconnected');
-    };
-  }, [user]);
+      if (cleanup) {
+        cleanup()
+      }
+    }
+  }, [user?.id])
 
   return {
-    feedbacks,
-    counts,
+    feedback,
     loading,
     error,
-    realtimeStatus,
-    loadFeedbacks
-  };
-};
+    refreshFeedback
+  }
+}
