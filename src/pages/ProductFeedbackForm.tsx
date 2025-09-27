@@ -9,20 +9,37 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle, AlertCircle, Package } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, Package, Star } from 'lucide-react';
 
-interface ProjectRecord {
-  id: string;
+interface ProductFeedbackFormProps {
+  projectId?: string;
+  previewMode?: boolean;
+  onSubmitted?: (data: any) => void;
 }
 
-const ProductFeedbackForm: React.FC = () => {
-  const { projectId } = useParams<{ projectId: string }>();
+interface FeedbackSettings {
+  id: string;
+  project_id: string;
+  widget_title: string;
+  widget_color: string;
+  greeting_text: string;
+  product_feedback_enabled: boolean;
+}
+
+const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
+  projectId: propProjectId,
+  previewMode = false,
+  onSubmitted
+}) => {
+  const { projectId: urlProjectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [isValidating, setIsValidating] = useState(true);
-  const [isValid, setIsValid] = useState(false);
-  const [projectRecord, setProjectRecord] = useState<ProjectRecord | null>(null);
+  const projectId = propProjectId || urlProjectId;
+
+  const [isValidating, setIsValidating] = useState(!previewMode);
+  const [isValid, setIsValid] = useState(previewMode);
+  const [settings, setSettings] = useState<FeedbackSettings | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
@@ -31,8 +48,8 @@ const ProductFeedbackForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [feedback, setFeedback] = useState('');
   const [features, setFeatures] = useState<string[]>([]);
-  const [rating, setRating] = useState('');
-  const [wouldRecommend, setWouldRecommend] = useState<boolean | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
+  const [priority, setPriority] = useState('');
 
   const feedbackTypes = [
     'Bug Report',
@@ -40,30 +57,49 @@ const ProductFeedbackForm: React.FC = () => {
     'General Feedback',
     'Usability Issue',
     'Performance Issue',
+    'Documentation',
+    'Integration Request',
     'Other',
   ];
 
   const featureOptions = [
     'User Interface',
     'Performance',
-    'Features',
+    'Features & Functionality',
     'Documentation',
-    'Support',
-    'Pricing',
-    'Integration',
+    'Customer Support',
+    'Pricing & Billing',
+    'API & Integrations',
     'Mobile Experience',
+    'Security',
+    'Accessibility'
+  ];
+
+  const priorityLevels = [
+    { value: 'low', label: 'Low - Nice to have' },
+    { value: 'medium', label: 'Medium - Important' },
+    { value: 'high', label: 'High - Critical' },
+    { value: 'urgent', label: 'Urgent - Blocking' }
   ];
 
   useEffect(() => {
-    if (projectId) {
+    if (projectId && !previewMode) {
       validateProject();
+    } else if (previewMode) {
+      // For preview mode, set dummy settings
+      setSettings({
+        id: 'preview',
+        project_id: projectId || 'preview',
+        widget_title: 'Product Feedback Form',
+        widget_color: '#10B981',
+        greeting_text: 'Help us improve our product by sharing your thoughts and suggestions',
+        product_feedback_enabled: true
+      });
     }
-  }, [projectId]);
+  }, [projectId, previewMode]);
 
-  // ✅ FIXED: Complete validateProject function with proper debugging
   const validateProject = async () => {
     if (!projectId) {
-      console.error('❌ No projectId in URL params');
       setValidationError('No project ID provided in URL');
       setIsValid(false);
       setIsValidating(false);
@@ -71,43 +107,33 @@ const ProductFeedbackForm: React.FC = () => {
     }
 
     setIsValidating(true);
-    console.log('🔍 Validating project ID:', projectId);
+    console.log('Validating project ID:', projectId);
 
     try {
-      // Debug: Check what projects exist
-      const { data: allProjects } = await supabase
-        .from('feedback_settings')
-        .select('id, project_id');
-      
-      console.log('📋 Available projects:', allProjects?.map(p => p.project_id));
-
-      // Try to find the specific project by project_id (text field)
       const { data, error } = await supabase
         .from('feedback_settings')
-        .select('id, project_id')
+        .select('*')
         .eq('project_id', projectId)
+        .eq('product_feedback_enabled', true)
         .maybeSingle();
 
       if (error) {
-        console.error('❌ Supabase error:', error);
+        console.error('Validation error:', error);
         throw error;
       }
 
-      console.log('🎯 Project query result:', data);
-
       if (data) {
-        setProjectRecord({ id: data.id });
+        setSettings(data);
         setIsValid(true);
         setValidationError('');
         console.log('✅ Project validated successfully');
       } else {
         setIsValid(false);
-        const availableProjects = allProjects?.map(p => p.project_id).join(', ') || 'None';
-        setValidationError(`Project "${projectId}" not found. Available: ${availableProjects}`);
-        console.log('❌ Project not found');
+        setValidationError(`Product feedback form is not enabled for this project.`);
+        console.log('❌ Project not found or form disabled');
       }
     } catch (err) {
-      console.error('💥 Validation failed:', err);
+      console.error('Error validating project:', err);
       setIsValid(false);
       setValidationError('This project link is invalid or expired.');
     } finally {
@@ -123,23 +149,36 @@ const ProductFeedbackForm: React.FC = () => {
     }
   };
 
+  const handleRatingClick = (selectedRating: number) => {
+    setRating(selectedRating);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (previewMode) {
+      toast({
+        title: 'Preview Mode',
+        description: 'This is a preview. Feedback will not be submitted.',
+        variant: 'default'
+      });
+      return;
+    }
 
     if (!feedbackType || !feedback.trim()) {
       toast({
         title: 'Required Fields',
         description: 'Please select a feedback type and provide your feedback',
-        variant: 'destructive',
+        variant: 'destructive'
       });
       return;
     }
 
-    if (!projectRecord?.id) {
+    if (!settings?.id) {
       toast({
         title: 'Invalid Project',
-        description: 'This project could not be found. Please check your project link.',
-        variant: 'destructive',
+        description: 'Cannot submit feedback for this project.',
+        variant: 'destructive'
       });
       return;
     }
@@ -147,93 +186,94 @@ const ProductFeedbackForm: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      // Format the feedback message to include all the details
-      const feedbackMessage = `Product Feedback - Type: ${feedbackType}
-${rating ? `Rating: ${rating}/5` : ''}
-${wouldRecommend !== null ? `Would Recommend: ${wouldRecommend ? 'Yes' : 'No'}` : ''}
-${features.length > 0 ? `Areas: ${features.join(', ')}` : ''}
+      // Get the project's internal UUID for the feedback table
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('project_id', projectId)
+        .single();
 
-Feedback:
-${feedback}`;
+      if (projectError || !projectData) {
+        throw new Error('Project not found');
+      }
 
-      // ✅ FIXED: Use correct table name and column names
+      const feedbackData = {
+        project_id: projectData.id,
+        form_type: 'product_feedback',
+        message: feedback.trim(),
+        rating: rating,
+        metadata: {
+          email: email.trim() || null,
+          feedback_type: feedbackType,
+          priority: priority || null,
+          features: features,
+          page_url: window.location.href,
+          user_agent: navigator.userAgent,
+          timestamp: new Date().toISOString()
+        }
+      };
+
       const { error } = await supabase
-        .from("feedback")
-        .insert([
-          {
-            project_id: projectRecord.id,     // Internal UUID
-            user_email: email?.trim() || null, // Correct column name
-            content: feedbackMessage,         // Correct column name
-            sentiment: null,                  // Sentiment column (nullable)
-            metadata: {                       // Add metadata
-              form_type: 'product',
-              feedback_type: feedbackType,
-              rating: rating || null,
-              would_recommend: wouldRecommend,
-              features: features,
-              page_url: window.location.href,
-              timestamp: new Date().toISOString()
-            }
-          }
-        ]);
+        .from('feedback')
+        .insert([feedbackData]);
 
       if (error) {
-        console.error("Error submitting feedback:", error.message, error.details);
+        console.error('Error submitting feedback:', error);
         
         let errorMessage = 'Failed to submit feedback.';
         if (error.code === '23503') {
           errorMessage = 'Invalid project reference. Please check your project link.';
-        } else if (error.code === '23505') {
-          errorMessage = 'Duplicate feedback detected. Please try again.';
         } else if (error.message) {
           errorMessage = error.message;
         }
         
         toast({
-          title: "Error",
+          title: 'Error',
           description: errorMessage,
-          variant: "destructive",
+          variant: 'destructive'
         });
         return;
       }
 
       setIsSubmitted(true);
+      if (onSubmitted) {
+        onSubmitted(feedbackData);
+      }
       toast({
-        title: "Thank you!",
-        description: "Your feedback has been submitted successfully.",
+        title: 'Thank you!',
+        description: 'Your product feedback has been submitted successfully.'
       });
-
-    } catch (error) {
-      console.error('Failed to submit feedback:', error);
+    } catch (err) {
+      console.error('Submit failed:', err);
       toast({
         title: 'Error',
         description: 'Failed to submit feedback. Please try again.',
-        variant: 'destructive',
+        variant: 'destructive'
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // === Render states ===
   if (isValidating) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading feedback form...</p>
+        </div>
       </div>
     );
   }
 
-  if (!isValid) {
+  if (!isValid && !previewMode) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <CardTitle className="text-xl">Invalid or Expired Link</CardTitle>
-            <CardDescription>
-              {validationError || 'This project link is invalid or expired.'}
-            </CardDescription>
+            <CardTitle className="text-xl">Form Not Available</CardTitle>
+            <CardDescription>{validationError}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={() => navigate('/')} className="w-full" variant="outline">
@@ -245,18 +285,18 @@ ${feedback}`;
     );
   }
 
-  if (isSubmitted) {
+  if (isSubmitted && !previewMode) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
             <CardTitle className="text-xl">Thank you for your feedback! 🎉</CardTitle>
-            <CardDescription>Your response was recorded successfully.</CardDescription>
+            <CardDescription>Your product feedback has been recorded successfully.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={() => window.close()} className="w-full">
-              Close Tab
+              Close
             </Button>
           </CardContent>
         </Card>
@@ -264,23 +304,36 @@ ${feedback}`;
     );
   }
 
-  // === Main form ===
+  const containerClass = previewMode 
+    ? "w-full" 
+    : "min-h-screen bg-background flex items-center justify-center p-4";
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className={containerClass}>
       <Card className="w-full max-w-2xl">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center mb-4">
-            <Package className="h-8 w-8 text-primary mr-2" />
-            <CardTitle className="text-2xl">Product Feedback Form</CardTitle>
+            <Package 
+              className="h-8 w-8 mr-2" 
+              style={{ color: settings?.widget_color || '#10B981' }}
+            />
+            <CardTitle className="text-2xl">
+              {settings?.widget_title || 'Product Feedback Form'}
+            </CardTitle>
           </div>
           <CardDescription>
-            Help us improve our product by sharing your thoughts and suggestions
+            {settings?.greeting_text || 'Help us improve our product by sharing your thoughts and suggestions'}
           </CardDescription>
+          {previewMode && (
+            <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
+              Preview Mode - Form will not submit
+            </div>
+          )}
         </CardHeader>
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Feedback Type */}
+            {/* Feedback Type and Priority */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="feedbackType">Feedback Type *</Label>
@@ -298,19 +351,18 @@ ${feedback}`;
                 </Select>
               </div>
 
-              {/* Rating */}
               <div className="space-y-2">
-                <Label htmlFor="rating">Overall Rating (optional)</Label>
-                <Select value={rating} onValueChange={setRating}>
+                <Label htmlFor="priority">Priority Level (optional)</Label>
+                <Select value={priority} onValueChange={setPriority}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select rating" />
+                    <SelectValue placeholder="Select priority" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">1 - Poor</SelectItem>
-                    <SelectItem value="2">2 - Fair</SelectItem>
-                    <SelectItem value="3">3 - Good</SelectItem>
-                    <SelectItem value="4">4 - Very Good</SelectItem>
-                    <SelectItem value="5">5 - Excellent</SelectItem>
+                    {priorityLevels.map((level) => (
+                      <SelectItem key={level.value} value={level.value}>
+                        {level.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -326,12 +378,15 @@ ${feedback}`;
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">
+                We'll only use this to follow up on your feedback if needed
+              </p>
             </div>
 
-            {/* Features */}
+            {/* Feature Areas */}
             <div className="space-y-3">
-              <Label>Which areas would you like to provide feedback on? (optional)</Label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Label>Which areas does your feedback relate to? (optional)</Label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {featureOptions.map((feature) => (
                   <div key={feature} className="flex items-center space-x-2">
                     <Checkbox
@@ -339,7 +394,7 @@ ${feedback}`;
                       checked={features.includes(feature)}
                       onCheckedChange={(checked) => handleFeatureChange(feature, checked as boolean)}
                     />
-                    <Label htmlFor={feature} className="text-sm">
+                    <Label htmlFor={feature} className="text-sm leading-tight">
                       {feature}
                     </Label>
                   </div>
@@ -347,51 +402,85 @@ ${feedback}`;
               </div>
             </div>
 
-            {/* Recommend */}
-            <div className="space-y-3">
-              <Label>Would you recommend this product? (optional)</Label>
-              <div className="flex space-x-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="recommend-yes"
-                    checked={wouldRecommend === true}
-                    onCheckedChange={(checked) => setWouldRecommend(checked ? true : null)}
-                  />
-                  <Label htmlFor="recommend-yes">Yes</Label>
+            {/* Overall Rating */}
+            <div className="space-y-4">
+              <Label className="text-base font-medium">Overall Product Rating (optional)</Label>
+              <div className="flex justify-center">
+                <div className="flex space-x-2">
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => handleRatingClick(value)}
+                      className="flex flex-col items-center cursor-pointer hover:opacity-80 transition-all p-2 rounded-lg hover:bg-gray-50"
+                    >
+                      <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        rating && rating >= value 
+                          ? `border-2` 
+                          : 'border-gray-300'
+                      }`} style={{
+                        borderColor: rating && rating >= value ? settings?.widget_color || '#10B981' : undefined,
+                        backgroundColor: rating && rating >= value ? `${settings?.widget_color || '#10B981'}15` : undefined
+                      }}>
+                        <Star
+                          className={`h-5 w-5 transition-colors ${
+                            rating && rating >= value 
+                              ? 'fill-current' 
+                              : 'text-gray-400'
+                          }`}
+                          style={{ 
+                            color: rating && rating >= value ? settings?.widget_color || '#10B981' : undefined 
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground mt-1">{value}</span>
+                    </button>
+                  ))}
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="recommend-no"
-                    checked={wouldRecommend === false}
-                    onCheckedChange={(checked) => setWouldRecommend(checked ? false : null)}
-                  />
-                  <Label htmlFor="recommend-no">No</Label>
-                </div>
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground px-4">
+                <span>Poor</span>
+                <span>Excellent</span>
               </div>
             </div>
 
-            {/* Feedback */}
+            {/* Feedback Message */}
             <div className="space-y-2">
               <Label htmlFor="feedback">Your Feedback *</Label>
               <Textarea
                 id="feedback"
-                placeholder="Please share your detailed feedback..."
+                placeholder="Please share your detailed feedback, suggestions, or report any issues you've encountered..."
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
                 rows={6}
                 className="resize-none"
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                Be as specific as possible to help us understand and address your feedback
+              </p>
             </div>
 
-            <Button type="submit" disabled={!feedbackType || !feedback.trim() || isSubmitting} className="w-full" size="lg">
+            <Button 
+              type="submit" 
+              disabled={!feedbackType || !feedback.trim() || isSubmitting || previewMode} 
+              className="w-full" 
+              size="lg"
+              style={{ 
+                backgroundColor: !feedbackType || !feedback.trim() || isSubmitting || previewMode 
+                  ? undefined 
+                  : settings?.widget_color || '#10B981' 
+              }}
+            >
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Submitting...
                 </>
+              ) : previewMode ? (
+                'Preview Mode - Cannot Submit'
               ) : (
-                'Submit Feedback'
+                'Submit Product Feedback'
               )}
             </Button>
           </form>
