@@ -36,12 +36,6 @@ const NoteXSidebar: React.FC = () => {
       requiresActiveSubscription: false,
     },
     {
-      name: 'Feedback',
-      href: '/feedback',
-      icon: MessageSquare,
-      requiresActiveSubscription: false,
-    },
-    {
       name: 'Roadmap',
       href: '/roadmap',
       icon: Target,

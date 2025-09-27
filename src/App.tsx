@@ -22,11 +22,7 @@ import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Teams from "./pages/Teams";
 import Profile from "./pages/Profile";
-import FeedbackSettings from "./pages/FeedbackSettings";
-import Feedback from "./pages/Feedback";
-import ProductFeedbackForm from "./pages/ProductFeedbackForm";
 import Roadmap from "./pages/Roadmap";
-import Widget from "./pages/Widget";
 import Testimonials from "./pages/Testimonials";
 import About from "./pages/About";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -47,12 +43,7 @@ import NotFound from "./pages/NotFound";
 // const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
 import TeamInvitation from "./pages/DashboardEnhanced";
 import Billing from "./pages/Billing";
-import CSATFormPage from "./pages/CSATFormPage";
-import ProductFeedbackFormPage from "./pages/ProductFeedbackFormPage";
-import FeedbackTest from "./pages/FeedbackTest";
 
-// ✅ Fixed: Use the actual form components from your pages
-import CSATForm from "./pages/CSATForm";
 
 const queryClient = new QueryClient();
 
@@ -87,11 +78,6 @@ const App = () => (
           <Route path="/templates" element={<Templates />} />
           <Route path="/cookie-policy" element={<CookiePolicy />} />
 
-          {/* 📋 FEEDBACK FORMS (public, no auth) */}
-          <Route path="/feedback/:projectId/csat" element={<CSATForm />} />
-          <Route path="/feedback/:projectId/product" element={<ProductFeedbackForm />} />
-          <Route path="/feedback-test" element={<FeedbackTest />} />
-          
           {/* 🔒 PROTECTED ROUTES */}
           <Route
             path="/*"
@@ -108,10 +94,6 @@ const App = () => (
                       <Route path="/teams" element={<DashboardLayout><Teams /></DashboardLayout>} />
                       <Route path="/billing" element={<DashboardLayout><Billing /></DashboardLayout>} />
                       <Route path="/profile" element={<DashboardLayout><Profile /></DashboardLayout>} />
-                      <Route path="/feedback-settings" element={<DashboardLayout><FeedbackSettings /></DashboardLayout>} />
-                      <Route path="/feedback" element={<DashboardLayout><Feedback /></DashboardLayout>} />
-                      <Route path="/roadmap" element={<DashboardLayout><Roadmap /></DashboardLayout>} />
-                      <Route path="/widget" element={<DashboardLayout><Widget /></DashboardLayout>} />
                       {/* <Route path="/teams/invite/:token" element={<TeamInvitation />} /> */}
                     </Routes>
                   </ThemeProvider>

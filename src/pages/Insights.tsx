@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useRealtimeFeedback } from '@/hooks/useRealtimeFeedback';
 import { toast } from 'sonner';
 import { 
   Brain, 
@@ -34,7 +33,6 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { FeedbackBadgeGroup } from '@/components/ui/FeedbackBadge';
 
 // Types
 interface Feedback {
@@ -77,13 +75,12 @@ const Insights: React.FC = () => {
   const location = useLocation();
   
   // Use real-time feedback hook
-  const { 
-    feedbacks, 
-    counts, 
-    loading: feedbackLoading, 
-    error: feedbackError, 
-    realtimeStatus 
-  } = useRealtimeFeedback();
+  // Mock feedback data since feedback system is removed
+  const feedbacks: Feedback[] = [];
+  const counts = { total: 0, new: 0, reviewed: 0, resolved: 0 };
+  const feedbackLoading = false;
+  const feedbackError = null;
+  const realtimeStatus = 'disconnected';
   
   // State
   const [selectedFeedbacks, setSelectedFeedbacks] = useState<Set<string>>(new Set());
