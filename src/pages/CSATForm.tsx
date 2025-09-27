@@ -46,21 +46,21 @@ const CSATForm: React.FC = () => {
   console.log('Validating project ID:', projectId); // Debug log
 
   try {
-    // First, check if feedback_settings table has any data
-    const { data: allSettings, error: debugError } = await supabase
-      .from('feedback_settings')
-      .select('id, project_id, user_id')
+    // First, check if projects table has any data
+    const { data: allProjects, error: debugError } = await supabase
+      .from('projects')
+      .select('id, project_id')
       .limit(10);
 
     if (debugError) {
       console.error('Debug query error:', debugError);
     } else {
-      console.log('Available feedback_settings:', allSettings); // Debug log
+      console.log('Available projects:', allProjects); // Debug log
     }
 
-    // Now try to find the specific project
+    // Now try to find the specific project by project_id (text field)
     const { data, error } = await supabase
-      .from('feedback_settings')
+      .from('projects')
       .select('id, project_id')
       .eq('project_id', projectId)
       .maybeSingle();
@@ -79,7 +79,7 @@ const CSATForm: React.FC = () => {
       console.log('✅ Project validated successfully'); // Debug log
     } else {
       setIsValid(false);
-      setValidationError(`Project "${projectId}" not found. Available projects: ${allSettings?.map(s => s.project_id).join(', ') || 'None'}`);
+      setValidationError(`Project "${projectId}" not found. Available projects: ${allProjects?.map(p => p.project_id).join(', ') || 'None'}`);
       console.log('❌ Project not found'); // Debug log
     }
   } catch (err) {
@@ -117,16 +117,21 @@ const CSATForm: React.FC = () => {
     try {
       const message = `CSAT Rating: ${rating}/5${comments ? `\n\nComments: ${comments}` : ''}`;
 
-      // ✅ FIXED: Only use columns that exist in the database schema
+      // ✅ FIXED: Use correct table name and column names
       const { error } = await supabase
-        .from('feedback')
+        .from('feedbacks')
         .insert([
           {
             project_id: projectRecord.project_id, // Internal UUID
-            email: email?.trim() || null,         // Email column (nullable)
-            message: message,                     // Message column
-            sentiment: null                       // Sentiment column (nullable)
-            // ❌ REMOVED: metadata and session_id (don't exist in schema)
+            user_email: email?.trim() || null,    // Correct column name
+            content: message,                     // Correct column name
+            sentiment: null,                      // Sentiment column (nullable)
+            metadata: {                           // Add metadata
+              form_type: 'csat',
+              rating: parseInt(rating),
+              page_url: window.location.href,
+              timestamp: new Date().toISOString()
+            }
           }
         ]);
 
