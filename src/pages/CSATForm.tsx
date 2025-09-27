@@ -48,7 +48,7 @@ const CSATForm: React.FC = () => {
   try {
     // First, check if projects table has any data
     const { data: allProjects, error: debugError } = await supabase
-      .from('projects')
+      .from('feedback_settings')
       .select('id, project_id')
       .limit(10);
 
@@ -60,7 +60,7 @@ const CSATForm: React.FC = () => {
 
     // Now try to find the specific project by project_id (text field)
     const { data, error } = await supabase
-      .from('projects')
+      .from('feedback_settings')
       .select('id, project_id')
       .eq('project_id', projectId)
       .maybeSingle();
@@ -119,7 +119,7 @@ const CSATForm: React.FC = () => {
 
       // ✅ FIXED: Use correct table name and column names
       const { error } = await supabase
-        .from('feedbacks')
+        .from('feedback')
         .insert([
           {
             project_id: projectRecord.project_id, // Internal UUID
