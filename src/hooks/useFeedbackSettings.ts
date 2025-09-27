@@ -84,7 +84,7 @@ export const useFeedbackSettings = (projectId?: string) => {
     try {
       // Get the first project for this user
       const { data: project, error: projectError } = await supabase
-        .from('projects')
+        .from('feedback_settings')
         .select('id')
         .eq('user_id', user.id)
         .order('created_at', { ascending: true })
