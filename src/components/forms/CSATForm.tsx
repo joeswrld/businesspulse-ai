@@ -8,17 +8,23 @@ import { useFeedbackForms } from '@/hooks/useFeedbackForms';
 import { Loader2, Star, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface CSATFormProps {
+  projectId?: string;
   title?: string;
-  description?: string;
+  greetingText?: string;
+  color?: string;
   onSuccess?: (data: any) => void;
   onError?: (error: string) => void;
+  className?: string;
 }
 
 const CSATForm: React.FC<CSATFormProps> = ({
+  projectId,
   title = "Customer Satisfaction Survey",
-  description = "Help us improve by sharing your experience",
+  greetingText = "Help us improve by sharing your experience",
+  color = "#3B82F6",
   onSuccess,
-  onError
+  onError,
+  className = ""
 }) => {
   const [formData, setFormData] = useState({
     email: '',
@@ -29,7 +35,7 @@ const CSATForm: React.FC<CSATFormProps> = ({
   const [showSuccess, setShowSuccess] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
 
-  const { submitFeedback, isSubmitting, isValidating, projectId, isValid, error: projectIdError } = useFeedbackForms();
+  const { submitFeedback, isSubmitting, isValidating, currentProjectId, isValid, error: projectIdError } = useFeedbackForms(projectId);
 
   const handleRatingClick = (rating: number) => {
     setFormData(prev => ({ ...prev, rating }));
@@ -100,7 +106,7 @@ const CSATForm: React.FC<CSATFormProps> = ({
   }
 
   // Show error if project ID is invalid
-  if (!isValid || !projectId) {
+  if (!isValid || !currentProjectId) {
     return (
       <Card className="w-full max-w-2xl mx-auto border-red-200">
         <CardContent className="p-8">
@@ -117,10 +123,10 @@ const CSATForm: React.FC<CSATFormProps> = ({
   }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className={`w-full max-w-2xl mx-auto ${className}`}>
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold text-gray-900">{title}</CardTitle>
-        <p className="text-gray-600">{description}</p>
+        <p className="text-gray-600">{greetingText}</p>
       </CardHeader>
       
       <CardContent>
