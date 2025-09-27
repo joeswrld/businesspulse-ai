@@ -28,7 +28,6 @@ import {
   ExternalLink,
   Code,
   Plus,
-  Upload,
   X
 } from 'lucide-react';
 
@@ -832,3 +831,10 @@ export default function FeedbackSettings() {
                   Create Project
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
