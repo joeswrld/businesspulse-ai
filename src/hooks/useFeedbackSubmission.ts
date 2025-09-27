@@ -72,12 +72,11 @@ export const useFeedbackSubmission = () => {
 
       // Submit to Supabase
       const { data: result, error } = await supabase
-        .from('feedbacks')
+        .from('feedback')
         .insert({
           project_id: data.projectId,
-          user_email: data.email?.trim() || null,
-          content: content.trim(),
-          sentiment: null, // Will be analyzed later
+          email: data.email?.trim() || null,
+          message: content.trim(),
           metadata: metadata
         })
         .select()

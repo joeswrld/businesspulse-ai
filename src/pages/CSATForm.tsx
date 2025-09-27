@@ -39,17 +39,17 @@ const CSATForm: React.FC = () => {
     setIsValidating(true);
 
     try {
-      // Validate projectId against projects table
+      // Validate projectId and get internal UUID from feedback_settings
       const { data, error } = await supabase
         .from('feedback_settings')
-        .select('project_id')
+        .select('id, project_id')
         .eq('project_id', projectId)
         .maybeSingle();
 
       if (error) throw error;
 
       if (data) {
-        setProjectRecord({ project_id: data.project_id });
+        setProjectRecord({ project_id: data.id }); // Use internal UUID
         setIsValid(true);
         setValidationError('');
       } else {
@@ -80,7 +80,7 @@ const CSATForm: React.FC = () => {
     if (!projectRecord?.project_id) {
       toast({
         title: 'Invalid Project',
-        description: 'Cannot submit feedback for this project.',
+        description: 'Cannot submit feedback for this project. Please check your project link.',
         variant: 'destructive'
       });
       return;
@@ -98,16 +98,31 @@ const CSATForm: React.FC = () => {
             project_id: projectRecord.project_id,
             email: email?.trim() || null,
             message,
-            sentiment: null,
-            session_id: crypto.randomUUID()
+            metadata: {
+              form_type: 'csat',
+              rating: parseInt(rating),
+              session_id: crypto.randomUUID(),
+              page_url: window.location.href,
+              browser: navigator.userAgent
+            }
           }
         ]);
 
       if (error) {
         console.error('Error submitting feedback:', error);
+        
+        let errorMessage = 'Failed to submit feedback.';
+        if (error.code === '23503') {
+          errorMessage = 'Invalid project reference. Please check your project link.';
+        } else if (error.code === '23505') {
+          errorMessage = 'Duplicate feedback detected. Please try again.';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
         toast({
           title: 'Error',
-          description: error.message || 'Failed to submit feedback.',
+          description: errorMessage,
           variant: 'destructive'
         });
         return;

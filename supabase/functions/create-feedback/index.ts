@@ -247,17 +247,19 @@ serve(async (req) => {
     // Insert feedback into database
     console.log('Inserting feedback...');
     const { data: feedback, error: feedbackError } = await supabase
-      .from('feedbacks')
+      .from('feedback')
       .insert({
-        user_id: user.id,
         project_id: project_id,
-        message: message,
-        name: name || null,
         email: email || null,
-        status: 'new',
-        sentiment: analyzedSentiment,
-        tags: tags || [],
-        timestamp: new Date().toISOString()
+        message: message,
+        metadata: {
+          user_id: user.id,
+          name: name || null,
+          status: 'new',
+          sentiment: analyzedSentiment,
+          tags: tags || [],
+          timestamp: new Date().toISOString()
+        }
       })
       .select()
       .single();
