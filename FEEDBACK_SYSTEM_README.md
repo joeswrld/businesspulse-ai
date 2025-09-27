@@ -1,207 +1,298 @@
-# Feedback System
+# Notex Feedback System
 
-A complete feedback collection system with customizable widget, settings management, and feedback viewing capabilities.
+A comprehensive feedback collection system with customizable widgets, forms, and analytics.
 
 ## 🚀 Features
 
-### 📊 Three Main Pages
-1. **Feedback Settings** (`/feedback-settings`) - Configure widget appearance and behavior
-2. **Feedback** (`/feedback`) - View and manage all feedback entries
-3. **Widget** (`/widget`) - Preview widget and get embed code
+### 1. **Enhanced Feedback Widget**
+- Floating widget with customizable appearance
+- Form type selection (CSAT or Product Feedback)
+- Minimizable and resizable interface
+- Real-time settings from database
+- Success animations and user feedback
 
-### 🎨 Widget Features
-- Floating feedback button with custom color
-- Customizable title and greeting text
-- Optional email collection
+### 2. **Customer Satisfaction Survey (CSAT)**
+- 5-star rating system with hover effects
+- Email collection (optional)
+- Detailed feedback text area
+- Sentiment analysis integration
 - Mobile-responsive design
-- Easy integration with single script tag
 
-### 🔒 Security
-- Row Level Security (RLS) enabled
-- Users can only access their own feedback data
-- Project-based data isolation
+### 3. **Product Feedback Form**
+- Feature request collection
+- Bug report functionality
+- User experience feedback
+- Categorization and tagging
+- Anonymous or identified submissions
 
-## 📋 Database Schema
+### 4. **Standalone Feedback Page**
+- Full-page responsive design
+- Direct URL access
+- Customizable branding
+- Form type selection
+- Success animations
 
-### `feedback_settings` Table
-```sql
-- id (uuid, primary key)
-- user_id (uuid, references auth.users)
-- project_id (text, unique)
-- widget_title (text, default: 'Share your feedback with us!')
-- widget_color (text, default: '#3B82F6')
-- greeting_text (text, default: 'Welcome, tell us what's on your mind')
-- created_at (timestamptz)
+### 5. **Embeddable JavaScript Widget**
+- One-line integration
+- Customizable appearance
+- No external dependencies
+- Cross-browser compatibility
+- Mobile-friendly
+
+## 📁 File Structure
+
+```
+src/
+├── components/forms/
+│   ├── EnhancedFeedbackWidget.tsx    # Main floating widget
+│   ├── CSATForm.tsx                 # Customer satisfaction form
+│   └── ProductFeedbackForm.tsx      # Product feedback form
+├── pages/
+│   ├── Feedback.tsx                 # Feedback management dashboard
+│   ├── FeedbackSettings.tsx         # Widget configuration
+│   ├── StandaloneFeedback.tsx       # Standalone feedback page
+│   └── FeedbackTest.tsx             # Testing and preview page
+├── hooks/
+│   ├── useFeedbackForms.ts          # Form submission logic
+│   └── useFeedbackSettings.ts       # Settings management
+└── integrations/supabase/
+    └── types.ts                     # Database type definitions
+
+public/
+└── feedback-widget.js               # Embeddable JavaScript widget
 ```
 
-### `feedback` Table
+## 🗄️ Database Schema
+
+### Feedback Table
 ```sql
-- id (uuid, primary key)
-- project_id (text, references feedback_settings.project_id)
-- email (text, optional)
-- message (text, required)
-- created_at (timestamptz)
+CREATE TABLE feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id TEXT NOT NULL,
+  user_email TEXT,
+  content TEXT NOT NULL,
+  sentiment TEXT,
+  session_id TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### Feedback Settings Table
+```sql
+CREATE TABLE feedback_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  project_id TEXT NOT NULL,
+  widget_title TEXT,
+  widget_color TEXT,
+  greeting_text TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
 ## 🛠️ Setup Instructions
 
-### 1. Deploy Database Schema
+### 1. Database Setup
+Run the SQL script to fix the database schema:
 ```bash
-# Run the deployment script
-./deploy-feedback-system.sh
-
-# Or manually deploy the schema
-supabase db push --file feedback_system_schema.sql
+psql -f fix_feedback_schema.sql
 ```
 
-### 2. Update Widget Configuration
-Edit `public/widget.js` and update the configuration:
+### 2. Environment Variables
+Ensure your Supabase configuration is properly set up in your environment.
 
-```javascript
-const CONFIG = {
-  apiUrl: 'YOUR_SUPABASE_URL',
-  apiKey: 'YOUR_SUPABASE_ANON_KEY',
-  // ... other config
-};
+### 3. Component Integration
+
+#### Basic Widget Integration
+```tsx
+import EnhancedFeedbackWidget from '@/components/forms/EnhancedFeedbackWidget';
+
+function App() {
+  return (
+    <div>
+      {/* Your app content */}
+      <EnhancedFeedbackWidget 
+        projectId="your-project-id"
+        onFeedbackSubmitted={(feedback) => {
+          console.log('Feedback received:', feedback);
+        }}
+      />
+    </div>
+  );
+}
 ```
 
-### 3. Test the System
-1. Visit `/feedback-settings` to configure your widget
-2. Visit `/feedback` to view feedback entries
-3. Visit `/widget` to get the embed code
-4. Test the widget on a sample page
+#### Standalone Page
+```tsx
+import StandaloneFeedback from '@/pages/StandaloneFeedback';
 
-## 📱 Usage
+// Route: /feedback/:projectId
+<Route path="/feedback/:projectId" element={<StandaloneFeedback />} />
+```
 
-### For Users (Website Owners)
-
-1. **Configure Widget**
-   - Go to Feedback Settings page
-   - Set widget title, color, and greeting text
-   - Copy your Project ID
-
-2. **Embed Widget**
-   - Go to Widget page
-   - Copy the embed script
-   - Paste before `</body>` tag on your website
-
-3. **View Feedback**
-   - Go to Feedback page
-   - View all feedback entries
-   - Use search and filters to find specific feedback
-
-### For Website Visitors
-
-1. **Submit Feedback**
-   - Click the floating feedback button
-   - Fill in the feedback form
-   - Optionally provide email for follow-up
-
-## 🔧 Technical Details
-
-### Widget Integration
+#### JavaScript Embed
 ```html
-<!-- Add this script to your website -->
-<script src="https://notex.com.ng/widget.js" data-project-id="YOUR_PROJECT_ID"></script>
+<script>
+  (function() {
+    var script = document.createElement('script');
+    script.src = 'https://your-domain.com/feedback-widget.js';
+    script.setAttribute('data-project-id', 'your-project-id');
+    script.setAttribute('data-widget-color', '#3B82F6');
+    script.setAttribute('data-widget-title', 'Share your feedback with us!');
+    script.setAttribute('data-greeting-text', 'Welcome, tell us what\'s on your mind');
+    document.head.appendChild(script);
+  })();
+</script>
 ```
-
-### API Endpoints
-- `GET /rest/v1/feedback_settings?project_id=eq.{project_id}` - Get widget settings
-- `POST /rest/v1/feedback` - Submit feedback
-- `GET /rest/v1/feedback?project_id=eq.{project_id}` - Get feedback entries
-
-### RLS Policies
-- Users can only access their own feedback settings
-- Users can only view feedback for their project
-- Anyone can submit feedback (public endpoint)
 
 ## 🎨 Customization
 
-### Widget Styling
-The widget automatically adapts to your settings:
-- **Color**: Set via `widget_color` in settings
-- **Title**: Set via `widget_title` in settings
-- **Greeting**: Set via `greeting_text` in settings
+### Widget Appearance
+- **Color**: Set `widget_color` in feedback_settings table
+- **Title**: Customize `widget_title` 
+- **Greeting**: Modify `greeting_text`
+- **Position**: Configure in JavaScript widget
 
-### Custom Styling
-You can override widget styles by adding CSS after the widget script:
+### Form Types
+- **CSAT**: Customer satisfaction with rating system
+- **Product**: Feature requests and bug reports
+- **Both**: Form type selection interface
 
-```html
-<script src="https://notex.com.ng/widget.js" data-project-id="YOUR_PROJECT_ID"></script>
-<style>
-  #notex-feedback-button {
-    /* Your custom styles */
-  }
-</style>
+### Styling
+All components use Tailwind CSS classes and can be customized:
+- Color schemes
+- Typography
+- Spacing and layout
+- Responsive breakpoints
+
+## 📊 Analytics & Data
+
+### Feedback Data Structure
+```typescript
+interface FeedbackEntry {
+  id: string;
+  project_id: string;
+  user_email: string | null;
+  content: string;
+  sentiment: 'positive' | 'negative' | 'neutral' | null;
+  metadata: {
+    form_type: 'csat' | 'product' | 'widget';
+    rating?: number;
+    page_url?: string;
+    browser?: object;
+    session_id?: string;
+  };
+  created_at: string;
+}
 ```
 
-## 🔍 Monitoring
+### Sentiment Analysis
+- Automatic sentiment detection
+- Rating-based sentiment scoring
+- Keyword analysis
+- Trend tracking
 
-### Feedback Analytics
-- Total feedback count
-- Feedback with/without email
-- Daily feedback count
-- Search and filter capabilities
+## 🔧 API Endpoints
 
-### Real-time Updates
-- Refresh button to get latest feedback
-- Automatic loading states
-- Error handling and user feedback
+### Submit Feedback
+```typescript
+POST /api/feedback
+Content-Type: application/json
 
-## 🚨 Troubleshooting
+{
+  "project_id": "string",
+  "user_email": "string (optional)",
+  "content": "string",
+  "rating": "number (optional)",
+  "metadata": "object"
+}
+```
+
+### Get Feedback Settings
+```typescript
+GET /api/feedback-settings?project_id=string
+```
+
+## 🧪 Testing
+
+### Test Page
+Visit `/feedback-test` to test all components:
+- Widget functionality
+- Form submissions
+- Standalone page
+- Embed code generation
+
+### Manual Testing
+1. **Widget Test**: Click the floating button
+2. **Form Test**: Submit both CSAT and Product forms
+3. **Standalone Test**: Open direct feedback URL
+4. **Embed Test**: Copy and test embed code
+
+## 🚀 Deployment
+
+### Production Checklist
+- [ ] Database schema updated
+- [ ] Environment variables configured
+- [ ] Widget JavaScript file deployed
+- [ ] API endpoints functional
+- [ ] CORS settings configured
+- [ ] SSL certificate installed
+
+### Performance Optimization
+- Lazy loading for components
+- Image optimization
+- CDN for static assets
+- Database indexing
+- Caching strategies
+
+## 🔒 Security
+
+### Data Protection
+- Email validation
+- Content sanitization
+- Rate limiting
+- CORS configuration
+- SQL injection prevention
+
+### Privacy Features
+- Anonymous submissions
+- Data retention policies
+- GDPR compliance
+- User consent management
+
+## 📈 Monitoring
+
+### Key Metrics
+- Feedback submission rate
+- Form completion rate
+- Sentiment distribution
+- Response time
+- Error rates
+
+### Alerts
+- High error rates
+- Failed submissions
+- Database issues
+- Performance degradation
+
+## 🤝 Support
+
+### Troubleshooting
+1. **Widget not appearing**: Check project ID and JavaScript console
+2. **Forms not submitting**: Verify database connection and API endpoints
+3. **Styling issues**: Check Tailwind CSS configuration
+4. **Database errors**: Run schema fix script
 
 ### Common Issues
+- **CORS errors**: Configure Supabase CORS settings
+- **Authentication**: Ensure proper RLS policies
+- **Performance**: Check database indexes and queries
 
-1. **Widget not appearing**
-   - Check if Project ID is correct
-   - Verify script is loaded before `</body>` tag
-   - Check browser console for errors
+## 📝 License
 
-2. **Feedback not submitting**
-   - Verify Supabase URL and API key in widget.js
-   - Check RLS policies are correctly set
-   - Ensure feedback table exists
-
-3. **Settings not saving**
-   - Check user authentication
-   - Verify RLS policies for feedback_settings table
-   - Check browser console for errors
-
-### Debug Mode
-Enable debug logging by adding `?debug=true` to your widget URL:
-```html
-<script src="https://notex.com.ng/widget.js?debug=true" data-project-id="YOUR_PROJECT_ID"></script>
-```
-
-## 📈 Future Enhancements
-
-- [ ] Email notifications for new feedback
-- [ ] Feedback categorization and tagging
-- [ ] Export feedback to CSV/PDF
-- [ ] Advanced analytics and reporting
-- [ ] Multi-language support
-- [ ] Custom form fields
-- [ ] Integration with popular platforms
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🆘 Support
-
-For support and questions:
-- Create an issue in the repository
-- Check the troubleshooting section
-- Review the documentation
+This feedback system is part of the Notex platform and follows the same licensing terms.
 
 ---
 
-**Happy feedback collecting! 🎉**
+For more information, visit the [Notex Documentation](https://docs.notex.com) or contact support.

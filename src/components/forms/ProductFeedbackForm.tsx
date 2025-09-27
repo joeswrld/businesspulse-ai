@@ -8,17 +8,23 @@ import { useFeedbackForms } from '@/hooks/useFeedbackForms';
 import { Loader2, CheckCircle, AlertCircle, MessageSquare } from 'lucide-react';
 
 interface ProductFeedbackFormProps {
+  projectId?: string;
   title?: string;
-  description?: string;
+  greetingText?: string;
+  color?: string;
   onSuccess?: (data: any) => void;
   onError?: (error: string) => void;
+  className?: string;
 }
 
 const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
+  projectId,
   title = "Product Feedback",
-  description = "Help us improve our product by sharing your thoughts",
+  greetingText = "Help us improve our product by sharing your thoughts",
+  color = "#3B82F6",
   onSuccess,
-  onError
+  onError,
+  className = ""
 }) => {
   const [formData, setFormData] = useState({
     email: '',
@@ -27,7 +33,7 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
   const [showSuccess, setShowSuccess] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
 
-  const { submitFeedback, isSubmitting, isValidating, projectId, isValid, error: projectIdError } = useFeedbackForms();
+  const { submitFeedback, isSubmitting, isValidating, currentProjectId, isValid, error: projectIdError } = useFeedbackForms(projectId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +86,7 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
   }
 
   // Show error if project ID is invalid
-  if (!isValid || !projectId) {
+  if (!isValid || !currentProjectId) {
     return (
       <Card className="w-full max-w-2xl mx-auto border-red-200">
         <CardContent className="p-8">
@@ -97,13 +103,13 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
   }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className={`w-full max-w-2xl mx-auto ${className}`}>
       <CardHeader className="text-center">
         <div className="flex items-center justify-center mb-2">
-          <MessageSquare className="h-8 w-8 text-blue-600" />
+          <MessageSquare className="h-8 w-8" style={{ color: color }} />
         </div>
         <CardTitle className="text-2xl font-bold text-gray-900">{title}</CardTitle>
-        <p className="text-gray-600">{description}</p>
+        <p className="text-gray-600">{greetingText}</p>
       </CardHeader>
       
       <CardContent>

@@ -27,10 +27,10 @@ export interface FeedbackFormState {
  * Enhanced hook for CSAT and Product Feedback forms with dynamic project ID validation
  * and comprehensive metadata tracking
  */
-export const useFeedbackForms = () => {
+export const useFeedbackForms = (projectId?: string) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { projectId, isValidating, isValid, error: projectIdError } = useProjectId();
+  const { projectId: currentProjectId, isValidating, isValid, error: projectIdError } = useProjectId(projectId);
 
   const generateSessionId = (): string => {
     return crypto.randomUUID();
@@ -73,7 +73,7 @@ export const useFeedbackForms = () => {
       return { success: false, error: 'Already submitting feedback' };
     }
 
-    if (!projectId) {
+    if (!currentProjectId) {
       return { success: false, error: 'Project ID not found. Please ensure you have a valid project link.' };
     }
 
@@ -110,10 +110,11 @@ export const useFeedbackForms = () => {
       const { data: result, error } = await supabase
         .from('feedback')
         .insert({
-          project_id: projectId,
-          email: data.email?.trim() || null,
-          message: content,
-          metadata: metadata
+          project_id: currentProjectId,
+          user_email: data.email?.trim() || null,
+          content: content,
+          metadata: metadata,
+          session_id: sessionId
         })
         .select()
         .single();
@@ -162,7 +163,7 @@ export const useFeedbackForms = () => {
     submitFeedback,
     isSubmitting,
     isValidating,
-    projectId,
+    currentProjectId,
     isValid,
     error: projectIdError
   };
