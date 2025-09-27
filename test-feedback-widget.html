@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoteX Feedback Widget Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #1f2937;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f9fafb;
+        }
+        .test-section h2 {
+            color: #374151;
+            margin-top: 0;
+        }
+        .code-block {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .button {
+            background: #3b82f6;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #2563eb;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        .instructions {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            color: #92400e;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 NoteX Feedback Widget Test Page</h1>
+        
+        <div class="instructions">
+            <h3>📋 Test Instructions</h3>
+            <ol>
+                <li>Replace <code>YOUR_PROJECT_ID</code> in the script tag below with your actual project ID</li>
+                <li>Make sure your NoteX platform is running and accessible</li>
+                <li>Configure your feedback settings in the NoteX dashboard</li>
+                <li>Test the widget by clicking the feedback button (should appear in bottom-right)</li>
+                <li>Submit both satisfaction and product feedback forms</li>
+                <li>Check the feedback dashboard to verify submissions</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h2>🚀 Widget Integration</h2>
+            <p>Add this script tag to your website to enable the feedback widget:</p>
+            <div class="code-block">
+&lt;script src="http://localhost:5173/widget.js" data-project-id="YOUR_PROJECT_ID"&gt;&lt;/script&gt;
+            </div>
+            <p><strong>Note:</strong> Replace <code>YOUR_PROJECT_ID</code> with your actual project ID from the NoteX dashboard.</p>
+        </div>
+
+        <div class="test-section">
+            <h2>🧪 Test Widget</h2>
+            <p>Click the button below to manually load the widget for testing:</p>
+            <button class="button" onclick="loadWidget()">Load Feedback Widget</button>
+            <button class="button" onclick="testAPI()">Test API Connection</button>
+            <div id="status"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Expected Behavior</h2>
+            <ul>
+                <li>✅ Floating feedback button appears in bottom-right corner</li>
+                <li>✅ Button has blue color and message icon</li>
+                <li>✅ Clicking button opens modal with forms</li>
+                <li>✅ Two tabs: "Satisfaction" and "Feedback"</li>
+                <li>✅ Satisfaction form has 5-star rating system</li>
+                <li>✅ Product feedback form has type and priority selectors</li>
+                <li>✅ Forms submit successfully and show success message</li>
+                <li>✅ Data appears in NoteX feedback dashboard</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 Debug Information</h2>
+            <p>Check browser console for any errors or debug information.</p>
+            <button class="button" onclick="showDebugInfo()">Show Debug Info</button>
+            <div id="debug-info"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📱 Mobile Testing</h2>
+            <p>Test the widget on mobile devices or use browser dev tools to simulate mobile viewport.</p>
+            <p>The widget should be responsive and work well on touch devices.</p>
+        </div>
+    </div>
+
+    <!-- NoteX Feedback Widget -->
+    <script src="http://localhost:5173/widget.js" data-project-id="test-project-id"></script>
+
+    <script>
+        function loadWidget() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = '<div class="status info">Widget should be loading... Check for the floating button in the bottom-right corner.</div>';
+            
+            // Check if widget loaded
+            setTimeout(() => {
+                const widget = document.getElementById('notex-feedback-button');
+                if (widget) {
+                    statusDiv.innerHTML = '<div class="status success">✅ Widget loaded successfully! Look for the floating button.</div>';
+                } else {
+                    statusDiv.innerHTML = '<div class="status error">❌ Widget failed to load. Check console for errors.</div>';
+                }
+            }, 2000);
+        }
+
+        function testAPI() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = '<div class="status info">Testing API connection...</div>';
+            
+            // Test API endpoint
+            fetch('http://localhost:54321/functions/v1/widget-settings/test-project-id')
+                .then(response => {
+                    if (response.ok) {
+                        statusDiv.innerHTML = '<div class="status success">✅ API connection successful!</div>';
+                    } else {
+                        statusDiv.innerHTML = '<div class="status error">❌ API connection failed. Check if Supabase functions are running.</div>';
+                    }
+                })
+                .catch(error => {
+                    statusDiv.innerHTML = '<div class="status error">❌ API connection failed: ' + error.message + '</div>';
+                });
+        }
+
+        function showDebugInfo() {
+            const debugDiv = document.getElementById('debug-info');
+            const info = {
+                userAgent: navigator.userAgent,
+                url: window.location.href,
+                timestamp: new Date().toISOString(),
+                widgetScript: document.querySelector('script[data-project-id]') ? 'Found' : 'Not found',
+                projectId: document.querySelector('script[data-project-id]')?.getAttribute('data-project-id') || 'Not set'
+            };
+            
+            debugDiv.innerHTML = '<div class="code-block">' + JSON.stringify(info, null, 2) + '</div>';
+        }
+
+        // Auto-load widget on page load
+        window.addEventListener('load', () => {
+            setTimeout(loadWidget, 1000);
+        });
+
+        // Log any errors
+        window.addEventListener('error', (e) => {
+            console.error('Page error:', e.error);
+        });
+    </script>
+</body>
+</html>
