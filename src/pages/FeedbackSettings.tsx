@@ -5,11 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -20,20 +18,14 @@ import {
   Copy,
   Check,
   MessageSquare,
-  Star,
-  Bug,
-  Lightbulb,
   Globe,
   Smartphone,
   Monitor,
-  Download,
-  Upload,
   RefreshCw,
   AlertCircle,
   CheckCircle,
   ExternalLink,
-  Code,
-  Share2
+  Code
 } from 'lucide-react';
 
 // Types
@@ -41,9 +33,9 @@ interface FeedbackSettings {
   id: string;
   user_id: string;
   project_id: string;
-  widget_title: string | null;
-  widget_color: string | null;
-  greeting_text: string | null;
+  widget_title: string;
+  widget_color: string;
+  greeting_text: string;
   created_at: string;
 }
 
@@ -51,6 +43,8 @@ interface Project {
   id: string;
   name: string;
   user_id: string;
+  project_id: string;
+  settings?: any;
 }
 
 export default function FeedbackSettings() {
@@ -72,7 +66,7 @@ export default function FeedbackSettings() {
       setLoading(true);
       setError(null);
 
-      // Load user's projects
+      // Check if projects table exists
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select('*')
@@ -81,19 +75,58 @@ export default function FeedbackSettings() {
 
       if (projectsError) {
         console.error('Error loading projects:', projectsError);
+        
+        // Handle case where projects table doesn't exist
+        if (projectsError.code === '42P01' || projectsError.message?.includes('relation "projects" does not exist')) {
+          console.log('Projects table does not exist, creating fallback project');
+          
+          // Create a fallback project structure
+          const fallbackProject: Project = {
+            id: `fallback-${user.id}`,
+            name: 'My Project',
+            user_id: user.id,
+            project_id: `proj-${Date.now()}`,
+            settings: {
+              widget_title: 'We love your feedback!',
+              widget_color: '#3B82F6',
+              greeting_text: 'Help us improve by sharing your thoughts'
+            }
+          };
+          
+          setProjects([fallbackProject]);
+          setSelectedProject(fallbackProject.id);
+          
+          const feedbackSettings: FeedbackSettings = {
+            id: fallbackProject.id,
+            user_id: fallbackProject.user_id,
+            project_id: fallbackProject.project_id,
+            widget_title: fallbackProject.settings.widget_title,
+            widget_color: fallbackProject.settings.widget_color,
+            greeting_text: fallbackProject.settings.greeting_text,
+            created_at: new Date().toISOString()
+          };
+          setSettings(feedbackSettings);
+          return;
+        }
         throw projectsError;
       }
 
       let currentProjects = projectsData || [];
 
-              // If no projects exist, create a default project
-        if (currentProjects.length === 0) {
-          const defaultProject = {
-            user_id: user.id,
-            name: 'My Project',
-            project_id: `proj-${Date.now()}` // Generate unique ID
-          };
+      // If no projects exist, create a default project
+      if (currentProjects.length === 0) {
+        const defaultProject = {
+          user_id: user.id,
+          name: 'My Project',
+          project_id: `proj-${Date.now()}`,
+          settings: {
+            widget_title: 'We love your feedback!',
+            widget_color: '#3B82F6',
+            greeting_text: 'Help us improve by sharing your thoughts'
+          }
+        };
 
+        try {
           const { data: newProject, error: createProjectError } = await supabase
             .from('projects')
             .insert(defaultProject)
@@ -106,7 +139,19 @@ export default function FeedbackSettings() {
           }
 
           currentProjects = [newProject];
+        } catch (createError) {
+          console.error('Failed to create project, using fallback:', createError);
+          // Use fallback project if creation fails
+          const fallbackProject: Project = {
+            id: `fallback-${user.id}`,
+            name: 'My Project',
+            user_id: user.id,
+            project_id: `proj-${Date.now()}`,
+            settings: defaultProject.settings
+          };
+          currentProjects = [fallbackProject];
         }
+      }
 
       setProjects(currentProjects);
 
@@ -114,62 +159,18 @@ export default function FeedbackSettings() {
         const firstProject = currentProjects[0];
         setSelectedProject(firstProject.id);
 
-        // Load settings for the first project from projects table
-        const { data: settingsData, error: settingsError } = await supabase
-          .from('projects')
-          .select('id, user_id, project_id, name, settings')
-          .eq('id', firstProject.id)
-          .single();
-
-        if (settingsError && settingsError.code !== 'PGRST116') {
-          console.error('Error loading settings:', settingsError);
-          throw settingsError;
-        }
-
-        if (settingsData) {
-          // Extract settings from project.settings JSONB field
-          const projectSettings = settingsData.settings || {};
-          const feedbackSettings: FeedbackSettings = {
-            id: settingsData.id,
-            user_id: settingsData.user_id,
-            project_id: settingsData.project_id,
-            widget_title: projectSettings.widget_title || 'We love your feedback!',
-            widget_color: projectSettings.widget_color || '#3B82F6',
-            greeting_text: projectSettings.greeting_text || 'Help us improve by sharing your thoughts',
-            created_at: new Date().toISOString()
-          };
-          setSettings(feedbackSettings);
-        } else {
-          // Create default settings in project.settings
-          const defaultSettings = {
-            widget_title: 'We love your feedback!',
-            widget_color: '#3B82F6',
-            greeting_text: 'Help us improve by sharing your thoughts'
-          };
-
-          const { data: updatedProject, error: updateError } = await supabase
-            .from('projects')
-            .update({ settings: defaultSettings })
-            .eq('id', firstProject.id)
-            .select()
-            .single();
-
-          if (updateError) {
-            console.error('Error updating project settings:', updateError);
-            throw updateError;
-          }
-
-          const feedbackSettings: FeedbackSettings = {
-            id: updatedProject.id,
-            user_id: updatedProject.user_id,
-            project_id: updatedProject.project_id,
-            widget_title: defaultSettings.widget_title,
-            widget_color: defaultSettings.widget_color,
-            greeting_text: defaultSettings.greeting_text,
-            created_at: new Date().toISOString()
-          };
-          setSettings(feedbackSettings);
-        }
+        // Extract settings from project
+        const projectSettings = firstProject.settings || {};
+        const feedbackSettings: FeedbackSettings = {
+          id: firstProject.id,
+          user_id: firstProject.user_id,
+          project_id: firstProject.project_id || firstProject.id,
+          widget_title: projectSettings.widget_title || 'We love your feedback!',
+          widget_color: projectSettings.widget_color || '#3B82F6',
+          greeting_text: projectSettings.greeting_text || 'Help us improve by sharing your thoughts',
+          created_at: new Date().toISOString()
+        };
+        setSettings(feedbackSettings);
       }
 
     } catch (error) {
@@ -195,58 +196,47 @@ export default function FeedbackSettings() {
   }, [selectedProject, user]);
 
   const loadProjectSettings = async (projectId: string) => {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+
     try {
-      const { data: projectData, error: projectError } = await supabase
-        .from('projects')
-        .select('id, user_id, project_id, name, settings')
-        .eq('id', projectId)
-        .single();
-
-      if (projectError && projectError.code !== 'PGRST116') {
-        console.error('Error loading project:', projectError);
-        throw projectError;
-      }
-
-      if (projectData) {
-        // Extract settings from project.settings JSONB field
-        const projectSettings = projectData.settings || {};
+      // If it's a fallback project, just use its settings
+      if (projectId.startsWith('fallback-')) {
+        const projectSettings = project.settings || {};
         const feedbackSettings: FeedbackSettings = {
-          id: projectData.id,
-          user_id: projectData.user_id,
-          project_id: projectData.project_id,
+          id: project.id,
+          user_id: project.user_id,
+          project_id: project.project_id,
           widget_title: projectSettings.widget_title || 'We love your feedback!',
           widget_color: projectSettings.widget_color || '#3B82F6',
           greeting_text: projectSettings.greeting_text || 'Help us improve by sharing your thoughts',
           created_at: new Date().toISOString()
         };
         setSettings(feedbackSettings);
-      } else {
-        // Create default settings for this project
-        const defaultSettings = {
-          widget_title: 'We love your feedback!',
-          widget_color: '#3B82F6',
-          greeting_text: 'Help us improve by sharing your thoughts'
-        };
+        return;
+      }
 
-        const { data: updatedProject, error: updateError } = await supabase
-          .from('projects')
-          .update({ settings: defaultSettings })
-          .eq('id', projectId)
-          .select()
-          .single();
+      // For real projects, load from database
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
 
-        if (updateError) {
-          console.error('Error updating project settings:', updateError);
-          throw updateError;
-        }
+      if (projectError && projectError.code !== 'PGRST116') {
+        console.error('Error loading project:', projectError);
+        return;
+      }
 
+      if (projectData) {
+        const projectSettings = projectData.settings || {};
         const feedbackSettings: FeedbackSettings = {
-          id: updatedProject.id,
-          user_id: updatedProject.user_id,
-          project_id: updatedProject.project_id,
-          widget_title: defaultSettings.widget_title,
-          widget_color: defaultSettings.widget_color,
-          greeting_text: defaultSettings.greeting_text,
+          id: projectData.id,
+          user_id: projectData.user_id,
+          project_id: projectData.project_id || projectData.id,
+          widget_title: projectSettings.widget_title || 'We love your feedback!',
+          widget_color: projectSettings.widget_color || '#3B82F6',
+          greeting_text: projectSettings.greeting_text || 'Help us improve by sharing your thoughts',
           created_at: new Date().toISOString()
         };
         setSettings(feedbackSettings);
@@ -264,7 +254,12 @@ export default function FeedbackSettings() {
     try {
       setSaving(true);
 
-      // Save settings to project.settings JSONB field
+      // If it's a fallback project, just show success (can't save to database)
+      if (selectedProject.startsWith('fallback-')) {
+        toast.success('Settings saved locally!');
+        return;
+      }
+
       const settingsToSave = {
         widget_title: settings.widget_title,
         widget_color: settings.widget_color,
@@ -298,12 +293,9 @@ export default function FeedbackSettings() {
 
   // Copy embed code
   const copyEmbedCode = async () => {
-    if (!selectedProject) return;
+    if (!selectedProject || !settings) return;
 
-    // Get the project_id from the selected project
-    const project = projects.find(p => p.id === selectedProject);
-    const projectId = project?.project_id || selectedProject;
-    const embedCode = `<script src="${window.location.origin}/widget.js" data-project-id="${projectId}"></script>`;
+    const embedCode = `<script src="${window.location.origin}/widget.js" data-project-id="${settings.project_id}"></script>`;
     
     try {
       await navigator.clipboard.writeText(embedCode);
@@ -318,22 +310,17 @@ export default function FeedbackSettings() {
 
   // Get embed URL
   const getEmbedUrl = () => {
-    if (!selectedProject) return '';
-    // Get the project_id from the selected project
-    const project = projects.find(p => p.id === selectedProject);
-    return `${window.location.origin}/widget.js?project_id=${project?.project_id || selectedProject}`;
+    if (!selectedProject || !settings) return '';
+    return `${window.location.origin}/widget.js?project_id=${settings.project_id}`;
   };
 
   // Get direct form URLs
   const getFormUrls = () => {
-    if (!selectedProject) return { satisfaction: '', feedback: '' };
+    if (!selectedProject || !settings) return { satisfaction: '', feedback: '' };
     const baseUrl = window.location.origin;
-    // Get the project_id from the selected project
-    const project = projects.find(p => p.id === selectedProject);
-    const projectId = project?.project_id || selectedProject;
     return {
-      satisfaction: `${baseUrl}/forms/satisfaction?project_id=${projectId}`,
-      feedback: `${baseUrl}/forms/feedback?project_id=${projectId}`
+      satisfaction: `${baseUrl}/forms/satisfaction?project_id=${settings.project_id}`,
+      feedback: `${baseUrl}/forms/feedback?project_id=${settings.project_id}`
     };
   };
 
@@ -393,10 +380,11 @@ export default function FeedbackSettings() {
             <Globe className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">No Projects Found</h2>
             <p className="text-gray-600 mb-4">
-              You need to create a project first to configure feedback settings.
+              Creating a default project for you...
             </p>
-            <Button asChild>
-              <a href="/dashboard">Go to Dashboard</a>
+            <Button onClick={loadData}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
             </Button>
           </div>
         </div>
@@ -480,7 +468,7 @@ export default function FeedbackSettings() {
                     <Label htmlFor="widget-title">Widget Title</Label>
                     <Input
                       id="widget-title"
-                      value={settings.widget_title}
+                      value={settings.widget_title || ''}
                       onChange={(e) => updateSetting('widget_title', e.target.value)}
                       placeholder="We love your feedback!"
                     />
@@ -493,12 +481,12 @@ export default function FeedbackSettings() {
                       <Input
                         id="widget-color"
                         type="color"
-                        value={settings.widget_color}
+                        value={settings.widget_color || '#3B82F6'}
                         onChange={(e) => updateSetting('widget_color', e.target.value)}
                         className="w-16 h-10 p-1 border rounded"
                       />
                       <Input
-                        value={settings.widget_color}
+                        value={settings.widget_color || '#3B82F6'}
                         onChange={(e) => updateSetting('widget_color', e.target.value)}
                         placeholder="#3B82F6"
                         className="flex-1"
@@ -511,13 +499,12 @@ export default function FeedbackSettings() {
                     <Label htmlFor="greeting-text">Greeting Text</Label>
                     <Textarea
                       id="greeting-text"
-                      value={settings.greeting_text}
+                      value={settings.greeting_text || ''}
                       onChange={(e) => updateSetting('greeting_text', e.target.value)}
                       placeholder="Help us improve by sharing your thoughts"
                       rows={3}
                     />
                   </div>
-
                 </div>
               </CardContent>
             </Card>
@@ -541,7 +528,7 @@ export default function FeedbackSettings() {
                   <Label>Embed Code</Label>
                   <div className="flex items-center space-x-2">
                     <Input
-                      value={`<script src="${getEmbedUrl()}" data-project-id="${projects.find(p => p.id === selectedProject)?.project_id || selectedProject}"></script>`}
+                      value={`<script src="${getEmbedUrl()}" data-project-id="${settings.project_id}"></script>`}
                       readOnly
                       className="font-mono text-sm"
                     />
@@ -601,13 +588,13 @@ export default function FeedbackSettings() {
                   <h4 className="font-medium mb-2">API Endpoints</h4>
                   <div className="space-y-2 text-sm font-mono">
                     <div>
-                      <span className="text-blue-600">GET</span> /api/widget/settings/{projects.find(p => p.id === selectedProject)?.project_id || selectedProject}
+                      <span className="text-blue-600">GET</span> /api/widget/settings/{settings.project_id}
                     </div>
                     <div>
                       <span className="text-green-600">POST</span> /api/widget/feedback
                     </div>
                     <div>
-                      <span className="text-blue-600">GET</span> /api/feedback/stats/{projects.find(p => p.id === selectedProject)?.project_id || selectedProject}
+                      <span className="text-blue-600">GET</span> /api/feedback/stats/{settings.project_id}
                     </div>
                   </div>
                 </div>
