@@ -91,20 +91,16 @@ const CSATForm: React.FC = () => {
     try {
       const message = `CSAT Rating: ${rating}/5${comments ? `\n\nComments: ${comments}` : ''}`;
 
+      // ✅ FIXED: Only use columns that exist in the database schema
       const { error } = await supabase
         .from('feedback')
         .insert([
           {
-            project_id: projectRecord.project_id,
-            email: email?.trim() || null,
-            message,
-            metadata: {
-              form_type: 'csat',
-              rating: parseInt(rating),
-              session_id: crypto.randomUUID(),
-              page_url: window.location.href,
-              browser: navigator.userAgent
-            }
+            project_id: projectRecord.project_id, // Internal UUID
+            email: email?.trim() || null,         // Email column (nullable)
+            message: message,                     // Message column
+            sentiment: null                       // Sentiment column (nullable)
+            // ❌ REMOVED: metadata and session_id (don't exist in schema)
           }
         ]);
 
