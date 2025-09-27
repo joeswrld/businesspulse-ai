@@ -30,7 +30,7 @@ interface FeedbackEntry {
 }
 
 interface ProjectSelection {
-  id: string // UUID used in feedbacks.project_id
+  id: string // UUID used in feedback.project_id
   project_id: string // external human-facing id
 }
 
@@ -65,7 +65,7 @@ const Feedback: React.FC = () => {
           {
             event: '*',
             schema: 'public',
-            table: 'feedbacks',
+            table: 'feedback',
             filter: `project_id=eq.${project.id}`
           },
           (payload) => {
@@ -111,7 +111,7 @@ const Feedback: React.FC = () => {
       setLoading(true)
       
       const { data, error } = await supabase
-        .from('feedbacks')
+        .from('feedback')
         .select('id, project_id, user_email, content, sentiment, metadata, created_at')
         .eq('project_id', project.id)
         .order('created_at', { ascending: false })
