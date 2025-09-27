@@ -86,27 +86,27 @@ export default function FeedbackSettings() {
 
       let currentProjects = projectsData || [];
 
-      // If no projects exist, create a default project
-      if (currentProjects.length === 0) {
-        const defaultProject = {
-          user_id: user.id,
-          name: 'My Project',
-          project_id: `proj_${Date.now()}` // Generate unique ID
-        };
+              // If no projects exist, create a default project
+        if (currentProjects.length === 0) {
+          const defaultProject = {
+            user_id: user.id,
+            name: 'My Project',
+            project_id: `proj-${Date.now()}` // Generate unique ID
+          };
 
-        const { data: newProject, error: createProjectError } = await supabase
-          .from('projects')
-          .insert(defaultProject)
-          .select()
-          .single();
+          const { data: newProject, error: createProjectError } = await supabase
+            .from('projects')
+            .insert(defaultProject)
+            .select()
+            .single();
 
-        if (createProjectError) {
-          console.error('Error creating default project:', createProjectError);
-          throw createProjectError;
+          if (createProjectError) {
+            console.error('Error creating default project:', createProjectError);
+            throw createProjectError;
+          }
+
+          currentProjects = [newProject];
         }
-
-        currentProjects = [newProject];
-      }
 
       setProjects(currentProjects);
 
@@ -114,11 +114,11 @@ export default function FeedbackSettings() {
         const firstProject = currentProjects[0];
         setSelectedProject(firstProject.id);
 
-        // Load settings for the first project
+        // Load settings for the first project from projects table
         const { data: settingsData, error: settingsError } = await supabase
-          .from('feedback_settings')
-          .select('*')
-          .eq('project_id', firstProject.id)
+          .from('projects')
+          .select('id, user_id, project_id, name, settings')
+          .eq('id', firstProject.id)
           .single();
 
         if (settingsError && settingsError.code !== 'PGRST116') {
@@ -127,29 +127,48 @@ export default function FeedbackSettings() {
         }
 
         if (settingsData) {
-          setSettings(settingsData);
+          // Extract settings from project.settings JSONB field
+          const projectSettings = settingsData.settings || {};
+          const feedbackSettings: FeedbackSettings = {
+            id: settingsData.id,
+            user_id: settingsData.user_id,
+            project_id: settingsData.project_id,
+            widget_title: projectSettings.widget_title || 'We love your feedback!',
+            widget_color: projectSettings.widget_color || '#3B82F6',
+            greeting_text: projectSettings.greeting_text || 'Help us improve by sharing your thoughts',
+            created_at: new Date().toISOString()
+          };
+          setSettings(feedbackSettings);
         } else {
-          // Create default settings
-          const defaultSettings: Omit<FeedbackSettings, 'id' | 'created_at'> = {
-            user_id: user.id,
-            project_id: firstProject.id,
+          // Create default settings in project.settings
+          const defaultSettings = {
             widget_title: 'We love your feedback!',
             widget_color: '#3B82F6',
             greeting_text: 'Help us improve by sharing your thoughts'
           };
 
-          const { data: newSettings, error: createError } = await supabase
-            .from('feedback_settings')
-            .insert(defaultSettings)
+          const { data: updatedProject, error: updateError } = await supabase
+            .from('projects')
+            .update({ settings: defaultSettings })
+            .eq('id', firstProject.id)
             .select()
             .single();
 
-          if (createError) {
-            console.error('Error creating settings:', createError);
-            throw createError;
+          if (updateError) {
+            console.error('Error updating project settings:', updateError);
+            throw updateError;
           }
 
-          setSettings(newSettings);
+          const feedbackSettings: FeedbackSettings = {
+            id: updatedProject.id,
+            user_id: updatedProject.user_id,
+            project_id: updatedProject.project_id,
+            widget_title: defaultSettings.widget_title,
+            widget_color: defaultSettings.widget_color,
+            greeting_text: defaultSettings.greeting_text,
+            created_at: new Date().toISOString()
+          };
+          setSettings(feedbackSettings);
         }
       }
 
@@ -177,41 +196,60 @@ export default function FeedbackSettings() {
 
   const loadProjectSettings = async (projectId: string) => {
     try {
-      const { data: settingsData, error: settingsError } = await supabase
-        .from('feedback_settings')
-        .select('*')
-        .eq('project_id', projectId)
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .select('id, user_id, project_id, name, settings')
+        .eq('id', projectId)
         .single();
 
-      if (settingsError && settingsError.code !== 'PGRST116') {
-        console.error('Error loading settings:', settingsError);
-        throw settingsError;
+      if (projectError && projectError.code !== 'PGRST116') {
+        console.error('Error loading project:', projectError);
+        throw projectError;
       }
 
-      if (settingsData) {
-        setSettings(settingsData);
+      if (projectData) {
+        // Extract settings from project.settings JSONB field
+        const projectSettings = projectData.settings || {};
+        const feedbackSettings: FeedbackSettings = {
+          id: projectData.id,
+          user_id: projectData.user_id,
+          project_id: projectData.project_id,
+          widget_title: projectSettings.widget_title || 'We love your feedback!',
+          widget_color: projectSettings.widget_color || '#3B82F6',
+          greeting_text: projectSettings.greeting_text || 'Help us improve by sharing your thoughts',
+          created_at: new Date().toISOString()
+        };
+        setSettings(feedbackSettings);
       } else {
         // Create default settings for this project
-        const defaultSettings: Omit<FeedbackSettings, 'id' | 'created_at'> = {
-          user_id: user.id,
-          project_id: projectId,
+        const defaultSettings = {
           widget_title: 'We love your feedback!',
           widget_color: '#3B82F6',
           greeting_text: 'Help us improve by sharing your thoughts'
         };
 
-        const { data: newSettings, error: createError } = await supabase
-          .from('feedback_settings')
-          .insert(defaultSettings)
+        const { data: updatedProject, error: updateError } = await supabase
+          .from('projects')
+          .update({ settings: defaultSettings })
+          .eq('id', projectId)
           .select()
           .single();
 
-        if (createError) {
-          console.error('Error creating settings:', createError);
-          throw createError;
+        if (updateError) {
+          console.error('Error updating project settings:', updateError);
+          throw updateError;
         }
 
-        setSettings(newSettings);
+        const feedbackSettings: FeedbackSettings = {
+          id: updatedProject.id,
+          user_id: updatedProject.user_id,
+          project_id: updatedProject.project_id,
+          widget_title: defaultSettings.widget_title,
+          widget_color: defaultSettings.widget_color,
+          greeting_text: defaultSettings.greeting_text,
+          created_at: new Date().toISOString()
+        };
+        setSettings(feedbackSettings);
       }
     } catch (error) {
       console.error('Error loading project settings:', error);
@@ -226,13 +264,17 @@ export default function FeedbackSettings() {
     try {
       setSaving(true);
 
+      // Save settings to project.settings JSONB field
+      const settingsToSave = {
+        widget_title: settings.widget_title,
+        widget_color: settings.widget_color,
+        greeting_text: settings.greeting_text
+      };
+
       const { error } = await supabase
-        .from('feedback_settings')
-        .upsert({
-          ...settings,
-          user_id: user.id,
-          project_id: selectedProject
-        });
+        .from('projects')
+        .update({ settings: settingsToSave })
+        .eq('id', selectedProject);
 
       if (error) {
         console.error('Error saving settings:', error);
@@ -258,7 +300,10 @@ export default function FeedbackSettings() {
   const copyEmbedCode = async () => {
     if (!selectedProject) return;
 
-    const embedCode = `<script src="${window.location.origin}/widget.js" data-project-id="${selectedProject}"></script>`;
+    // Get the project_id from the selected project
+    const project = projects.find(p => p.id === selectedProject);
+    const projectId = project?.project_id || selectedProject;
+    const embedCode = `<script src="${window.location.origin}/widget.js" data-project-id="${projectId}"></script>`;
     
     try {
       await navigator.clipboard.writeText(embedCode);
@@ -274,16 +319,21 @@ export default function FeedbackSettings() {
   // Get embed URL
   const getEmbedUrl = () => {
     if (!selectedProject) return '';
-    return `${window.location.origin}/widget.js?project_id=${selectedProject}`;
+    // Get the project_id from the selected project
+    const project = projects.find(p => p.id === selectedProject);
+    return `${window.location.origin}/widget.js?project_id=${project?.project_id || selectedProject}`;
   };
 
   // Get direct form URLs
   const getFormUrls = () => {
     if (!selectedProject) return { satisfaction: '', feedback: '' };
     const baseUrl = window.location.origin;
+    // Get the project_id from the selected project
+    const project = projects.find(p => p.id === selectedProject);
+    const projectId = project?.project_id || selectedProject;
     return {
-      satisfaction: `${baseUrl}/forms/satisfaction?project_id=${selectedProject}`,
-      feedback: `${baseUrl}/forms/feedback?project_id=${selectedProject}`
+      satisfaction: `${baseUrl}/forms/satisfaction?project_id=${projectId}`,
+      feedback: `${baseUrl}/forms/feedback?project_id=${projectId}`
     };
   };
 
@@ -491,7 +541,7 @@ export default function FeedbackSettings() {
                   <Label>Embed Code</Label>
                   <div className="flex items-center space-x-2">
                     <Input
-                      value={`<script src="${getEmbedUrl()}" data-project-id="${selectedProject}"></script>`}
+                      value={`<script src="${getEmbedUrl()}" data-project-id="${projects.find(p => p.id === selectedProject)?.project_id || selectedProject}"></script>`}
                       readOnly
                       className="font-mono text-sm"
                     />
@@ -551,13 +601,13 @@ export default function FeedbackSettings() {
                   <h4 className="font-medium mb-2">API Endpoints</h4>
                   <div className="space-y-2 text-sm font-mono">
                     <div>
-                      <span className="text-blue-600">GET</span> /api/widget/settings/{selectedProject}
+                      <span className="text-blue-600">GET</span> /api/widget/settings/{projects.find(p => p.id === selectedProject)?.project_id || selectedProject}
                     </div>
                     <div>
                       <span className="text-green-600">POST</span> /api/widget/feedback
                     </div>
                     <div>
-                      <span className="text-blue-600">GET</span> /api/feedback/stats/{selectedProject}
+                      <span className="text-blue-600">GET</span> /api/feedback/stats/{projects.find(p => p.id === selectedProject)?.project_id || selectedProject}
                     </div>
                   </div>
                 </div>

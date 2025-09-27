@@ -57,10 +57,15 @@ import {
 interface Feedback {
   id: string;
   project_id: string;
-  email: string | null;
-  message: string;
-  page_url: string | null;
-  browser: string | null;
+  user_email: string | null;
+  content: string;
+  sentiment: string | null;
+  metadata: {
+    email?: string;
+    page_url?: string;
+    user_agent?: string;
+    [key: string]: any;
+  };
   created_at: string;
 }
 
@@ -125,14 +130,14 @@ export default function Feedback() {
 
       // Load feedbacks
       const { data: feedbacksData, error: feedbacksError } = await supabase
-        .from('feedback')
+        .from('feedbacks')
         .select(`
           id,
           project_id,
-          email,
-          message,
-          page_url,
-          browser,
+          user_email,
+          content,
+          sentiment,
+          metadata,
           created_at
         `)
         .in('project_id', projectIds)
@@ -149,15 +154,26 @@ export default function Feedback() {
       const feedbacksList = feedbacksData || [];
       const totalFeedback = feedbacksList.length;
       
-      // Since the current feedback table doesn't have rating/form_type, we'll use basic stats
-      const averageRating = 0; // Will be calculated when rating data is available
-      const customerSatisfactionCount = 0; // Will be calculated when form_type data is available
-      const productFeedbackCount = totalFeedback; // All feedback is product feedback for now
+      // Calculate sentiment-based stats since we don't have rating/form_type
+      const positiveCount = feedbacksList.filter(f => f.sentiment === 'positive').length;
+      const negativeCount = feedbacksList.filter(f => f.sentiment === 'negative').length;
+      const neutralCount = feedbacksList.filter(f => f.sentiment === 'neutral').length;
       
-      const ratingDistribution: { [key: number]: number } = {};
-      for (let i = 1; i <= 5; i++) {
-        ratingDistribution[i] = 0; // Will be populated when rating data is available
-      }
+      // Use sentiment as a proxy for rating (positive = 5, neutral = 3, negative = 1)
+      const averageRating = totalFeedback > 0 ? 
+        (positiveCount * 5 + neutralCount * 3 + negativeCount * 1) / totalFeedback : 0;
+      
+      // For now, treat all feedback as product feedback since we don't have form_type
+      const customerSatisfactionCount = 0;
+      const productFeedbackCount = totalFeedback;
+      
+      const ratingDistribution: { [key: number]: number } = {
+        1: negativeCount,
+        2: 0,
+        3: neutralCount,
+        4: 0,
+        5: positiveCount
+      };
 
       setStats({
         totalFeedback,
@@ -194,7 +210,7 @@ export default function Feedback() {
         {
           event: '*',
           schema: 'public',
-          table: 'feedback'
+          table: 'feedbacks'
         },
         (payload) => {
           console.log('Feedback change received:', payload);
@@ -241,8 +257,9 @@ export default function Feedback() {
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase();
       filtered = filtered.filter(f => 
-        f.message.toLowerCase().includes(query) ||
-        (f.email && f.email.toLowerCase().includes(query))
+        f.content.toLowerCase().includes(query) ||
+        (f.user_email && f.user_email.toLowerCase().includes(query)) ||
+        (f.metadata?.email && f.metadata.email.toLowerCase().includes(query))
       );
     }
 
@@ -286,13 +303,14 @@ export default function Feedback() {
   // Export functionality
   const exportToCSV = () => {
     const csvContent = [
-      ['Date', 'Message', 'Email', 'Page URL', 'Browser'].join(','),
+      ['Date', 'Content', 'Email', 'Sentiment', 'Page URL', 'User Agent'].join(','),
       ...filteredFeedbacks.map(f => [
         new Date(f.created_at).toLocaleDateString(),
-        `"${f.message.replace(/"/g, '""')}"`,
-        f.email || '',
-        f.page_url || '',
-        f.browser || ''
+        `"${f.content.replace(/"/g, '""')}"`,
+        f.user_email || f.metadata?.email || '',
+        f.sentiment || '',
+        f.metadata?.page_url || '',
+        f.metadata?.user_agent || ''
       ].join(','))
     ].join('\n');
 
@@ -656,22 +674,27 @@ export default function Feedback() {
                       <Badge variant="secondary">
                         Product Feedback
                       </Badge>
+                      {feedback.sentiment && (
+                        <Badge variant={feedback.sentiment === 'positive' ? 'default' : feedback.sentiment === 'negative' ? 'destructive' : 'secondary'}>
+                          {feedback.sentiment}
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center space-x-2 text-sm text-gray-500">
                       <Clock className="h-4 w-4" />
                       <span>{format(new Date(feedback.created_at), 'MMM dd, yyyy HH:mm')}</span>
                     </div>
                   </div>
-                  <p className="text-gray-700 text-sm mb-2">{feedback.message}</p>
+                  <p className="text-gray-700 text-sm mb-2">{feedback.content}</p>
                   <div className="flex items-center space-x-4 text-xs text-gray-500">
-                    {feedback.email && (
-                      <span>From: {feedback.email}</span>
+                    {(feedback.user_email || feedback.metadata?.email) && (
+                      <span>From: {feedback.user_email || feedback.metadata?.email}</span>
                     )}
-                    {feedback.page_url && (
-                      <span>Page: {feedback.page_url}</span>
+                    {feedback.metadata?.page_url && (
+                      <span>Page: {feedback.metadata.page_url}</span>
                     )}
-                    {feedback.browser && (
-                      <span>Browser: {feedback.browser}</span>
+                    {feedback.metadata?.user_agent && (
+                      <span>Browser: {feedback.metadata.user_agent}</span>
                     )}
                   </div>
                 </div>
