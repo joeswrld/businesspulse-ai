@@ -61,40 +61,7 @@ const ProductFeedbackForm: React.FC = () => {
   }, [projectId]);
 
   const validateProject = async () => {
-    if (!projectId) return;
-    try {
-      setIsValidating(true);
-
-      const { data, error } = await supabase
-        .from('feedback_settings')
-        .select('id, project_id')
-        .eq('project_id', projectId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Validation error:', error);
-        setIsValid(false);
-        setValidationError('This project link is invalid or expired.');
-        return;
-      }
-
-      if (data) {
-        setProjectRecord({ id: data.id }); // Use internal UUID
-        setIsValid(true);
-        setValidationError('');
-      } else {
-        setIsValid(false);
-        setValidationError('This project link is invalid or expired.');
-      }
-    } catch (error) {
-      console.error('Error validating project:', error);
-      setIsValid(false);
-      setValidationError('This project link is invalid or expired.');
-    } finally {
-      setIsValidating(false);
-    }
-  };
-
+  if (!projectId)
   const handleFeatureChange = (feature: string, checked: boolean) => {
     if (checked) {
       setFeatures([...features, feature]);
