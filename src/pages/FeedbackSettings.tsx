@@ -7,6 +7,7 @@ const FeedbackSettings = () => {
   const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState({
     customerSatisfactionEnabled: true,
     productFeedbackEnabled: true,
@@ -24,18 +25,69 @@ const FeedbackSettings = () => {
   const initializeProject = async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      // Call the safe RPC function
-      const { data, error } = await supabase.rpc("create_project_with_settings", {
+      // First, try the RPC function
+      let project = null;
+      const { data: rpcData, error: rpcError } = await supabase.rpc("create_project_with_settings", {
         user_id: user.id,
       });
 
-      if (error || !data || data.length === 0) {
-        console.error("❌ Project creation failed:", error || "No data returned");
-        throw new Error("Failed to initialize project");
+      if (!rpcError && rpcData && rpcData.length > 0) {
+        project = rpcData[0];
+      } else {
+        // Fallback: Manual project creation if RPC doesn't exist
+        console.log("🔄 RPC failed, falling back to manual project creation...");
+        
+        // Check if user already has a project
+        const { data: existingProjects } = await supabase
+          .from('projects')
+          .select('*')
+          .eq('user_id', user.id)
+          .limit(1);
+
+        if (existingProjects && existingProjects.length > 0) {
+          project = existingProjects[0];
+        } else {
+          // Create new project manually
+          const { data: newProject, error: createError } = await supabase
+            .from('projects')
+            .insert([
+              {
+                user_id: user.id,
+                name: 'Default Project',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }
+            ])
+            .select()
+            .single();
+
+          if (createError) throw createError;
+          project = newProject;
+        }
+
+        // Ensure widget settings exist
+        if (project) {
+          await supabase
+            .from('widget_settings')
+            .upsert({
+              project_id: project.id,
+              customer_satisfaction_enabled: true,
+              product_feedback_enabled: true,
+              theme: 'light',
+              brand_color: '#3B82F6',
+              greeting: 'We value your feedback!',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+        }
       }
 
-      const project = data[0];
+      if (!project) {
+        throw new Error("Failed to create or find project");
+      }
+
       setProject(project);
 
       // Load existing widget settings
@@ -56,8 +108,9 @@ const FeedbackSettings = () => {
         }));
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error initializing project:", error);
+      setError(error.message || "Failed to initialize project");
     } finally {
       setLoading(false);
     }
@@ -68,6 +121,7 @@ const FeedbackSettings = () => {
 
     try {
       setSaving(true);
+      setError(null);
 
       const { error } = await supabase
         .from('widget_settings')
@@ -83,10 +137,10 @@ const FeedbackSettings = () => {
 
       if (error) throw error;
 
-      // Show success notification
       console.log("✅ Settings saved successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Error saving settings:", error);
+      setError(error.message || "Failed to save settings");
     } finally {
       setSaving(false);
     }
@@ -122,6 +176,36 @@ const FeedbackSettings = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error</h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>{error}</p>
+              </div>
+              <div className="mt-4">
+                <button
+                  onClick={initializeProject}
+                  className="bg-red-100 px-3 py-2 rounded-md text-sm font-medium text-red-800 hover:bg-red-200"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
