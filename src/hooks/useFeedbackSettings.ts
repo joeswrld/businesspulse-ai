@@ -43,6 +43,11 @@ export const useFeedbackSettings = () => {
 
       if (error) {
         console.error('Error loading feedback settings:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load feedback settings. Please try again.",
+          variant: "destructive",
+        });
         throw error;
       }
 
@@ -50,7 +55,7 @@ export const useFeedbackSettings = () => {
       console.log('✅ Feedback settings loaded:', data);
     } catch (error) {
       console.error('Failed to load feedback settings:', error);
-      // Don't throw - let component handle gracefully
+      // Don't re-throw to prevent infinite loading state
     } finally {
       setLoading(false);
     }
