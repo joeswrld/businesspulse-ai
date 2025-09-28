@@ -341,16 +341,7 @@ const navigation = [
             <div className="space-y-1">
              
               
-              <button
-                onClick={handleSignOut}
-                className={cn(
-                  "flex items-center space-x-3 rounded-lg text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 group",
-                  sidebarCollapsed ? "px-2 py-2 justify-center w-full" : "px-3 py-2.5 w-full"
-                )}
-                title={sidebarCollapsed ? "Sign Out" : undefined}
-              >
-                
-              </button>
+              
             </div>
           </div>
         </div>
