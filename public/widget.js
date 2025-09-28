@@ -16,7 +16,7 @@ if (typeof window !== 'undefined' && !window.ethereum) {
     brandColor: '#3B82F6',
     greeting: 'We value your feedback!',
     supabaseUrl: 'https://xjbrqeqizpoqdjkiyqzt.supabase.co',
-    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQyNzQ2NzUsImV4cCI6MjA0OTg1MDY3NX0.zMLj9Ua4VzKTxQ5X86K4m6oAyNMGiQVWBNlGrLrYYew'
+    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84'
   };
 
   // Initialize widget
