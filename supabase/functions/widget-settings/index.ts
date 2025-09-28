@@ -44,7 +44,7 @@ serve(async (req) => {
       .from('feedback_settings')
       .select('*')
       .eq('project_id', projectId)
-      .single()
+      .maybeSingle()
 
     if (error) {
       console.error('Error fetching widget settings:', error)

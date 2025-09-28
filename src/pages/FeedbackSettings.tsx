@@ -11,6 +11,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { 
+  createProject, 
+  getUserProjects, 
+  getFeedbackSettings, 
+  createDefaultFeedbackSettings,
+  updateFeedbackSettings,
+  deleteProject as deleteProjectUtil,
+  uploadProjectLogo,
+  type Project,
+  type FeedbackSettings,
+  type ProjectWithSettings
+} from '@/utils/projectUtils';
 
 import {
   Settings,
@@ -32,31 +44,12 @@ import {
   Trash2
 } from 'lucide-react';
 
-// Types
-interface FeedbackSettings {
-  id: string;
-  user_id: string;
-  project_id: string;
-  widget_title: string;
-  widget_color: string;
-  greeting_text: string;
-  created_at: string;
-  updated_at?: string;
-}
-
-interface Project {
-  id: string;
-  name: string;
-  user_id: string;
-  logo_url?: string;
-  created_at: string;
-  updated_at?: string;
-}
+// Types are now imported from projectUtils
 
 export default function FeedbackSettings() {
   const { user } = useAuth();
   const [settings, setSettings] = useState<FeedbackSettings | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectWithSettings[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -80,43 +73,14 @@ export default function FeedbackSettings() {
 
       console.log('Loading projects for user:', user.id);
 
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (projectsError) {
-        console.error('Error loading projects:', projectsError);
-        
-        // Handle specific error cases
-        if (projectsError.code === '42P01') {
-          setError('Database tables are not set up properly. Please run the database setup script.');
-          return;
-        }
-        
-        if (projectsError.message?.includes('relation "projects" does not exist')) {
-          setError('Projects table does not exist. Please run the database setup script.');
-          return;
-        }
-
-        if (projectsError.code === 'PGRST116') {
-          // No rows found - this is normal for new users
-          setProjects([]);
-          return;
-        }
-        
-        throw projectsError;
-      }
-
-      const currentProjects = projectsData || [];
-      console.log('Loaded projects:', currentProjects);
-      setProjects(currentProjects);
+      const projectsData = await getUserProjects(user.id);
+      console.log('Loaded projects:', projectsData);
+      setProjects(projectsData);
 
       // Auto-select first project if available and none is selected
-      if (currentProjects.length > 0 && !selectedProject) {
-        console.log('Auto-selecting first project:', currentProjects[0].id);
-        setSelectedProject(currentProjects[0].id);
+      if (projectsData.length > 0 && !selectedProject) {
+        console.log('Auto-selecting first project:', projectsData[0].id);
+        setSelectedProject(projectsData[0].id);
       }
 
     } catch (error) {
@@ -137,33 +101,7 @@ export default function FeedbackSettings() {
       console.log('Loading feedback settings for project:', projectId);
 
       // Try to load existing settings
-      const { data: settingsData, error: settingsError } = await supabase
-        .from('feedback_settings')
-        .select('*')
-        .eq('project_id', projectId)
-        .eq('user_id', user.id)
-        .maybeSingle(); // Use maybeSingle instead of single to avoid errors when no rows found
-
-      if (settingsError) {
-        console.error('Error loading settings:', settingsError);
-        
-        // Handle case where feedback_settings table doesn't exist
-        if (settingsError.code === '42P01' || settingsError.message?.includes('relation "feedback_settings" does not exist')) {
-          console.log('feedback_settings table does not exist, creating fallback');
-          const fallbackSettings: FeedbackSettings = {
-            id: `fallback-${projectId}`,
-            user_id: user.id,
-            project_id: projectId,
-            widget_title: 'We love your feedback!',
-            widget_color: '#3B82F6',
-            greeting_text: 'Help us improve by sharing your thoughts',
-            created_at: new Date().toISOString()
-          };
-          setSettings(fallbackSettings);
-          return;
-        }
-        throw settingsError;
-      }
+      let settingsData = await getFeedbackSettings(projectId, user.id);
 
       if (settingsData) {
         console.log('Loaded existing settings:', settingsData);
@@ -171,48 +109,19 @@ export default function FeedbackSettings() {
       } else {
         // Create default settings if none exist
         console.log('No settings found, creating default settings');
-        const defaultSettings = {
-          project_id: projectId,
-          user_id: user.id,
-          widget_title: 'We love your feedback!',
-          widget_color: '#3B82F6',
-          greeting_text: 'Help us improve by sharing your thoughts'
-        };
-
         try {
-          const { data: newSettings, error: createError } = await supabase
-            .from('feedback_settings')
-            .insert(defaultSettings)
-            .select()
-            .single();
-
-          if (createError) {
-            console.error('Error creating default settings:', createError);
-            // Use fallback settings if database creation fails
-            const fallbackSettings: FeedbackSettings = {
-              id: `fallback-${projectId}`,
-              user_id: user.id,
-              project_id: projectId,
-              widget_title: defaultSettings.widget_title,
-              widget_color: defaultSettings.widget_color,
-              greeting_text: defaultSettings.greeting_text,
-              created_at: new Date().toISOString()
-            };
-            setSettings(fallbackSettings);
-            toast.warning('Using offline settings. Database unavailable.');
-          } else {
-            console.log('Created new settings:', newSettings);
-            setSettings(newSettings);
-          }
+          settingsData = await createDefaultFeedbackSettings(projectId, user.id);
+          console.log('Created new settings:', settingsData);
+          setSettings(settingsData);
         } catch (createError) {
           console.error('Failed to create settings, using fallback:', createError);
           const fallbackSettings: FeedbackSettings = {
             id: `fallback-${projectId}`,
             user_id: user.id,
             project_id: projectId,
-            widget_title: defaultSettings.widget_title,
-            widget_color: defaultSettings.widget_color,
-            greeting_text: defaultSettings.greeting_text,
+            widget_title: 'We love your feedback!',
+            widget_color: '#3B82F6',
+            greeting_text: 'Help us improve by sharing your thoughts',
             created_at: new Date().toISOString()
           };
           setSettings(fallbackSettings);
@@ -226,7 +135,7 @@ export default function FeedbackSettings() {
   }, [user]);
 
   // Enhanced project creation with comprehensive error handling
-  const createProject = async () => {
+  const handleCreateProject = async () => {
     if (!user || !newProjectName.trim()) {
       toast.error('Project name is required');
       return;
@@ -237,203 +146,29 @@ export default function FeedbackSettings() {
       console.log('Starting project creation...', { 
         userId: user.id, 
         projectName: newProjectName,
-        userEmail: user.email,
-        userRole: user.role 
+        userEmail: user.email
       });
 
-      let logoUrl = null;
+      let logoUrl: string | undefined = undefined;
       
       // Upload logo if provided
       if (newProjectLogo) {
         try {
-          const fileExt = newProjectLogo.name.split('.').pop();
-          const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-          
-          console.log('Uploading logo...', fileName);
-          
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('project-logos')
-            .upload(fileName, newProjectLogo);
-
-          if (uploadError) {
-            console.error('Error uploading logo:', uploadError);
-            toast.warning('Failed to upload logo, but project will be created without it');
-          } else {
-            const { data: { publicUrl } } = supabase.storage
-              .from('project-logos')
-              .getPublicUrl(fileName);
-            logoUrl = publicUrl;
-            console.log('Logo uploaded successfully:', logoUrl);
-          }
+          logoUrl = await uploadProjectLogo(user.id, newProjectLogo);
+          console.log('Logo uploaded successfully:', logoUrl);
         } catch (logoError) {
           console.error('Logo upload failed:', logoError);
           toast.warning('Logo upload failed, continuing without logo');
         }
       }
 
-      // Create project data
-      const projectData = {
-        user_id: user.id,
-        name: newProjectName.trim(),
-        logo_url: logoUrl
-      };
-
-      console.log('Creating project with data:', projectData);
-      
-      // Log current session info
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error('Session error:', sessionError);
-      } else {
-        console.log('Current session:', {
-          userId: session?.user?.id,
-          userEmail: session?.user?.email,
-          accessToken: session?.access_token ? 'present' : 'missing',
-          expiresAt: session?.expires_at
-        });
-      }
-
-      // Test database connection first
-      console.log('Testing database connection...');
-      try {
-        const { data: testData, error: testError } = await supabase
-          .from('projects')
-          .select('count')
-          .limit(1);
-
-        if (testError) {
-          console.error('Database connection test failed:', {
-            code: testError.code,
-            message: testError.message,
-            details: testError.details,
-            hint: testError.hint
-          });
-          
-          if (testError.code === '42P01') {
-            toast.error('Database tables are not set up. Please run the database setup script.');
-            return;
-          } else if (testError.message?.includes('permission denied')) {
-            toast.error('Permission denied. Please check your RLS policies.');
-            return;
-          }
-          
-          toast.error(`Database connection failed: ${testError.message}`);
-          return;
-        }
-        console.log('Database connection successful');
-      } catch (dbTestError) {
-        console.error('Database test exception:', dbTestError);
-        toast.error('Failed to test database connection');
-        return;
-      }
-
-      // Try to create the project
-      console.log('Attempting to insert project...');
-      const { data: newProject, error: projectError } = await supabase
-        .from('projects')
-        .insert(projectData)
-        .select()
-        .single();
-
-      // Enhanced error logging with full details
-      if (projectError) {
-        console.error('DETAILED PROJECT CREATION ERROR:', {
-          code: projectError.code,
-          message: projectError.message,
-          details: projectError.details,
-          hint: projectError.hint,
-          projectData: projectData,
-          timestamp: new Date().toISOString(),
-          supabaseUrl: supabase.supabaseUrl,
-          authStatus: user ? 'authenticated' : 'not authenticated'
-        });
-        
-        // More specific error handling
-        switch (projectError.code) {
-          case '42P01':
-            toast.error('Database tables are not set up. Please run the database setup script.');
-            return;
-            
-          case '23505':
-            toast.error('A project with this name already exists for your account');
-            return;
-            
-          case '23502':
-            const missingField = projectError.message.match(/column "([^"]+)"/)?.[1];
-            toast.error(`Missing required field: ${missingField || 'unknown'}`);
-            return;
-            
-          case '42501':
-            toast.error('Permission denied. Please check your account permissions and RLS policies.');
-            return;
-            
-          case 'PGRST301':
-            toast.error('Row Level Security policy violation. Authentication issue detected.');
-            return;
-            
-          default:
-            if (projectError.message?.includes('permission denied')) {
-              toast.error('Permission denied. Please check your account permissions.');
-              return;
-            } else if (projectError.message?.includes('relation') && projectError.message?.includes('does not exist')) {
-              toast.error('Database not properly configured. Please run the database setup.');
-              return;
-            } else if (projectError.message?.includes('RLS')) {
-              toast.error('Security policy error. Please check your authentication.');
-              return;
-            } else if (projectError.message?.includes('null value')) {
-              const field = projectError.message.match(/column "([^"]+)"/)?.[1];
-              toast.error(`Required field is missing: ${field || 'user_id'}. Authentication may have failed.`);
-              return;
-            }
-        }
-        
-        // Generic error fallback
-        toast.error(`Failed to create project: ${projectError.message}`);
-        throw projectError;
-      }
-
-      if (!newProject) {
-        console.error('No project data returned despite no error');
-        throw new Error('Project was created but no data was returned');
-      }
-
+      // Create project using the helper function
+      const newProject = await createProject(user.id, newProjectName.trim(), logoUrl);
       console.log('Project created successfully:', newProject);
-
-      // Create default feedback settings for the new project
-      const defaultSettings = {
-        project_id: newProject.id,
-        user_id: user.id,
-        widget_title: 'We love your feedback!',
-        widget_color: '#3B82F6',
-        greeting_text: 'Help us improve by sharing your thoughts'
-      };
-
-      console.log('Creating default feedback settings...', defaultSettings);
-
-      try {
-        const { error: settingsError } = await supabase
-          .from('feedback_settings')
-          .insert(defaultSettings);
-
-        if (settingsError) {
-          console.error('Error creating default settings:', {
-            code: settingsError.code,
-            message: settingsError.message,
-            details: settingsError.details
-          });
-          toast.warning('Project created but failed to create default settings. You can configure them manually.');
-        } else {
-          console.log('Default feedback settings created successfully');
-        }
-      } catch (settingsError) {
-        console.error('Failed to create default settings:', settingsError);
-        // Continue even if settings creation fails
-      }
 
       // Refresh projects and select the new one
       console.log('Refreshing projects list...');
-      setProjects(prevProjects => [...prevProjects, newProject]);
+      await loadProjects();
       setSelectedProject(newProject.id);
 
       // Reset modal state
@@ -444,19 +179,7 @@ export default function FeedbackSettings() {
       toast.success('Project created successfully!');
 
     } catch (error) {
-      console.error('COMPREHENSIVE ERROR DETAILS:', {
-        error: error,
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-        name: error instanceof Error ? error.name : undefined,
-        cause: error instanceof Error ? error.cause : undefined,
-        timestamp: new Date().toISOString(),
-        userInfo: {
-          id: user?.id,
-          email: user?.email,
-          authenticated: !!user
-        }
-      });
+      console.error('Error creating project:', error);
       
       // More detailed error messages based on the error type
       if (error instanceof Error) {
@@ -516,25 +239,15 @@ export default function FeedbackSettings() {
       const settingsToSave = {
         widget_title: settings.widget_title.trim(),
         widget_color: settings.widget_color,
-        greeting_text: settings.greeting_text.trim(),
-        updated_at: new Date().toISOString()
+        greeting_text: settings.greeting_text.trim()
       };
 
       console.log('Saving settings:', settingsToSave);
 
-      const { error } = await supabase
-        .from('feedback_settings')
-        .update(settingsToSave)
-        .eq('id', settings.id)
-        .eq('user_id', user?.id); // Additional security check
-
-      if (error) {
-        console.error('Error saving settings:', error);
-        throw error;
-      }
-
+      const updatedSettings = await updateFeedbackSettings(settings.id, settingsToSave);
+      
       // Update local state with the saved data
-      setSettings(prev => prev ? { ...prev, ...settingsToSave } : null);
+      setSettings(updatedSettings);
       
       toast.success('Settings saved successfully!');
     } catch (error) {
@@ -626,7 +339,7 @@ export default function FeedbackSettings() {
   };
 
   // Delete project function
-  const deleteProject = async (projectId: string, projectName: string) => {
+  const handleDeleteProject = async (projectId: string, projectName: string) => {
     if (!user) return;
 
     const confirmed = window.confirm(
@@ -636,17 +349,7 @@ export default function FeedbackSettings() {
     if (!confirmed) return;
 
     try {
-      const { error } = await supabase
-        .from('projects')
-        .delete()
-        .eq('id', projectId)
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error('Error deleting project:', error);
-        toast.error('Failed to delete project');
-        return;
-      }
+      await deleteProjectUtil(projectId, user.id);
 
       // Remove from local state
       setProjects(prev => prev.filter(p => p.id !== projectId));
@@ -811,7 +514,7 @@ export default function FeedbackSettings() {
                       onClick={() => {
                         const project = projects.find(p => p.id === selectedProject);
                         if (project) {
-                          deleteProject(project.id, project.name);
+                          handleDeleteProject(project.id, project.name);
                         }
                       }}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -1185,7 +888,7 @@ export default function FeedbackSettings() {
             >
               Cancel
             </Button>
-            <Button onClick={createProject} disabled={creating || !newProjectName.trim()}>
+            <Button onClick={handleCreateProject} disabled={creating || !newProjectName.trim()}>
               {creating ? (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
