@@ -51,6 +51,17 @@ interface Feedback {
   created_at: string;
 }
 
+interface FeedbackSettings {
+  id: string;
+  user_id: string;
+  project_id: string;
+  customer_survey_url: string | null;
+  product_feedback_url: string | null;
+  widget_code: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface FeedbackStats {
   totalFeedback: number;
   averageRating: number;
@@ -73,6 +84,7 @@ export default function Feedback() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<FeedbackStats | null>(null);
+  const [feedbackSettings, setFeedbackSettings] = useState<FeedbackSettings | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     formType: 'all',
     rating: 'all',
@@ -91,19 +103,42 @@ export default function Feedback() {
       setLoading(true);
       setError(null);
 
-      // First, check if projects table exists and get user's projects
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('user_id', user.id);
+      // First, get or create feedback settings
+      let settings: FeedbackSettings | null = null;
+      
+      try {
+        const { data: existingSettings, error: settingsError } = await supabase
+          .from("feedback_settings")
+          .select("*")
+          .eq("user_id", user.id)
+          .single();
 
-      if (projectsError) {
-        console.error('Error loading projects:', projectsError);
+        if (settingsError) {
+          if (settingsError.code === 'PGRST116') {
+            // No row found, create one using the RPC function
+            console.log('No feedback settings found, creating new ones...');
+            
+            const { data: newSettings, error: rpcError } = await supabase
+              .rpc("get_or_create_feedback_settings", { p_user_id: user.id });
+
+            if (rpcError) {
+              console.error('Error creating feedback settings:', rpcError);
+              throw rpcError;
+            }
+
+            settings = newSettings;
+          } else {
+            throw settingsError;
+          }
+        } else {
+          settings = existingSettings;
+        }
+      } catch (settingsError) {
+        console.error('Error with feedback_settings table:', settingsError);
         
-        // If projects table doesn't exist or user has no projects, create a default project
-        if (projectsError.code === '42P01' || projectsError.message?.includes('relation "projects" does not exist')) {
-          // Handle case where projects table doesn't exist
-          console.log('Projects table does not exist, using fallback');
+        // If feedback_settings table doesn't exist, show empty state
+        if (settingsError.code === '42P01' || settingsError.message?.includes('relation "feedback_settings" does not exist')) {
+          console.log('Feedback settings table does not exist, showing empty state');
           setFeedbacks([]);
           setStats({
             totalFeedback: 0,
@@ -115,38 +150,11 @@ export default function Feedback() {
           });
           return;
         }
-        throw projectsError;
+        throw settingsError;
       }
 
-      let projectIds = projectsData?.map(p => p.id) || [];
-
-      // If no projects exist, create a default one
-      if (projectIds.length === 0) {
-        const defaultProject = {
-          user_id: user.id,
-          name: 'Default Project',
-          project_id: `proj-${Date.now()}`
-        };
-
-        try {
-          const { data: newProject, error: createError } = await supabase
-            .from('projects')
-            .insert(defaultProject)
-            .select('id')
-            .single();
-
-          if (createError) {
-            console.error('Error creating default project:', createError);
-          } else if (newProject) {
-            projectIds = [newProject.id];
-          }
-        } catch (createError) {
-          console.error('Failed to create default project:', createError);
-          // Continue without projects
-        }
-      }
-
-      if (projectIds.length === 0) {
+      if (!settings) {
+        console.log('No feedback settings available, showing empty state');
         setFeedbacks([]);
         setStats({
           totalFeedback: 0,
@@ -159,11 +167,13 @@ export default function Feedback() {
         return;
       }
 
-      // Load feedback
+      setFeedbackSettings(settings);
+
+      // Load feedback using the project_id from feedback_settings
       const { data: feedbacksData, error: feedbacksError } = await supabase
         .from('feedback')
         .select('*')
-        .in('project_id', projectIds)
+        .eq('project_id', settings.project_id)
         .order('created_at', { ascending: false });
 
       if (feedbacksError) {
@@ -224,6 +234,9 @@ export default function Feedback() {
     } catch (error) {
       console.error('Error loading feedback data:', error);
       setError(error instanceof Error ? error.message : 'An error occurred while loading data');
+      toast.error('Failed to load feedback data', {
+        description: error instanceof Error ? error.message : 'An unknown error occurred'
+      });
     } finally {
       setLoading(false);
     }
@@ -238,7 +251,7 @@ export default function Feedback() {
 
   // Set up real-time subscriptions
   useEffect(() => {
-    if (!user) return;
+    if (!user || !feedbackSettings) return;
 
     const channel = supabase
       .channel('feedback-changes')
@@ -247,7 +260,8 @@ export default function Feedback() {
         {
           event: '*',
           schema: 'public',
-          table: 'feedback'
+          table: 'feedback',
+          filter: `project_id=eq.${feedbackSettings.project_id}`
         },
         (payload) => {
           console.log('Feedback change received:', payload);
@@ -259,7 +273,7 @@ export default function Feedback() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, loadFeedbackData]);
+  }, [user, feedbackSettings, loadFeedbackData]);
 
   // Filter feedbacks based on current filters
   const filteredFeedbacks = useMemo(() => {
@@ -337,6 +351,8 @@ export default function Feedback() {
     a.download = `feedback-export-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
+    
+    toast.success('Feedback data exported successfully');
   };
 
   if (!user) {
@@ -396,9 +412,14 @@ export default function Feedback() {
           <p className="text-primary/70 mt-2">
             Real-time insights into your customer feedback
           </p>
+          {feedbackSettings && (
+            <p className="text-sm text-gray-500 mt-1">
+              Project ID: {feedbackSettings.project_id}
+            </p>
+          )}
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={exportToCSV}>
+          <Button variant="outline" onClick={exportToCSV} disabled={filteredFeedbacks.length === 0}>
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
