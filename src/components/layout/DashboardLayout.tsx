@@ -21,7 +21,8 @@ import {
   Zap,
   ChevronDown,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Cog
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -126,11 +127,12 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
 const navigation = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Feedback", href: "/feedback", icon: MessageSquare },
   { name: "AI Insights", href: "/insights-simple", icon: Brain },
   { name: "Reports & Analytics", href: "/reports", icon: FileText },
-  { name: "Feedback", href: "/feedback", icon: MessageSquare },
-  { name: "Roadmap", href: "/roadmap", icon: BarChart3 },
+  { name: "Feedback Settings", href: "/feedback-settings", icon: Cog },
   { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
+  { name: "Roadmap", href: "/roadmap", icon: BarChart3 },
   { name: "Team Collaboration", href: "/teams", icon: Users },
 ];
 
