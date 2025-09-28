@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 const FeedbackSettings = () => {
   const { user } = useAuth();
-  const [project, setProject] = useState(null);
+  const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
@@ -48,7 +48,11 @@ const FeedbackSettings = () => {
       if (widgetSettings) {
         setSettings(prev => ({
           ...prev,
-          ...widgetSettings
+          customerSatisfactionEnabled: widgetSettings.customer_satisfaction_enabled ?? prev.customerSatisfactionEnabled,
+          productFeedbackEnabled: widgetSettings.product_feedback_enabled ?? prev.productFeedbackEnabled,
+          theme: widgetSettings.theme ?? prev.theme,
+          brandColor: widgetSettings.brand_color ?? prev.brandColor,
+          greeting: widgetSettings.greeting ?? prev.greeting
         }));
       }
 
@@ -103,6 +107,15 @@ const FeedbackSettings = () => {
     document.head.appendChild(script);
   })();
 </script>`;
+  };
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(generateEmbedCode());
+      console.log("✅ Embed code copied to clipboard");
+    } catch (error) {
+      console.error("❌ Failed to copy to clipboard:", error);
+    }
   };
 
   if (loading) {
@@ -246,7 +259,7 @@ const FeedbackSettings = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <button
-              onClick={() => navigator.clipboard.writeText(generateEmbedCode())}
+              onClick={copyToClipboard}
               className="absolute top-2 right-2 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               Copy
