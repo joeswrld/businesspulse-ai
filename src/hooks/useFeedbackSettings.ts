@@ -103,9 +103,9 @@ export const useFeedbackSettings = () => {
       const updatedSettings = {
         ...settings,
         project_id: newProjectId,
-        customer_survey_url: `${baseUrl}/survey/${user.id}`,
-        product_feedback_url: `${baseUrl}/feedback/${user.id}`,
-        widget_code: `<script src="${baseUrl}/widget.js" data-user-id="${user.id}"></script>`
+        customer_survey_url: `${baseUrl}/survey/${new_project_id}`,
+        product_feedback_url: `${baseUrl}/feedback/${new_project_id}`,
+        widget_code: `<script src="${baseUrl}/widget.js" data-project-id="${new_project_id}"></script>`
       };
 
       const { error } = await supabase
