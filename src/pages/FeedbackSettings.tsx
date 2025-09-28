@@ -102,10 +102,6 @@ const FeedbackSettings: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900">Feedback Settings</h1>
           <p className="text-gray-600 mt-2">Configure your feedback collection settings and generate embed codes.</p>
         </div>
-        <Button onClick={handleRegenerateUrls} variant="outline" disabled={saving}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${saving ? 'animate-spin' : ''}`} />
-          Regenerate URLs
-        </Button>
       </div>
 
       <div className="grid gap-6">
