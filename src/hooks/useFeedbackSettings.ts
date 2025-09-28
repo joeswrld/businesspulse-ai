@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface FeedbackSettings {
   id: string;
@@ -14,114 +14,128 @@ export interface FeedbackSettings {
 }
 
 export const useFeedbackSettings = () => {
+  const { user } = useAuth();
   const [settings, setSettings] = useState<FeedbackSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { toast } = useToast();
+
+  // Suppress MetaMask warning
+  if (!window.ethereum) {
+    console.debug("No Ethereum provider detected — safe to ignore");
+  }
+
+  useEffect(() => {
+    if (user) {
+      loadSettings();
+    }
+  }, [user]);
 
   const loadSettings = async () => {
+    if (!user) return;
+
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
       
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
+      // Call RPC function to get or create settings
       const { data, error } = await supabase.rpc('get_or_create_feedback_settings', {
-        p_user_id: user.id
+        p_user_id: user.id,
       });
 
       if (error) {
+        console.error('Error loading feedback settings:', error);
         throw error;
       }
 
-      if (data && data.length > 0) {
-        setSettings(data[0]);
-      }
+      setSettings(data);
+      console.log('✅ Feedback settings loaded:', data);
     } catch (error) {
-      console.error('Error loading feedback settings:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load feedback settings. Please try again.",
-        variant: "destructive",
-      });
-      throw error;
+      console.error('Failed to load feedback settings:', error);
+      // Don't throw - let component handle gracefully
     } finally {
       setLoading(false);
     }
   };
 
-  const saveSettings = async (updatedSettings: Partial<FeedbackSettings>) => {
+  const saveSettings = async (updatedSettings: FeedbackSettings) => {
+    if (!user) return;
+
     try {
       setSaving(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
 
-      const { data, error } = await supabase.rpc('update_feedback_settings', {
-        p_user_id: user.id,
-        p_customer_survey_url: updatedSettings.customer_survey_url,
-        p_product_feedback_url: updatedSettings.product_feedback_url,
-        p_widget_code: updatedSettings.widget_code
-      });
+      const { error } = await supabase
+        .from('feedback_settings')
+        .update({
+          customer_survey_url: updatedSettings.customer_survey_url,
+          product_feedback_url: updatedSettings.product_feedback_url,
+          widget_code: updatedSettings.widget_code,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
 
       if (error) {
+        console.error('Error saving settings:', error);
         throw error;
       }
 
-      if (data && data.length > 0) {
-        setSettings(data[0]);
-        toast({
-          title: "Success",
-          description: "Feedback settings saved successfully!",
-          variant: "default",
-        });
-        return data[0];
-      }
+      setSettings(updatedSettings);
+      console.log('✅ Settings saved successfully');
     } catch (error) {
-      console.error('Error saving feedback settings:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save settings. Please try again.",
-        variant: "destructive",
-      });
+      console.error('Failed to save settings:', error);
       throw error;
     } finally {
       setSaving(false);
     }
   };
 
-  const regenerateUrls = () => {
-    if (!settings) return;
-    
-    const baseUrl = 'https://notex.com.ng';
-    const newProjectId = crypto.randomUUID();
-    
-    const updatedSettings = {
-      ...settings,
-      customer_survey_url: `${baseUrl}/survey/${newProjectId}`,
-      product_feedback_url: `${baseUrl}/feedback/${newProjectId}`,
-      widget_code: `<script src="${baseUrl}/widget.js" data-project-id="${newProjectId}"></script>`
-    };
-    
-    setSettings(updatedSettings);
-    return updatedSettings;
-  };
+  const regenerateUrls = async () => {
+    if (!user || !settings) return;
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
+    try {
+      setSaving(true);
+      const baseUrl = 'https://notex.com.ng';
+      const newProjectId = crypto.randomUUID();
+
+      const updatedSettings = {
+        ...settings,
+        project_id: newProjectId,
+        customer_survey_url: `${baseUrl}/survey/${user.id}`,
+        product_feedback_url: `${baseUrl}/feedback/${user.id}`,
+        widget_code: `<script src="${baseUrl}/widget.js" data-user-id="${user.id}"></script>`
+      };
+
+      const { error } = await supabase
+        .from('feedback_settings')
+        .update({
+          project_id: newProjectId,
+          customer_survey_url: updatedSettings.customer_survey_url,
+          product_feedback_url: updatedSettings.product_feedback_url,
+          widget_code: updatedSettings.widget_code,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error regenerating URLs:', error);
+        throw error;
+      }
+
+      setSettings(updatedSettings);
+      console.log('✅ URLs regenerated successfully');
+    } catch (error) {
+      console.error('Failed to regenerate URLs:', error);
+      throw error;
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return {
     settings,
     loading,
     saving,
-    loadSettings,
+    setSettings,
     saveSettings,
     regenerateUrls,
-    setSettings
+    loadSettings
   };
 };
