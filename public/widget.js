@@ -1,5 +1,5 @@
 // public/widget.js
-// NoteX Feedback Widget - Modern ES6+ Version
+// NoteX Feedback Widget - Fixed Version
 
 // Suppress MetaMask/Ethereum injection warnings
 if (typeof window !== 'undefined' && !window.ethereum) {
@@ -172,8 +172,6 @@ if (typeof window !== 'undefined' && !window.ethereum) {
           <select id="feedback-type" style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 6px; background-color: ${inputBg}; color: ${textColor}; font-size: 14px;">
             <option value="satisfaction">Customer Satisfaction</option>
             <option value="product">Product Feedback</option>
-            <option value="bug">Bug Report</option>
-            <option value="suggestion">Suggestion</option>
           </select>
         </div>
 
@@ -298,15 +296,18 @@ if (typeof window !== 'undefined' && !window.ethereum) {
       return;
     }
 
+    // Fixed data structure to match the feedback table schema
     var feedbackData = {
       project_id: config.projectId,
-      type: type,
-      rating: rating || null,
-      message: message,
-      email: email || null,
-      user_agent: navigator.userAgent,
-      page_url: window.location.href,
-      created_at: new Date().toISOString()
+      message: message, // This matches your 'message' column
+      form_type: type === 'satisfaction' ? 'customer_satisfaction' : 'product_feedback', // Must match your CHECK constraint
+      rating: rating || null, // This matches your 'rating' column
+      metadata: {
+        email: email || null,
+        user_agent: navigator.userAgent,
+        page_url: window.location.href,
+        original_type: type // Store the original type in metadata
+      }
     };
 
     // Show loading state
@@ -315,30 +316,62 @@ if (typeof window !== 'undefined' && !window.ethereum) {
     submitBtn.textContent = 'Submitting...';
     submitBtn.disabled = true;
 
-    // Submit to Supabase
+    // Submit to Supabase with better error handling
     fetch(config.supabaseUrl + '/rest/v1/feedback', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'apikey': config.supabaseKey,
-        'Authorization': 'Bearer ' + config.supabaseKey
+        'Authorization': 'Bearer ' + config.supabaseKey,
+        'Prefer': 'return=minimal' // Don't return the inserted row
       },
       body: JSON.stringify(feedbackData)
     })
     .then(function(response) {
+      // Check if the response is ok
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        // Try to get error details from response
+        return response.text().then(function(text) {
+          var errorMessage = 'HTTP ' + response.status;
+          try {
+            var errorData = JSON.parse(text);
+            errorMessage = errorData.message || errorData.hint || errorMessage;
+          } catch (e) {
+            // If not JSON, use the text as error message
+            if (text) errorMessage = text;
+          }
+          throw new Error(errorMessage);
+        });
       }
-      return response.json();
+      
+      // For successful responses, we don't need to parse JSON if using Prefer: return=minimal
+      return response.status === 201 ? { success: true } : response.json();
     })
     .then(function(data) {
       // Success
+      console.log('Feedback submitted successfully');
       showSuccessMessage();
       setTimeout(closeCallback, 2000);
     })
     .catch(function(error) {
       console.error('Error submitting feedback:', error);
-      alert('Failed to submit feedback. Please try again.');
+      
+      // Show more specific error messages
+      var errorMessage = 'Failed to submit feedback. Please try again.';
+      
+      if (error.message.includes('JWT')) {
+        errorMessage = 'Authentication error. Please refresh the page and try again.';
+      } else if (error.message.includes('permission')) {
+        errorMessage = 'Permission denied. Please contact support.';
+      } else if (error.message.includes('duplicate') || error.message.includes('unique')) {
+        errorMessage = 'This feedback has already been submitted.';
+      } else if (error.message.includes('project_id')) {
+        errorMessage = 'Invalid project configuration. Please contact support.';
+      } else if (error.message && error.message !== 'Failed to fetch') {
+        errorMessage = error.message;
+      }
+      
+      alert(errorMessage);
       
       // Reset button
       submitBtn.textContent = originalText;
