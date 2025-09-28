@@ -91,12 +91,12 @@ export default function FeedbackSettings() {
         
         // Handle specific error cases
         if (projectsError.code === '42P01') {
-          setError('Database tables are not set up properly. Please contact support.');
+          setError('Database tables are not set up properly. Please run the database setup script.');
           return;
         }
         
         if (projectsError.message?.includes('relation "projects" does not exist')) {
-          setError('Projects table does not exist. Please run the database setup.');
+          setError('Projects table does not exist. Please run the database setup script.');
           return;
         }
 
@@ -225,7 +225,7 @@ export default function FeedbackSettings() {
     }
   }, [user]);
 
-  // Enhanced project creation with better error handling
+  // Enhanced project creation with comprehensive error handling
   const createProject = async () => {
     if (!user || !newProjectName.trim()) {
       toast.error('Project name is required');
@@ -234,7 +234,12 @@ export default function FeedbackSettings() {
 
     try {
       setCreating(true);
-      console.log('Starting project creation...', { userId: user.id, projectName: newProjectName });
+      console.log('Starting project creation...', { 
+        userId: user.id, 
+        projectName: newProjectName,
+        userEmail: user.email,
+        userRole: user.role 
+      });
 
       let logoUrl = null;
       
@@ -266,7 +271,7 @@ export default function FeedbackSettings() {
         }
       }
 
-      // Create project
+      // Create project data
       const projectData = {
         user_id: user.id,
         name: newProjectName.trim(),
@@ -274,35 +279,122 @@ export default function FeedbackSettings() {
       };
 
       console.log('Creating project with data:', projectData);
+      
+      // Log current session info
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+      } else {
+        console.log('Current session:', {
+          userId: session?.user?.id,
+          userEmail: session?.user?.email,
+          accessToken: session?.access_token ? 'present' : 'missing',
+          expiresAt: session?.expires_at
+        });
+      }
 
+      // Test database connection first
+      console.log('Testing database connection...');
+      try {
+        const { data: testData, error: testError } = await supabase
+          .from('projects')
+          .select('count')
+          .limit(1);
+
+        if (testError) {
+          console.error('Database connection test failed:', {
+            code: testError.code,
+            message: testError.message,
+            details: testError.details,
+            hint: testError.hint
+          });
+          
+          if (testError.code === '42P01') {
+            toast.error('Database tables are not set up. Please run the database setup script.');
+            return;
+          } else if (testError.message?.includes('permission denied')) {
+            toast.error('Permission denied. Please check your RLS policies.');
+            return;
+          }
+          
+          toast.error(`Database connection failed: ${testError.message}`);
+          return;
+        }
+        console.log('Database connection successful');
+      } catch (dbTestError) {
+        console.error('Database test exception:', dbTestError);
+        toast.error('Failed to test database connection');
+        return;
+      }
+
+      // Try to create the project
+      console.log('Attempting to insert project...');
       const { data: newProject, error: projectError } = await supabase
         .from('projects')
         .insert(projectData)
         .select()
         .single();
 
+      // Enhanced error logging with full details
       if (projectError) {
-        console.error('Error creating project:', projectError);
+        console.error('DETAILED PROJECT CREATION ERROR:', {
+          code: projectError.code,
+          message: projectError.message,
+          details: projectError.details,
+          hint: projectError.hint,
+          projectData: projectData,
+          timestamp: new Date().toISOString(),
+          supabaseUrl: supabase.supabaseUrl,
+          authStatus: user ? 'authenticated' : 'not authenticated'
+        });
         
-        // More specific error messages
-        if (projectError.code === '42P01') {
-          toast.error('Database tables are not set up. Please run the database setup script.');
-          return;
-        } else if (projectError.code === '23505') {
-          toast.error('A project with this name already exists');
-          return;
-        } else if (projectError.message?.includes('permission denied')) {
-          toast.error('Permission denied. Please check your account permissions.');
-          return;
-        } else if (projectError.message?.includes('relation') && projectError.message?.includes('does not exist')) {
-          toast.error('Database not properly configured. Please run the database setup.');
-          return;
+        // More specific error handling
+        switch (projectError.code) {
+          case '42P01':
+            toast.error('Database tables are not set up. Please run the database setup script.');
+            return;
+            
+          case '23505':
+            toast.error('A project with this name already exists for your account');
+            return;
+            
+          case '23502':
+            const missingField = projectError.message.match(/column "([^"]+)"/)?.[1];
+            toast.error(`Missing required field: ${missingField || 'unknown'}`);
+            return;
+            
+          case '42501':
+            toast.error('Permission denied. Please check your account permissions and RLS policies.');
+            return;
+            
+          case 'PGRST301':
+            toast.error('Row Level Security policy violation. Authentication issue detected.');
+            return;
+            
+          default:
+            if (projectError.message?.includes('permission denied')) {
+              toast.error('Permission denied. Please check your account permissions.');
+              return;
+            } else if (projectError.message?.includes('relation') && projectError.message?.includes('does not exist')) {
+              toast.error('Database not properly configured. Please run the database setup.');
+              return;
+            } else if (projectError.message?.includes('RLS')) {
+              toast.error('Security policy error. Please check your authentication.');
+              return;
+            } else if (projectError.message?.includes('null value')) {
+              const field = projectError.message.match(/column "([^"]+)"/)?.[1];
+              toast.error(`Required field is missing: ${field || 'user_id'}. Authentication may have failed.`);
+              return;
+            }
         }
         
+        // Generic error fallback
+        toast.error(`Failed to create project: ${projectError.message}`);
         throw projectError;
       }
 
       if (!newProject) {
+        console.error('No project data returned despite no error');
         throw new Error('Project was created but no data was returned');
       }
 
@@ -325,7 +417,11 @@ export default function FeedbackSettings() {
           .insert(defaultSettings);
 
         if (settingsError) {
-          console.error('Error creating default settings:', settingsError);
+          console.error('Error creating default settings:', {
+            code: settingsError.code,
+            message: settingsError.message,
+            details: settingsError.details
+          });
           toast.warning('Project created but failed to create default settings. You can configure them manually.');
         } else {
           console.log('Default feedback settings created successfully');
@@ -348,19 +444,35 @@ export default function FeedbackSettings() {
       toast.success('Project created successfully!');
 
     } catch (error) {
-      console.error('Error creating project:', error);
+      console.error('COMPREHENSIVE ERROR DETAILS:', {
+        error: error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : undefined,
+        cause: error instanceof Error ? error.cause : undefined,
+        timestamp: new Date().toISOString(),
+        userInfo: {
+          id: user?.id,
+          email: user?.email,
+          authenticated: !!user
+        }
+      });
       
       // More detailed error messages based on the error type
       if (error instanceof Error) {
-        if (error.message.includes('fetch')) {
-          toast.error('Network error. Please check your connection and try again.');
+        if (error.message.includes('fetch') || error.message.includes('network')) {
+          toast.error('Network error. Please check your internet connection and try again.');
         } else if (error.message.includes('JWT') || error.message.includes('token')) {
-          toast.error('Session expired. Please refresh the page and try again.');
+          toast.error('Session expired. Please refresh the page and log in again.');
+        } else if (error.message.includes('permission')) {
+          toast.error('Permission denied. Please check your authentication and try logging out/in.');
+        } else if (error.message.includes('timeout')) {
+          toast.error('Request timed out. Please try again.');
         } else {
           toast.error(`Failed to create project: ${error.message}`);
         }
       } else {
-        toast.error('Failed to create project. Please try again.');
+        toast.error('Failed to create project. Check console for detailed error information.');
       }
     } finally {
       setCreating(false);
@@ -513,6 +625,45 @@ export default function FeedbackSettings() {
     }
   };
 
+  // Delete project function
+  const deleteProject = async (projectId: string, projectName: string) => {
+    if (!user) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${projectName}"? This action cannot be undone and will delete all associated feedback data.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error deleting project:', error);
+        toast.error('Failed to delete project');
+        return;
+      }
+
+      // Remove from local state
+      setProjects(prev => prev.filter(p => p.id !== projectId));
+      
+      // Clear selection if deleted project was selected
+      if (selectedProject === projectId) {
+        setSelectedProject('');
+        setSettings(null);
+      }
+
+      toast.success('Project deleted successfully');
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      toast.error('Failed to delete project');
+    }
+  };
+
   // Reset error state when user changes
   useEffect(() => {
     if (user) {
@@ -618,29 +769,59 @@ export default function FeedbackSettings() {
               </Button>
             </div>
           ) : (
-            // Projects exist - show dropdown
-            <div className="flex items-center space-x-2">
-              <div className="flex-1 space-y-2">
-                <Label htmlFor="project-select">Project</Label>
-                <Select value={selectedProject} onValueChange={setSelectedProject}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            // Projects exist - show dropdown with management options
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="project-select">Project</Label>
+                  <Select value={selectedProject} onValueChange={setSelectedProject}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="pt-6">
+                  <Button variant="outline" onClick={() => setShowCreateModal(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Project
+                  </Button>
+                </div>
               </div>
-              <div className="pt-6">
-                <Button variant="outline" onClick={() => setShowCreateModal(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Project
-                </Button>
-              </div>
+
+              {/* Project Management */}
+              {selectedProject && (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Project Management</h4>
+                      <p className="text-sm text-gray-600">
+                        {projects.find(p => p.id === selectedProject)?.name}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const project = projects.find(p => p.id === selectedProject);
+                        if (project) {
+                          deleteProject(project.id, project.name);
+                        }
+                      }}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Project
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
