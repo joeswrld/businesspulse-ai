@@ -82,6 +82,8 @@ export default function FeedbackSettings() {
             id: `fallback-${userProject.id}`,
             user_id: user.id,
             project_id: userProject.id,
+            customer_satisfaction_enabled: true,
+            product_feedback_enabled: true,
             widget_title: 'We love your feedback!',
             widget_color: '#3B82F6',
             greeting_text: 'Help us improve by sharing your thoughts',
@@ -295,67 +297,104 @@ export default function FeedbackSettings() {
         </div>
       </div>
 
-      {/* Project Information - Read Only */}
+      {/* Project ID - Read Only */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Lock className="h-5 w-5" />
-            <span>Your Project</span>
+            <span>Project ID</span>
           </CardTitle>
           <CardDescription>
-            Your project is automatically generated and cannot be modified
+            Your auto-generated project identifier
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="project-name">Project Name</Label>
+            <div className="space-y-2">
+              <Label htmlFor="project-id">Project ID</Label>
+              <div className="flex items-center space-x-2">
                 <Input
-                  id="project-name"
-                  value={project?.name || 'My Project'}
+                  id="project-id"
+                  value={project?.id || ''}
                   readOnly
-                  className="bg-gray-50"
+                  className="bg-gray-50 font-mono text-sm"
                 />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (project?.id) {
+                      navigator.clipboard.writeText(project.id);
+                      toast.success('Project ID copied to clipboard!');
+                    }
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="project-id">Project ID</Label>
-                <div className="flex items-center space-x-2">
-                  <Input
-                    id="project-id"
-                    value={project?.id || ''}
-                    readOnly
-                    className="bg-gray-50 font-mono text-sm"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (project?.id) {
-                        navigator.clipboard.writeText(project.id);
-                        toast.success('Project ID copied to clipboard!');
-                      }
-                    }}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <div className="flex items-start space-x-2">
-                <Globe className="h-5 w-5 text-blue-500 mt-0.5" />
-                <div>
-                  <h4 className="font-medium text-blue-900">Auto-Generated Project</h4>
-                  <p className="text-sm text-blue-700 mt-1">
-                    Every user automatically gets a project when they sign up. This project ID is permanent and cannot be changed.
-                  </p>
-                </div>
-              </div>
+              <p className="text-xs text-gray-500">
+                This ID is automatically generated and cannot be changed
+              </p>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Form Toggles */}
+      {settings && project && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Settings className="h-5 w-5" />
+              <span>Form Settings</span>
+            </CardTitle>
+            <CardDescription>
+              Enable or disable feedback forms for your project
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {/* Customer Satisfaction Form Toggle */}
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-1">
+                  <h3 className="font-medium">Customer Satisfaction Form</h3>
+                  <p className="text-sm text-gray-600">
+                    Allow customers to rate their satisfaction with your service
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.customer_satisfaction_enabled || false}
+                    onChange={(e) => updateSetting('customer_satisfaction_enabled', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {/* Product Feedback Form Toggle */}
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-1">
+                  <h3 className="font-medium">Product Feedback Form</h3>
+                  <p className="text-sm text-gray-600">
+                    Collect detailed feedback and suggestions from users
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.product_feedback_enabled || false}
+                    onChange={(e) => updateSetting('product_feedback_enabled', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Settings Tabs - Only show if project and settings are loaded */}
       {settings && project && (
