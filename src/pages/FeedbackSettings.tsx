@@ -27,58 +27,38 @@ const FeedbackSettings = () => {
       setLoading(true);
       setError(null);
       
-      let project = null;
-
-      // First, check if user already has a project
-      const { data: existingProjects, error: fetchError } = await supabase
+      // Use upsert to ensure user has exactly one project
+      // This will create a new project if none exists, or return existing one
+      const { data: projectData, error: upsertError } = await supabase
         .from('projects')
-        .select('*')
-        .eq('user_id', user.id)
-        .limit(1);
+        .upsert(
+          {
+            user_id: user.id,
+            name: 'Default Project',
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'user_id' }
+        )
+        .select()
+        .single();
 
-      if (fetchError) {
-        console.error("Error fetching projects:", fetchError);
-        throw new Error(`Failed to fetch projects: ${fetchError.message}`);
+      if (upsertError) {
+        console.error("Error upserting project:", upsertError);
+        throw new Error(`Failed to ensure project exists: ${upsertError.message}`);
       }
 
-      if (existingProjects && existingProjects.length > 0) {
-        project = existingProjects[0];
-        console.log("✅ Found existing project:", project.id);
-      } else {
-        // Create new project
-        const { data: newProject, error: createError } = await supabase
-          .from('projects')
-          .insert([
-            {
-              user_id: user.id,
-              name: 'Default Project',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }
-          ])
-          .select()
-          .single();
-
-        if (createError) {
-          console.error("Error creating project:", createError);
-          throw new Error(`Failed to create project: ${createError.message}`);
-        }
-        
-        project = newProject;
-        console.log("✅ Created new project:", project.id);
-      }
-
-      if (!project) {
+      if (!projectData) {
         throw new Error("Failed to create or find project");
       }
 
-      setProject(project);
+      console.log("✅ Project ensured:", projectData.id);
+      setProject(projectData);
 
-      // Check if widget settings exist
+      // Check if widget settings exist for this project
       const { data: existingSettings, error: settingsError } = await supabase
         .from('widget_settings')
         .select('*')
-        .eq('project_id', project.id)
+        .eq('project_id', projectData.id)
         .single();
 
       if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116 is "not found"
@@ -98,23 +78,21 @@ const FeedbackSettings = () => {
         }));
         console.log("✅ Loaded existing widget settings");
       } else {
-        // Create default widget settings
+        // Create default widget settings using simple insert
         const { error: insertError } = await supabase
           .from('widget_settings')
           .insert({
-            project_id: project.id,
+            project_id: projectData.id,
             customer_satisfaction_enabled: true,
             product_feedback_enabled: true,
             theme: 'light',
             brand_color: '#3B82F6',
-            greeting: 'We value your feedback!',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            greeting: 'We value your feedback!'
           });
 
         if (insertError) {
           console.error("Error creating widget settings:", insertError);
-          // Don't throw here, just log the error as settings can still work
+          // Don't throw here, just log the error as settings can still work with defaults
           console.warn("Widget settings creation failed, but continuing with defaults");
         } else {
           console.log("✅ Created default widget settings");
@@ -136,17 +114,16 @@ const FeedbackSettings = () => {
       setSaving(true);
       setError(null);
 
-      // First check if settings exist
+      // First check if settings exist for this project
       const { data: existingSettings } = await supabase
         .from('widget_settings')
         .select('id')
         .eq('project_id', project.id)
         .single();
 
-      let result;
       if (existingSettings) {
         // Update existing settings
-        result = await supabase
+        const { error } = await supabase
           .from('widget_settings')
           .update({
             customer_satisfaction_enabled: settings.customerSatisfactionEnabled,
@@ -157,9 +134,11 @@ const FeedbackSettings = () => {
             updated_at: new Date().toISOString()
           })
           .eq('project_id', project.id);
+
+        if (error) throw error;
       } else {
-        // Insert new settings
-        result = await supabase
+        // Insert new settings (no onConflict since project_id is not unique)
+        const { error } = await supabase
           .from('widget_settings')
           .insert({
             project_id: project.id,
@@ -167,13 +146,11 @@ const FeedbackSettings = () => {
             product_feedback_enabled: settings.productFeedbackEnabled,
             theme: settings.theme,
             brand_color: settings.brandColor,
-            greeting: settings.greeting,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            greeting: settings.greeting
           });
-      }
 
-      if (result.error) throw result.error;
+        if (error) throw error;
+      }
 
       console.log("✅ Settings saved successfully");
     } catch (error: any) {
