@@ -9,25 +9,12 @@ export interface Project {
   updated_at?: string;
 }
 
-export interface FeedbackSettings {
-  id: string;
-  user_id: string;
-  project_id: string;
-  customer_satisfaction_enabled: boolean;
-  product_feedback_enabled: boolean;
-  widget_title: string;
-  widget_color: string;
-  greeting_text: string;
-  created_at: string;
-  updated_at?: string;
-}
-
 export interface ProjectWithSettings extends Project {
-  settings?: FeedbackSettings;
+  // Project settings can be added here if needed in the future
 }
 
 /**
- * Create a new project with default feedback settings
+ * Create a new project
  */
 export async function createProject(userId: string, name: string, logoUrl?: string): Promise<Project> {
   if (!userId) {
@@ -147,106 +134,6 @@ export async function getUserProjects(userId: string): Promise<ProjectWithSettin
   return attemptFetch();
 }
 
-/**
- * Get feedback settings for a specific project
- */
-export async function getFeedbackSettings(projectId: string, userId: string): Promise<FeedbackSettings | null> {
-  if (!projectId || !userId) {
-    throw new Error('Project ID and User ID are required');
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('feedback_settings')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Error fetching feedback settings:', error);
-      throw new Error(`Failed to fetch settings: ${error.message}`);
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in getFeedbackSettings:', error);
-    throw error;
-  }
-}
-
-/**
- * Create default feedback settings for a project
- */
-export async function createDefaultFeedbackSettings(projectId: string, userId: string): Promise<FeedbackSettings> {
-  if (!projectId || !userId) {
-    throw new Error('Project ID and User ID are required');
-  }
-
-  try {
-    const defaultSettings = {
-      user_id: userId,
-      project_id: projectId,
-      customer_satisfaction_enabled: true,
-      product_feedback_enabled: true,
-      widget_title: 'We love your feedback!',
-      widget_color: '#3B82F6',
-      greeting_text: 'Help us improve by sharing your thoughts'
-    };
-
-    const { data, error } = await supabase
-      .from('feedback_settings')
-      .insert(defaultSettings)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating default settings:', error);
-      throw new Error(`Failed to create settings: ${error.message}`);
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in createDefaultFeedbackSettings:', error);
-    throw error;
-  }
-}
-
-/**
- * Update feedback settings
- */
-export async function updateFeedbackSettings(
-  settingsId: string, 
-  updates: Partial<Omit<FeedbackSettings, 'id' | 'user_id' | 'project_id' | 'created_at'>>
-): Promise<FeedbackSettings> {
-  if (!settingsId) {
-    throw new Error('Settings ID is required');
-  }
-
-  try {
-    const updateData = {
-      ...updates,
-      updated_at: new Date().toISOString()
-    };
-
-    const { data, error } = await supabase
-      .from('feedback_settings')
-      .update(updateData)
-      .eq('id', settingsId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating feedback settings:', error);
-      throw new Error(`Failed to update settings: ${error.message}`);
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in updateFeedbackSettings:', error);
-    throw error;
-  }
-}
 
 /**
  * Delete a project and all its associated data
