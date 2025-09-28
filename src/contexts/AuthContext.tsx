@@ -56,7 +56,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (event === 'SIGNED_IN') {
             console.log("✅ User signed in successfully:", session?.user?.email);
             
-            // Automatically ensure user has a project
+            // Automatically ensure user has a project with retry logic
             if (session?.user?.id) {
               ensureUserHasProject(session.user.id)
                 .then((project) => {
@@ -64,7 +64,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 })
                 .catch((error) => {
                   console.error("❌ Failed to ensure user project:", error);
+                  
+                  // Log specific error types for debugging
+                  if (error.message.includes('network')) {
+                    console.warn("⚠️ Network error during project creation - will retry on next interaction");
+                  } else if (error.message.includes('JWT expired')) {
+                    console.warn("⚠️ Session expired during project creation - user may need to refresh");
+                  } else {
+                    console.error("❌ Unexpected error during project creation:", error.message);
+                  }
+                  
                   // Don't throw here as it would break the auth flow
+                  // The project will be created when the user visits FeedbackSettings
                 });
             }
           } else if (event === 'SIGNED_OUT') {
@@ -112,6 +123,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               })
               .catch((error) => {
                 console.error("❌ Failed to ensure user project on initial load:", error);
+                
+                // Log specific error types for debugging
+                if (error.message.includes('network')) {
+                  console.warn("⚠️ Network error during initial project check - will retry on next interaction");
+                } else if (error.message.includes('JWT expired')) {
+                  console.warn("⚠️ Session expired during initial project check - user may need to refresh");
+                } else {
+                  console.error("❌ Unexpected error during initial project check:", error.message);
+                }
               });
           }
         }

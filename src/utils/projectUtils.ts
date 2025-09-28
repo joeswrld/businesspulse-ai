@@ -277,71 +277,84 @@ export async function deleteProject(projectId: string, userId: string): Promise<
 /**
  * Automatically create a default project for a user if they don't have one
  * This function ensures every user has exactly one project
+ * Uses the new get_or_create_user_project function for better error handling
  */
 export async function ensureUserHasProject(userId: string): Promise<Project> {
   if (!userId) {
     throw new Error('User ID is required');
   }
 
-  try {
-    console.log('🔍 Checking if user has a project:', userId);
-    
-    // First, check if user already has a project
-    const { data: existingProjects, error: fetchError } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('user_id', userId)
-      .limit(1);
+  const attemptCreate = async (isRetry = false): Promise<Project> => {
+    try {
+      console.log('🔍 Ensuring user has a project:', userId);
+      
+      // Use the new helper function that handles both cases
+      const { data, error } = await supabase.rpc('get_or_create_user_project', {
+        p_user_id: userId
+      });
 
-    if (fetchError) {
-      console.error('Error checking existing projects:', fetchError);
-      throw new Error(`Failed to check existing projects: ${fetchError.message}`);
+      if (error) {
+        console.error('Error in get_or_create_user_project:', error);
+        
+        // Check if it's a JWT expired error and we haven't retried yet
+        if (error.message.includes('JWT expired') && !isRetry) {
+          console.log('JWT expired, attempting to refresh token...');
+          
+          // Try to refresh the session
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError) {
+            console.error('Failed to refresh session:', refreshError);
+            throw new Error('Session expired. Please log in again.');
+          }
+          
+          console.log('Token refreshed successfully, retrying...');
+          // Retry the original request
+          return attemptCreate(true);
+        }
+        
+        // Check if server returned HTML instead of JSON (common with 404/500 errors)
+        if (error.message.includes('Unexpected token') || error.message.includes('<')) {
+          throw new Error('Server returned an error page. Please check your connection and try again.');
+        }
+        
+        // Check for network errors
+        if (error.message.includes('ERR_INTERNET_DISCONNECTED') || error.message.includes('network')) {
+          throw new Error('Network error. Please check your internet connection and try again.');
+        }
+        
+        throw new Error(`Failed to ensure user project: ${error.message}`);
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error('No data returned from project creation');
+      }
+
+      const { project_id, project_name } = data[0];
+      
+      // Return the project data in the expected format
+      const project: Project = {
+        id: project_id,
+        name: project_name,
+        user_id: userId,
+        created_at: new Date().toISOString()
+      };
+
+      console.log('✅ User project ensured successfully:', project.id);
+      return project;
+    } catch (error) {
+      console.error('Error in ensureUserHasProject:', error);
+      
+      // If it's a network error, provide a more helpful message
+      if (error instanceof Error && error.message.includes('network')) {
+        throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
+      }
+      
+      throw error;
     }
+  };
 
-    // If user already has a project, return it
-    if (existingProjects && existingProjects.length > 0) {
-      console.log('✅ User already has a project:', existingProjects[0].id);
-      return existingProjects[0];
-    }
-
-    // User doesn't have a project, create one automatically
-    console.log('📝 Creating default project for user:', userId);
-    
-    const { data, error } = await supabase.rpc('create_project_with_settings', {
-      p_user_id: userId,
-      p_name: 'My Project',
-      p_logo_url: null
-    });
-
-    if (error) {
-      console.error('Error creating default project:', error);
-      throw new Error(`Failed to create default project: ${error.message}`);
-    }
-
-    if (!data || data.length === 0) {
-      throw new Error('No data returned from project creation');
-    }
-
-    const { project_id } = data[0];
-
-    // Fetch the created project
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('id', project_id)
-      .single();
-
-    if (projectError) {
-      console.error('Error fetching created project:', projectError);
-      throw new Error(`Failed to fetch created project: ${projectError.message}`);
-    }
-
-    console.log('✅ Default project created successfully:', project.id);
-    return project;
-  } catch (error) {
-    console.error('Error in ensureUserHasProject:', error);
-    throw error;
-  }
+  return attemptCreate();
 }
 
 /**
