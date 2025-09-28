@@ -34,15 +34,43 @@ const FeedbackSettings: React.FC = () => {
     }
   };
 
-  const handleRegenerateUrls = () => {
-    regenerateUrls();
+  const handleRegenerateUrls = async () => {
+    try {
+      await regenerateUrls();
+      toast({
+        title: "URLs Regenerated!",
+        description: "New project ID and URLs have been generated.",
+        variant: "default",
+      });
+    } catch (error) {
+      toast({
+        title: "Regeneration Failed",
+        description: "Failed to regenerate URLs. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSaveSettings = async () => {
     if (!settings) return;
-    await saveSettings(settings);
+    
+    try {
+      await saveSettings(settings);
+      toast({
+        title: "Settings Saved!",
+        description: "Your feedback settings have been updated.",
+        variant: "default",
+      });
+    } catch (error) {
+      toast({
+        title: "Save Failed",
+        description: "Failed to save settings. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
+  // Loading state
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -53,11 +81,15 @@ const FeedbackSettings: React.FC = () => {
     );
   }
 
+  // Settings will always exist due to RPC function - no "not found" state
   if (!settings) {
     return (
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="text-gray-600">Initializing your feedback settings...</p>
+          </div>
         </div>
       </div>
     );
@@ -70,8 +102,8 @@ const FeedbackSettings: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900">Feedback Settings</h1>
           <p className="text-gray-600 mt-2">Configure your feedback collection settings and generate embed codes.</p>
         </div>
-        <Button onClick={handleRegenerateUrls} variant="outline">
-          <RefreshCw className="h-4 w-4 mr-2" />
+        <Button onClick={handleRegenerateUrls} variant="outline" disabled={saving}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${saving ? 'animate-spin' : ''}`} />
           Regenerate URLs
         </Button>
       </div>
@@ -96,7 +128,7 @@ const FeedbackSettings: React.FC = () => {
                   id="project-id"
                   value={settings.project_id}
                   readOnly
-                  className="bg-gray-50"
+                  className="bg-gray-50 font-mono text-sm"
                 />
                 <Button
                   variant="outline"
