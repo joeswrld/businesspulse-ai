@@ -43,68 +43,18 @@
   }
 
   // Create floating button
-function createFloatingButton(settings) {
-  // Remove any existing button to avoid duplicates
-  const existing = document.getElementById('notex-feedback-button');
-  if (existing) existing.remove();
-
-  const button = document.createElement('button');
-  button.id = 'notex-feedback-button';
-
-  // Add content (icon + label)
-  button.innerHTML = `
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-        xmlns="http://www.w3.org/2000/svg">
+ function createFloatingButton(settings) {
+    const button = document.createElement('button');
+    button.id = 'notex-feedback-button';
+    button.innerHTML = `
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+      xmlns="http://www.w3.org/2000/svg">
       <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z"
         stroke="currentColor" stroke-width="2"
         stroke-linecap="round" stroke-linejoin="round"/>
+        We love your feedback
     </svg>
-    <span style="margin-left:8px;">
-      ${settings?.widgetTitle || "We love your feedback 💬"}
-    </span>
-  `;
-
-  // Floating styles
-  Object.assign(button.style, {
-    position: "fixed",
-    bottom: "20px",
-    right: "20px",
-    backgroundColor: settings?.brandColor || "#2563eb", // default blue
-    color: "#fff",
-    border: "none",
-    borderRadius: "9999px",
-    padding: "12px 20px",
-    fontSize: "14px",
-    fontFamily: "inherit",
-    display: "flex",
-    alignItems: "center",
-    cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-    zIndex: "9999",
-    transition: "background 0.3s ease"
-  });
-
-  // Hover effect
-  button.addEventListener("mouseenter", () => {
-    button.style.backgroundColor = settings?.hoverColor || "#1d4ed8";
-  });
-  button.addEventListener("mouseleave", () => {
-    button.style.backgroundColor = settings?.brandColor || "#2563eb";
-  });
-
-  // Append to body
-  document.body.appendChild(button);
-
-  // Optional click handler
-  button.addEventListener("click", () => {
-    if (typeof settings?.onClick === "function") {
-      settings.onClick();
-    } else {
-      alert("Feedback form coming soon 🚀");
-    }
-  });
-}
-
+    `;
     
     // Apply styles
     Object.assign(button.style, {
