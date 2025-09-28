@@ -76,45 +76,73 @@ export async function createProject(userId: string, name: string, logoUrl?: stri
 
 /**
  * Get all projects for a user with their feedback settings
+ * Includes retry logic for JWT token refresh
  */
 export async function getUserProjects(userId: string): Promise<ProjectWithSettings[]> {
   if (!userId) {
     throw new Error('User ID is required');
   }
 
-  try {
-    const { data, error } = await supabase.rpc('get_user_projects_with_settings', {
-      p_user_id: userId
-    });
+  const attemptFetch = async (isRetry = false): Promise<ProjectWithSettings[]> => {
+    try {
+      const { data, error } = await supabase.rpc('get_user_projects_with_settings', {
+        p_user_id: userId
+      });
 
-    if (error) {
-      console.error('Error fetching user projects:', error);
-      throw new Error(`Failed to fetch projects: ${error.message}`);
-    }
+      if (error) {
+        console.error('Error fetching user projects:', error);
+        
+        // Check if it's a JWT expired error and we haven't retried yet
+        if (error.message.includes('JWT expired') && !isRetry) {
+          console.log('JWT expired, attempting to refresh token...');
+          
+          // Try to refresh the session
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError) {
+            console.error('Failed to refresh session:', refreshError);
+            throw new Error('Session expired. Please log in again.');
+          }
+          
+          console.log('Token refreshed successfully, retrying...');
+          // Retry the original request
+          return attemptFetch(true);
+        }
+        
+        // Check if server returned HTML instead of JSON (common with 404/500 errors)
+        if (error.message.includes('Unexpected token') || error.message.includes('<')) {
+          throw new Error('Server returned an error page. Please check your connection and try again.');
+        }
+        
+        throw new Error(`Failed to fetch projects: ${error.message}`);
+      }
 
-    // Transform the data to match our interface
-    return (data || []).map((row: any) => ({
-      id: row.project_id,
-      name: row.project_name,
-      user_id: userId,
-      logo_url: row.project_logo_url,
-      created_at: row.project_created_at,
-      updated_at: row.project_created_at, // Use created_at as fallback
-      settings: row.settings_id ? {
-        id: row.settings_id,
+      // Transform the data to match our interface
+      return (data || []).map((row: any) => ({
+        id: row.project_id,
+        name: row.project_name,
         user_id: userId,
-        project_id: row.project_id,
-        widget_title: row.widget_title,
-        widget_color: row.widget_color,
-        greeting_text: row.greeting_text,
+        logo_url: row.project_logo_url,
         created_at: row.project_created_at,
-        updated_at: row.settings_updated_at
-      } : undefined
-    }));
-  } catch (error) {
-    console.error('Error in getUserProjects:', error);
-    throw error;
-  }
+        updated_at: row.project_created_at, // Use created_at as fallback
+        settings: row.settings_id ? {
+          id: row.settings_id,
+          user_id: userId,
+          project_id: row.project_id,
+          widget_title: row.widget_title,
+          widget_color: row.widget_color,
+          greeting_text: row.greeting_text,
+          created_at: row.project_created_at,
+          updated_at: row.settings_updated_at
+        } : undefined
+      }));
+    } catch (error) {
+      console.error('Error in getUserProjects:', error);
+      throw error;
+    }
+  };
+
+  return attemptFetch();
 }
 
 /**
