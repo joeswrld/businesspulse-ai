@@ -27,61 +27,45 @@ const FeedbackSettings = () => {
       setLoading(true);
       setError(null);
       
-      // First, try the RPC function
       let project = null;
-      const { data: rpcData, error: rpcError } = await supabase.rpc("create_project_with_settings", {
-        p_user_id: user.id,
-      });
 
-      if (!rpcError && rpcData && rpcData.length > 0) {
-        project = rpcData[0];
+      // First, check if user already has a project
+      const { data: existingProjects, error: fetchError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('user_id', user.id)
+        .limit(1);
+
+      if (fetchError) {
+        console.error("Error fetching projects:", fetchError);
+        throw new Error(`Failed to fetch projects: ${fetchError.message}`);
+      }
+
+      if (existingProjects && existingProjects.length > 0) {
+        project = existingProjects[0];
+        console.log("✅ Found existing project:", project.id);
       } else {
-        // Fallback: Manual project creation if RPC doesn't exist
-        console.log("🔄 RPC failed, falling back to manual project creation...");
-        
-        // Check if user already has a project
-        const { data: existingProjects } = await supabase
+        // Create new project
+        const { data: newProject, error: createError } = await supabase
           .from('projects')
-          .select('*')
-          .eq('user_id', user.id)
-          .limit(1);
-
-        if (existingProjects && existingProjects.length > 0) {
-          project = existingProjects[0];
-        } else {
-          // Create new project manually
-          const { data: newProject, error: createError } = await supabase
-            .from('projects')
-            .insert([
-              {
-                user_id: user.id,
-                name: 'Default Project',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              }
-            ])
-            .select()
-            .single();
-
-          if (createError) throw createError;
-          project = newProject;
-        }
-
-        // Ensure widget settings exist
-        if (project) {
-          await supabase
-            .from('widget_settings')
-            .upsert({
-              project_id: project.id,
-              customer_satisfaction_enabled: true,
-              product_feedback_enabled: true,
-              theme: 'light',
-              brand_color: '#3B82F6',
-              greeting: 'We value your feedback!',
+          .insert([
+            {
+              user_id: user.id,
+              name: 'Default Project',
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
-            });
+            }
+          ])
+          .select()
+          .single();
+
+        if (createError) {
+          console.error("Error creating project:", createError);
+          throw new Error(`Failed to create project: ${createError.message}`);
         }
+        
+        project = newProject;
+        console.log("✅ Created new project:", project.id);
       }
 
       if (!project) {
@@ -90,22 +74,51 @@ const FeedbackSettings = () => {
 
       setProject(project);
 
-      // Load existing widget settings
-      const { data: widgetSettings } = await supabase
+      // Check if widget settings exist
+      const { data: existingSettings, error: settingsError } = await supabase
         .from('widget_settings')
         .select('*')
         .eq('project_id', project.id)
         .single();
 
-      if (widgetSettings) {
+      if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error("Error fetching widget settings:", settingsError);
+        throw new Error(`Failed to fetch widget settings: ${settingsError.message}`);
+      }
+
+      if (existingSettings) {
+        // Update existing settings
         setSettings(prev => ({
           ...prev,
-          customerSatisfactionEnabled: widgetSettings.customer_satisfaction_enabled ?? prev.customerSatisfactionEnabled,
-          productFeedbackEnabled: widgetSettings.product_feedback_enabled ?? prev.productFeedbackEnabled,
-          theme: widgetSettings.theme ?? prev.theme,
-          brandColor: widgetSettings.brand_color ?? prev.brandColor,
-          greeting: widgetSettings.greeting ?? prev.greeting
+          customerSatisfactionEnabled: existingSettings.customer_satisfaction_enabled ?? prev.customerSatisfactionEnabled,
+          productFeedbackEnabled: existingSettings.product_feedback_enabled ?? prev.productFeedbackEnabled,
+          theme: existingSettings.theme ?? prev.theme,
+          brandColor: existingSettings.brand_color ?? prev.brandColor,
+          greeting: existingSettings.greeting ?? prev.greeting
         }));
+        console.log("✅ Loaded existing widget settings");
+      } else {
+        // Create default widget settings
+        const { error: insertError } = await supabase
+          .from('widget_settings')
+          .insert({
+            project_id: project.id,
+            customer_satisfaction_enabled: true,
+            product_feedback_enabled: true,
+            theme: 'light',
+            brand_color: '#3B82F6',
+            greeting: 'We value your feedback!',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+
+        if (insertError) {
+          console.error("Error creating widget settings:", insertError);
+          // Don't throw here, just log the error as settings can still work
+          console.warn("Widget settings creation failed, but continuing with defaults");
+        } else {
+          console.log("✅ Created default widget settings");
+        }
       }
 
     } catch (error: any) {
@@ -123,19 +136,44 @@ const FeedbackSettings = () => {
       setSaving(true);
       setError(null);
 
-      const { error } = await supabase
+      // First check if settings exist
+      const { data: existingSettings } = await supabase
         .from('widget_settings')
-        .upsert({
-          project_id: project.id,
-          customer_satisfaction_enabled: settings.customerSatisfactionEnabled,
-          product_feedback_enabled: settings.productFeedbackEnabled,
-          theme: settings.theme,
-          brand_color: settings.brandColor,
-          greeting: settings.greeting,
-          updated_at: new Date().toISOString()
-        });
+        .select('id')
+        .eq('project_id', project.id)
+        .single();
 
-      if (error) throw error;
+      let result;
+      if (existingSettings) {
+        // Update existing settings
+        result = await supabase
+          .from('widget_settings')
+          .update({
+            customer_satisfaction_enabled: settings.customerSatisfactionEnabled,
+            product_feedback_enabled: settings.productFeedbackEnabled,
+            theme: settings.theme,
+            brand_color: settings.brandColor,
+            greeting: settings.greeting,
+            updated_at: new Date().toISOString()
+          })
+          .eq('project_id', project.id);
+      } else {
+        // Insert new settings
+        result = await supabase
+          .from('widget_settings')
+          .insert({
+            project_id: project.id,
+            customer_satisfaction_enabled: settings.customerSatisfactionEnabled,
+            product_feedback_enabled: settings.productFeedbackEnabled,
+            theme: settings.theme,
+            brand_color: settings.brandColor,
+            greeting: settings.greeting,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+      }
+
+      if (result.error) throw result.error;
 
       console.log("✅ Settings saved successfully");
     } catch (error: any) {
