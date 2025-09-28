@@ -129,7 +129,6 @@ const navigation = [
   { name: "AI Insights", href: "/insights-simple", icon: Brain },
   { name: "Reports & Analytics", href: "/reports", icon: FileText },
   { name: "Feedback", href: "/feedback", icon: MessageSquare },
-  { name: "Feedback Settings", href: "/feedback-settings", icon: Settings },
   { name: "Roadmap", href: "/roadmap", icon: BarChart3 },
   { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
   { name: "Team Collaboration", href: "/teams", icon: Users },

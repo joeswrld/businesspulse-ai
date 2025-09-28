@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   }
                   
                   // Don't throw here as it would break the auth flow
-                  // The project will be created when the user visits FeedbackSettings
+                  // The project will be created when needed
                 });
             }
           } else if (event === 'SIGNED_OUT') {

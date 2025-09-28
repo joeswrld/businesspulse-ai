@@ -23,7 +23,6 @@ import Settings from "./pages/Settings";
 import Teams from "./pages/Teams";
 import Profile from "./pages/Profile";
 import Feedback from "./pages/Feedback";
-import FeedbackSettings from "./pages/FeedbackSettings";
 import Roadmap from "./pages/Roadmap";
 import Testimonials from "./pages/Testimonials";
 import About from "./pages/About";
@@ -93,7 +92,6 @@ const App = () => (
                       <Route path="/insights-simple" element={<DashboardLayout><InsightsSimple /></DashboardLayout>} />
                       <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
                       <Route path="/feedback" element={<DashboardLayout><Feedback /></DashboardLayout>} />
-                      <Route path="/feedback-settings" element={<DashboardLayout><FeedbackSettings /></DashboardLayout>} />
                       <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
                       <Route path="/teams" element={<DashboardLayout><Teams /></DashboardLayout>} />
                       <Route path="/billing" element={<DashboardLayout><Billing /></DashboardLayout>} />

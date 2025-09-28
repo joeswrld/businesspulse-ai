@@ -976,7 +976,7 @@ export default function Dashboard() {
                                     Start collecting feedback through your widget to see insights and analytics.
                                 </p>
                                 <Button variant="outline" asChild>
-                                    <a href="/feedback-settings">Configure Widget</a>
+                                    <a href="/feedback">View Feedback</a>
                                 </Button>
                             </div>
                         )}
