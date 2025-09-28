@@ -28,7 +28,8 @@ import {
   ExternalLink,
   Code,
   Plus,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 
 // Types
@@ -40,6 +41,7 @@ interface FeedbackSettings {
   widget_color: string;
   greeting_text: string;
   created_at: string;
+  updated_at?: string;
 }
 
 interface Project {
@@ -48,6 +50,7 @@ interface Project {
   user_id: string;
   logo_url?: string;
   created_at: string;
+  updated_at?: string;
 }
 
 export default function FeedbackSettings() {
@@ -67,13 +70,15 @@ export default function FeedbackSettings() {
   const [newProjectLogo, setNewProjectLogo] = useState<File | null>(null);
   const [creating, setCreating] = useState(false);
 
-  // Load user projects
+  // Load user projects with enhanced error handling
   const loadProjects = useCallback(async () => {
     if (!user) return;
 
     try {
       setLoading(true);
       setError(null);
+
+      console.log('Loading projects for user:', user.id);
 
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
@@ -84,45 +89,62 @@ export default function FeedbackSettings() {
       if (projectsError) {
         console.error('Error loading projects:', projectsError);
         
-        // Handle case where projects table doesn't exist
-        if (projectsError.code === '42P01' || projectsError.message?.includes('relation "projects" does not exist')) {
-          console.log('Projects table does not exist');
+        // Handle specific error cases
+        if (projectsError.code === '42P01') {
+          setError('Database tables are not set up properly. Please contact support.');
+          return;
+        }
+        
+        if (projectsError.message?.includes('relation "projects" does not exist')) {
+          setError('Projects table does not exist. Please run the database setup.');
+          return;
+        }
+
+        if (projectsError.code === 'PGRST116') {
+          // No rows found - this is normal for new users
           setProjects([]);
           return;
         }
+        
         throw projectsError;
       }
 
       const currentProjects = projectsData || [];
+      console.log('Loaded projects:', currentProjects);
       setProjects(currentProjects);
 
-      // Auto-select first project if available
+      // Auto-select first project if available and none is selected
       if (currentProjects.length > 0 && !selectedProject) {
+        console.log('Auto-selecting first project:', currentProjects[0].id);
         setSelectedProject(currentProjects[0].id);
       }
 
     } catch (error) {
       console.error('Error loading projects:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred while loading projects');
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred while loading projects';
+      setError(errorMessage);
+      toast.error(`Failed to load projects: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
   }, [user, selectedProject]);
 
-  // Load feedback settings for selected project
+  // Load feedback settings with better error handling
   const loadFeedbackSettings = useCallback(async (projectId: string) => {
     if (!user || !projectId) return;
 
     try {
+      console.log('Loading feedback settings for project:', projectId);
+
       // Try to load existing settings
       const { data: settingsData, error: settingsError } = await supabase
         .from('feedback_settings')
         .select('*')
         .eq('project_id', projectId)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single to avoid errors when no rows found
 
-      if (settingsError && settingsError.code !== 'PGRST116') {
+      if (settingsError) {
         console.error('Error loading settings:', settingsError);
         
         // Handle case where feedback_settings table doesn't exist
@@ -140,12 +162,15 @@ export default function FeedbackSettings() {
           setSettings(fallbackSettings);
           return;
         }
+        throw settingsError;
       }
 
       if (settingsData) {
+        console.log('Loaded existing settings:', settingsData);
         setSettings(settingsData);
       } else {
         // Create default settings if none exist
+        console.log('No settings found, creating default settings');
         const defaultSettings = {
           project_id: projectId,
           user_id: user.id,
@@ -163,7 +188,7 @@ export default function FeedbackSettings() {
 
           if (createError) {
             console.error('Error creating default settings:', createError);
-            // Use fallback settings
+            // Use fallback settings if database creation fails
             const fallbackSettings: FeedbackSettings = {
               id: `fallback-${projectId}`,
               user_id: user.id,
@@ -174,7 +199,9 @@ export default function FeedbackSettings() {
               created_at: new Date().toISOString()
             };
             setSettings(fallbackSettings);
+            toast.warning('Using offline settings. Database unavailable.');
           } else {
+            console.log('Created new settings:', newSettings);
             setSettings(newSettings);
           }
         } catch (createError) {
@@ -189,6 +216,7 @@ export default function FeedbackSettings() {
             created_at: new Date().toISOString()
           };
           setSettings(fallbackSettings);
+          toast.warning('Using offline settings. Database unavailable.');
         }
       }
     } catch (error) {
@@ -196,6 +224,214 @@ export default function FeedbackSettings() {
       toast.error('Failed to load settings for this project');
     }
   }, [user]);
+
+  // Enhanced project creation with better error handling
+  const createProject = async () => {
+    if (!user || !newProjectName.trim()) {
+      toast.error('Project name is required');
+      return;
+    }
+
+    try {
+      setCreating(true);
+      console.log('Starting project creation...', { userId: user.id, projectName: newProjectName });
+
+      let logoUrl = null;
+      
+      // Upload logo if provided
+      if (newProjectLogo) {
+        try {
+          const fileExt = newProjectLogo.name.split('.').pop();
+          const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+          
+          console.log('Uploading logo...', fileName);
+          
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('project-logos')
+            .upload(fileName, newProjectLogo);
+
+          if (uploadError) {
+            console.error('Error uploading logo:', uploadError);
+            toast.warning('Failed to upload logo, but project will be created without it');
+          } else {
+            const { data: { publicUrl } } = supabase.storage
+              .from('project-logos')
+              .getPublicUrl(fileName);
+            logoUrl = publicUrl;
+            console.log('Logo uploaded successfully:', logoUrl);
+          }
+        } catch (logoError) {
+          console.error('Logo upload failed:', logoError);
+          toast.warning('Logo upload failed, continuing without logo');
+        }
+      }
+
+      // Create project
+      const projectData = {
+        user_id: user.id,
+        name: newProjectName.trim(),
+        logo_url: logoUrl
+      };
+
+      console.log('Creating project with data:', projectData);
+
+      const { data: newProject, error: projectError } = await supabase
+        .from('projects')
+        .insert(projectData)
+        .select()
+        .single();
+
+      if (projectError) {
+        console.error('Error creating project:', projectError);
+        
+        // More specific error messages
+        if (projectError.code === '42P01') {
+          toast.error('Database tables are not set up. Please run the database setup script.');
+          return;
+        } else if (projectError.code === '23505') {
+          toast.error('A project with this name already exists');
+          return;
+        } else if (projectError.message?.includes('permission denied')) {
+          toast.error('Permission denied. Please check your account permissions.');
+          return;
+        } else if (projectError.message?.includes('relation') && projectError.message?.includes('does not exist')) {
+          toast.error('Database not properly configured. Please run the database setup.');
+          return;
+        }
+        
+        throw projectError;
+      }
+
+      if (!newProject) {
+        throw new Error('Project was created but no data was returned');
+      }
+
+      console.log('Project created successfully:', newProject);
+
+      // Create default feedback settings for the new project
+      const defaultSettings = {
+        project_id: newProject.id,
+        user_id: user.id,
+        widget_title: 'We love your feedback!',
+        widget_color: '#3B82F6',
+        greeting_text: 'Help us improve by sharing your thoughts'
+      };
+
+      console.log('Creating default feedback settings...', defaultSettings);
+
+      try {
+        const { error: settingsError } = await supabase
+          .from('feedback_settings')
+          .insert(defaultSettings);
+
+        if (settingsError) {
+          console.error('Error creating default settings:', settingsError);
+          toast.warning('Project created but failed to create default settings. You can configure them manually.');
+        } else {
+          console.log('Default feedback settings created successfully');
+        }
+      } catch (settingsError) {
+        console.error('Failed to create default settings:', settingsError);
+        // Continue even if settings creation fails
+      }
+
+      // Refresh projects and select the new one
+      console.log('Refreshing projects list...');
+      setProjects(prevProjects => [...prevProjects, newProject]);
+      setSelectedProject(newProject.id);
+
+      // Reset modal state
+      setShowCreateModal(false);
+      setNewProjectName('');
+      setNewProjectLogo(null);
+
+      toast.success('Project created successfully!');
+
+    } catch (error) {
+      console.error('Error creating project:', error);
+      
+      // More detailed error messages based on the error type
+      if (error instanceof Error) {
+        if (error.message.includes('fetch')) {
+          toast.error('Network error. Please check your connection and try again.');
+        } else if (error.message.includes('JWT') || error.message.includes('token')) {
+          toast.error('Session expired. Please refresh the page and try again.');
+        } else {
+          toast.error(`Failed to create project: ${error.message}`);
+        }
+      } else {
+        toast.error('Failed to create project. Please try again.');
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // Enhanced save settings with validation
+  const saveSettings = async () => {
+    if (!settings || !selectedProject) {
+      toast.error('No settings to save');
+      return;
+    }
+
+    // Validate settings
+    if (!settings.widget_title.trim()) {
+      toast.error('Widget title is required');
+      return;
+    }
+
+    if (!settings.greeting_text.trim()) {
+      toast.error('Greeting text is required');
+      return;
+    }
+
+    // Validate color format
+    const colorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+    if (!colorRegex.test(settings.widget_color)) {
+      toast.error('Please enter a valid hex color (e.g., #3B82F6)');
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      // If it's a fallback settings, just show success (can't save to database)
+      if (settings.id.startsWith('fallback-')) {
+        toast.success('Settings saved locally! Note: Database not available.');
+        return;
+      }
+
+      const settingsToSave = {
+        widget_title: settings.widget_title.trim(),
+        widget_color: settings.widget_color,
+        greeting_text: settings.greeting_text.trim(),
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('Saving settings:', settingsToSave);
+
+      const { error } = await supabase
+        .from('feedback_settings')
+        .update(settingsToSave)
+        .eq('id', settings.id)
+        .eq('user_id', user?.id); // Additional security check
+
+      if (error) {
+        console.error('Error saving settings:', error);
+        throw error;
+      }
+
+      // Update local state with the saved data
+      setSettings(prev => prev ? { ...prev, ...settingsToSave } : null);
+      
+      toast.success('Settings saved successfully!');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast.error('Failed to save settings. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Load data on component mount
   useEffect(() => {
@@ -211,134 +447,18 @@ export default function FeedbackSettings() {
     }
   }, [selectedProject, loadFeedbackSettings, user]);
 
-  // Create new project
-  const createProject = async () => {
-    if (!user || !newProjectName.trim()) {
-      toast.error('Project name is required');
-      return;
-    }
-
-    try {
-      setCreating(true);
-
-      let logoUrl = null;
-      
-      // Upload logo if provided
-      if (newProjectLogo) {
-        const fileExt = newProjectLogo.name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('project-logos')
-          .upload(fileName, newProjectLogo);
-
-        if (uploadError) {
-          console.error('Error uploading logo:', uploadError);
-          toast.error('Failed to upload logo, but project will be created without it');
-        } else {
-          const { data: { publicUrl } } = supabase.storage
-            .from('project-logos')
-            .getPublicUrl(fileName);
-          logoUrl = publicUrl;
-        }
-      }
-
-      // Create project
-      const projectData = {
-        user_id: user.id,
-        name: newProjectName.trim(),
-        logo_url: logoUrl
-      };
-
-      const { data: newProject, error: projectError } = await supabase
-        .from('projects')
-        .insert(projectData)
-        .select()
-        .single();
-
-      if (projectError) {
-        console.error('Error creating project:', projectError);
-        throw projectError;
-      }
-
-      // Create default feedback settings for the new project
-      const defaultSettings = {
-        project_id: newProject.id,
-        user_id: user.id,
-        widget_title: 'We love your feedback!',
-        widget_color: '#3B82F6',
-        greeting_text: 'Help us improve by sharing your thoughts'
-      };
-
-      try {
-        await supabase
-          .from('feedback_settings')
-          .insert(defaultSettings);
-      } catch (settingsError) {
-        console.error('Error creating default settings:', settingsError);
-        // Continue even if settings creation fails
-      }
-
-      // Refresh projects and select the new one
-      await loadProjects();
-      setSelectedProject(newProject.id);
-
-      // Reset modal state
-      setShowCreateModal(false);
-      setNewProjectName('');
-      setNewProjectLogo(null);
-
-      toast.success('Project created successfully!');
-
-    } catch (error) {
-      console.error('Error creating project:', error);
-      toast.error('Failed to create project. Please try again.');
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  // Save settings
-  const saveSettings = async () => {
-    if (!settings || !selectedProject) return;
-
-    try {
-      setSaving(true);
-
-      // If it's a fallback settings, just show success (can't save to database)
-      if (settings.id.startsWith('fallback-')) {
-        toast.success('Settings saved locally! Note: Database not available.');
-        return;
-      }
-
-      const settingsToSave = {
-        widget_title: settings.widget_title,
-        widget_color: settings.widget_color,
-        greeting_text: settings.greeting_text
-      };
-
-      const { error } = await supabase
-        .from('feedback_settings')
-        .update(settingsToSave)
-        .eq('id', settings.id);
-
-      if (error) {
-        console.error('Error saving settings:', error);
-        throw error;
-      }
-
-      toast.success('Settings saved successfully!');
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      toast.error('Failed to save settings. Please try again.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Update setting
+  // Update setting with validation
   const updateSetting = (key: keyof FeedbackSettings, value: any) => {
     if (!settings) return;
+    
+    // Basic validation
+    if (key === 'widget_color' && typeof value === 'string') {
+      // Ensure it's a valid color format
+      if (value && !value.startsWith('#')) {
+        value = '#' + value.replace('#', '');
+      }
+    }
+    
     setSettings(prev => prev ? { ...prev, [key]: value } : null);
   };
 
@@ -375,7 +495,7 @@ export default function FeedbackSettings() {
     };
   };
 
-  // Handle logo file selection
+  // Handle logo file selection with validation
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -392,6 +512,13 @@ export default function FeedbackSettings() {
       setNewProjectLogo(file);
     }
   };
+
+  // Reset error state when user changes
+  useEffect(() => {
+    if (user) {
+      setError(null);
+    }
+  }, [user]);
 
   if (!user) {
     return (
@@ -431,10 +558,15 @@ export default function FeedbackSettings() {
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Error Loading Settings</h2>
             <p className="text-gray-600 mb-4">{error}</p>
-            <Button onClick={loadProjects}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
-            </Button>
+            <div className="space-x-2">
+              <Button onClick={loadProjects}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+              <Button variant="outline" onClick={() => setError(null)}>
+                Clear Error
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -539,18 +671,22 @@ export default function FeedbackSettings() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Widget Title */}
                   <div className="space-y-2">
-                    <Label htmlFor="widget-title">Widget Title</Label>
+                    <Label htmlFor="widget-title">Widget Title *</Label>
                     <Input
                       id="widget-title"
                       value={settings.widget_title || ''}
                       onChange={(e) => updateSetting('widget_title', e.target.value)}
                       placeholder="We love your feedback!"
+                      maxLength={100}
                     />
+                    <p className="text-xs text-gray-500">
+                      {settings.widget_title.length}/100 characters
+                    </p>
                   </div>
 
                   {/* Widget Color */}
                   <div className="space-y-2">
-                    <Label htmlFor="widget-color">Widget Color</Label>
+                    <Label htmlFor="widget-color">Widget Color *</Label>
                     <div className="flex items-center space-x-2">
                       <Input
                         id="widget-color"
@@ -564,20 +700,25 @@ export default function FeedbackSettings() {
                         onChange={(e) => updateSetting('widget_color', e.target.value)}
                         placeholder="#3B82F6"
                         className="flex-1"
+                        pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
                       />
                     </div>
                   </div>
 
                   {/* Greeting Text */}
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="greeting-text">Greeting Text</Label>
+                    <Label htmlFor="greeting-text">Greeting Text *</Label>
                     <Textarea
                       id="greeting-text"
                       value={settings.greeting_text || ''}
                       onChange={(e) => updateSetting('greeting_text', e.target.value)}
                       placeholder="Help us improve by sharing your thoughts"
                       rows={3}
+                      maxLength={500}
                     />
+                    <p className="text-xs text-gray-500">
+                      {settings.greeting_text.length}/500 characters
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -717,7 +858,7 @@ export default function FeedbackSettings() {
 
                 {/* Preview Frame */}
                 <div className={cn(
-                  "border rounded-lg bg-white overflow-hidden",
+                  "border rounded-lg bg-white overflow-hidden shadow-sm",
                   previewMode === 'mobile' ? "max-w-sm mx-auto" : "w-full"
                 )}>
                   <div className="h-8 bg-gray-100 border-b flex items-center justify-center">
@@ -750,6 +891,37 @@ export default function FeedbackSettings() {
                           className="text-sm"
                           readOnly
                         />
+                        <div className="mt-3 flex justify-end">
+                          <Button 
+                            size="sm" 
+                            style={{ backgroundColor: settings.widget_color }}
+                          >
+                            Submit Feedback
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Rating Preview */}
+                      <div className="p-4 border rounded-lg">
+                        <h4 className="font-medium mb-3 flex items-center">
+                          <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+                          Satisfaction Survey
+                        </h4>
+                        <div className="flex justify-center space-x-2 mb-3">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <div 
+                              key={star}
+                              className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm cursor-pointer hover:bg-gray-50"
+                              style={{ borderColor: settings.widget_color }}
+                            >
+                              {star}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500">
+                          <span>Very Dissatisfied</span>
+                          <span>Very Satisfied</span>
+                        </div>
                       </div>
                     </div>
 
@@ -784,7 +956,11 @@ export default function FeedbackSettings() {
                 onChange={(e) => setNewProjectName(e.target.value)}
                 placeholder="Enter project name..."
                 disabled={creating}
+                maxLength={100}
               />
+              <p className="text-xs text-gray-500">
+                {newProjectName.length}/100 characters
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="project-logo">Logo (Optional)</Label>
@@ -809,14 +985,23 @@ export default function FeedbackSettings() {
                 )}
               </div>
               {newProjectLogo && (
-                <p className="text-xs text-gray-500">
-                  Selected: {newProjectLogo.name}
-                </p>
+                <div className="text-xs text-gray-500 space-y-1">
+                  <p>Selected: {newProjectLogo.name}</p>
+                  <p>Size: {(newProjectLogo.size / 1024 / 1024).toFixed(2)} MB</p>
+                </div>
               )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateModal(false)} disabled={creating}>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowCreateModal(false);
+                setNewProjectName('');
+                setNewProjectLogo(null);
+              }} 
+              disabled={creating}
+            >
               Cancel
             </Button>
             <Button onClick={createProject} disabled={creating || !newProjectName.trim()}>
