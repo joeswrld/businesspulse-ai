@@ -5,20 +5,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { 
-  createProject, 
   getUserProjects, 
   getFeedbackSettings, 
   createDefaultFeedbackSettings,
   updateFeedbackSettings,
-  deleteProject as deleteProjectUtil,
-  uploadProjectLogo,
+  ensureUserHasProject,
   type Project,
   type FeedbackSettings,
   type ProjectWithSettings
@@ -39,69 +35,36 @@ import {
   CheckCircle,
   ExternalLink,
   Code,
-  Plus,
-  X,
-  Trash2
+  Lock
 } from 'lucide-react';
-
-// Types are now imported from projectUtils
 
 export default function FeedbackSettings() {
   const { user } = useAuth();
   const [settings, setSettings] = useState<FeedbackSettings | null>(null);
-  const [projects, setProjects] = useState<ProjectWithSettings[]>([]);
-  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
-  
-  // Create Project Modal State
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectLogo, setNewProjectLogo] = useState<File | null>(null);
-  const [creating, setCreating] = useState(false);
 
-  // Load user projects with enhanced error handling
-  const loadProjects = useCallback(async () => {
+  // Load user's auto-generated project and settings
+  const loadUserProject = useCallback(async () => {
     if (!user) return;
 
     try {
       setLoading(true);
       setError(null);
 
-      console.log('Loading projects for user:', user.id);
+      console.log('Loading user project for:', user.id);
 
-      const projectsData = await getUserProjects(user.id);
-      console.log('Loaded projects:', projectsData);
-      setProjects(projectsData);
+      // Ensure user has a project (auto-generated)
+      const userProject = await ensureUserHasProject(user.id);
+      console.log('User project loaded:', userProject);
+      setProject(userProject);
 
-      // Auto-select first project if available and none is selected
-      if (projectsData.length > 0 && !selectedProject) {
-        console.log('Auto-selecting first project:', projectsData[0].id);
-        setSelectedProject(projectsData[0].id);
-      }
-
-    } catch (error) {
-      console.error('Error loading projects:', error);
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred while loading projects';
-      setError(errorMessage);
-      toast.error(`Failed to load projects: ${errorMessage}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, selectedProject]);
-
-  // Load feedback settings with better error handling
-  const loadFeedbackSettings = useCallback(async (projectId: string) => {
-    if (!user || !projectId) return;
-
-    try {
-      console.log('Loading feedback settings for project:', projectId);
-
-      // Try to load existing settings
-      let settingsData = await getFeedbackSettings(projectId, user.id);
+      // Load feedback settings for this project
+      let settingsData = await getFeedbackSettings(userProject.id, user.id);
 
       if (settingsData) {
         console.log('Loaded existing settings:', settingsData);
@@ -110,15 +73,15 @@ export default function FeedbackSettings() {
         // Create default settings if none exist
         console.log('No settings found, creating default settings');
         try {
-          settingsData = await createDefaultFeedbackSettings(projectId, user.id);
+          settingsData = await createDefaultFeedbackSettings(userProject.id, user.id);
           console.log('Created new settings:', settingsData);
           setSettings(settingsData);
         } catch (createError) {
           console.error('Failed to create settings, using fallback:', createError);
           const fallbackSettings: FeedbackSettings = {
-            id: `fallback-${projectId}`,
+            id: `fallback-${userProject.id}`,
             user_id: user.id,
-            project_id: projectId,
+            project_id: userProject.id,
             widget_title: 'We love your feedback!',
             widget_color: '#3B82F6',
             greeting_text: 'Help us improve by sharing your thoughts',
@@ -128,83 +91,20 @@ export default function FeedbackSettings() {
           toast.warning('Using offline settings. Database unavailable.');
         }
       }
+
     } catch (error) {
-      console.error('Error loading feedback settings:', error);
-      toast.error('Failed to load settings for this project');
+      console.error('Error loading user project:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred while loading your project';
+      setError(errorMessage);
+      toast.error(`Failed to load project: ${errorMessage}`);
+    } finally {
+      setLoading(false);
     }
   }, [user]);
 
-  // Enhanced project creation with comprehensive error handling
-  const handleCreateProject = async () => {
-    if (!user || !newProjectName.trim()) {
-      toast.error('Project name is required');
-      return;
-    }
-
-    try {
-      setCreating(true);
-      console.log('Starting project creation...', { 
-        userId: user.id, 
-        projectName: newProjectName,
-        userEmail: user.email
-      });
-
-      let logoUrl: string | undefined = undefined;
-      
-      // Upload logo if provided
-      if (newProjectLogo) {
-        try {
-          logoUrl = await uploadProjectLogo(user.id, newProjectLogo);
-          console.log('Logo uploaded successfully:', logoUrl);
-        } catch (logoError) {
-          console.error('Logo upload failed:', logoError);
-          toast.warning('Logo upload failed, continuing without logo');
-        }
-      }
-
-      // Create project using the helper function
-      const newProject = await createProject(user.id, newProjectName.trim(), logoUrl);
-      console.log('Project created successfully:', newProject);
-
-      // Refresh projects and select the new one
-      console.log('Refreshing projects list...');
-      await loadProjects();
-      setSelectedProject(newProject.id);
-
-      // Reset modal state
-      setShowCreateModal(false);
-      setNewProjectName('');
-      setNewProjectLogo(null);
-
-      toast.success('Project created successfully!');
-
-    } catch (error) {
-      console.error('Error creating project:', error);
-      
-      // More detailed error messages based on the error type
-      if (error instanceof Error) {
-        if (error.message.includes('fetch') || error.message.includes('network')) {
-          toast.error('Network error. Please check your internet connection and try again.');
-        } else if (error.message.includes('JWT') || error.message.includes('token')) {
-          toast.error('Session expired. Please refresh the page and log in again.');
-        } else if (error.message.includes('permission')) {
-          toast.error('Permission denied. Please check your authentication and try logging out/in.');
-        } else if (error.message.includes('timeout')) {
-          toast.error('Request timed out. Please try again.');
-        } else {
-          toast.error(`Failed to create project: ${error.message}`);
-        }
-      } else {
-        toast.error('Failed to create project. Check console for detailed error information.');
-      }
-    } finally {
-      setCreating(false);
-    }
-  };
-
   // Enhanced save settings with validation
   const saveSettings = async () => {
-    if (!settings || !selectedProject) {
+    if (!settings || !project) {
       toast.error('No settings to save');
       return;
     }
@@ -261,16 +161,9 @@ export default function FeedbackSettings() {
   // Load data on component mount
   useEffect(() => {
     if (user) {
-      loadProjects();
+      loadUserProject();
     }
-  }, [loadProjects, user]);
-
-  // Load settings when project changes
-  useEffect(() => {
-    if (selectedProject && user) {
-      loadFeedbackSettings(selectedProject);
-    }
-  }, [selectedProject, loadFeedbackSettings, user]);
+  }, [loadUserProject, user]);
 
   // Update setting with validation
   const updateSetting = (key: keyof FeedbackSettings, value: any) => {
@@ -289,7 +182,7 @@ export default function FeedbackSettings() {
 
   // Copy embed code
   const copyEmbedCode = async () => {
-    if (!selectedProject || !settings) return;
+    if (!project || !settings) return;
 
     const embedCode = `<script src="https://notex.com.ng/widget.js" data-project-id="${settings.project_id}"></script>`;
     
@@ -306,65 +199,18 @@ export default function FeedbackSettings() {
 
   // Get embed URL
   const getEmbedUrl = () => {
-    if (!selectedProject || !settings) return '';
+    if (!project || !settings) return '';
     return `https://notex.com.ng/widget.js?project_id=${settings.project_id}`;
   };
 
   // Get direct form URLs
   const getFormUrls = () => {
-    if (!selectedProject || !settings) return { satisfaction: '', feedback: '' };
+    if (!project || !settings) return { satisfaction: '', feedback: '' };
     const baseUrl = 'https://notex.com.ng';
     return {
       satisfaction: `${baseUrl}/forms/satisfaction?project_id=${settings.project_id}`,
       feedback: `${baseUrl}/forms/feedback?project_id=${settings.project_id}`
     };
-  };
-
-  // Handle logo file selection with validation
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file');
-        return;
-      }
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('File size must be less than 5MB');
-        return;
-      }
-      setNewProjectLogo(file);
-    }
-  };
-
-  // Delete project function
-  const handleDeleteProject = async (projectId: string, projectName: string) => {
-    if (!user) return;
-
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${projectName}"? This action cannot be undone and will delete all associated feedback data.`
-    );
-
-    if (!confirmed) return;
-
-    try {
-      await deleteProjectUtil(projectId, user.id);
-
-      // Remove from local state
-      setProjects(prev => prev.filter(p => p.id !== projectId));
-      
-      // Clear selection if deleted project was selected
-      if (selectedProject === projectId) {
-        setSelectedProject('');
-        setSettings(null);
-      }
-
-      toast.success('Project deleted successfully');
-    } catch (error) {
-      console.error('Error deleting project:', error);
-      toast.error('Failed to delete project');
-    }
   };
 
   // Reset error state when user changes
@@ -413,7 +259,7 @@ export default function FeedbackSettings() {
             <h2 className="text-xl font-semibold mb-2">Error Loading Settings</h2>
             <p className="text-gray-600 mb-4">{error}</p>
             <div className="space-x-2">
-              <Button onClick={loadProjects}>
+              <Button onClick={loadUserProject}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Try Again
               </Button>
@@ -449,89 +295,70 @@ export default function FeedbackSettings() {
         </div>
       </div>
 
-      {/* Project Selection */}
+      {/* Project Information - Read Only */}
       <Card>
         <CardHeader>
-          <CardTitle>Select Project</CardTitle>
+          <CardTitle className="flex items-center space-x-2">
+            <Lock className="h-5 w-5" />
+            <span>Your Project</span>
+          </CardTitle>
           <CardDescription>
-            Choose which project to configure feedback settings for
+            Your project is automatically generated and cannot be modified
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {projects.length === 0 ? (
-            // No projects state
-            <div className="text-center py-8">
-              <Globe className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Projects Found</h3>
-              <p className="text-gray-600 mb-4">
-                Create your first project to start collecting feedback
-              </p>
-              <Button onClick={() => setShowCreateModal(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create New Project
-              </Button>
-            </div>
-          ) : (
-            // Projects exist - show dropdown with management options
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <div className="flex-1 space-y-2">
-                  <Label htmlFor="project-select">Project</Label>
-                  <Select value={selectedProject} onValueChange={setSelectedProject}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="pt-6">
-                  <Button variant="outline" onClick={() => setShowCreateModal(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Project
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="project-name">Project Name</Label>
+                <Input
+                  id="project-name"
+                  value={project?.name || 'My Project'}
+                  readOnly
+                  className="bg-gray-50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="project-id">Project ID</Label>
+                <div className="flex items-center space-x-2">
+                  <Input
+                    id="project-id"
+                    value={project?.id || ''}
+                    readOnly
+                    className="bg-gray-50 font-mono text-sm"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (project?.id) {
+                        navigator.clipboard.writeText(project.id);
+                        toast.success('Project ID copied to clipboard!');
+                      }
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
-
-              {/* Project Management */}
-              {selectedProject && (
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Project Management</h4>
-                      <p className="text-sm text-gray-600">
-                        {projects.find(p => p.id === selectedProject)?.name}
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const project = projects.find(p => p.id === selectedProject);
-                        if (project) {
-                          handleDeleteProject(project.id, project.name);
-                        }
-                      }}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Project
-                    </Button>
-                  </div>
-                </div>
-              )}
             </div>
-          )}
+            <div className="p-4 bg-blue-50 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <Globe className="h-5 w-5 text-blue-500 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-blue-900">Auto-Generated Project</h4>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Every user automatically gets a project when they sign up. This project ID is permanent and cannot be changed.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Settings Tabs - Only show if project is selected */}
-      {settings && selectedProject && (
+      {/* Settings Tabs - Only show if project and settings are loaded */}
+      {settings && project && (
         <Tabs defaultValue="widget" className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="widget">Widget Customization</TabsTrigger>
@@ -764,17 +591,9 @@ export default function FeedbackSettings() {
                     <div className="space-y-3">
                       <div className="p-3 border rounded-lg">
                         <p className="text-sm font-medium mb-2">What's your feedback about?</p>
-                        <Select disabled>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="bug">Bug Report</SelectItem>
-                            <SelectItem value="feature">Feature Request</SelectItem>
-                            <SelectItem value="general">General Feedback</SelectItem>
-                            <SelectItem value="improvement">Improvement Suggestion</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="p-2 border rounded bg-gray-50">
+                          <span className="text-sm text-gray-500">Select a category</span>
+                        </div>
                       </div>
                       <div className="p-3 border rounded-lg">
                         <p className="text-sm font-medium mb-2">Describe your feedback</p>
@@ -806,11 +625,9 @@ export default function FeedbackSettings() {
                       <div className="space-y-3">
                         <div>
                           <label className="text-sm font-medium">What's your feedback about?</label>
-                          <Select disabled>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                          </Select>
+                          <div className="p-2 border rounded bg-white mt-1">
+                            <span className="text-sm text-gray-500">Select a category</span>
+                          </div>
                         </div>
                         <div>
                           <label className="text-sm font-medium">Describe your feedback</label>
@@ -818,7 +635,7 @@ export default function FeedbackSettings() {
                             placeholder="Please provide detailed feedback..."
                             rows={3}
                             readOnly
-                            className="bg-white"
+                            className="bg-white mt-1"
                           />
                         </div>
                         <div>
@@ -826,7 +643,7 @@ export default function FeedbackSettings() {
                           <Input
                             placeholder="Your email address"
                             readOnly
-                            className="bg-white"
+                            className="bg-white mt-1"
                           />
                         </div>
                         <Button 
@@ -1055,89 +872,6 @@ export default function FeedbackSettings() {
           </TabsContent>
         </Tabs>
       )}
-
-      {/* Create Project Modal */}
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
-            <DialogDescription>
-              Create a new project to start collecting feedback from your users.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="project-name">Project Name *</Label>
-              <Input
-                id="project-name"
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                placeholder="Enter project name..."
-                disabled={creating}
-                maxLength={100}
-              />
-              <p className="text-xs text-gray-500">
-                {newProjectName.length}/100 characters
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-logo">Logo (Optional)</Label>
-              <div className="flex items-center space-x-2">
-                <Input
-                  id="project-logo"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoChange}
-                  disabled={creating}
-                  className="flex-1"
-                />
-                {newProjectLogo && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setNewProjectLogo(null)}
-                    disabled={creating}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              {newProjectLogo && (
-                <div className="text-xs text-gray-500 space-y-1">
-                  <p>Selected: {newProjectLogo.name}</p>
-                  <p>Size: {(newProjectLogo.size / 1024 / 1024).toFixed(2)} MB</p>
-                </div>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setShowCreateModal(false);
-                setNewProjectName('');
-                setNewProjectLogo(null);
-              }} 
-              disabled={creating}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleCreateProject} disabled={creating || !newProjectName.trim()}>
-              {creating ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Project
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

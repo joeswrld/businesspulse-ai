@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { Loader2 } from "lucide-react";
+import { ensureUserHasProject } from "@/utils/projectUtils";
 
 interface AuthContextType {
   user: User | null;
@@ -54,6 +55,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           if (event === 'SIGNED_IN') {
             console.log("✅ User signed in successfully:", session?.user?.email);
+            
+            // Automatically ensure user has a project
+            if (session?.user?.id) {
+              ensureUserHasProject(session.user.id)
+                .then((project) => {
+                  console.log("🎯 User project ensured:", project.id);
+                })
+                .catch((error) => {
+                  console.error("❌ Failed to ensure user project:", error);
+                  // Don't throw here as it would break the auth flow
+                });
+            }
           } else if (event === 'SIGNED_OUT') {
             console.log("🚪 User signed out");
           } else if (event === 'TOKEN_REFRESHED') {
@@ -90,6 +103,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
+          
+          // If user is already signed in, ensure they have a project
+          if (session?.user?.id) {
+            ensureUserHasProject(session.user.id)
+              .then((project) => {
+                console.log("🎯 User project ensured on initial load:", project.id);
+              })
+              .catch((error) => {
+                console.error("❌ Failed to ensure user project on initial load:", error);
+              });
+          }
         }
       } catch (error) {
         console.error("❌ Error in getInitialSession:", error);

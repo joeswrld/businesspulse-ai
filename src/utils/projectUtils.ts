@@ -271,6 +271,76 @@ export async function deleteProject(projectId: string, userId: string): Promise<
 }
 
 /**
+ * Automatically create a default project for a user if they don't have one
+ * This function ensures every user has exactly one project
+ */
+export async function ensureUserHasProject(userId: string): Promise<Project> {
+  if (!userId) {
+    throw new Error('User ID is required');
+  }
+
+  try {
+    console.log('🔍 Checking if user has a project:', userId);
+    
+    // First, check if user already has a project
+    const { data: existingProjects, error: fetchError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('user_id', userId)
+      .limit(1);
+
+    if (fetchError) {
+      console.error('Error checking existing projects:', fetchError);
+      throw new Error(`Failed to check existing projects: ${fetchError.message}`);
+    }
+
+    // If user already has a project, return it
+    if (existingProjects && existingProjects.length > 0) {
+      console.log('✅ User already has a project:', existingProjects[0].id);
+      return existingProjects[0];
+    }
+
+    // User doesn't have a project, create one automatically
+    console.log('📝 Creating default project for user:', userId);
+    
+    const { data, error } = await supabase.rpc('create_project_with_settings', {
+      p_user_id: userId,
+      p_name: 'My Project',
+      p_logo_url: null
+    });
+
+    if (error) {
+      console.error('Error creating default project:', error);
+      throw new Error(`Failed to create default project: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+      throw new Error('No data returned from project creation');
+    }
+
+    const { project_id } = data[0];
+
+    // Fetch the created project
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', project_id)
+      .single();
+
+    if (projectError) {
+      console.error('Error fetching created project:', projectError);
+      throw new Error(`Failed to fetch created project: ${projectError.message}`);
+    }
+
+    console.log('✅ Default project created successfully:', project.id);
+    return project;
+  } catch (error) {
+    console.error('Error in ensureUserHasProject:', error);
+    throw error;
+  }
+}
+
+/**
  * Upload project logo to storage
  */
 export async function uploadProjectLogo(userId: string, file: File): Promise<string> {
