@@ -67,10 +67,10 @@ const navigationItems: NavItem[] = [
     allowedWhenExpired: true
   },
   {
-    id: 'widget',
-    label: 'Widget',
+    id: 'feedback-settings',
+    label: 'Feedback Settings',
     icon: <Widget className="h-5 w-5" />,
-    path: '/widget',
+    path: '/feedback-settings',
     requiresAccess: false,
     allowedWhenExpired: true
   },

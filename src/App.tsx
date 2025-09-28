@@ -44,6 +44,7 @@ import NotFound from "./pages/NotFound";
 // const TeamInvitation = lazy(() => import("./pages/TeamInvitation"));
 import TeamInvitation from "./pages/DashboardEnhanced";
 import Billing from "./pages/Billing";
+import FeedbackSettings from "./pages/FeedbackSettings";
 
 
 const queryClient = new QueryClient();
@@ -95,6 +96,7 @@ const App = () => (
                       <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
                       <Route path="/teams" element={<DashboardLayout><Teams /></DashboardLayout>} />
                       <Route path="/billing" element={<DashboardLayout><Billing /></DashboardLayout>} />
+                      <Route path="/feedback-settings" element={<DashboardLayout><FeedbackSettings /></DashboardLayout>} />
                       <Route path="/profile" element={<DashboardLayout><Profile /></DashboardLayout>} />
                       {/* <Route path="/teams/invite/:token" element={<TeamInvitation />} /> */}
                     </Routes>
