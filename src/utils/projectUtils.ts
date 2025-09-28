@@ -13,6 +13,8 @@ export interface FeedbackSettings {
   id: string;
   user_id: string;
   project_id: string;
+  customer_satisfaction_enabled: boolean;
+  product_feedback_enabled: boolean;
   widget_title: string;
   widget_color: string;
   greeting_text: string;
@@ -185,6 +187,8 @@ export async function createDefaultFeedbackSettings(projectId: string, userId: s
     const defaultSettings = {
       user_id: userId,
       project_id: projectId,
+      customer_satisfaction_enabled: true,
+      product_feedback_enabled: true,
       widget_title: 'We love your feedback!',
       widget_color: '#3B82F6',
       greeting_text: 'Help us improve by sharing your thoughts'
