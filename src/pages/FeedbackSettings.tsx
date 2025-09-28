@@ -30,7 +30,7 @@ const FeedbackSettings = () => {
       // First, try the RPC function
       let project = null;
       const { data: rpcData, error: rpcError } = await supabase.rpc("create_project_with_settings", {
-        user_id: user.id,
+        p_user_id: user.id,
       });
 
       if (!rpcError && rpcData && rpcData.length > 0) {
