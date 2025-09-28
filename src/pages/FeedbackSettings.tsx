@@ -56,18 +56,9 @@ const FeedbackSettings: React.FC = () => {
   if (!settings) {
     return (
       <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Settings Found</h3>
-              <p className="text-gray-600 mb-4">Unable to load feedback settings. Please try refreshing the page.</p>
-              <Button onClick={() => window.location.reload()}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Retry
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
       </div>
     );
   }
