@@ -40,13 +40,14 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
-// Types
+// Types - Updated to match your actual database schema
 interface Feedback {
   id: string;
   project_id: string;
-  user_email: string | null;
-  content: string;
-  sentiment: string | null;
+  user_id: string | null;
+  form_type: string;
+  message: string;
+  rating: number | null;
   metadata: any;
   created_at: string;
 }
@@ -199,27 +200,25 @@ export default function Feedback() {
       const feedbacksList = feedbacksData || [];
       setFeedbacks(feedbacksList);
 
-      // Calculate stats
+      // Calculate stats based on actual rating values
       const totalFeedback = feedbacksList.length;
       
-      // Calculate sentiment-based stats
-      const positiveCount = feedbacksList.filter(f => f.sentiment === 'positive').length;
-      const negativeCount = feedbacksList.filter(f => f.sentiment === 'negative').length;
-      const neutralCount = feedbacksList.filter(f => f.sentiment === 'neutral').length;
+      // Count by form_type
+      const customerSatisfactionCount = feedbacksList.filter(f => f.form_type === 'customer_satisfaction').length;
+      const productFeedbackCount = feedbacksList.filter(f => f.form_type === 'product_feedback').length;
       
-      // Use sentiment as a proxy for rating
-      const averageRating = totalFeedback > 0 ? 
-        (positiveCount * 5 + neutralCount * 3 + negativeCount * 1) / totalFeedback : 0;
+      // Calculate average rating from actual rating field
+      const ratingsArray = feedbacksList.filter(f => f.rating !== null).map(f => f.rating!);
+      const averageRating = ratingsArray.length > 0 ? 
+        ratingsArray.reduce((sum, rating) => sum + rating, 0) / ratingsArray.length : 0;
       
-      const customerSatisfactionCount = 0;
-      const productFeedbackCount = totalFeedback;
-      
+      // Count ratings distribution
       const ratingDistribution: { [key: number]: number } = {
-        1: negativeCount,
-        2: 0,
-        3: neutralCount,
-        4: 0,
-        5: positiveCount
+        1: feedbacksList.filter(f => f.rating === 1).length,
+        2: feedbacksList.filter(f => f.rating === 2).length,
+        3: feedbacksList.filter(f => f.rating === 3).length,
+        4: feedbacksList.filter(f => f.rating === 4).length,
+        5: feedbacksList.filter(f => f.rating === 5).length
       };
 
       setStats({
@@ -279,12 +278,22 @@ export default function Feedback() {
   const filteredFeedbacks = useMemo(() => {
     let filtered = feedbacks;
 
+    // Filter by form type
+    if (filters.formType !== 'all') {
+      filtered = filtered.filter(f => f.form_type === filters.formType);
+    }
+
+    // Filter by rating
+    if (filters.rating !== 'all') {
+      const ratingValue = parseInt(filters.rating);
+      filtered = filtered.filter(f => f.rating === ratingValue);
+    }
+
     // Filter by search query
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase();
       filtered = filtered.filter(f => 
-        f.content.toLowerCase().includes(query) ||
-        (f.user_email && f.user_email.toLowerCase().includes(query)) ||
+        f.message.toLowerCase().includes(query) ||
         (f.metadata?.email && f.metadata.email.toLowerCase().includes(query))
       );
     }
@@ -334,12 +343,13 @@ export default function Feedback() {
   // Export functionality
   const exportToCSV = () => {
     const csvContent = [
-      ['Date', 'Content', 'Email', 'Sentiment', 'Page URL'].join(','),
+      ['Date', 'Form Type', 'Message', 'Rating', 'Email', 'Page URL'].join(','),
       ...filteredFeedbacks.map(f => [
         new Date(f.created_at).toLocaleDateString(),
-        `"${f.content.replace(/"/g, '""')}"`,
-        f.user_email || f.metadata?.email || '',
-        f.sentiment || '',
+        f.form_type,
+        `"${f.message.replace(/"/g, '""')}"`,
+        f.rating || '',
+        f.metadata?.email || '',
         f.metadata?.page_url || ''
       ].join(','))
     ].join('\n');
@@ -456,40 +466,40 @@ export default function Feedback() {
                 {stats.averageRating > 0 ? stats.averageRating.toFixed(1) : 'N/A'}
               </div>
               <p className="text-xs text-muted-foreground">
-                Based on sentiment
+                Based on user ratings
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Positive Feedback</CardTitle>
+              <CardTitle className="text-sm font-medium">Customer Satisfaction</CardTitle>
               <ThumbsUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.ratingDistribution[5]}</div>
+              <div className="text-2xl font-bold">{stats.customerSatisfactionCount}</div>
               <p className="text-xs text-muted-foreground">
-                Positive sentiment
+                Satisfaction surveys
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Recent Feedback</CardTitle>
+              <CardTitle className="text-sm font-medium">Product Feedback</CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.recentFeedback.length}</div>
+              <div className="text-2xl font-bold">{stats.productFeedbackCount}</div>
               <p className="text-xs text-muted-foreground">
-                Last 5 entries
+                Product suggestions
               </p>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Simple Filters */}
+      {/* Enhanced Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -498,7 +508,38 @@ export default function Feedback() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Form Type</label>
+              <Select value={filters.formType} onValueChange={(value) => setFilters(prev => ({ ...prev, formType: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="customer_satisfaction">Customer Satisfaction</SelectItem>
+                  <SelectItem value="product_feedback">Product Feedback</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Rating</label>
+              <Select value={filters.rating} onValueChange={(value) => setFilters(prev => ({ ...prev, rating: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All ratings" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Ratings</SelectItem>
+                  <SelectItem value="5">5 Stars</SelectItem>
+                  <SelectItem value="4">4 Stars</SelectItem>
+                  <SelectItem value="3">3 Stars</SelectItem>
+                  <SelectItem value="2">2 Stars</SelectItem>
+                  <SelectItem value="1">1 Star</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium">Date Range</label>
               <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
@@ -602,12 +643,12 @@ export default function Feedback() {
           </CardContent>
         </Card>
 
-        {/* Sentiment Distribution */}
+        {/* Rating Distribution */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <BarChart3 className="h-5 w-5" />
-              <span>Sentiment Distribution</span>
+              <Star className="h-5 w-5" />
+              <span>Rating Distribution</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -616,9 +657,11 @@ export default function Feedback() {
                 <RechartsPieChart>
                   <Pie
                     data={[
-                      { name: 'Positive', value: stats.ratingDistribution[5], color: '#10b981' },
-                      { name: 'Neutral', value: stats.ratingDistribution[3], color: '#f59e0b' },
-                      { name: 'Negative', value: stats.ratingDistribution[1], color: '#ef4444' }
+                      { name: '5 Stars', value: stats.ratingDistribution[5], color: '#10b981' },
+                      { name: '4 Stars', value: stats.ratingDistribution[4], color: '#84cc16' },
+                      { name: '3 Stars', value: stats.ratingDistribution[3], color: '#f59e0b' },
+                      { name: '2 Stars', value: stats.ratingDistribution[2], color: '#f97316' },
+                      { name: '1 Star', value: stats.ratingDistribution[1], color: '#ef4444' }
                     ].filter(item => item.value > 0)}
                     cx="50%"
                     cy="50%"
@@ -627,9 +670,11 @@ export default function Feedback() {
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
                     {[
-                      { name: 'Positive', value: stats.ratingDistribution[5], color: '#10b981' },
-                      { name: 'Neutral', value: stats.ratingDistribution[3], color: '#f59e0b' },
-                      { name: 'Negative', value: stats.ratingDistribution[1], color: '#ef4444' }
+                      { name: '5 Stars', value: stats.ratingDistribution[5], color: '#10b981' },
+                      { name: '4 Stars', value: stats.ratingDistribution[4], color: '#84cc16' },
+                      { name: '3 Stars', value: stats.ratingDistribution[3], color: '#f59e0b' },
+                      { name: '2 Stars', value: stats.ratingDistribution[2], color: '#f97316' },
+                      { name: '1 Star', value: stats.ratingDistribution[1], color: '#ef4444' }
                     ].filter(item => item.value > 0).map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
@@ -667,12 +712,12 @@ export default function Feedback() {
                 <div key={feedback.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center space-x-2">
-                      {feedback.sentiment && (
-                        <Badge variant={
-                          feedback.sentiment === 'positive' ? 'default' : 
-                          feedback.sentiment === 'negative' ? 'destructive' : 'secondary'
-                        }>
-                          {feedback.sentiment}
+                      <Badge variant="outline">
+                        {feedback.form_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </Badge>
+                      {feedback.rating && (
+                        <Badge variant="secondary">
+                          {feedback.rating} ⭐
                         </Badge>
                       )}
                     </div>
@@ -681,10 +726,10 @@ export default function Feedback() {
                       <span>{format(new Date(feedback.created_at), 'MMM dd, yyyy HH:mm')}</span>
                     </div>
                   </div>
-                  <p className="text-gray-700 text-sm mb-2">{feedback.content}</p>
+                  <p className="text-gray-700 text-sm mb-2">{feedback.message}</p>
                   <div className="flex items-center space-x-4 text-xs text-gray-500">
-                    {(feedback.user_email || feedback.metadata?.email) && (
-                      <span>From: {feedback.user_email || feedback.metadata?.email}</span>
+                    {feedback.metadata?.email && (
+                      <span>From: {feedback.metadata.email}</span>
                     )}
                     {feedback.metadata?.page_url && (
                       <span>Page: {feedback.metadata.page_url}</span>
@@ -730,12 +775,12 @@ export default function Feedback() {
                 No feedback found
               </h3>
               <p className="text-gray-600 mb-4">
-                {filters.searchQuery || filters.dateRange.from || filters.dateRange.to
+                {filters.searchQuery || filters.dateRange.from || filters.dateRange.to || filters.formType !== 'all' || filters.rating !== 'all'
                   ? 'Try adjusting your filters to see more results.'
                   : 'Start collecting feedback through your widget to see insights and analytics.'
                 }
               </p>
-              {(filters.searchQuery || filters.dateRange.from || filters.dateRange.to) && (
+              {(filters.searchQuery || filters.dateRange.from || filters.dateRange.to || filters.formType !== 'all' || filters.rating !== 'all') && (
                 <Button 
                   variant="outline" 
                   onClick={() => setFilters({
