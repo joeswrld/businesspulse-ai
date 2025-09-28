@@ -291,7 +291,7 @@ export default function FeedbackSettings() {
   const copyEmbedCode = async () => {
     if (!selectedProject || !settings) return;
 
-    const embedCode = `<script src="${window.location.origin}/widget.js" data-project-id="${settings.project_id}"></script>`;
+    const embedCode = `<script src="https://notex.com.ng/widget.js" data-project-id="${settings.project_id}"></script>`;
     
     try {
       await navigator.clipboard.writeText(embedCode);
@@ -307,13 +307,13 @@ export default function FeedbackSettings() {
   // Get embed URL
   const getEmbedUrl = () => {
     if (!selectedProject || !settings) return '';
-    return `${window.location.origin}/widget.js?project_id=${settings.project_id}`;
+    return `https://notex.com.ng/widget.js?project_id=${settings.project_id}`;
   };
 
   // Get direct form URLs
   const getFormUrls = () => {
     if (!selectedProject || !settings) return { satisfaction: '', feedback: '' };
-    const baseUrl = window.location.origin;
+    const baseUrl = 'https://notex.com.ng';
     return {
       satisfaction: `${baseUrl}/forms/satisfaction?project_id=${settings.project_id}`,
       feedback: `${baseUrl}/forms/feedback?project_id=${settings.project_id}`
@@ -533,8 +533,10 @@ export default function FeedbackSettings() {
       {/* Settings Tabs - Only show if project is selected */}
       {settings && selectedProject && (
         <Tabs defaultValue="widget" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="widget">Widget Customization</TabsTrigger>
+            <TabsTrigger value="satisfaction">Customer Satisfaction</TabsTrigger>
+            <TabsTrigger value="feedback">Product Feedback</TabsTrigger>
             <TabsTrigger value="integration">Integration</TabsTrigger>
             <TabsTrigger value="preview">Preview</TabsTrigger>
           </TabsList>
@@ -609,6 +611,238 @@ export default function FeedbackSettings() {
             </Card>
           </TabsContent>
 
+          {/* Customer Satisfaction Form Settings */}
+          <TabsContent value="satisfaction" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <CheckCircle className="h-5 w-5" />
+                  <span>Customer Satisfaction Form</span>
+                </CardTitle>
+                <CardDescription>
+                  Configure your customer satisfaction survey settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Satisfaction Form Title */}
+                  <div className="space-y-2">
+                    <Label htmlFor="satisfaction-title">Form Title</Label>
+                    <Input
+                      id="satisfaction-title"
+                      value="How satisfied are you with our service?"
+                      placeholder="How satisfied are you with our service?"
+                      readOnly
+                      className="bg-gray-50"
+                    />
+                    <p className="text-xs text-gray-500">
+                      This title will be displayed on the satisfaction form
+                    </p>
+                  </div>
+
+                  {/* Rating Scale */}
+                  <div className="space-y-2">
+                    <Label>Rating Scale</Label>
+                    <div className="p-4 border rounded-lg bg-gray-50">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium">1 - Very Dissatisfied</span>
+                        <span className="text-sm font-medium">5 - Very Satisfied</span>
+                      </div>
+                      <div className="flex justify-center space-x-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <div 
+                            key={star}
+                            className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm"
+                            style={{ borderColor: settings.widget_color }}
+                          >
+                            {star}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Follow-up Questions */}
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Follow-up Questions</Label>
+                    <div className="space-y-3">
+                      <div className="p-3 border rounded-lg">
+                        <p className="text-sm font-medium mb-2">What could we improve?</p>
+                        <Textarea
+                          placeholder="Please share your thoughts..."
+                          rows={2}
+                          readOnly
+                          className="bg-gray-50"
+                        />
+                      </div>
+                      <div className="p-3 border rounded-lg">
+                        <p className="text-sm font-medium mb-2">Any additional comments?</p>
+                        <Textarea
+                          placeholder="Tell us more about your experience..."
+                          rows={2}
+                          readOnly
+                          className="bg-gray-50"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form Preview */}
+                <div className="mt-6 p-4 border rounded-lg bg-gray-50">
+                  <h4 className="font-medium mb-3">Form Preview</h4>
+                  <div className="space-y-3">
+                    <div className="text-center">
+                      <h3 className="font-semibold text-lg mb-2">How satisfied are you with our service?</h3>
+                      <div className="flex justify-center space-x-2 mb-4">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <div 
+                            key={star}
+                            className="w-10 h-10 rounded-full border-2 flex items-center justify-center text-sm cursor-pointer hover:bg-gray-100"
+                            style={{ borderColor: settings.widget_color }}
+                          >
+                            {star}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-500 mb-4">
+                        <span>Very Dissatisfied</span>
+                        <span>Very Satisfied</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Product Feedback Form Settings */}
+          <TabsContent value="feedback" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <MessageSquare className="h-5 w-5" />
+                  <span>Product Feedback Form</span>
+                </CardTitle>
+                <CardDescription>
+                  Configure your product feedback collection settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Feedback Form Title */}
+                  <div className="space-y-2">
+                    <Label htmlFor="feedback-title">Form Title</Label>
+                    <Input
+                      id="feedback-title"
+                      value="Share Your Feedback"
+                      placeholder="Share Your Feedback"
+                      readOnly
+                      className="bg-gray-50"
+                    />
+                    <p className="text-xs text-gray-500">
+                      This title will be displayed on the feedback form
+                    </p>
+                  </div>
+
+                  {/* Feedback Categories */}
+                  <div className="space-y-2">
+                    <Label>Feedback Categories</Label>
+                    <div className="space-y-2">
+                      {['Bug Report', 'Feature Request', 'General Feedback', 'Improvement Suggestion'].map((category) => (
+                        <div key={category} className="flex items-center space-x-2">
+                          <input type="checkbox" defaultChecked className="rounded" />
+                          <span className="text-sm">{category}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Feedback Form Fields */}
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Form Fields</Label>
+                    <div className="space-y-3">
+                      <div className="p-3 border rounded-lg">
+                        <p className="text-sm font-medium mb-2">What's your feedback about?</p>
+                        <Select disabled>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="bug">Bug Report</SelectItem>
+                            <SelectItem value="feature">Feature Request</SelectItem>
+                            <SelectItem value="general">General Feedback</SelectItem>
+                            <SelectItem value="improvement">Improvement Suggestion</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="p-3 border rounded-lg">
+                        <p className="text-sm font-medium mb-2">Describe your feedback</p>
+                        <Textarea
+                          placeholder="Please provide detailed feedback..."
+                          rows={3}
+                          readOnly
+                          className="bg-gray-50"
+                        />
+                      </div>
+                      <div className="p-3 border rounded-lg">
+                        <p className="text-sm font-medium mb-2">Contact Information (Optional)</p>
+                        <Input
+                          placeholder="Your email address"
+                          readOnly
+                          className="bg-gray-50"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form Preview */}
+                <div className="mt-6 p-4 border rounded-lg bg-gray-50">
+                  <h4 className="font-medium mb-3">Form Preview</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="font-semibold text-lg mb-2">Share Your Feedback</h3>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-sm font-medium">What's your feedback about?</label>
+                          <Select disabled>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">Describe your feedback</label>
+                          <Textarea
+                            placeholder="Please provide detailed feedback..."
+                            rows={3}
+                            readOnly
+                            className="bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">Contact Information (Optional)</label>
+                          <Input
+                            placeholder="Your email address"
+                            readOnly
+                            className="bg-white"
+                          />
+                        </div>
+                        <Button 
+                          style={{ backgroundColor: settings.widget_color }}
+                          className="w-full"
+                        >
+                          Submit Feedback
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Integration */}
           <TabsContent value="integration" className="space-y-6">
             <Card>
@@ -627,7 +861,7 @@ export default function FeedbackSettings() {
                   <Label>Embed Code</Label>
                   <div className="flex items-center space-x-2">
                     <Input
-                      value={`<script src="${getEmbedUrl()}" data-project-id="${settings.project_id}"></script>`}
+                      value={`<script src="https://notex.com.ng/widget.js" data-project-id="${settings.project_id}"></script>`}
                       readOnly
                       className="font-mono text-sm"
                     />
