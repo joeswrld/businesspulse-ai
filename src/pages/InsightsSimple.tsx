@@ -259,12 +259,15 @@ const InsightsSimple: React.FC = () => {
       }).join('\n\n');
 
       console.log('🤖 Generating AI insights for', selectedIds.length, 'feedbacks');
+      console.log('📝 Feedback text length:', feedbackText.length, 'characters');
 
       // Get auth session
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !sessionData.session) {
-        throw new Error('Authentication session not found');
+        throw new Error('Authentication session not found. Please log in again.');
       }
+
+      console.log('🔑 Auth session obtained, calling AI endpoint...');
 
       // Call AI analysis endpoint
       const response = await fetch(`https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/analyze-insights`, {
@@ -280,12 +283,14 @@ const InsightsSimple: React.FC = () => {
         }),
       });
 
+      console.log('📡 Response status:', response.status);
+
       if (response.ok) {
         const result = await response.json();
         console.log('✅ AI Analysis complete:', result);
 
         if (!result.analysis) {
-          throw new Error('Invalid response from analysis service');
+          throw new Error('Invalid response from analysis service. The AI did not return insights.');
         }
 
         setInsights(result.analysis);
@@ -312,15 +317,43 @@ const InsightsSimple: React.FC = () => {
         
         toast.success('Insights generated successfully!');
       } else {
-        const errorText = await response.text();
-        console.error('❌ AI Analysis failed:', response.status, errorText);
-        throw new Error(`Analysis failed: ${response.status} ${errorText}`);
+        let errorText = 'Unknown error';
+        let errorDetails = {};
+        
+        try {
+          const errorJson = await response.json();
+          errorDetails = errorJson;
+          errorText = errorJson.error || JSON.stringify(errorJson);
+        } catch {
+          errorText = await response.text();
+        }
+
+        console.error('❌ AI Analysis failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+          details: errorDetails
+        });
+
+        // Provide helpful error messages
+        let userMessage = 'Analysis failed. ';
+        if (response.status === 404) {
+          userMessage += 'The AI service endpoint was not found. Please check your Gemini API configuration.';
+        } else if (response.status === 401 || response.status === 403) {
+          userMessage += 'Authentication failed. Please check your API keys and permissions.';
+        } else if (response.status === 500) {
+          userMessage += 'Server error. The issue might be with the Gemini API key or configuration. Please contact support.';
+        } else {
+          userMessage += `Error ${response.status}: ${errorText}`;
+        }
+
+        throw new Error(userMessage);
       }
     } catch (error) {
       console.error('💥 Analysis error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Analysis failed';
+      const errorMessage = error instanceof Error ? error.message : 'Analysis failed. Please try again.';
       setError(errorMessage);
-      toast.error('Analysis failed. Please try again.');
+      toast.error(errorMessage, { duration: 5000 });
     } finally {
       setGenerating(false);
     }
