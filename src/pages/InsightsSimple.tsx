@@ -10,12 +10,14 @@ import {
   MessageSquare, 
   Calendar,
   Mail,
-  Sparkles
+  Sparkles,
+  AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Types
 interface Feedback {
@@ -65,6 +67,7 @@ const InsightsSimple: React.FC = () => {
   const [generating, setGenerating] = useState(false);
   const [insights, setInsights] = useState<AIInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
 
   // Fetch feedbacks
   const fetchFeedbacks = useCallback(async () => {
@@ -74,34 +77,82 @@ const InsightsSimple: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Get user's project ID first
-      const { data: projectData, error: projectError } = await supabase
-        .rpc('get_or_create_feedback_settings', { p_user_id: user.id });
-      
-      if (projectError) {
-        console.error('Error loading project ID:', projectError);
-        setError('Failed to load project settings');
-        return;
+      // Try to get user's project ID using the RPC function
+      let userProjectId: string | null = null;
+
+      try {
+        const { data: projectData, error: projectError } = await supabase
+          .rpc('get_or_create_feedback_settings', { p_user_id: user.id });
+        
+        if (projectError) {
+          console.error('Error with get_or_create_feedback_settings:', projectError);
+          throw projectError;
+        }
+
+        if (projectData && projectData.length > 0) {
+          userProjectId = projectData[0].project_id;
+        }
+      } catch (rpcError) {
+        console.error('RPC function failed, trying direct query:', rpcError);
+        
+        // Fallback: Try to get project_id directly from feedback_settings
+        const { data: settingsData, error: settingsError } = await supabase
+          .from('feedback_settings')
+          .select('project_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (settingsError) {
+          console.error('Direct query failed:', settingsError);
+          
+          // Last resort: Create feedback_settings manually
+          const { data: newSettings, error: insertError } = await supabase
+            .from('feedback_settings')
+            .insert({ user_id: user.id })
+            .select('project_id')
+            .single();
+
+          if (insertError) {
+            throw new Error(`Failed to create project: ${insertError.message}`);
+          }
+
+          userProjectId = newSettings.project_id;
+        } else if (settingsData) {
+          userProjectId = settingsData.project_id;
+        } else {
+          // No settings exist, create them
+          const { data: newSettings, error: insertError } = await supabase
+            .from('feedback_settings')
+            .insert({ user_id: user.id })
+            .select('project_id')
+            .single();
+
+          if (insertError) {
+            throw new Error(`Failed to create project: ${insertError.message}`);
+          }
+
+          userProjectId = newSettings.project_id;
+        }
       }
 
-      if (!projectData || projectData.length === 0) {
+      if (!userProjectId) {
         setFeedbacks([]);
+        setError('No project found. Please contact support.');
         return;
       }
 
-      const projectId = projectData[0].project_id;
+      setProjectId(userProjectId);
 
       // Fetch feedbacks for this project
       const { data: feedbackData, error: feedbackError } = await supabase
         .from('feedback')
         .select('id, message, email, session_id, created_at')
-        .eq('project_id', projectId)
+        .eq('project_id', userProjectId)
         .order('created_at', { ascending: false });
 
       if (feedbackError) {
         console.error('Error loading feedback:', feedbackError);
-        setError('Failed to load feedback');
-        return;
+        throw new Error(`Failed to load feedback: ${feedbackError.message}`);
       }
 
       setFeedbacks(feedbackData || []);
@@ -119,13 +170,18 @@ const InsightsSimple: React.FC = () => {
 
         if (behaviorError) {
           console.error('Error loading behavior analysis:', behaviorError);
+          // Don't throw, just log - behavior analysis is optional
         } else {
           setBehaviorAnalyses(behaviorData || []);
         }
       }
+
+      setError(null);
     } catch (error) {
       console.error('Error in fetchFeedbacks:', error);
-      setError('Failed to load feedback');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load feedback';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -138,7 +194,7 @@ const InsightsSimple: React.FC = () => {
 
   // Set up real-time subscription
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || !projectId) return;
 
     const channel = supabase
       .channel('feedback-changes')
@@ -159,7 +215,7 @@ const InsightsSimple: React.FC = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, fetchFeedbacks]);
+  }, [user?.id, projectId, fetchFeedbacks]);
 
   // Handle feedback selection
   const handleFeedbackSelection = (feedbackId: string, checked: boolean) => {
@@ -256,13 +312,11 @@ const InsightsSimple: React.FC = () => {
 
           if (reportError) {
             console.error('Error saving report:', reportError);
-            // Don't show error to user as insights were still generated successfully
           } else {
             console.log('Report saved successfully');
           }
         } catch (reportError) {
           console.error('Error saving report:', reportError);
-          // Don't show error to user as insights were still generated successfully
         }
         
         toast.success('Insights generated successfully!');
@@ -273,7 +327,8 @@ const InsightsSimple: React.FC = () => {
       }
     } catch (error) {
       console.error('Analysis error:', error);
-      setError(error instanceof Error ? error.message : 'Analysis failed');
+      const errorMessage = error instanceof Error ? error.message : 'Analysis failed';
+      setError(errorMessage);
       toast.error('Analysis failed. Please try again.');
     } finally {
       setGenerating(false);
@@ -295,6 +350,24 @@ const InsightsSimple: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {error}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchFeedbacks}
+              className="ml-4"
+            >
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Feedback Selection */}
       <Card>
@@ -555,52 +628,8 @@ const InsightsSimple: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                
-                {/* Individual Behavior Analyses */}
-                <div className="mt-4">
-                  <h4 className="font-medium text-gray-900 mb-2">Individual Session Behaviors</h4>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {behaviorAnalyses.map((analysis) => {
-                      const feedback = feedbacks.find(f => f.id === analysis.feedback_id);
-                      return (
-                        <div key={analysis.id} className="bg-gray-50 rounded-lg p-3 text-sm">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium">
-                              {feedback?.email || 'Anonymous'}
-                            </span>
-                            <Badge 
-                              variant={
-                                analysis.behavior_sentiment === 'positive' ? 'default' :
-                                analysis.behavior_sentiment === 'negative' ? 'destructive' :
-                                analysis.behavior_sentiment === 'frustrated' ? 'destructive' : 'secondary'
-                              }
-                              className="text-xs"
-                            >
-                              {analysis.behavior_sentiment}
-                            </Badge>
-                          </div>
-                          <div className="text-gray-600">
-                            {analysis.rage_clicks} rage clicks • {analysis.time_on_page_seconds}s on page
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
               </div>
             )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Error Display */}
-      {error && (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2 text-red-700">
-              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-              <span className="font-medium">Error: {error}</span>
-            </div>
           </CardContent>
         </Card>
       )}
