@@ -36,7 +36,8 @@ import {
   Flag,
   CheckCircle2,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  Copy
 } from 'lucide-react';
 
 import {
