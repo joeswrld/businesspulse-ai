@@ -185,29 +185,52 @@ export default function Feedback() {
       setLoading(true);
       setError(null);
 
-      // Step 1: Get feedback settings
+      // Step 1: Get feedback settings (or create if doesn't exist)
       const { data: existingSettings, error: settingsError } = await supabase
         .from("feedback_settings")
         .select("*")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single to avoid error when no row exists
 
       let settings: FeedbackSettings | null = null;
 
       if (settingsError) {
-        if (settingsError.code === 'PGRST116') {
-          const { data: newSettings, error: rpcError } = await supabase
-            .rpc("get_or_create_feedback_settings", { p_user_id: user.id });
+        console.error('Error fetching feedback settings:', settingsError);
+        throw new Error('Failed to load feedback settings.');
+      }
 
-          if (rpcError) {
-            throw new Error('Failed to initialize feedback settings.');
-          }
-          settings = newSettings;
-        } else {
-          throw new Error('Failed to load feedback settings.');
+      if (!existingSettings) {
+        // Create new settings if they don't exist
+        console.log('No feedback settings found, creating new ones...');
+        
+        // Generate a new project ID
+        const newProjectId = crypto.randomUUID();
+        const baseUrl = window.location.origin;
+        
+        const newSettings = {
+          user_id: user.id,
+          project_id: newProjectId,
+          customer_survey_url: `${baseUrl}/survey/${newProjectId}?type=satisfaction`,
+          product_feedback_url: `${baseUrl}/survey/${newProjectId}?type=product`,
+          widget_code: `<script src="${baseUrl}/widget.js" data-project-id="${newProjectId}"></script>`
+        };
+
+        const { data: createdSettings, error: createError } = await supabase
+          .from('feedback_settings')
+          .insert(newSettings)
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating feedback settings:', createError);
+          throw new Error('Failed to create feedback settings.');
         }
+
+        settings = createdSettings;
+        console.log('Created new feedback settings:', settings);
       } else {
         settings = existingSettings;
+        console.log('Found existing feedback settings:', settings);
       }
 
       if (!settings || !settings.project_id) {
