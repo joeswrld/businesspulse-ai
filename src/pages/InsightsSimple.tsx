@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { 
   Brain, 
   Loader2, 
@@ -8,14 +11,19 @@ import {
   Calendar,
   User,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Star
 } from 'lucide-react';
 
-// Types
+// Types matching your database schema
 interface Feedback {
   id: string;
+  project_id: string;
+  user_id: string | null;
+  form_type: 'customer_satisfaction' | 'product_feedback';
   message: string;
-  session_id: string | null;
+  rating: number | null;
+  metadata: Record<string, any>;
   created_at: string;
 }
 
@@ -48,13 +56,7 @@ interface AIInsights {
 }
 
 const InsightsSimple: React.FC = () => {
-  // NOTE: You'll need to import these from your actual implementation:
-  // import { useAuth } from '@/contexts/AuthContext';
-  // import { supabase } from '@/integrations/supabase/client';
-  // import { toast } from 'sonner';
-  
-  // For now, using placeholder implementations
-  const user = { id: 'user-id-placeholder' }; // Replace with: const { user } = useAuth();
+  const { user } = useAuth();
   
   // State
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
@@ -64,7 +66,7 @@ const InsightsSimple: React.FC = () => {
   const [generating, setGenerating] = useState(false);
   const [insights, setInsights] = useState<AIInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectIds, setProjectIds] = useState<string[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Dark mode detection
@@ -85,127 +87,124 @@ const InsightsSimple: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Fetch feedbacks
+  // Fetch user's projects and feedbacks
   const fetchFeedbacks = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('No user logged in');
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
       setError(null);
+      console.log('🔍 Fetching feedback for user:', user.id);
 
-      // REPLACE THIS WITH YOUR ACTUAL SUPABASE IMPLEMENTATION:
-      /*
-      let userProjectId: string | null = null;
+      // Step 1: Get all projects owned by this user from feedback_settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('feedback_settings')
+        .select('project_id')
+        .eq('user_id', user.id);
 
-      try {
-        const { data: projectData, error: projectError } = await supabase
-          .rpc('get_or_create_feedback_settings', { p_user_id: user.id });
-        
-        if (projectError) throw projectError;
-        if (projectData && projectData.length > 0) {
-          userProjectId = projectData[0].project_id;
-        }
-      } catch (rpcError) {
-        const { data: settingsData, error: settingsError } = await supabase
-          .from('feedback_settings')
-          .select('project_id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (settingsError) {
-          const { data: newSettings, error: insertError } = await supabase
-            .from('feedback_settings')
-            .insert({ user_id: user.id })
-            .select('project_id')
-            .single();
-
-          if (insertError) throw new Error(`Failed to create project: ${insertError.message}`);
-          userProjectId = newSettings.project_id;
-        } else if (settingsData) {
-          userProjectId = settingsData.project_id;
-        } else {
-          const { data: newSettings, error: insertError } = await supabase
-            .from('feedback_settings')
-            .insert({ user_id: user.id })
-            .select('project_id')
-            .single();
-
-          if (insertError) throw new Error(`Failed to create project: ${insertError.message}`);
-          userProjectId = newSettings.project_id;
-        }
+      if (settingsError) {
+        console.error('Error fetching feedback_settings:', settingsError);
+        throw new Error(`Failed to fetch projects: ${settingsError.message}`);
       }
 
-      if (!userProjectId) {
+      const userProjectIds = settingsData?.map(s => s.project_id) || [];
+      console.log('📁 User projects:', userProjectIds);
+
+      if (userProjectIds.length === 0) {
+        console.log('⚠️ No projects found for user');
         setFeedbacks([]);
-        setError('No project found. Please contact support.');
+        setProjectIds([]);
+        setLoading(false);
         return;
       }
 
-      setProjectId(userProjectId);
+      setProjectIds(userProjectIds);
 
-      // IMPORTANT: Removed 'email' from the select query
+      // Step 2: Fetch all feedback for these projects
       const { data: feedbackData, error: feedbackError } = await supabase
         .from('feedback')
-        .select('id, message, session_id, created_at')
-        .eq('project_id', userProjectId)
+        .select('id, project_id, user_id, form_type, message, rating, metadata, created_at')
+        .in('project_id', userProjectIds)
         .order('created_at', { ascending: false });
 
-      if (feedbackError) throw new Error(`Failed to load feedback: ${feedbackError.message}`);
+      if (feedbackError) {
+        console.error('❌ Error loading feedback:', feedbackError);
+        throw new Error(`Failed to load feedback: ${feedbackError.message}`);
+      }
+
+      console.log('✅ Loaded feedbacks:', feedbackData?.length || 0);
       setFeedbacks(feedbackData || []);
 
-      const feedbackIdsWithSessions = feedbackData?.filter(f => f.session_id).map(f => f.id) || [];
+      // Step 3: Try to fetch behavior analyses if the table exists
+      if (feedbackData && feedbackData.length > 0) {
+        const feedbackIds = feedbackData.map(f => f.id);
+        
+        try {
+          const { data: behaviorData, error: behaviorError } = await supabase
+            .from('behavior_analysis')
+            .select('*')
+            .in('feedback_id', feedbackIds);
 
-      if (feedbackIdsWithSessions.length > 0) {
-        const { data: behaviorData, error: behaviorError } = await supabase
-          .from('behavior_analysis')
-          .select('*')
-          .in('feedback_id', feedbackIdsWithSessions);
-
-        if (!behaviorError) {
-          setBehaviorAnalyses(behaviorData || []);
+          if (!behaviorError && behaviorData) {
+            console.log('📊 Loaded behavior analyses:', behaviorData.length);
+            setBehaviorAnalyses(behaviorData);
+          }
+        } catch (behaviorErr) {
+          // Behavior analysis table might not exist - that's okay
+          console.log('ℹ️ No behavior analysis data available');
         }
       }
-      */
 
       setError(null);
     } catch (error) {
-      console.error('Error in fetchFeedbacks:', error);
+      console.error('💥 Error in fetchFeedbacks:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to load feedback';
       setError(errorMessage);
-      // Replace with: toast.error(errorMessage);
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   }, [user?.id]);
 
+  // Load feedbacks on mount
   useEffect(() => {
     fetchFeedbacks();
   }, [fetchFeedbacks]);
 
-  // Real-time subscription setup
+  // Set up real-time subscription for feedback changes
   useEffect(() => {
-    if (!user?.id || !projectId) return;
+    if (!user?.id || projectIds.length === 0) return;
 
-    // REPLACE WITH YOUR ACTUAL SUPABASE REALTIME:
-    /*
+    console.log('🔄 Setting up real-time subscription for projects:', projectIds);
+
     const channel = supabase
       .channel('feedback-changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'feedback',
-      }, () => {
-        fetchFeedbacks();
-      })
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'feedback',
+          filter: `project_id=in.(${projectIds.join(',')})`,
+        },
+        (payload) => {
+          console.log('📡 Real-time update received:', payload);
+          fetchFeedbacks();
+        }
+      )
       .subscribe();
 
     return () => {
+      console.log('🔌 Unsubscribing from real-time updates');
       supabase.removeChannel(channel);
     };
-    */
-  }, [user?.id, projectId, fetchFeedbacks]);
+  }, [user?.id, projectIds, fetchFeedbacks]);
 
+  // Handle feedback selection
   const handleFeedbackSelection = (feedbackId: string, checked: boolean) => {
     const newSelection = new Set(selectedFeedbacks);
     if (checked) {
@@ -216,6 +215,7 @@ const InsightsSimple: React.FC = () => {
     setSelectedFeedbacks(newSelection);
   };
 
+  // Handle select all
   const handleSelectAll = () => {
     if (selectedFeedbacks.size === feedbacks.length && feedbacks.length > 0) {
       setSelectedFeedbacks(new Set());
@@ -224,14 +224,15 @@ const InsightsSimple: React.FC = () => {
     }
   };
 
+  // Generate AI insights
   const generateInsights = async () => {
     if (!user) {
-      alert('Please log in to generate insights.');
+      toast.error('Please log in to generate insights.');
       return;
     }
 
     if (selectedFeedbacks.size === 0) {
-      alert('Please select at least one feedback to analyze.');
+      toast.error('Please select at least one feedback to analyze.');
       return;
     }
 
@@ -242,29 +243,35 @@ const InsightsSimple: React.FC = () => {
       const selectedIds = Array.from(selectedFeedbacks);
       const selectedFeedbackData = feedbacks.filter(f => selectedIds.includes(f.id));
 
+      // Create enhanced feedback text with context
       const feedbackText = selectedFeedbackData.map(f => {
         const behaviorAnalysis = behaviorAnalyses.find(b => b.feedback_id === f.id);
         let behaviorContext = '';
         
         if (behaviorAnalysis) {
-          behaviorContext = `\n[Behavior Analysis: ${behaviorAnalysis.behavior_sentiment} sentiment, ${behaviorAnalysis.rage_clicks} rage clicks, ${behaviorAnalysis.time_on_page_seconds}s on page]`;
+          behaviorContext = `\n[Behavior: ${behaviorAnalysis.behavior_sentiment}, ${behaviorAnalysis.rage_clicks} rage clicks, ${behaviorAnalysis.time_on_page_seconds}s on page]`;
         }
+
+        const ratingText = f.rating ? `\n[Rating: ${f.rating}/5 stars]` : '';
+        const formType = `\n[Type: ${f.form_type.replace('_', ' ')}]`;
         
-        return `[User Feedback] ${f.message}${behaviorContext}`;
+        return `[Feedback] ${f.message}${ratingText}${formType}${behaviorContext}`;
       }).join('\n\n');
 
-      // REPLACE WITH YOUR ACTUAL AUTH SESSION:
-      /*
-      const session = await supabase.auth.getSession();
-      if (session.error || !session.data.session) {
+      console.log('🤖 Generating AI insights for', selectedIds.length, 'feedbacks');
+
+      // Get auth session
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
         throw new Error('Authentication session not found');
       }
 
+      // Call AI analysis endpoint
       const response = await fetch(`https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/analyze-insights`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.data.session.access_token}`,
+          'Authorization': `Bearer ${sessionData.session.access_token}`,
         },
         body: JSON.stringify({
           data: feedbackText,
@@ -275,40 +282,72 @@ const InsightsSimple: React.FC = () => {
 
       if (response.ok) {
         const result = await response.json();
-        if (!result.analysis) throw new Error('Invalid response from analysis service');
-        
+        console.log('✅ AI Analysis complete:', result);
+
+        if (!result.analysis) {
+          throw new Error('Invalid response from analysis service');
+        }
+
         setInsights(result.analysis);
         
-        const { error: reportError } = await supabase
-          .from('reports')
-          .insert({
-            user_id: user.id,
-            title: 'Insight Report',
-            feedback_ids: selectedIds,
-            insights_text: JSON.stringify(result.analysis)
-          });
+        // Save the report to database
+        try {
+          const { error: reportError } = await supabase
+            .from('reports')
+            .insert({
+              user_id: user.id,
+              title: `Insight Report - ${new Date().toLocaleDateString()}`,
+              feedback_ids: selectedIds,
+              insights_text: JSON.stringify(result.analysis)
+            });
 
-        if (reportError) console.error('Error saving report:', reportError);
+          if (reportError) {
+            console.error('⚠️ Error saving report:', reportError);
+          } else {
+            console.log('💾 Report saved successfully');
+          }
+        } catch (reportError) {
+          console.error('⚠️ Error saving report:', reportError);
+        }
         
-        // Replace with: toast.success('Insights generated successfully!');
-        alert('Insights generated successfully!');
+        toast.success('Insights generated successfully!');
       } else {
         const errorText = await response.text();
+        console.error('❌ AI Analysis failed:', response.status, errorText);
         throw new Error(`Analysis failed: ${response.status} ${errorText}`);
       }
-      */
     } catch (error) {
-      console.error('Analysis error:', error);
+      console.error('💥 Analysis error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Analysis failed';
       setError(errorMessage);
-      alert('Analysis failed. Please try again.');
+      toast.error('Analysis failed. Please try again.');
     } finally {
       setGenerating(false);
     }
   };
 
+  // Format timestamp
   const formatTimestamp = (timestamp: string) => {
     return new Date(timestamp).toLocaleString();
+  };
+
+  // Render star rating
+  const renderStars = (rating: number | null) => {
+    if (!rating) return null;
+    return (
+      <div className="flex items-center space-x-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Star
+            key={star}
+            className={`h-3 w-3 ${
+              star <= rating
+                ? 'fill-yellow-400 text-yellow-400'
+                : 'text-gray-300 dark:text-gray-600'
+            }`}
+          />
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -331,7 +370,7 @@ const InsightsSimple: React.FC = () => {
               <p className="text-red-800 dark:text-red-200">{error}</p>
               <button
                 onClick={fetchFeedbacks}
-                className="mt-2 px-3 py-1 text-sm border border-red-300 dark:border-red-700 rounded hover:bg-red-100 dark:hover:bg-red-900/40"
+                className="mt-2 px-3 py-1 text-sm border border-red-300 dark:border-red-700 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-800 dark:text-red-200"
               >
                 Retry
               </button>
@@ -353,7 +392,7 @@ const InsightsSimple: React.FC = () => {
         </div>
         <div className="p-6 space-y-4">
           {/* Selection Controls */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center space-x-4">
               <button
                 onClick={handleSelectAll}
@@ -419,11 +458,14 @@ const InsightsSimple: React.FC = () => {
                       className="mt-1 h-4 w-4 rounded border-gray-300 dark:border-gray-500"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="px-2 py-1 text-xs border dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500 rounded flex items-center space-x-1">
-                          <User className="h-3 w-3" />
-                          <span>User Feedback</span>
-                        </span>
+                      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2 py-1 text-xs border dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500 rounded flex items-center space-x-1">
+                            <User className="h-3 w-3" />
+                            <span>{feedback.form_type.replace('_', ' ')}</span>
+                          </span>
+                          {feedback.rating && renderStars(feedback.rating)}
+                        </div>
                         <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center space-x-1">
                           <Calendar className="h-3 w-3" />
                           <span>{formatTimestamp(feedback.created_at)}</span>
@@ -467,7 +509,7 @@ const InsightsSimple: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {insights.key_themes.map((theme, index) => (
                     <div key={index} className="flex items-center space-x-2 p-3 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">
-                      <div className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full"></div>
+                      <div className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full flex-shrink-0"></div>
                       <span className="text-gray-700 dark:text-gray-300">{theme}</span>
                     </div>
                   ))}
@@ -482,7 +524,7 @@ const InsightsSimple: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {insights.suggested_actions.map((action, index) => (
                     <div key={index} className="flex items-center space-x-2 p-3 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">
-                      <div className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full"></div>
+                      <div className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full flex-shrink-0"></div>
                       <span className="text-gray-700 dark:text-gray-300">{action}</span>
                     </div>
                   ))}
