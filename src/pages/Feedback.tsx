@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -24,7 +25,18 @@ import {
   Clock,
   AlertCircle,
   BarChart3,
-  LineChart
+  LineChart,
+  TrendingUp,
+  TrendingDown,
+  Sparkles,
+  Mail,
+  ExternalLink,
+  MoreVertical,
+  Archive,
+  Flag,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle
 } from 'lucide-react';
 
 import {
@@ -37,7 +49,10 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  Legend
 } from 'recharts';
 
 // Types
@@ -50,6 +65,10 @@ interface Feedback {
   rating: number | null;
   metadata: any;
   created_at: string;
+  status?: 'new' | 'reviewed' | 'resolved' | 'archived';
+  sentiment?: 'positive' | 'neutral' | 'negative';
+  ai_summary?: string;
+  suggested_reply?: string;
 }
 
 interface FeedbackSettings {
@@ -70,11 +89,20 @@ interface FeedbackStats {
   productFeedbackCount: number;
   ratingDistribution: { [key: number]: number };
   recentFeedback: Feedback[];
+  sentimentBreakdown: {
+    positive: number;
+    neutral: number;
+    negative: number;
+  };
+  responseRate: number;
+  trendPercentage: number;
 }
 
 interface FilterState {
   formType: string;
   rating: string;
+  sentiment: string;
+  status: string;
   dateRange: { from: Date | undefined; to: Date | undefined };
   searchQuery: string;
 }
@@ -89,14 +117,67 @@ export default function Feedback() {
   const [filters, setFilters] = useState<FilterState>({
     formType: 'all',
     rating: 'all',
+    sentiment: 'all',
+    status: 'all',
     dateRange: { from: undefined, to: undefined },
     searchQuery: ''
   });
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
+  const [aiProcessing, setAiProcessing] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
 
-  // Load feedback data
+  // Sentiment analysis helper (simple keyword-based for demo)
+  const analyzeSentiment = (message: string): 'positive' | 'neutral' | 'negative' => {
+    const lowerMessage = message.toLowerCase();
+    const positiveWords = ['great', 'excellent', 'amazing', 'love', 'awesome', 'fantastic', 'good', 'best', 'wonderful'];
+    const negativeWords = ['bad', 'terrible', 'awful', 'hate', 'worst', 'poor', 'disappointed', 'horrible', 'useless'];
+    
+    const positiveCount = positiveWords.filter(word => lowerMessage.includes(word)).length;
+    const negativeCount = negativeWords.filter(word => lowerMessage.includes(word)).length;
+    
+    if (positiveCount > negativeCount) return 'positive';
+    if (negativeCount > positiveCount) return 'negative';
+    return 'neutral';
+  };
+
+  // Generate AI summary (placeholder for Gemini API integration)
+  const generateAISummary = async (feedback: Feedback): Promise<string> => {
+    // TODO: Replace with actual Gemini API call
+    setAiProcessing(true);
+    
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    const sentiment = analyzeSentiment(feedback.message);
+    const summaries = {
+      positive: `Customer expressed satisfaction with ${feedback.form_type.replace('_', ' ')}. Key points: positive experience, recommends service.`,
+      neutral: `Customer provided ${feedback.form_type.replace('_', ' ')} feedback. Mixed feedback with both positive and negative aspects.`,
+      negative: `Customer reported issues with ${feedback.form_type.replace('_', ' ')}. Immediate attention recommended.`
+    };
+    
+    setAiProcessing(false);
+    return summaries[sentiment];
+  };
+
+  // Generate suggested reply (placeholder for Gemini API integration)
+  const generateSuggestedReply = async (feedback: Feedback): Promise<string> => {
+    // TODO: Replace with actual Gemini API call
+    const sentiment = analyzeSentiment(feedback.message);
+    const rating = feedback.rating || 3;
+    
+    if (sentiment === 'positive' && rating >= 4) {
+      return `Thank you so much for your positive feedback! We're thrilled to hear you had a great experience. Your satisfaction is our top priority, and we look forward to serving you again soon.`;
+    } else if (sentiment === 'negative' || rating <= 2) {
+      return `We sincerely apologize for the experience you described. Your feedback is invaluable to us, and we'd like to make this right. Our team will reach out to you within 24 hours to resolve this issue. Thank you for bringing this to our attention.`;
+    } else {
+      return `Thank you for taking the time to share your feedback. We appreciate your insights and will use them to improve our service. If you have any additional concerns, please don't hesitate to reach out.`;
+    }
+  };
+
+  // Load feedback data with enhanced processing
   const loadFeedbackData = useCallback(async () => {
     if (!user) return;
 
@@ -104,9 +185,7 @@ export default function Feedback() {
       setLoading(true);
       setError(null);
 
-      // Step 1: Get or create feedback settings to retrieve project_id
-      console.log('Fetching feedback settings for user:', user.id);
-      
+      // Step 1: Get feedback settings
       const { data: existingSettings, error: settingsError } = await supabase
         .from("feedback_settings")
         .select("*")
@@ -117,37 +196,27 @@ export default function Feedback() {
 
       if (settingsError) {
         if (settingsError.code === 'PGRST116') {
-          // No row found, create one using the RPC function
-          console.log('No feedback settings found, creating new ones...');
-          
           const { data: newSettings, error: rpcError } = await supabase
             .rpc("get_or_create_feedback_settings", { p_user_id: user.id });
 
           if (rpcError) {
-            console.error('Error creating feedback settings:', rpcError);
-            throw new Error('Failed to initialize feedback settings. Please refresh the page.');
+            throw new Error('Failed to initialize feedback settings.');
           }
-
           settings = newSettings;
-          console.log('Created new feedback settings:', settings);
         } else {
-          console.error('Error fetching feedback settings:', settingsError);
-          throw new Error('Failed to load feedback settings. Please try again.');
+          throw new Error('Failed to load feedback settings.');
         }
       } else {
         settings = existingSettings;
-        console.log('Found existing feedback settings:', settings);
       }
 
       if (!settings || !settings.project_id) {
-        throw new Error('No project ID found. Please check your feedback settings.');
+        throw new Error('No project ID found.');
       }
 
       setFeedbackSettings(settings);
 
-      // Step 2: Load feedback entries for this project_id
-      console.log('Loading feedback for project_id:', settings.project_id);
-      
+      // Step 2: Load feedback with enhanced data
       const { data: feedbacksData, error: feedbacksError } = await supabase
         .from('feedback')
         .select('*')
@@ -155,31 +224,58 @@ export default function Feedback() {
         .order('created_at', { ascending: false });
 
       if (feedbacksError) {
-        console.error('Error loading feedback:', feedbacksError);
         throw new Error(`Failed to load feedback: ${feedbacksError.message}`);
       }
 
-      const feedbacksList = feedbacksData || [];
-      console.log(`Successfully loaded ${feedbacksList.length} feedback entries`);
-      setFeedbacks(feedbacksList);
+      // Enhance feedback with sentiment analysis
+      const enhancedFeedbacks = (feedbacksData || []).map(fb => ({
+        ...fb,
+        sentiment: analyzeSentiment(fb.message),
+        status: fb.metadata?.status || 'new'
+      }));
 
-      // Step 3: Calculate statistics
-      const totalFeedback = feedbacksList.length;
+      setFeedbacks(enhancedFeedbacks);
+
+      // Step 3: Calculate comprehensive statistics
+      const totalFeedback = enhancedFeedbacks.length;
+      const customerSatisfactionCount = enhancedFeedbacks.filter(f => f.form_type === 'customer_satisfaction').length;
+      const productFeedbackCount = enhancedFeedbacks.filter(f => f.form_type === 'product_feedback').length;
       
-      const customerSatisfactionCount = feedbacksList.filter(f => f.form_type === 'customer_satisfaction').length;
-      const productFeedbackCount = feedbacksList.filter(f => f.form_type === 'product_feedback').length;
-      
-      const ratingsArray = feedbacksList.filter(f => f.rating !== null).map(f => f.rating!);
+      const ratingsArray = enhancedFeedbacks.filter(f => f.rating !== null).map(f => f.rating!);
       const averageRating = ratingsArray.length > 0 ? 
         ratingsArray.reduce((sum, rating) => sum + rating, 0) / ratingsArray.length : 0;
       
       const ratingDistribution: { [key: number]: number } = {
-        1: feedbacksList.filter(f => f.rating === 1).length,
-        2: feedbacksList.filter(f => f.rating === 2).length,
-        3: feedbacksList.filter(f => f.rating === 3).length,
-        4: feedbacksList.filter(f => f.rating === 4).length,
-        5: feedbacksList.filter(f => f.rating === 5).length
+        1: enhancedFeedbacks.filter(f => f.rating === 1).length,
+        2: enhancedFeedbacks.filter(f => f.rating === 2).length,
+        3: enhancedFeedbacks.filter(f => f.rating === 3).length,
+        4: enhancedFeedbacks.filter(f => f.rating === 4).length,
+        5: enhancedFeedbacks.filter(f => f.rating === 5).length
       };
+
+      const sentimentBreakdown = {
+        positive: enhancedFeedbacks.filter(f => f.sentiment === 'positive').length,
+        neutral: enhancedFeedbacks.filter(f => f.sentiment === 'neutral').length,
+        negative: enhancedFeedbacks.filter(f => f.sentiment === 'negative').length
+      };
+
+      // Calculate trend (comparing last 7 days vs previous 7 days)
+      const now = new Date();
+      const last7Days = enhancedFeedbacks.filter(f => {
+        const date = new Date(f.created_at);
+        const daysDiff = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+        return daysDiff <= 7;
+      }).length;
+
+      const previous7Days = enhancedFeedbacks.filter(f => {
+        const date = new Date(f.created_at);
+        const daysDiff = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+        return daysDiff > 7 && daysDiff <= 14;
+      }).length;
+
+      const trendPercentage = previous7Days > 0 
+        ? ((last7Days - previous7Days) / previous7Days) * 100 
+        : last7Days > 0 ? 100 : 0;
 
       setStats({
         totalFeedback,
@@ -187,40 +283,32 @@ export default function Feedback() {
         customerSatisfactionCount,
         productFeedbackCount,
         ratingDistribution,
-        recentFeedback: feedbacksList.slice(0, 5)
-      });
-
-      console.log('Stats calculated:', {
-        totalFeedback,
-        averageRating: averageRating.toFixed(2),
-        customerSatisfactionCount,
-        productFeedbackCount
+        recentFeedback: enhancedFeedbacks.slice(0, 5),
+        sentimentBreakdown,
+        responseRate: 0, // TODO: Implement response tracking
+        trendPercentage
       });
 
     } catch (error) {
       console.error('Error loading feedback data:', error);
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred while loading data';
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
       setError(errorMessage);
-      toast.error('Failed to load feedback data', {
-        description: errorMessage
-      });
+      toast.error('Failed to load feedback data', { description: errorMessage });
     } finally {
       setLoading(false);
     }
   }, [user]);
 
-  // Load data on component mount
+  // Load data on mount
   useEffect(() => {
     if (user) {
       loadFeedbackData();
     }
   }, [loadFeedbackData, user]);
 
-  // Set up real-time subscriptions
+  // Real-time subscriptions
   useEffect(() => {
     if (!user || !feedbackSettings) return;
-
-    console.log('Setting up real-time subscription for project:', feedbackSettings.project_id);
 
     const channel = supabase
       .channel('feedback-changes')
@@ -233,19 +321,21 @@ export default function Feedback() {
           filter: `project_id=eq.${feedbackSettings.project_id}`
         },
         (payload) => {
-          console.log('Feedback change received:', payload);
+          console.log('Real-time feedback update:', payload);
+          toast.success('New feedback received!', {
+            description: 'Dashboard data has been updated.'
+          });
           loadFeedbackData();
         }
       )
       .subscribe();
 
     return () => {
-      console.log('Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };
   }, [user, feedbackSettings, loadFeedbackData]);
 
-  // Filter feedbacks based on current filters
+  // Filter feedbacks
   const filteredFeedbacks = useMemo(() => {
     let filtered = feedbacks;
 
@@ -256,6 +346,14 @@ export default function Feedback() {
     if (filters.rating !== 'all') {
       const ratingValue = parseInt(filters.rating);
       filtered = filtered.filter(f => f.rating === ratingValue);
+    }
+
+    if (filters.sentiment !== 'all') {
+      filtered = filtered.filter(f => f.sentiment === filters.sentiment);
+    }
+
+    if (filters.status !== 'all') {
+      filtered = filtered.filter(f => f.status === filters.status);
     }
 
     if (filters.searchQuery) {
@@ -286,18 +384,18 @@ export default function Feedback() {
   );
 
   // Chart data
-  const chartData = useMemo(() => {
+  const volumeChartData = useMemo(() => {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     
-    const filteredByDate = feedbacks.filter(feedback => {
-      const feedbackDate = new Date(feedback.created_at);
-      return feedbackDate >= thirtyDaysAgo && feedbackDate <= now;
+    const filtered = feedbacks.filter(fb => {
+      const date = new Date(fb.created_at);
+      return date >= thirtyDaysAgo && date <= now;
     });
 
     const volumeData: Record<string, number> = {};
-    filteredByDate.forEach(feedback => {
-      const date = new Date(feedback.created_at).toISOString().split('T')[0];
+    filtered.forEach(fb => {
+      const date = new Date(fb.created_at).toISOString().split('T')[0];
       volumeData[date] = (volumeData[date] || 0) + 1;
     });
 
@@ -306,15 +404,26 @@ export default function Feedback() {
       .map(([date, count]) => ({ date, count }));
   }, [feedbacks]);
 
+  const sentimentChartData = useMemo(() => {
+    if (!stats) return [];
+    return [
+      { name: 'Positive', value: stats.sentimentBreakdown.positive, color: '#10b981' },
+      { name: 'Neutral', value: stats.sentimentBreakdown.neutral, color: '#f59e0b' },
+      { name: 'Negative', value: stats.sentimentBreakdown.negative, color: '#ef4444' }
+    ].filter(item => item.value > 0);
+  }, [stats]);
+
   // Export functionality
   const exportToCSV = () => {
     const csvContent = [
-      ['Date', 'Form Type', 'Message', 'Rating', 'Email', 'Page URL'].join(','),
+      ['Date', 'Form Type', 'Message', 'Rating', 'Sentiment', 'Status', 'Email', 'Page URL'].join(','),
       ...filteredFeedbacks.map(f => [
         new Date(f.created_at).toLocaleDateString(),
         f.form_type,
         `"${f.message.replace(/"/g, '""')}"`,
         f.rating || '',
+        f.sentiment || '',
+        f.status || 'new',
         f.metadata?.email || '',
         f.metadata?.page_url || ''
       ].join(','))
@@ -324,11 +433,53 @@ export default function Feedback() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `feedback-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `notex-feedback-export-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
     
-    toast.success('Feedback data exported successfully');
+    toast.success('Export successful', {
+      description: `${filteredFeedbacks.length} feedback entries exported to CSV`
+    });
+  };
+
+  // Handle AI processing for selected feedback
+  const handleAIProcess = async (feedback: Feedback) => {
+    setSelectedFeedback(feedback);
+    try {
+      const [summary, reply] = await Promise.all([
+        generateAISummary(feedback),
+        generateSuggestedReply(feedback)
+      ]);
+      
+      setSelectedFeedback({
+        ...feedback,
+        ai_summary: summary,
+        suggested_reply: reply
+      });
+      
+      toast.success('AI analysis complete', {
+        description: 'Summary and suggested reply generated'
+      });
+    } catch (error) {
+      toast.error('AI processing failed', {
+        description: 'Please try again'
+      });
+    }
+  };
+
+  // Sentiment badge component
+  const SentimentBadge = ({ sentiment }: { sentiment: string }) => {
+    const colors = {
+      positive: 'bg-green-100 text-green-800',
+      neutral: 'bg-yellow-100 text-yellow-800',
+      negative: 'bg-red-100 text-red-800'
+    };
+    
+    return (
+      <Badge className={colors[sentiment as keyof typeof colors]}>
+        {sentiment === 'positive' ? '😊' : sentiment === 'negative' ? '😞' : '😐'} {sentiment}
+      </Badge>
+    );
   };
 
   if (!user) {
@@ -354,7 +505,7 @@ export default function Feedback() {
           <div className="text-center">
             <RefreshCw className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Loading Feedback...</h2>
-            <p className="text-gray-600">Please wait while we fetch your data.</p>
+            <p className="text-gray-600">Fetching real-time data...</p>
           </div>
         </div>
       </div>
@@ -364,21 +515,19 @@ export default function Feedback() {
   if (error) {
     return (
       <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Card className="w-full max-w-md">
-            <CardContent className="p-6">
-              <div className="text-center">
-                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                <h2 className="text-xl font-semibold mb-2">Error Loading Feedback</h2>
-                <p className="text-gray-600 mb-4">{error}</p>
-                <Button onClick={loadFeedbackData}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Try Again
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="w-full max-w-md mx-auto">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Error Loading Feedback</h2>
+              <p className="text-gray-600 mb-4">{error}</p>
+              <Button onClick={loadFeedbackData}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -388,22 +537,17 @@ export default function Feedback() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-primary">Feedback Dashboard</h1>
-          <p className="text-primary/70 mt-2">
-            Real-time insights into your customer feedback
+          <h1 className="text-3xl font-bold text-gray-900">Feedback Dashboard</h1>
+          <p className="text-gray-600 mt-2">
+            AI-powered real-time insights • {filteredFeedbacks.length} total entries
           </p>
-          {feedbackSettings && (
-            <p className="text-sm text-gray-500 mt-1">
-              Project ID: {feedbackSettings.project_id}
-            </p>
-          )}
         </div>
         <div className="flex items-center space-x-2">
           <Button variant="outline" onClick={exportToCSV} disabled={filteredFeedbacks.length === 0}>
             <Download className="h-4 w-4 mr-2" />
-            Export CSV
+            Export
           </Button>
-          <Button variant="outline" onClick={loadFeedbackData} disabled={loading}>
+          <Button variant="outline" onClick={loadFeedbackData}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -420,351 +564,647 @@ export default function Feedback() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalFeedback}</div>
-              <p className="text-xs text-muted-foreground">
-                All time feedback count
-              </p>
+              <div className="flex items-center text-xs text-muted-foreground mt-1">
+                {stats.trendPercentage >= 0 ? (
+                  <>
+                    <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
+                    <span className="text-green-600">+{stats.trendPercentage.toFixed(1)}%</span>
+                  </>
+                ) : (
+                  <>
+                    <TrendingDown className="h-3 w-3 text-red-500 mr-1" />
+                    <span className="text-red-600">{stats.trendPercentage.toFixed(1)}%</span>
+                  </>
+                )}
+                <span className="ml-1">vs last week</span>
+              </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
-              <Star className="h-4 w-4 text-muted-foreground" />
+              <Star className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {stats.averageRating > 0 ? stats.averageRating.toFixed(1) : 'N/A'}
+                {stats.averageRating > 0 ? (
+                  <span className="flex items-center">
+                    {stats.averageRating.toFixed(1)}
+                    <Star className="h-4 w-4 text-yellow-500 fill-yellow-500 ml-1" />
+                  </span>
+                ) : 'N/A'}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Based on user ratings
+              <p className="text-xs text-muted-foreground mt-1">
+                Based on {Object.values(stats.ratingDistribution).reduce((a, b) => a + b, 0)} ratings
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Customer Satisfaction</CardTitle>
-              <ThumbsUp className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Sentiment Score</CardTitle>
+              <Sparkles className="h-4 w-4 text-purple-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.customerSatisfactionCount}</div>
-              <p className="text-xs text-muted-foreground">
-                Satisfaction surveys
+              <div className="text-2xl font-bold">
+                {stats.sentimentBreakdown.positive > 0 ? (
+                  <span className="text-green-600">
+                    {((stats.sentimentBreakdown.positive / stats.totalFeedback) * 100).toFixed(0)}%
+                  </span>
+                ) : 'N/A'}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stats.sentimentBreakdown.positive} positive • {stats.sentimentBreakdown.negative} negative
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Product Feedback</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Response Rate</CardTitle>
+              <Mail className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.productFeedbackCount}</div>
-              <p className="text-xs text-muted-foreground">
-                Product suggestions
+              <div className="text-2xl font-bold">--</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Track response metrics (coming soon)
               </p>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Filter className="h-5 w-5" />
-            <span>Filters</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Form Type</label>
-              <Select value={filters.formType} onValueChange={(value) => setFilters(prev => ({ ...prev, formType: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="customer_satisfaction">Customer Satisfaction</SelectItem>
-                  <SelectItem value="product_feedback">Product Feedback</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      {/* Tabs Navigation */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="feedback">All Feedback</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        </TabsList>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Rating</label>
-              <Select value={filters.rating} onValueChange={(value) => setFilters(prev => ({ ...prev, rating: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All ratings" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Ratings</SelectItem>
-                  <SelectItem value="5">5 Stars</SelectItem>
-                  <SelectItem value="4">4 Stars</SelectItem>
-                  <SelectItem value="3">3 Stars</SelectItem>
-                  <SelectItem value="2">2 Stars</SelectItem>
-                  <SelectItem value="1">1 Star</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-6">
+          {/* Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <LineChart className="h-5 w-5" />
+                  <span>Feedback Volume (30 Days)</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {volumeChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={volumeChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={(value) => format(new Date(value), "MMM dd")}
+                        fontSize={12}
+                      />
+                      <YAxis fontSize={12} />
+                      <Tooltip
+                        labelFormatter={(value) => format(new Date(value), "MMM dd, yyyy")}
+                        formatter={(value: any) => [value, 'Feedback']}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="count"
+                        stroke="#3b82f6"
+                        fill="#3b82f6"
+                        fillOpacity={0.3}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-gray-400">
+                    <div className="text-center">
+                      <BarChart3 className="h-12 w-12 mx-auto mb-2" />
+                      <p>No data available</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Date Range</label>
-              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-                <PopoverTrigger asChild>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Sparkles className="h-5 w-5" />
+                  <span>Sentiment Distribution</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {sentimentChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsPieChart>
+                      <Pie
+                        data={sentimentChartData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {sentimentChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-gray-400">
+                    <div className="text-center">
+                      <Star className="h-12 w-12 mx-auto mb-2" />
+                      <p>No data available</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Feedback */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Feedback</CardTitle>
+              <CardDescription>Latest customer feedback entries</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {stats?.recentFeedback.slice(0, 5).map((feedback) => (
+                  <div key={feedback.id} className="flex items-start justify-between p-3 border rounded-lg hover:bg-gray-50">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <Badge variant="outline" className="text-xs">
+                          {feedback.form_type.replace('_', ' ')}
+                        </Badge>
+                        {feedback.sentiment && <SentimentBadge sentiment={feedback.sentiment} />}
+                        {feedback.rating && (
+                          <Badge variant="secondary" className="text-xs">
+                            {feedback.rating}⭐
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-700 line-clamp-2">{feedback.message}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {format(new Date(feedback.created_at), 'MMM dd, yyyy • HH:mm')}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleAIProcess(feedback)}
+                      disabled={aiProcessing}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* All Feedback Tab */}
+        <TabsContent value="feedback" className="space-y-6">
+          {/* Filters */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Filter className="h-5 w-5" />
+                <span>Filters</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Form Type</label>
+                  <Select value={filters.formType} onValueChange={(value) => setFilters(prev => ({ ...prev, formType: value }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="customer_satisfaction">Customer Satisfaction</SelectItem>
+                      <SelectItem value="product_feedback">Product Feedback</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Rating</label>
+                  <Select value={filters.rating} onValueChange={(value) => setFilters(prev => ({ ...prev, rating: value }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Ratings</SelectItem>
+                      <SelectItem value="5">5 Stars</SelectItem>
+                      <SelectItem value="4">4 Stars</SelectItem>
+                      <SelectItem value="3">3 Stars</SelectItem>
+                      <SelectItem value="2">2 Stars</SelectItem>
+                      <SelectItem value="1">1 Star</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Sentiment</label>
+                  <Select value={filters.sentiment} onValueChange={(value) => setFilters(prev => ({ ...prev, sentiment: value }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Sentiments</SelectItem>
+                      <SelectItem value="positive">Positive</SelectItem>
+                      <SelectItem value="neutral">Neutral</SelectItem>
+                      <SelectItem value="negative">Negative</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Status</label>
+                  <Select value={filters.status} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="new">New</SelectItem>
+                      <SelectItem value="reviewed">Reviewed</SelectItem>
+                      <SelectItem value="resolved">Resolved</SelectItem>
+                      <SelectItem value="archived">Archived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Search</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search..."
+                      value={filters.searchQuery}
+                      onChange={(e) => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Feedback List */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Feedback Entries ({filteredFeedbacks.length})</span>
+                {(filters.searchQuery || filters.formType !== 'all' || filters.rating !== 'all' || filters.sentiment !== 'all' || filters.status !== 'all') && (
                   <Button
                     variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !filters.dateRange.from && "text-muted-foreground"
-                    )}
+                    size="sm"
+                    onClick={() => setFilters({
+                      formType: 'all',
+                      rating: 'all',
+                      sentiment: 'all',
+                      status: 'all',
+                      dateRange: { from: undefined, to: undefined },
+                      searchQuery: ''
+                    })}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filters.dateRange.from ? (
-                      filters.dateRange.to ? (
-                        <>
-                          {format(filters.dateRange.from, "LLL dd, y")} -{" "}
-                          {format(filters.dateRange.to, "LLL dd, y")}
-                        </>
-                      ) : (
-                        format(filters.dateRange.from, "LLL dd, y")
-                      )
-                    ) : (
-                      <span>Pick a date range</span>
-                    )}
+                    Clear Filters
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={filters.dateRange.from}
-                    selected={filters.dateRange}
-                    onSelect={(range) => {
-                      setFilters(prev => ({ ...prev, dateRange: range || { from: undefined, to: undefined } }));
-                      setDatePickerOpen(false);
-                    }}
-                    numberOfMonths={2}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {paginatedFeedbacks.length > 0 ? (
+                <div className="space-y-4">
+                  {paginatedFeedbacks.map((feedback) => (
+                    <div key={feedback.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-2 flex-wrap gap-2">
+                          <Badge variant="outline">
+                            {feedback.form_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </Badge>
+                          {feedback.sentiment && <SentimentBadge sentiment={feedback.sentiment} />}
+                          {feedback.rating && (
+                            <Badge variant="secondary">
+                              {feedback.rating} ⭐
+                            </Badge>
+                          )}
+                          <Badge className={
+                            feedback.status === 'new' ? 'bg-blue-100 text-blue-800' :
+                            feedback.status === 'reviewed' ? 'bg-yellow-100 text-yellow-800' :
+                            feedback.status === 'resolved' ? 'bg-green-100 text-green-800' :
+                            'bg-gray-100 text-gray-800'
+                          }>
+                            {feedback.status || 'new'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAIProcess(feedback)}
+                            disabled={aiProcessing}
+                          >
+                            <Sparkles className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search messages..."
-                  value={filters.searchQuery}
-                  onChange={(e) => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                      <p className="text-gray-700 mb-3">{feedback.message}</p>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <LineChart className="h-5 w-5" />
-              <span>Feedback Volume (Last 30 Days)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={(value) => format(new Date(value), "MMM dd")}
-                    fontSize={12}
-                  />
-                  <YAxis fontSize={12} />
-                  <Tooltip
-                    labelFormatter={(value) => format(new Date(value), "MMM dd, yyyy")}
-                    formatter={(value: any) => [value, 'Feedback Count']}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="count"
-                    stroke="#3b82f6"
-                    fill="#3b82f6"
-                    fillOpacity={0.3}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-64 text-gray-500">
-                <div className="text-center">
-                  <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                  <p>No data available</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <div className="flex items-center space-x-4">
+                          <span className="flex items-center">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {format(new Date(feedback.created_at), 'MMM dd, yyyy HH:mm')}
+                          </span>
+                          {feedback.metadata?.email && (
+                            <span className="flex items-center">
+                              <Mail className="h-3 w-3 mr-1" />
+                              {feedback.metadata.email}
+                            </span>
+                          )}
+                          {feedback.metadata?.page_url && (
+                            <span className="flex items-center">
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              {new URL(feedback.metadata.page_url).hostname}
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Star className="h-5 w-5" />
-              <span>Rating Distribution</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {stats && Object.values(stats.ratingDistribution).some(count => count > 0) ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <RechartsPieChart>
-                  <Pie
-                    data={[
-                      { name: '5 Stars', value: stats.ratingDistribution[5], color: '#10b981' },
-                      { name: '4 Stars', value: stats.ratingDistribution[4], color: '#84cc16' },
-                      { name: '3 Stars', value: stats.ratingDistribution[3], color: '#f59e0b' },
-                      { name: '2 Stars', value: stats.ratingDistribution[2], color: '#f97316' },
-                      { name: '1 Star', value: stats.ratingDistribution[1], color: '#ef4444' }
-                    ].filter(item => item.value > 0)}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {[
-                      { name: '5 Stars', value: stats.ratingDistribution[5], color: '#10b981' },
-                      { name: '4 Stars', value: stats.ratingDistribution[4], color: '#84cc16' },
-                      { name: '3 Stars', value: stats.ratingDistribution[3], color: '#f59e0b' },
-                      { name: '2 Stars', value: stats.ratingDistribution[2], color: '#f97316' },
-                      { name: '1 Star', value: stats.ratingDistribution[1], color: '#ef4444' }
-                    ].filter(item => item.value > 0).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-64 text-gray-500">
-                <div className="text-center">
-                  <Star className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                  <p>No data available</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Feedback List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <MessageSquare className="h-5 w-5" />
-            <span>Feedback Entries</span>
-          </CardTitle>
-          <CardDescription>
-            {filteredFeedbacks.length} feedback entries found
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {paginatedFeedbacks.length > 0 ? (
-            <div className="space-y-4">
-              {paginatedFeedbacks.map((feedback) => (
-                <div key={feedback.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="outline">
-                        {feedback.form_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </Badge>
-                      {feedback.rating && (
-                        <Badge variant="secondary">
-                          {feedback.rating} ⭐
-                        </Badge>
+                      {/* AI Insights (if processed) */}
+                      {selectedFeedback?.id === feedback.id && selectedFeedback.ai_summary && (
+                        <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <Sparkles className="h-4 w-4 text-purple-600" />
+                            <span className="text-sm font-medium text-purple-900">AI Insights</span>
+                          </div>
+                          <p className="text-sm text-purple-800 mb-3">{selectedFeedback.ai_summary}</p>
+                          {selectedFeedback.suggested_reply && (
+                            <div className="mt-2">
+                              <span className="text-xs font-medium text-purple-900">Suggested Reply:</span>
+                              <p className="text-sm text-purple-700 mt-1 italic">{selectedFeedback.suggested_reply}</p>
+                              <div className="flex items-center space-x-2 mt-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(selectedFeedback.suggested_reply || '');
+                                    toast.success('Copied to clipboard');
+                                  }}
+                                >
+                                  <Copy className="h-3 w-3 mr-1" />
+                                  Copy Reply
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
-                    <div className="flex items-center space-x-2 text-sm text-gray-500">
-                      <Clock className="h-4 w-4" />
-                      <span>{format(new Date(feedback.created_at), 'MMM dd, yyyy HH:mm')}</span>
+                  ))}
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-4 border-t">
+                      <p className="text-sm text-gray-500">
+                        Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredFeedbacks.length)} of {filteredFeedbacks.length}
+                      </p>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">
+                    No feedback found
+                  </h3>
+                  <p className="text-gray-600">
+                    {filters.searchQuery || filters.formType !== 'all' || filters.rating !== 'all'
+                      ? 'Try adjusting your filters.'
+                      : 'Start collecting feedback to see insights.'}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Analytics Tab */}
+        <TabsContent value="analytics" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Rating Distribution Bar Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <BarChart3 className="h-5 w-5" />
+                  <span>Rating Distribution</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stats && Object.values(stats.ratingDistribution).some(count => count > 0) ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart
+                      data={[
+                        { rating: '5★', count: stats.ratingDistribution[5], color: '#10b981' },
+                        { rating: '4★', count: stats.ratingDistribution[4], color: '#84cc16' },
+                        { rating: '3★', count: stats.ratingDistribution[3], color: '#f59e0b' },
+                        { rating: '2★', count: stats.ratingDistribution[2], color: '#f97316' },
+                        { rating: '1★', count: stats.ratingDistribution[1], color: '#ef4444' }
+                      ]}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="rating" fontSize={12} />
+                      <YAxis fontSize={12} />
+                      <Tooltip />
+                      <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                        {[
+                          { rating: '5★', count: stats.ratingDistribution[5], color: '#10b981' },
+                          { rating: '4★', count: stats.ratingDistribution[4], color: '#84cc16' },
+                          { rating: '3★', count: stats.ratingDistribution[3], color: '#f59e0b' },
+                          { rating: '2★', count: stats.ratingDistribution[2], color: '#f97316' },
+                          { rating: '1★', count: stats.ratingDistribution[1], color: '#ef4444' }
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-gray-400">
+                    <div className="text-center">
+                      <BarChart3 className="h-12 w-12 mx-auto mb-2" />
+                      <p>No rating data available</p>
                     </div>
                   </div>
-                  <p className="text-gray-700 text-sm mb-2">{feedback.message}</p>
-                  <div className="flex items-center space-x-4 text-xs text-gray-500">
-                    {feedback.metadata?.email && (
-                      <span>From: {feedback.metadata.email}</span>
-                    )}
-                    {feedback.metadata?.page_url && (
-                      <span>Page: {feedback.metadata.page_url}</span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                )}
+              </CardContent>
+            </Card>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-6">
-                  <p className="text-sm text-gray-500">
-                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredFeedbacks.length)} of {filteredFeedbacks.length} entries
-                  </p>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                      disabled={currentPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-sm">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={currentPage === totalPages}
-                    >
-                      Next
-                    </Button>
+            {/* Form Type Distribution */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <MessageSquare className="h-5 w-5" />
+                  <span>Feedback Type Breakdown</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stats && (stats.customerSatisfactionCount > 0 || stats.productFeedbackCount > 0) ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsPieChart>
+                      <Pie
+                        data={[
+                          { name: 'Customer Satisfaction', value: stats.customerSatisfactionCount, color: '#3b82f6' },
+                          { name: 'Product Feedback', value: stats.productFeedbackCount, color: '#8b5cf6' }
+                        ].filter(item => item.value > 0)}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {[
+                          { name: 'Customer Satisfaction', value: stats.customerSatisfactionCount, color: '#3b82f6' },
+                          { name: 'Product Feedback', value: stats.productFeedbackCount, color: '#8b5cf6' }
+                        ].filter(item => item.value > 0).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-gray-400">
+                    <div className="text-center">
+                      <MessageSquare className="h-12 w-12 mx-auto mb-2" />
+                      <p>No feedback type data</p>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-xl font-medium text-gray-900 mb-2">
-                No feedback found
-              </h3>
-              <p className="text-gray-600 mb-4">
-                {filters.searchQuery || filters.dateRange.from || filters.dateRange.to || filters.formType !== 'all' || filters.rating !== 'all'
-                  ? 'Try adjusting your filters to see more results.'
-                  : 'Start collecting feedback through your widget to see insights and analytics.'
-                }
-              </p>
-              {(filters.searchQuery || filters.dateRange.from || filters.dateRange.to || filters.formType !== 'all' || filters.rating !== 'all') && (
-                <Button 
-                  variant="outline" 
-                  onClick={() => setFilters({
-                    formType: 'all',
-                    rating: 'all',
-                    dateRange: { from: undefined, to: undefined },
-                    searchQuery: ''
-                  })}
-                >
-                  Clear Filters
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Key Insights */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Sparkles className="h-5 w-5" />
+                <span>AI-Powered Insights</span>
+              </CardTitle>
+              <CardDescription>
+                Actionable insights derived from your feedback data
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {stats && stats.totalFeedback > 0 ? (
+                  <>
+                    {stats.averageRating >= 4 && (
+                      <div className="flex items-start space-x-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                        <div>
+                          <h4 className="font-medium text-green-900">Strong Performance</h4>
+                          <p className="text-sm text-green-700">
+                            Your average rating of {stats.averageRating.toFixed(1)}★ indicates excellent customer satisfaction.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {stats.averageRating < 3 && stats.averageRating > 0 && (
+                      <div className="flex items-start space-x-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
+                        <div>
+                          <h4 className="font-medium text-red-900">Action Required</h4>
+                          <p className="text-sm text-red-700">
+                            Your average rating of {stats.averageRating.toFixed(1)}★ suggests areas for improvement. Review negative feedback urgently.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {stats.sentimentBreakdown.negative > stats.totalFeedback * 0.3 && (
+                      <div className="flex items-start space-x-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                        <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5" />
+                        <div>
+                          <h4 className="font-medium text-orange-900">High Negative Sentiment</h4>
+                          <p className="text-sm text-orange-700">
+                            {((stats.sentimentBreakdown.negative / stats.totalFeedback) * 100).toFixed(0)}% of feedback shows negative sentiment. 
+                            Consider reviewing common issues and implementing improvements.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {stats.trendPercentage > 20 && (
+                      <div className="flex items-start space-x-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <TrendingUp className="h-5 w-5 text-blue-600 mt-0.5" />
+                        <div>
+                          <h4 className="font-medium text-blue-900">Growing Engagement</h4>
+                          <p className="text-sm text-blue-700">
+                            Feedback volume increased by {stats.trendPercentage.toFixed(0)}% compared to last week. 
+                            Your customers are actively engaged!
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {stats.productFeedbackCount > stats.customerSatisfactionCount * 2 && (
+                      <div className="flex items-start space-x-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                        <MessageSquare className="h-5 w-5 text-purple-600 mt-0.5" />
+                        <div>
+                          <h4 className="font-medium text-purple-900">Product-Focused Customers</h4>
+                          <p className="text-sm text-purple-700">
+                            Your customers are actively providing product feedback. This is valuable data for product development.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Sparkles className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <p>Collect more feedback to see AI-powered insights</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
