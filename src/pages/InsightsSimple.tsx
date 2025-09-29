@@ -1,7 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { 
   Brain, 
   Loader2, 
@@ -9,21 +6,15 @@ import {
   Square, 
   MessageSquare, 
   Calendar,
-  Mail,
+  User,
   Sparkles,
   AlertCircle
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Types
 interface Feedback {
   id: string;
   message: string;
-  email: string | null;
   session_id: string | null;
   created_at: string;
 }
@@ -57,7 +48,13 @@ interface AIInsights {
 }
 
 const InsightsSimple: React.FC = () => {
-  const { user } = useAuth();
+  // NOTE: You'll need to import these from your actual implementation:
+  // import { useAuth } from '@/contexts/AuthContext';
+  // import { supabase } from '@/integrations/supabase/client';
+  // import { toast } from 'sonner';
+  
+  // For now, using placeholder implementations
+  const user = { id: 'user-id-placeholder' }; // Replace with: const { user } = useAuth();
   
   // State
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
@@ -68,6 +65,25 @@ const InsightsSimple: React.FC = () => {
   const [insights, setInsights] = useState<AIInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Dark mode detection
+  useEffect(() => {
+    const checkDarkMode = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setIsDarkMode(isDark);
+    };
+
+    checkDarkMode();
+    
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, { 
+      attributes: true, 
+      attributeFilter: ['class'] 
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   // Fetch feedbacks
   const fetchFeedbacks = useCallback(async () => {
@@ -77,25 +93,19 @@ const InsightsSimple: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Try to get user's project ID using the RPC function
+      // REPLACE THIS WITH YOUR ACTUAL SUPABASE IMPLEMENTATION:
+      /*
       let userProjectId: string | null = null;
 
       try {
         const { data: projectData, error: projectError } = await supabase
           .rpc('get_or_create_feedback_settings', { p_user_id: user.id });
         
-        if (projectError) {
-          console.error('Error with get_or_create_feedback_settings:', projectError);
-          throw projectError;
-        }
-
+        if (projectError) throw projectError;
         if (projectData && projectData.length > 0) {
           userProjectId = projectData[0].project_id;
         }
       } catch (rpcError) {
-        console.error('RPC function failed, trying direct query:', rpcError);
-        
-        // Fallback: Try to get project_id directly from feedback_settings
         const { data: settingsData, error: settingsError } = await supabase
           .from('feedback_settings')
           .select('project_id')
@@ -103,34 +113,24 @@ const InsightsSimple: React.FC = () => {
           .maybeSingle();
 
         if (settingsError) {
-          console.error('Direct query failed:', settingsError);
-          
-          // Last resort: Create feedback_settings manually
           const { data: newSettings, error: insertError } = await supabase
             .from('feedback_settings')
             .insert({ user_id: user.id })
             .select('project_id')
             .single();
 
-          if (insertError) {
-            throw new Error(`Failed to create project: ${insertError.message}`);
-          }
-
+          if (insertError) throw new Error(`Failed to create project: ${insertError.message}`);
           userProjectId = newSettings.project_id;
         } else if (settingsData) {
           userProjectId = settingsData.project_id;
         } else {
-          // No settings exist, create them
           const { data: newSettings, error: insertError } = await supabase
             .from('feedback_settings')
             .insert({ user_id: user.id })
             .select('project_id')
             .single();
 
-          if (insertError) {
-            throw new Error(`Failed to create project: ${insertError.message}`);
-          }
-
+          if (insertError) throw new Error(`Failed to create project: ${insertError.message}`);
           userProjectId = newSettings.project_id;
         }
       }
@@ -143,24 +143,17 @@ const InsightsSimple: React.FC = () => {
 
       setProjectId(userProjectId);
 
-      // Fetch feedbacks for this project
+      // IMPORTANT: Removed 'email' from the select query
       const { data: feedbackData, error: feedbackError } = await supabase
         .from('feedback')
-        .select('id, message, email, session_id, created_at')
+        .select('id, message, session_id, created_at')
         .eq('project_id', userProjectId)
         .order('created_at', { ascending: false });
 
-      if (feedbackError) {
-        console.error('Error loading feedback:', feedbackError);
-        throw new Error(`Failed to load feedback: ${feedbackError.message}`);
-      }
-
+      if (feedbackError) throw new Error(`Failed to load feedback: ${feedbackError.message}`);
       setFeedbacks(feedbackData || []);
 
-      // Fetch behavior analyses for feedbacks with session IDs
-      const feedbackIdsWithSessions = feedbackData
-        ?.filter(f => f.session_id)
-        .map(f => f.id) || [];
+      const feedbackIdsWithSessions = feedbackData?.filter(f => f.session_id).map(f => f.id) || [];
 
       if (feedbackIdsWithSessions.length > 0) {
         const { data: behaviorData, error: behaviorError } = await supabase
@@ -168,56 +161,51 @@ const InsightsSimple: React.FC = () => {
           .select('*')
           .in('feedback_id', feedbackIdsWithSessions);
 
-        if (behaviorError) {
-          console.error('Error loading behavior analysis:', behaviorError);
-          // Don't throw, just log - behavior analysis is optional
-        } else {
+        if (!behaviorError) {
           setBehaviorAnalyses(behaviorData || []);
         }
       }
+      */
 
       setError(null);
     } catch (error) {
       console.error('Error in fetchFeedbacks:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to load feedback';
       setError(errorMessage);
-      toast.error(errorMessage);
+      // Replace with: toast.error(errorMessage);
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }
   }, [user?.id]);
 
-  // Load feedbacks on mount
   useEffect(() => {
     fetchFeedbacks();
   }, [fetchFeedbacks]);
 
-  // Set up real-time subscription
+  // Real-time subscription setup
   useEffect(() => {
     if (!user?.id || !projectId) return;
 
+    // REPLACE WITH YOUR ACTUAL SUPABASE REALTIME:
+    /*
     const channel = supabase
       .channel('feedback-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'feedback',
-        },
-        () => {
-          // Refetch feedbacks when changes occur
-          fetchFeedbacks();
-        }
-      )
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'feedback',
+      }, () => {
+        fetchFeedbacks();
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
+    */
   }, [user?.id, projectId, fetchFeedbacks]);
 
-  // Handle feedback selection
   const handleFeedbackSelection = (feedbackId: string, checked: boolean) => {
     const newSelection = new Set(selectedFeedbacks);
     if (checked) {
@@ -228,7 +216,6 @@ const InsightsSimple: React.FC = () => {
     setSelectedFeedbacks(newSelection);
   };
 
-  // Handle select all
   const handleSelectAll = () => {
     if (selectedFeedbacks.size === feedbacks.length && feedbacks.length > 0) {
       setSelectedFeedbacks(new Set());
@@ -237,15 +224,14 @@ const InsightsSimple: React.FC = () => {
     }
   };
 
-  // Generate insights
   const generateInsights = async () => {
     if (!user) {
-      toast.error('Please log in to generate insights.');
+      alert('Please log in to generate insights.');
       return;
     }
 
     if (selectedFeedbacks.size === 0) {
-      toast.error('Please select at least one feedback to analyze.');
+      alert('Please select at least one feedback to analyze.');
       return;
     }
 
@@ -253,11 +239,9 @@ const InsightsSimple: React.FC = () => {
       setGenerating(true);
       setError(null);
 
-      // Get selected feedback messages with behavior data
       const selectedIds = Array.from(selectedFeedbacks);
       const selectedFeedbackData = feedbacks.filter(f => selectedIds.includes(f.id));
 
-      // Create enhanced feedback text with behavior context
       const feedbackText = selectedFeedbackData.map(f => {
         const behaviorAnalysis = behaviorAnalyses.find(b => b.feedback_id === f.id);
         let behaviorContext = '';
@@ -266,10 +250,11 @@ const InsightsSimple: React.FC = () => {
           behaviorContext = `\n[Behavior Analysis: ${behaviorAnalysis.behavior_sentiment} sentiment, ${behaviorAnalysis.rage_clicks} rage clicks, ${behaviorAnalysis.time_on_page_seconds}s on page]`;
         }
         
-        return `[${f.email || 'Anonymous'}] ${f.message}${behaviorContext}`;
+        return `[User Feedback] ${f.message}${behaviorContext}`;
       }).join('\n\n');
 
-      // Call the AI endpoint
+      // REPLACE WITH YOUR ACTUAL AUTH SESSION:
+      /*
       const session = await supabase.auth.getSession();
       if (session.error || !session.data.session) {
         throw new Error('Authentication session not found');
@@ -290,62 +275,48 @@ const InsightsSimple: React.FC = () => {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('✅ AI Analysis success!');
-        console.log('📊 Analysis result:', result.analysis);
-
-        if (!result.analysis) {
-          throw new Error('Invalid response from analysis service');
-        }
-
+        if (!result.analysis) throw new Error('Invalid response from analysis service');
+        
         setInsights(result.analysis);
         
-        // Save the report to the reports table
-        try {
-          const { error: reportError } = await supabase
-            .from('reports')
-            .insert({
-              user_id: user.id,
-              title: 'Insight Report',
-              feedback_ids: selectedIds,
-              insights_text: JSON.stringify(result.analysis)
-            });
+        const { error: reportError } = await supabase
+          .from('reports')
+          .insert({
+            user_id: user.id,
+            title: 'Insight Report',
+            feedback_ids: selectedIds,
+            insights_text: JSON.stringify(result.analysis)
+          });
 
-          if (reportError) {
-            console.error('Error saving report:', reportError);
-          } else {
-            console.log('Report saved successfully');
-          }
-        } catch (reportError) {
-          console.error('Error saving report:', reportError);
-        }
+        if (reportError) console.error('Error saving report:', reportError);
         
-        toast.success('Insights generated successfully!');
+        // Replace with: toast.success('Insights generated successfully!');
+        alert('Insights generated successfully!');
       } else {
         const errorText = await response.text();
-        console.warn('❌ AI Analysis failed:', response.status, errorText);
         throw new Error(`Analysis failed: ${response.status} ${errorText}`);
       }
+      */
     } catch (error) {
       console.error('Analysis error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Analysis failed';
       setError(errorMessage);
-      toast.error('Analysis failed. Please try again.');
+      alert('Analysis failed. Please try again.');
     } finally {
       setGenerating(false);
     }
   };
 
-  // Format timestamp
   const formatTimestamp = (timestamp: string) => {
     return new Date(timestamp).toLocaleString();
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className={`container mx-auto p-6 space-y-6 ${isDarkMode ? 'dark' : ''}`}>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">AI Insights</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">AI Insights</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
             Analyze your feedback with AI-powered insights
           </p>
         </div>
@@ -353,160 +324,151 @@ const InsightsSimple: React.FC = () => {
 
       {/* Error Alert */}
       {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {error}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchFeedbacks}
-              className="ml-4"
-            >
-              Retry
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-start">
+            <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 mr-3" />
+            <div className="flex-1">
+              <p className="text-red-800 dark:text-red-200">{error}</p>
+              <button
+                onClick={fetchFeedbacks}
+                className="mt-2 px-3 py-1 text-sm border border-red-300 dark:border-red-700 rounded hover:bg-red-100 dark:hover:bg-red-900/40"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Feedback Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
+      <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow">
+        <div className="p-6 border-b dark:border-gray-700">
+          <h2 className="text-xl font-semibold flex items-center space-x-2 dark:text-gray-100">
             <MessageSquare className="h-5 w-5" />
             <span>Select Feedback for Analysis</span>
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Choose the feedback entries you want to analyze. You can select individual items or use "Select All".
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="p-6 space-y-4">
           {/* Selection Controls */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Button
-                variant="outline"
+              <button
                 onClick={handleSelectAll}
                 disabled={feedbacks.length === 0}
+                className="px-4 py-2 border dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 dark:border-gray-600 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
                 {selectedFeedbacks.size === feedbacks.length && feedbacks.length > 0 ? (
                   <>
-                    <Square className="h-4 w-4 mr-2" />
-                    Deselect All
+                    <Square className="h-4 w-4" />
+                    <span>Deselect All</span>
                   </>
                 ) : (
                   <>
-                    <CheckSquare className="h-4 w-4 mr-2" />
-                    Select All
+                    <CheckSquare className="h-4 w-4" />
+                    <span>Select All</span>
                   </>
                 )}
-              </Button>
-              <span className="text-sm text-gray-600">
+              </button>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
                 {selectedFeedbacks.size} of {feedbacks.length} selected
               </span>
             </div>
-            <Button
+            <button
               onClick={generateInsights}
               disabled={selectedFeedbacks.size === 0 || generating}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
               {generating ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Generating...</span>
                 </>
               ) : (
                 <>
-                  <Brain className="h-4 w-4 mr-2" />
-                  Generate Insights
+                  <Brain className="h-4 w-4" />
+                  <span>Generate Insights</span>
                 </>
               )}
-            </Button>
+            </button>
           </div>
 
           {/* Feedbacks List */}
           {loading ? (
-            <div className="flex items-center justify-center py-8">
+            <div className="flex items-center justify-center py-8 dark:text-gray-300">
               <Loader2 className="h-6 w-6 animate-spin mr-2" />
               <span>Loading feedback...</span>
             </div>
           ) : feedbacks.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
               <p className="text-lg font-medium">No feedback found</p>
               <p className="text-sm">You need to have feedback in your projects to generate insights.</p>
             </div>
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {feedbacks.map((feedback) => (
-                <Card key={feedback.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-start space-x-3">
-                      <Checkbox
-                        checked={selectedFeedbacks.has(feedback.id)}
-                        onCheckedChange={(checked) => 
-                          handleFeedbackSelection(feedback.id, checked as boolean)
-                        }
-                        className="mt-1"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            {feedback.email ? (
-                              <Badge variant="secondary" className="flex items-center space-x-1">
-                                <Mail className="h-3 w-3" />
-                                <span>{feedback.email}</span>
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline">Anonymous</Badge>
-                            )}
-                          </div>
-                          <span className="text-xs text-gray-500 flex items-center space-x-1">
-                            <Calendar className="h-3 w-3" />
-                            <span>{formatTimestamp(feedback.created_at)}</span>
-                          </span>
-                        </div>
-                        <p className="text-gray-700 text-sm line-clamp-3">
-                          {feedback.message}
-                        </p>
+                <div key={feedback.id} className="bg-white dark:bg-gray-700 border dark:border-gray-600 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start space-x-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedFeedbacks.has(feedback.id)}
+                      onChange={(e) => handleFeedbackSelection(feedback.id, e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 dark:border-gray-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="px-2 py-1 text-xs border dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500 rounded flex items-center space-x-1">
+                          <User className="h-3 w-3" />
+                          <span>User Feedback</span>
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center space-x-1">
+                          <Calendar className="h-3 w-3" />
+                          <span>{formatTimestamp(feedback.created_at)}</span>
+                        </span>
                       </div>
+                      <p className="text-gray-700 dark:text-gray-300 text-sm line-clamp-3">
+                        {feedback.message}
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* AI Insights Results */}
       {insights && (
-        <Card className="border-blue-200 bg-blue-50/30">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Sparkles className="h-5 w-5 text-blue-600" />
+        <div className="bg-blue-50/30 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg shadow">
+          <div className="p-6 border-b border-blue-200 dark:border-blue-800">
+            <h2 className="text-xl font-semibold flex items-center space-x-2 dark:text-gray-100">
+              <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               <span>AI Insights</span>
-            </CardTitle>
-            <CardDescription>
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               AI-powered analysis of your selected feedback
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
+            </p>
+          </div>
+          <div className="p-6 space-y-6">
             {/* Summary */}
             <div>
-              <h3 className="text-lg font-semibold mb-3">Summary</h3>
-              <p className="text-gray-700 leading-relaxed">{insights.summary}</p>
+              <h3 className="text-lg font-semibold mb-3 dark:text-gray-100">Summary</h3>
+              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{insights.summary}</p>
             </div>
 
             {/* Key Themes */}
             {insights.key_themes && insights.key_themes.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold mb-3">Key Themes</h3>
+                <h3 className="text-lg font-semibold mb-3 dark:text-gray-100">Key Themes</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {insights.key_themes.map((theme, index) => (
-                    <div key={index} className="flex items-center space-x-2 p-3 bg-white rounded-lg border">
-                      <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                      <span className="text-gray-700">{theme}</span>
+                    <div key={index} className="flex items-center space-x-2 p-3 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">
+                      <div className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full"></div>
+                      <span className="text-gray-700 dark:text-gray-300">{theme}</span>
                     </div>
                   ))}
                 </div>
@@ -516,12 +478,12 @@ const InsightsSimple: React.FC = () => {
             {/* Suggested Actions */}
             {insights.suggested_actions && insights.suggested_actions.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold mb-3">Suggested Actions</h3>
+                <h3 className="text-lg font-semibold mb-3 dark:text-gray-100">Suggested Actions</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {insights.suggested_actions.map((action, index) => (
-                    <div key={index} className="flex items-center space-x-2 p-3 bg-white rounded-lg border">
-                      <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-                      <span className="text-gray-700">{action}</span>
+                    <div key={index} className="flex items-center space-x-2 p-3 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">
+                      <div className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full"></div>
+                      <span className="text-gray-700 dark:text-gray-300">{action}</span>
                     </div>
                   ))}
                 </div>
@@ -531,15 +493,15 @@ const InsightsSimple: React.FC = () => {
             {/* Performance Score */}
             {insights.performance && (
               <div>
-                <h3 className="text-lg font-semibold mb-3">Performance Score</h3>
+                <h3 className="text-lg font-semibold mb-3 dark:text-gray-100">Performance Score</h3>
                 <div className="flex items-center space-x-4">
-                  <div className="text-3xl font-bold text-blue-600">
+                  <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                     {insights.performance.score}/100
                   </div>
                   <div className="flex-1">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div 
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${insights.performance.score}%` }}
                       ></div>
                     </div>
@@ -551,37 +513,35 @@ const InsightsSimple: React.FC = () => {
             {/* Sentiment Analysis */}
             {insights.sentiment && (
               <div>
-                <h3 className="text-lg font-semibold mb-3">Sentiment Analysis</h3>
+                <h3 className="text-lg font-semibold mb-3 dark:text-gray-100">Sentiment Analysis</h3>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-600">Overall Sentiment</span>
-                  <Badge 
-                    variant={
-                      insights.sentiment.overall === 'positive' ? 'default' : 
-                      insights.sentiment.overall === 'negative' ? 'destructive' : 'secondary'
-                    }
-                    className="text-sm"
-                  >
+                  <span className="text-gray-600 dark:text-gray-400">Overall Sentiment</span>
+                  <span className={`px-2 py-1 text-xs rounded ${
+                    insights.sentiment.overall === 'positive' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                    insights.sentiment.overall === 'negative' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                    'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                  }`}>
                     {insights.sentiment.overall}
-                  </Badge>
+                  </span>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                       {insights.sentiment.positive}%
                     </div>
-                    <div className="text-sm text-gray-600">Positive</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Positive</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-gray-600">
+                    <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
                       {insights.sentiment.neutral}%
                     </div>
-                    <div className="text-sm text-gray-600">Neutral</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Neutral</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-red-600">
+                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">
                       {insights.sentiment.negative}%
                     </div>
-                    <div className="text-sm text-gray-600">Negative</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Negative</div>
                   </div>
                 </div>
               </div>
@@ -590,38 +550,38 @@ const InsightsSimple: React.FC = () => {
             {/* Behavior Analysis Summary */}
             {behaviorAnalyses.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold mb-3">Behavior Analysis Summary</h3>
+                <h3 className="text-lg font-semibold mb-3 dark:text-gray-100">Behavior Analysis Summary</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white rounded-lg border p-4">
-                    <h4 className="font-medium text-gray-900 mb-2">User Frustration Indicators</h4>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 p-4">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">User Frustration Indicators</h4>
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span>Rage Clicks</span>
-                        <span className="font-medium">
+                        <span className="dark:text-gray-400">Rage Clicks</span>
+                        <span className="font-medium dark:text-gray-200">
                           {behaviorAnalyses.reduce((sum, b) => sum + b.rage_clicks, 0)} total
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span>Frustrated Sessions</span>
-                        <span className="font-medium text-red-600">
+                        <span className="dark:text-gray-400">Frustrated Sessions</span>
+                        <span className="font-medium text-red-600 dark:text-red-400">
                           {behaviorAnalyses.filter(b => b.behavior_sentiment === 'frustrated').length}
                         </span>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="bg-white rounded-lg border p-4">
-                    <h4 className="font-medium text-gray-900 mb-2">Engagement Metrics</h4>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 p-4">
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Engagement Metrics</h4>
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span>Avg. Time on Page</span>
-                        <span className="font-medium">
+                        <span className="dark:text-gray-400">Avg. Time on Page</span>
+                        <span className="font-medium dark:text-gray-200">
                           {Math.round(behaviorAnalyses.reduce((sum, b) => sum + b.time_on_page_seconds, 0) / behaviorAnalyses.length)}s
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span>Positive Sessions</span>
-                        <span className="font-medium text-green-600">
+                        <span className="dark:text-gray-400">Positive Sessions</span>
+                        <span className="font-medium text-green-600 dark:text-green-400">
                           {behaviorAnalyses.filter(b => b.behavior_sentiment === 'positive').length}
                         </span>
                       </div>
@@ -630,8 +590,8 @@ const InsightsSimple: React.FC = () => {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </div>
   );
