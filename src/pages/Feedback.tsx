@@ -40,7 +40,7 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
-// Types - Updated to match your actual database schema
+// Types
 interface Feedback {
   id: string;
   project_id: string;
@@ -104,73 +104,50 @@ export default function Feedback() {
       setLoading(true);
       setError(null);
 
-      // First, get or create feedback settings
-      let settings: FeedbackSettings | null = null;
+      // Step 1: Get or create feedback settings to retrieve project_id
+      console.log('Fetching feedback settings for user:', user.id);
       
-      try {
-        const { data: existingSettings, error: settingsError } = await supabase
-          .from("feedback_settings")
-          .select("*")
-          .eq("user_id", user.id)
-          .single();
+      const { data: existingSettings, error: settingsError } = await supabase
+        .from("feedback_settings")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
 
-        if (settingsError) {
-          if (settingsError.code === 'PGRST116') {
-            // No row found, create one using the RPC function
-            console.log('No feedback settings found, creating new ones...');
-            
-            const { data: newSettings, error: rpcError } = await supabase
-              .rpc("get_or_create_feedback_settings", { p_user_id: user.id });
+      let settings: FeedbackSettings | null = null;
 
-            if (rpcError) {
-              console.error('Error creating feedback settings:', rpcError);
-              throw rpcError;
-            }
+      if (settingsError) {
+        if (settingsError.code === 'PGRST116') {
+          // No row found, create one using the RPC function
+          console.log('No feedback settings found, creating new ones...');
+          
+          const { data: newSettings, error: rpcError } = await supabase
+            .rpc("get_or_create_feedback_settings", { p_user_id: user.id });
 
-            settings = newSettings;
-          } else {
-            throw settingsError;
+          if (rpcError) {
+            console.error('Error creating feedback settings:', rpcError);
+            throw new Error('Failed to initialize feedback settings. Please refresh the page.');
           }
+
+          settings = newSettings;
+          console.log('Created new feedback settings:', settings);
         } else {
-          settings = existingSettings;
+          console.error('Error fetching feedback settings:', settingsError);
+          throw new Error('Failed to load feedback settings. Please try again.');
         }
-      } catch (settingsError) {
-        console.error('Error with feedback_settings table:', settingsError);
-        
-        // If feedback_settings table doesn't exist, show empty state
-        if (settingsError.code === '42P01' || settingsError.message?.includes('relation "feedback_settings" does not exist')) {
-          console.log('Feedback settings table does not exist, showing empty state');
-          setFeedbacks([]);
-          setStats({
-            totalFeedback: 0,
-            averageRating: 0,
-            customerSatisfactionCount: 0,
-            productFeedbackCount: 0,
-            ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-            recentFeedback: []
-          });
-          return;
-        }
-        throw settingsError;
+      } else {
+        settings = existingSettings;
+        console.log('Found existing feedback settings:', settings);
       }
 
-      if (!settings) {
-        console.log('No feedback settings available, showing empty state');
-        setFeedbacks([]);
-        setStats({
-          totalFeedback: 0,
-          averageRating: 0,
-          customerSatisfactionCount: 0,
-          productFeedbackCount: 0,
-          ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-          recentFeedback: []
-        });
-        return;
+      if (!settings || !settings.project_id) {
+        throw new Error('No project ID found. Please check your feedback settings.');
       }
 
       setFeedbackSettings(settings);
 
-      // Load feedback using the project_id from feedback_settings
+      // Step 2: Load feedback entries for this project_id
+      console.log('Loading feedback for project_id:', settings.project_id);
+      
       const { data: feedbacksData, error: feedbacksError } = await supabase
         .from('feedback')
         .select('*')
@@ -179,40 +156,23 @@ export default function Feedback() {
 
       if (feedbacksError) {
         console.error('Error loading feedback:', feedbacksError);
-        
-        // If feedback table doesn't exist, return empty state
-        if (feedbacksError.code === '42P01' || feedbacksError.message?.includes('relation "feedback" does not exist')) {
-          console.log('Feedback table does not exist, showing empty state');
-          setFeedbacks([]);
-          setStats({
-            totalFeedback: 0,
-            averageRating: 0,
-            customerSatisfactionCount: 0,
-            productFeedbackCount: 0,
-            ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-            recentFeedback: []
-          });
-          return;
-        }
-        throw feedbacksError;
+        throw new Error(`Failed to load feedback: ${feedbacksError.message}`);
       }
 
       const feedbacksList = feedbacksData || [];
+      console.log(`Successfully loaded ${feedbacksList.length} feedback entries`);
       setFeedbacks(feedbacksList);
 
-      // Calculate stats based on actual rating values
+      // Step 3: Calculate statistics
       const totalFeedback = feedbacksList.length;
       
-      // Count by form_type
       const customerSatisfactionCount = feedbacksList.filter(f => f.form_type === 'customer_satisfaction').length;
       const productFeedbackCount = feedbacksList.filter(f => f.form_type === 'product_feedback').length;
       
-      // Calculate average rating from actual rating field
       const ratingsArray = feedbacksList.filter(f => f.rating !== null).map(f => f.rating!);
       const averageRating = ratingsArray.length > 0 ? 
         ratingsArray.reduce((sum, rating) => sum + rating, 0) / ratingsArray.length : 0;
       
-      // Count ratings distribution
       const ratingDistribution: { [key: number]: number } = {
         1: feedbacksList.filter(f => f.rating === 1).length,
         2: feedbacksList.filter(f => f.rating === 2).length,
@@ -230,11 +190,19 @@ export default function Feedback() {
         recentFeedback: feedbacksList.slice(0, 5)
       });
 
+      console.log('Stats calculated:', {
+        totalFeedback,
+        averageRating: averageRating.toFixed(2),
+        customerSatisfactionCount,
+        productFeedbackCount
+      });
+
     } catch (error) {
       console.error('Error loading feedback data:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred while loading data');
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred while loading data';
+      setError(errorMessage);
       toast.error('Failed to load feedback data', {
-        description: error instanceof Error ? error.message : 'An unknown error occurred'
+        description: errorMessage
       });
     } finally {
       setLoading(false);
@@ -251,6 +219,8 @@ export default function Feedback() {
   // Set up real-time subscriptions
   useEffect(() => {
     if (!user || !feedbackSettings) return;
+
+    console.log('Setting up real-time subscription for project:', feedbackSettings.project_id);
 
     const channel = supabase
       .channel('feedback-changes')
@@ -270,6 +240,7 @@ export default function Feedback() {
       .subscribe();
 
     return () => {
+      console.log('Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };
   }, [user, feedbackSettings, loadFeedbackData]);
@@ -278,18 +249,15 @@ export default function Feedback() {
   const filteredFeedbacks = useMemo(() => {
     let filtered = feedbacks;
 
-    // Filter by form type
     if (filters.formType !== 'all') {
       filtered = filtered.filter(f => f.form_type === filters.formType);
     }
 
-    // Filter by rating
     if (filters.rating !== 'all') {
       const ratingValue = parseInt(filters.rating);
       filtered = filtered.filter(f => f.rating === ratingValue);
     }
 
-    // Filter by search query
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase();
       filtered = filtered.filter(f => 
@@ -298,7 +266,6 @@ export default function Feedback() {
       );
     }
 
-    // Filter by date range
     if (filters.dateRange.from || filters.dateRange.to) {
       filtered = filtered.filter(f => {
         const feedbackDate = new Date(f.created_at);
@@ -328,7 +295,6 @@ export default function Feedback() {
       return feedbackDate >= thirtyDaysAgo && feedbackDate <= now;
     });
 
-    // Group by date
     const volumeData: Record<string, number> = {};
     filteredByDate.forEach(feedback => {
       const date = new Date(feedback.created_at).toISOString().split('T')[0];
@@ -399,15 +365,19 @@ export default function Feedback() {
     return (
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Error Loading Feedback</h2>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <Button onClick={loadFeedbackData}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
-            </Button>
-          </div>
+          <Card className="w-full max-w-md">
+            <CardContent className="p-6">
+              <div className="text-center">
+                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                <h2 className="text-xl font-semibold mb-2">Error Loading Feedback</h2>
+                <p className="text-gray-600 mb-4">{error}</p>
+                <Button onClick={loadFeedbackData}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Try Again
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -499,7 +469,7 @@ export default function Feedback() {
         </div>
       )}
 
-      {/* Enhanced Filters */}
+      {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -600,7 +570,6 @@ export default function Feedback() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Feedback Volume Over Time */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -643,7 +612,6 @@ export default function Feedback() {
           </CardContent>
         </Card>
 
-        {/* Rating Distribution */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
