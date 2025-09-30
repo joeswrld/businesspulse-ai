@@ -179,150 +179,167 @@ export default function Feedback() {
   };
 
   // Load feedback data with enhanced processing
-  const loadFeedbackData = useCallback(async () => {
-    if (!user) return;
+  // Replace the loadFeedbackData function in src/pages/Feedback.tsx with this complete implementation
 
-    try {
-      setLoading(true);
-      setError(null);
+const loadFeedbackData = useCallback(async () => {
+  if (!user) return;
 
-      // Step 1: Get feedback settings (or create if doesn't exist)
-      const { data: existingSettings, error: settingsError } = await supabase
-        .from("feedback_settings")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle(); // Use maybeSingle instead of single to avoid error when no row exists
+  try {
+    setLoading(true);
+    setError(null);
 
-      let settings: FeedbackSettings | null = null;
+    console.log('🔄 Loading feedback data for user:', user.id);
 
-      if (settingsError) {
-        console.error('Error fetching feedback settings:', settingsError);
-        throw new Error('Failed to load feedback settings.');
-      }
+    // Step 1: Get or create feedback settings
+    const { data: existingSettings, error: settingsError } = await supabase
+      .from("feedback_settings")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-      if (!existingSettings) {
-        // Create new settings if they don't exist
-        console.log('No feedback settings found, creating new ones...');
-        
-        // Generate a new project ID
-        const newProjectId = crypto.randomUUID();
-        const baseUrl = window.location.origin;
-        
-        const newSettings = {
-          user_id: user.id,
-          project_id: newProjectId,
-          customer_survey_url: `${baseUrl}/survey/${newProjectId}?type=satisfaction`,
-          product_feedback_url: `${baseUrl}/survey/${newProjectId}?type=product`,
-          widget_code: `<script src="${baseUrl}/widget.js" data-project-id="${newProjectId}"></script>`
-        };
-
-        const { data: createdSettings, error: createError } = await supabase
-          .from('feedback_settings')
-          .insert(newSettings)
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('Error creating feedback settings:', createError);
-          throw new Error('Failed to create feedback settings.');
-        }
-
-        settings = createdSettings;
-        console.log('Created new feedback settings:', settings);
-      } else {
-        settings = existingSettings;
-        console.log('Found existing feedback settings:', settings);
-      }
-
-      if (!settings || !settings.project_id) {
-        throw new Error('No project ID found.');
-      }
-
-      setFeedbackSettings(settings);
-
-      // Step 2: Load feedback with enhanced data
-      const { data: feedbacksData, error: feedbacksError } = await supabase
-        .from('feedback')
-        .select('*')
-        .eq('project_id', settings.project_id)
-        .order('created_at', { ascending: false });
-
-      if (feedbacksError) {
-        throw new Error(`Failed to load feedback: ${feedbacksError.message}`);
-      }
-
-      // Enhance feedback with sentiment analysis
-      const enhancedFeedbacks = (feedbacksData || []).map(fb => ({
-        ...fb,
-        sentiment: analyzeSentiment(fb.message),
-        status: fb.metadata?.status || 'new'
-      }));
-
-      setFeedbacks(enhancedFeedbacks);
-
-      // Step 3: Calculate comprehensive statistics
-      const totalFeedback = enhancedFeedbacks.length;
-      const customerSatisfactionCount = enhancedFeedbacks.filter(f => f.form_type === 'customer_satisfaction').length;
-      const productFeedbackCount = enhancedFeedbacks.filter(f => f.form_type === 'product_feedback').length;
-      
-      const ratingsArray = enhancedFeedbacks.filter(f => f.rating !== null).map(f => f.rating!);
-      const averageRating = ratingsArray.length > 0 ? 
-        ratingsArray.reduce((sum, rating) => sum + rating, 0) / ratingsArray.length : 0;
-      
-      const ratingDistribution: { [key: number]: number } = {
-        1: enhancedFeedbacks.filter(f => f.rating === 1).length,
-        2: enhancedFeedbacks.filter(f => f.rating === 2).length,
-        3: enhancedFeedbacks.filter(f => f.rating === 3).length,
-        4: enhancedFeedbacks.filter(f => f.rating === 4).length,
-        5: enhancedFeedbacks.filter(f => f.rating === 5).length
-      };
-
-      const sentimentBreakdown = {
-        positive: enhancedFeedbacks.filter(f => f.sentiment === 'positive').length,
-        neutral: enhancedFeedbacks.filter(f => f.sentiment === 'neutral').length,
-        negative: enhancedFeedbacks.filter(f => f.sentiment === 'negative').length
-      };
-
-      // Calculate trend (comparing last 7 days vs previous 7 days)
-      const now = new Date();
-      const last7Days = enhancedFeedbacks.filter(f => {
-        const date = new Date(f.created_at);
-        const daysDiff = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-        return daysDiff <= 7;
-      }).length;
-
-      const previous7Days = enhancedFeedbacks.filter(f => {
-        const date = new Date(f.created_at);
-        const daysDiff = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-        return daysDiff > 7 && daysDiff <= 14;
-      }).length;
-
-      const trendPercentage = previous7Days > 0 
-        ? ((last7Days - previous7Days) / previous7Days) * 100 
-        : last7Days > 0 ? 100 : 0;
-
-      setStats({
-        totalFeedback,
-        averageRating,
-        customerSatisfactionCount,
-        productFeedbackCount,
-        ratingDistribution,
-        recentFeedback: enhancedFeedbacks.slice(0, 5),
-        sentimentBreakdown,
-        responseRate: 0, // TODO: Implement response tracking
-        trendPercentage
-      });
-
-    } catch (error) {
-      console.error('Error loading feedback data:', error);
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
-      setError(errorMessage);
-      toast.error('Failed to load feedback data', { description: errorMessage });
-    } finally {
-      setLoading(false);
+    if (settingsError) {
+      console.error('❌ Error fetching feedback settings:', settingsError);
+      throw new Error('Failed to load feedback settings.');
     }
-  }, [user]);
 
+    let settings: FeedbackSettings | null = null;
+
+    if (!existingSettings) {
+      console.log('📝 No feedback settings found, creating new ones...');
+      
+      const newProjectId = crypto.randomUUID();
+      const baseUrl = window.location.origin;
+      
+      const newSettings = {
+        user_id: user.id,
+        project_id: newProjectId,
+        customer_survey_url: `${baseUrl}/csat/${newProjectId}`,
+        product_feedback_url: `${baseUrl}/product-feedback/${newProjectId}`,
+        widget_code: `<script src="${baseUrl}/widget.js" data-project-id="${newProjectId}"></script>`,
+        widget_title: 'Share Your Feedback',
+        widget_color: '#3B82F6',
+        greeting_text: 'We value your feedback!',
+        customer_satisfaction_enabled: true,
+        product_feedback_enabled: true
+      };
+
+      const { data: createdSettings, error: createError } = await supabase
+        .from('feedback_settings')
+        .insert(newSettings)
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('❌ Error creating feedback settings:', createError);
+        throw new Error('Failed to create feedback settings.');
+      }
+
+      settings = createdSettings;
+      console.log('✅ Created new feedback settings:', settings);
+    } else {
+      settings = existingSettings;
+      console.log('✅ Found existing feedback settings:', settings);
+    }
+
+    if (!settings || !settings.project_id) {
+      throw new Error('No project ID found.');
+    }
+
+    setFeedbackSettings(settings);
+
+    // Step 2: Load feedback using project_id from feedback_settings
+    console.log('📥 Loading feedback for project_id:', settings.project_id);
+    
+    const { data: feedbacksData, error: feedbacksError } = await supabase
+      .from('feedback')
+      .select('*')
+      .eq('project_id', settings.project_id)
+      .order('created_at', { ascending: false });
+
+    if (feedbacksError) {
+      console.error('❌ Error loading feedback:', feedbacksError);
+      throw new Error(`Failed to load feedback: ${feedbacksError.message}`);
+    }
+
+    console.log(`✅ Loaded ${feedbacksData?.length || 0} feedback entries`);
+
+    // Step 3: Enhance feedback with sentiment analysis
+    const enhancedFeedbacks = (feedbacksData || []).map(fb => ({
+      ...fb,
+      sentiment: analyzeSentiment(fb.message),
+      status: fb.metadata?.status || 'new'
+    }));
+
+    setFeedbacks(enhancedFeedbacks);
+
+    // Step 4: Calculate comprehensive statistics
+    const totalFeedback = enhancedFeedbacks.length;
+    const customerSatisfactionCount = enhancedFeedbacks.filter(f => f.form_type === 'customer_satisfaction').length;
+    const productFeedbackCount = enhancedFeedbacks.filter(f => f.form_type === 'product_feedback').length;
+    
+    const ratingsArray = enhancedFeedbacks.filter(f => f.rating !== null).map(f => f.rating!);
+    const averageRating = ratingsArray.length > 0 ? 
+      ratingsArray.reduce((sum, rating) => sum + rating, 0) / ratingsArray.length : 0;
+    
+    const ratingDistribution: { [key: number]: number } = {
+      1: enhancedFeedbacks.filter(f => f.rating === 1).length,
+      2: enhancedFeedbacks.filter(f => f.rating === 2).length,
+      3: enhancedFeedbacks.filter(f => f.rating === 3).length,
+      4: enhancedFeedbacks.filter(f => f.rating === 4).length,
+      5: enhancedFeedbacks.filter(f => f.rating === 5).length
+    };
+
+    const sentimentBreakdown = {
+      positive: enhancedFeedbacks.filter(f => f.sentiment === 'positive').length,
+      neutral: enhancedFeedbacks.filter(f => f.sentiment === 'neutral').length,
+      negative: enhancedFeedbacks.filter(f => f.sentiment === 'negative').length
+    };
+
+    // Calculate trend (comparing last 7 days vs previous 7 days)
+    const now = new Date();
+    const last7Days = enhancedFeedbacks.filter(f => {
+      const date = new Date(f.created_at);
+      const daysDiff = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+      return daysDiff <= 7;
+    }).length;
+
+    const previous7Days = enhancedFeedbacks.filter(f => {
+      const date = new Date(f.created_at);
+      const daysDiff = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+      return daysDiff > 7 && daysDiff <= 14;
+    }).length;
+
+    const trendPercentage = previous7Days > 0 
+      ? ((last7Days - previous7Days) / previous7Days) * 100 
+      : last7Days > 0 ? 100 : 0;
+
+    setStats({
+      totalFeedback,
+      averageRating,
+      customerSatisfactionCount,
+      productFeedbackCount,
+      ratingDistribution,
+      recentFeedback: enhancedFeedbacks.slice(0, 5),
+      sentimentBreakdown,
+      responseRate: 0,
+      trendPercentage
+    });
+
+    console.log('📊 Stats calculated:', {
+      totalFeedback,
+      averageRating: averageRating.toFixed(2),
+      sentiment: sentimentBreakdown
+    });
+
+  } catch (error) {
+    console.error('❌ Error loading feedback data:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+    setError(errorMessage);
+    toast.error('Failed to load feedback data', { description: errorMessage });
+  } finally {
+    setLoading(false);
+  }
+}, [user]);
   // Load data on mount
   useEffect(() => {
     if (user) {
