@@ -18,6 +18,7 @@ interface ProductFeedbackFormProps {
 interface FeedbackSettings {
   id: string;
   project_id: string;
+  user_id: string;
   widget_title: string;
   widget_color: string;
   greeting_text: string;
@@ -50,10 +51,10 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
     if (projectId && !previewMode) {
       validateProject();
     } else if (previewMode) {
-      // For preview mode, set dummy settings
       setSettings({
         id: 'preview',
         project_id: projectId || 'preview',
+        user_id: 'preview',
         widget_title: 'Product Feedback',
         widget_color: '#8B5CF6',
         greeting_text: 'Share your thoughts about our product',
@@ -71,35 +72,47 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
     }
 
     setIsValidating(true);
-    console.log('Validating project ID:', projectId);
+    console.log('🔍 Validating project ID:', projectId);
 
     try {
+      // Query feedback_settings by project_id
       const { data, error } = await supabase
         .from('feedback_settings')
         .select('*')
         .eq('project_id', projectId)
-        .eq('product_feedback_enabled', true)
         .maybeSingle();
 
+      console.log('📊 Query result:', { data, error });
+
       if (error) {
-        console.error('Validation error:', error);
+        console.error('❌ Validation error:', error);
         throw error;
       }
 
-      if (data) {
-        setSettings(data);
-        setIsValid(true);
-        setValidationError('');
-        console.log('✅ Project validated successfully');
-      } else {
+      if (!data) {
         setIsValid(false);
-        setValidationError(`Product feedback is not enabled for this project.`);
-        console.log('❌ Project not found or feedback disabled');
+        setValidationError('Project not found. Please check your feedback link.');
+        console.log('❌ No feedback_settings found for project_id:', projectId);
+        return;
       }
+
+      // Check if product feedback is enabled
+      if (!data.product_feedback_enabled) {
+        setIsValid(false);
+        setValidationError('Product feedback is currently disabled for this project.');
+        console.log('❌ Product feedback disabled for project');
+        return;
+      }
+
+      setSettings(data);
+      setIsValid(true);
+      setValidationError('');
+      console.log('✅ Project validated successfully:', data);
+
     } catch (err) {
-      console.error('Error validating project:', err);
+      console.error('❌ Error validating project:', err);
       setIsValid(false);
-      setValidationError('This project link is invalid or expired.');
+      setValidationError('Unable to load feedback form. Please try again later.');
     } finally {
       setIsValidating(false);
     }
@@ -130,7 +143,7 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
       return;
     }
 
-    if (!settings?.id) {
+    if (!settings?.project_id) {
       toast({
         title: 'Invalid Project',
         description: 'Cannot submit feedback for this project.',
@@ -142,19 +155,8 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
     setIsSubmitting(true);
 
     try {
-      // Get the project's internal UUID for the feedback table
-      const { data: projectData, error: projectError } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('project_id', projectId)
-        .single();
-
-      if (projectError || !projectData) {
-        throw new Error('Project not found');
-      }
-
       const feedbackData = {
-        project_id: projectData.id,
+        project_id: settings.project_id, // Use project_id from feedback_settings
         form_type: 'product_feedback',
         message: message.trim(),
         rating: rating || null,
@@ -166,16 +168,18 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
         }
       };
 
+      console.log('📤 Submitting feedback:', feedbackData);
+
       const { error } = await supabase
         .from('feedback')
         .insert([feedbackData]);
 
       if (error) {
-        console.error('Error submitting feedback:', error);
+        console.error('❌ Error submitting feedback:', error);
         
         let errorMessage = 'Failed to submit feedback.';
         if (error.code === '23503') {
-          errorMessage = 'Invalid project reference. Please check your project link.';
+          errorMessage = 'Invalid project reference. Please contact support.';
         } else if (error.message) {
           errorMessage = error.message;
         }
@@ -188,16 +192,19 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
         return;
       }
 
+      console.log('✅ Feedback submitted successfully');
       setIsSubmitted(true);
+      
       if (onSubmitted) {
         onSubmitted(feedbackData);
       }
+      
       toast({
         title: 'Thank you!',
         description: 'Your feedback has been submitted successfully.'
       });
     } catch (err) {
-      console.error('Submit failed:', err);
+      console.error('❌ Submit failed:', err);
       toast({
         title: 'Error',
         description: 'Failed to submit feedback. Please try again.',
@@ -221,12 +228,12 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
 
   if (!isValid && !previewMode) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
             <CardTitle className="text-xl">Feedback Form Not Available</CardTitle>
-            <CardDescription>{validationError}</CardDescription>
+            <CardDescription className="text-base mt-2">{validationError}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={() => navigate('/')} className="w-full" variant="outline">
