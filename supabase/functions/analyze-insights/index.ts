@@ -234,8 +234,8 @@ Pay special attention to:
     console.log('🤖 Calling Gemini API...');
 
     // FIXED: Use the correct API endpoint and model name
-    // Use v1 API (not v1beta) and correct model name: gemini-pro
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+    // Use v1beta API and correct model name: gemini-1.5-pro
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`;
     
     const response = await fetch(geminiUrl, {
       method: "POST",

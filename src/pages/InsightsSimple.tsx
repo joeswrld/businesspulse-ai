@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Brain, 
   Loader2, 
@@ -12,8 +13,24 @@ import {
   User,
   Sparkles,
   AlertCircle,
-  Star
+  Star,
+  TrendingUp,
+  Target,
+  BarChart3,
+  Lightbulb,
+  RefreshCw,
+  Eye,
+  Filter
 } from 'lucide-react';
+
+// Import shadcn/ui components
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
 
 // Types matching your database schema
 interface Feedback {
@@ -68,6 +85,7 @@ const InsightsSimple: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [projectIds, setProjectIds] = useState<string[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
 
   // Dark mode detection
   useEffect(() => {
@@ -294,6 +312,7 @@ const InsightsSimple: React.FC = () => {
         }
 
         setInsights(result.analysis);
+        setShowInsights(true);
         
         // Save the report to database
         try {
@@ -383,291 +402,518 @@ const InsightsSimple: React.FC = () => {
     );
   };
 
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
+
+  const insightCardVariants = {
+    hidden: { opacity: 0, scale: 0.9 },
+    visible: { 
+      opacity: 1, 
+      scale: 1,
+      transition: {
+        type: "spring",
+        stiffness: 100,
+        damping: 15
+      }
+    }
+  };
+
   return (
-    <div className={`container mx-auto p-6 space-y-6 ${isDarkMode ? 'dark' : ''}`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">AI Insights</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Analyze your feedback with AI-powered insights
-          </p>
-        </div>
-      </div>
-
-      {/* Error Alert */}
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <div className="flex items-start">
-            <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 mr-3" />
-            <div className="flex-1">
-              <p className="text-red-800 dark:text-red-200">{error}</p>
-              <button
-                onClick={fetchFeedbacks}
-                className="mt-2 px-3 py-1 text-sm border border-red-300 dark:border-red-700 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-800 dark:text-red-200"
-              >
-                Retry
-              </button>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="container mx-auto p-6 space-y-8">
+        {/* Header Section */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center space-y-4"
+        >
+          <div className="flex items-center justify-center space-x-3">
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+              <Brain className="h-8 w-8 text-blue-600 dark:text-blue-400" />
             </div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              AI-Powered Insights
+            </h1>
           </div>
-        </div>
-      )}
-
-      {/* Feedback Selection */}
-      <div className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow">
-        <div className="p-6 border-b dark:border-gray-700">
-          <h2 className="text-xl font-semibold flex items-center space-x-2 dark:text-gray-100">
-            <MessageSquare className="h-5 w-5" />
-            <span>Select Feedback for Analysis</span>
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Choose the feedback entries you want to analyze. You can select individual items or use "Select All".
+          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            Transform your feedback into actionable insights with advanced AI analysis
           </p>
-        </div>
-        <div className="p-6 space-y-4">
-          {/* Selection Controls */}
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={handleSelectAll}
-                disabled={feedbacks.length === 0}
-                className="px-4 py-2 border dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 dark:border-gray-600 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
-                {selectedFeedbacks.size === feedbacks.length && feedbacks.length > 0 ? (
-                  <>
-                    <Square className="h-4 w-4" />
-                    <span>Deselect All</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckSquare className="h-4 w-4" />
-                    <span>Select All</span>
-                  </>
-                )}
-              </button>
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                {selectedFeedbacks.size} of {feedbacks.length} selected
-              </span>
-            </div>
-            <button
-              onClick={generateInsights}
-              disabled={selectedFeedbacks.size === 0 || generating}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-            >
-              {generating ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Generating...</span>
-                </>
-              ) : (
-                <>
-                  <Brain className="h-4 w-4" />
-                  <span>Generate Insights</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Feedbacks List */}
-          {loading ? (
-            <div className="flex items-center justify-center py-8 dark:text-gray-300">
-              <Loader2 className="h-6 w-6 animate-spin mr-2" />
-              <span>Loading feedback...</span>
-            </div>
-          ) : feedbacks.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
-              <p className="text-lg font-medium">No feedback found</p>
-              <p className="text-sm">You need to have feedback in your projects to generate insights.</p>
-            </div>
-          ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {feedbacks.map((feedback) => (
-                <div key={feedback.id} className="bg-white dark:bg-gray-700 border dark:border-gray-600 rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-start space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedFeedbacks.has(feedback.id)}
-                      onChange={(e) => handleFeedbackSelection(feedback.id, e.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-gray-300 dark:border-gray-500"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                        <div className="flex items-center space-x-2">
-                          <span className="px-2 py-1 text-xs border dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500 rounded flex items-center space-x-1">
-                            <User className="h-3 w-3" />
-                            <span>{feedback.form_type.replace('_', ' ')}</span>
-                          </span>
-                          {feedback.rating && renderStars(feedback.rating)}
-                        </div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center space-x-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>{formatTimestamp(feedback.created_at)}</span>
-                        </span>
-                      </div>
-                      <p className="text-gray-700 dark:text-gray-300 text-sm line-clamp-3">
-                        {feedback.message}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
+          {projectIds.length > 0 && (
+            <div className="flex items-center justify-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+              <Badge variant="outline" className="flex items-center space-x-1">
+                <Eye className="h-3 w-3" />
+                <span>{projectIds.length} Project{projectIds.length !== 1 ? 's' : ''}</span>
+              </Badge>
+              <Badge variant="outline" className="flex items-center space-x-1">
+                <MessageSquare className="h-3 w-3" />
+                <span>{feedbacks.length} Feedback{feedbacks.length !== 1 ? 's' : ''}</span>
+              </Badge>
             </div>
           )}
-        </div>
+        </motion.div>
+
+        {/* Error Alert */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="flex items-center justify-between">
+                  <span>{error}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchFeedbacks}
+                    className="ml-4"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Retry
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Main Content */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="space-y-8"
+        >
+          {/* Feedback Selection Card */}
+          <motion.div variants={itemVariants}>
+            <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Filter className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <span>Select Feedback for Analysis</span>
+                </CardTitle>
+                <CardDescription>
+                  Choose the feedback entries you want to analyze. You can select individual items or use "Select All".
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Selection Controls */}
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center space-x-4">
+                    <Button
+                      variant="outline"
+                      onClick={handleSelectAll}
+                      disabled={feedbacks.length === 0}
+                      className="flex items-center space-x-2"
+                    >
+                      {selectedFeedbacks.size === feedbacks.length && feedbacks.length > 0 ? (
+                        <>
+                          <Square className="h-4 w-4" />
+                          <span>Deselect All</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckSquare className="h-4 w-4" />
+                          <span>Select All</span>
+                        </>
+                      )}
+                    </Button>
+                    <Badge variant="secondary" className="flex items-center space-x-1">
+                      <span>{selectedFeedbacks.size} of {feedbacks.length} selected</span>
+                    </Badge>
+                  </div>
+                  <Button
+                    onClick={generateInsights}
+                    disabled={selectedFeedbacks.size === 0 || generating}
+                    size="lg"
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg"
+                  >
+                    {generating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <span>Generating Insights...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        <span>Generate Insights</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <Separator />
+
+                {/* Feedbacks List */}
+                {loading ? (
+                  <div className="space-y-4">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="flex items-start space-x-3 p-4">
+                        <Skeleton className="h-4 w-4 rounded mt-1" />
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <Skeleton className="h-4 w-20" />
+                            <Skeleton className="h-4 w-16" />
+                          </div>
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-4 w-3/4" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : feedbacks.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                      <MessageSquare className="h-8 w-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                      No feedback found
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      You need to have feedback in your projects to generate insights.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {feedbacks.map((feedback, index) => (
+                      <motion.div
+                        key={feedback.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="group"
+                      >
+                        <Card className="hover:shadow-md transition-all duration-200 border-l-4 border-l-transparent hover:border-l-blue-500">
+                          <CardContent className="p-4">
+                            <div className="flex items-start space-x-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedFeedbacks.has(feedback.id)}
+                                onChange={(e) => handleFeedbackSelection(feedback.id, e.target.checked)}
+                                className="mt-1 h-4 w-4 rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-blue-500"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                                  <div className="flex items-center space-x-2">
+                                    <Badge variant="outline" className="flex items-center space-x-1">
+                                      <User className="h-3 w-3" />
+                                      <span className="capitalize">{feedback.form_type.replace('_', ' ')}</span>
+                                    </Badge>
+                                    {feedback.rating && renderStars(feedback.rating)}
+                                  </div>
+                                  <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>{formatTimestamp(feedback.created_at)}</span>
+                                  </div>
+                                </div>
+                                <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed line-clamp-3">
+                                  {feedback.message}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* AI Insights Results */}
+          <AnimatePresence>
+            {insights && showInsights && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.5 }}
+              >
+                <Card className="border-0 shadow-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 backdrop-blur-sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-2xl">
+                      <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                        <Sparkles className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <span>AI Insights</span>
+                    </CardTitle>
+                    <CardDescription>
+                      AI-powered analysis of your selected feedback
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-8">
+                    {/* Summary */}
+                    <motion.div
+                      variants={insightCardVariants}
+                      initial="hidden"
+                      animate="visible"
+                    >
+                      <Card className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm">
+                        <CardHeader>
+                          <CardTitle className="flex items-center space-x-2">
+                            <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            <span>Summary</span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                            {insights.summary}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+
+                    {/* Key Themes */}
+                    {insights.key_themes && insights.key_themes.length > 0 && (
+                      <motion.div
+                        variants={insightCardVariants}
+                        initial="hidden"
+                        animate="visible"
+                        transition={{ delay: 0.1 }}
+                      >
+                        <Card className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm">
+                          <CardHeader>
+                            <CardTitle className="flex items-center space-x-2">
+                              <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                              <span>Key Themes</span>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {insights.key_themes.map((theme, index) => (
+                                <motion.div
+                                  key={index}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: 0.2 + index * 0.1 }}
+                                  className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600"
+                                >
+                                  <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                                  <span className="text-gray-700 dark:text-gray-300">{theme}</span>
+                                </motion.div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    )}
+
+                    {/* Suggested Actions */}
+                    {insights.suggested_actions && insights.suggested_actions.length > 0 && (
+                      <motion.div
+                        variants={insightCardVariants}
+                        initial="hidden"
+                        animate="visible"
+                        transition={{ delay: 0.2 }}
+                      >
+                        <Card className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm">
+                          <CardHeader>
+                            <CardTitle className="flex items-center space-x-2">
+                              <Target className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                              <span>Suggested Actions</span>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {insights.suggested_actions.map((action, index) => (
+                                <motion.div
+                                  key={index}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: 0.3 + index * 0.1 }}
+                                  className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600"
+                                >
+                                  <div className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0"></div>
+                                  <span className="text-gray-700 dark:text-gray-300">{action}</span>
+                                </motion.div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    )}
+
+                    {/* Performance Score */}
+                    {insights.performance && (
+                      <motion.div
+                        variants={insightCardVariants}
+                        initial="hidden"
+                        animate="visible"
+                        transition={{ delay: 0.3 }}
+                      >
+                        <Card className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm">
+                          <CardHeader>
+                            <CardTitle className="flex items-center space-x-2">
+                              <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                              <span>Performance Score</span>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <span className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                                  {insights.performance.score}/100
+                                </span>
+                                <Badge 
+                                  variant={insights.performance.score >= 80 ? "default" : insights.performance.score >= 60 ? "secondary" : "destructive"}
+                                  className="text-sm"
+                                >
+                                  {insights.performance.score >= 80 ? "Excellent" : insights.performance.score >= 60 ? "Good" : "Needs Improvement"}
+                                </Badge>
+                              </div>
+                              <Progress 
+                                value={insights.performance.score} 
+                                className="h-3"
+                              />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    )}
+
+                    {/* Sentiment Analysis */}
+                    {insights.sentiment && (
+                      <motion.div
+                        variants={insightCardVariants}
+                        initial="hidden"
+                        animate="visible"
+                        transition={{ delay: 0.4 }}
+                      >
+                        <Card className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm">
+                          <CardHeader>
+                            <CardTitle className="flex items-center space-x-2">
+                              <Lightbulb className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                              <span>Sentiment Analysis</span>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <span className="text-gray-600 dark:text-gray-400">Overall Sentiment</span>
+                                <Badge 
+                                  variant={
+                                    insights.sentiment.overall === 'positive' ? "default" :
+                                    insights.sentiment.overall === 'negative' ? "destructive" : "secondary"
+                                  }
+                                >
+                                  {insights.sentiment.overall}
+                                </Badge>
+                              </div>
+                              <div className="grid grid-cols-3 gap-4">
+                                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                    {insights.sentiment.positive}%
+                                  </div>
+                                  <div className="text-sm text-gray-600 dark:text-gray-400">Positive</div>
+                                </div>
+                                <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                  <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                                    {insights.sentiment.neutral}%
+                                  </div>
+                                  <div className="text-sm text-gray-600 dark:text-gray-400">Neutral</div>
+                                </div>
+                                <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                                  <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                                    {insights.sentiment.negative}%
+                                  </div>
+                                  <div className="text-sm text-gray-600 dark:text-gray-400">Negative</div>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    )}
+
+                    {/* Behavior Analysis Summary */}
+                    {behaviorAnalyses.length > 0 && (
+                      <motion.div
+                        variants={insightCardVariants}
+                        initial="hidden"
+                        animate="visible"
+                        transition={{ delay: 0.5 }}
+                      >
+                        <Card className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm">
+                          <CardHeader>
+                            <CardTitle className="flex items-center space-x-2">
+                              <Eye className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                              <span>Behavior Analysis Summary</span>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <Card className="bg-white dark:bg-gray-700">
+                                <CardHeader className="pb-2">
+                                  <CardTitle className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    User Frustration Indicators
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600 dark:text-gray-400">Rage Clicks</span>
+                                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                                      {behaviorAnalyses.reduce((sum, b) => sum + b.rage_clicks, 0)} total
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600 dark:text-gray-400">Frustrated Sessions</span>
+                                    <span className="font-medium text-red-600 dark:text-red-400">
+                                      {behaviorAnalyses.filter(b => b.behavior_sentiment === 'frustrated').length}
+                                    </span>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                              
+                              <Card className="bg-white dark:bg-gray-700">
+                                <CardHeader className="pb-2">
+                                  <CardTitle className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    Engagement Metrics
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600 dark:text-gray-400">Avg. Time on Page</span>
+                                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                                      {Math.round(behaviorAnalyses.reduce((sum, b) => sum + b.time_on_page_seconds, 0) / behaviorAnalyses.length)}s
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600 dark:text-gray-400">Positive Sessions</span>
+                                    <span className="font-medium text-green-600 dark:text-green-400">
+                                      {behaviorAnalyses.filter(b => b.behavior_sentiment === 'positive').length}
+                                    </span>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
       </div>
-
-      {/* AI Insights Results */}
-      {insights && (
-        <div className="bg-blue-50/30 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg shadow">
-          <div className="p-6 border-b border-blue-200 dark:border-blue-800">
-            <h2 className="text-xl font-semibold flex items-center space-x-2 dark:text-gray-100">
-              <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              <span>AI Insights</span>
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              AI-powered analysis of your selected feedback
-            </p>
-          </div>
-          <div className="p-6 space-y-6">
-            {/* Summary */}
-            <div>
-              <h3 className="text-lg font-semibold mb-3 dark:text-gray-100">Summary</h3>
-              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{insights.summary}</p>
-            </div>
-
-            {/* Key Themes */}
-            {insights.key_themes && insights.key_themes.length > 0 && (
-              <div>
-                <h3 className="text-lg font-semibold mb-3 dark:text-gray-100">Key Themes</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {insights.key_themes.map((theme, index) => (
-                    <div key={index} className="flex items-center space-x-2 p-3 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">
-                      <div className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full flex-shrink-0"></div>
-                      <span className="text-gray-700 dark:text-gray-300">{theme}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Suggested Actions */}
-            {insights.suggested_actions && insights.suggested_actions.length > 0 && (
-              <div>
-                <h3 className="text-lg font-semibold mb-3 dark:text-gray-100">Suggested Actions</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {insights.suggested_actions.map((action, index) => (
-                    <div key={index} className="flex items-center space-x-2 p-3 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">
-                      <div className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full flex-shrink-0"></div>
-                      <span className="text-gray-700 dark:text-gray-300">{action}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Performance Score */}
-            {insights.performance && (
-              <div>
-                <h3 className="text-lg font-semibold mb-3 dark:text-gray-100">Performance Score</h3>
-                <div className="flex items-center space-x-4">
-                  <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                    {insights.performance.score}/100
-                  </div>
-                  <div className="flex-1">
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div 
-                        className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${insights.performance.score}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Sentiment Analysis */}
-            {insights.sentiment && (
-              <div>
-                <h3 className="text-lg font-semibold mb-3 dark:text-gray-100">Sentiment Analysis</h3>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-600 dark:text-gray-400">Overall Sentiment</span>
-                  <span className={`px-2 py-1 text-xs rounded ${
-                    insights.sentiment.overall === 'positive' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                    insights.sentiment.overall === 'negative' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                    'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                  }`}>
-                    {insights.sentiment.overall}
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                      {insights.sentiment.positive}%
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Positive</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
-                      {insights.sentiment.neutral}%
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Neutral</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                      {insights.sentiment.negative}%
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Negative</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Behavior Analysis Summary */}
-            {behaviorAnalyses.length > 0 && (
-              <div>
-                <h3 className="text-lg font-semibold mb-3 dark:text-gray-100">Behavior Analysis Summary</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 p-4">
-                    <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">User Frustration Indicators</h4>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="dark:text-gray-400">Rage Clicks</span>
-                        <span className="font-medium dark:text-gray-200">
-                          {behaviorAnalyses.reduce((sum, b) => sum + b.rage_clicks, 0)} total
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="dark:text-gray-400">Frustrated Sessions</span>
-                        <span className="font-medium text-red-600 dark:text-red-400">
-                          {behaviorAnalyses.filter(b => b.behavior_sentiment === 'frustrated').length}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 p-4">
-                    <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Engagement Metrics</h4>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="dark:text-gray-400">Avg. Time on Page</span>
-                        <span className="font-medium dark:text-gray-200">
-                          {Math.round(behaviorAnalyses.reduce((sum, b) => sum + b.time_on_page_seconds, 0) / behaviorAnalyses.length)}s
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="dark:text-gray-400">Positive Sessions</span>
-                        <span className="font-medium text-green-600 dark:text-green-400">
-                          {behaviorAnalyses.filter(b => b.behavior_sentiment === 'positive').length}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
