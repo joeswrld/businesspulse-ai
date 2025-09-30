@@ -1,9 +1,148 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// --- Configuration Constants ---
+// Define the full JSON schema for structured output to ensure reliability
+const ANALYSIS_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    summary: {
+      type: "STRING",
+      description: "A comprehensive 2-3 paragraph summary of the key findings and insights from the user feedback. Focus on patterns, pain points, satisfaction levels, and opportunities for improvement."
+    },
+    key_themes: {
+      type: "ARRAY",
+      description: "Five recurring feedback topics, user pain points, and positive experiences.",
+      items: {
+        type: "STRING"
+      }
+    },
+    suggested_actions: {
+      type: "ARRAY",
+      description: "Five practical improvements that address user feedback.",
+      items: {
+        type: "STRING"
+      }
+    },
+    trends: {
+      type: "ARRAY",
+      description: "Four highlight patterns in user sentiment and feedback.",
+      items: {
+        type: "STRING"
+      }
+    },
+    performance: {
+      type: "OBJECT",
+      properties: {
+        metrics: {
+          type: "ARRAY",
+          description: "Four key metrics derived from the data.",
+          items: {
+            type: "STRING"
+          }
+        },
+        score: {
+          type: "NUMBER",
+          description: "Overall performance score (0-100) based on feedback sentiment."
+        }
+      },
+      required: [
+        "metrics",
+        "score"
+      ]
+    },
+    sentiment: {
+      type: "OBJECT",
+      properties: {
+        positive: {
+          type: "NUMBER",
+          description: "Percentage of positive sentiment (0-100). Sum of all sentiments should be 100."
+        },
+        negative: {
+          type: "NUMBER",
+          description: "Percentage of negative sentiment (0-100). Sum of all sentiments should be 100."
+        },
+        neutral: {
+          type: "NUMBER",
+          description: "Percentage of neutral sentiment (0-100). Sum of all sentiments should be 100."
+        },
+        overall: {
+          type: "STRING",
+          description: "Overall sentiment: 'positive', 'negative', or 'neutral'."
+        }
+      },
+      required: [
+        "positive",
+        "negative",
+        "neutral",
+        "overall"
+      ]
+    }
+  },
+  required: [
+    "summary",
+    "key_themes",
+    "suggested_actions",
+    "trends",
+    "performance",
+    "sentiment"
+  ]
+};
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
+// --- AI Prompt Definition ---
+// Simplified prompt—the JSON structure is now defined by the schema (ANALYSIS_RESPONSE_SCHEMA)
+const ANALYSIS_PROMPT_TEMPLATE = (dataString, fileType)=>`You are an expert business analyst specializing in customer feedback analysis and user experience insights. Analyze the following user feedback data and provide comprehensive, actionable insights in the required JSON format.
+
+Data to analyze:
+${dataString}
+
+Analysis type: ${fileType === 'feedback-analysis' ? 'User Feedback Analysis' : 'General Data Analysis'}
+
+Important guidelines for analysis:
+- Summary should focus on user experience insights, common issues, and satisfaction patterns.
+- Key themes should identify recurring feedback topics, user pain points, and positive experiences.
+- Suggested actions should be practical improvements that address user feedback.
+- Trends should highlight patterns in user sentiment and feedback.
+- Performance score should be 0-100 based on overall feedback sentiment and actionable insights.
+- Sentiment percentages must reflect the proportion of positive, negative, and neutral entries.
+- The output MUST strictly follow the requested JSON schema.
+`;
+// --- Utility Function for Resilient Fetching ---
+/**
+ * Fetches an API endpoint with exponential backoff for transient errors (5xx and 429 status codes).
+ * @param url The API URL.
+ * @param options Fetch request options.
+ * @param maxRetries The maximum number of retry attempts.
+ * @returns The Response object.
+ */ async function fetchWithExponentialBackoff(url, options, maxRetries = 3) {
+  let attempt = 0;
+  while(attempt < maxRetries){
+    attempt++;
+    const delay = Math.pow(2, attempt) * 100 + Math.random() * 100; // 300ms, 700ms, 1500ms...
+    try {
+      const response = await fetch(url, options);
+      // Successful response or client error (4xx) that shouldn't be retried (except 429)
+      if (response.ok || response.status >= 400 && response.status !== 429) {
+        return response;
+      }
+      // Server error (5xx) or Rate Limit (429) - retry
+      console.warn(`[Attempt ${attempt}/${maxRetries}] API call failed with status ${response.status}. Retrying in ${delay.toFixed(0)}ms...`);
+    } catch (error) {
+      // Network error (e.g., Deno.errors.Http or connection loss) - retry
+      console.warn(`[Attempt ${attempt}/${maxRetries}] API call failed with network error: ${error.message}. Retrying in ${delay.toFixed(0)}ms...`);
+    }
+    if (attempt < maxRetries) {
+      await new Promise((resolve)=>setTimeout(resolve, delay));
+    }
+  }
+  // Final attempt failed, throw an error or return the last non-ok response
+  console.error(`[Attempt ${attempt}/${maxRetries}] Max retries reached. Final API call failed.`);
+  // Re-run the last fetch outside the loop to get the final response/error for robust handling downstream
+  return fetch(url, options);
+}
+// --- Main Handler ---
 serve(async (req)=>{
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -45,7 +184,9 @@ serve(async (req)=>{
     // Initialize Supabase Service Role client for system operations (usage tracking)
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    // FIX: Renamed for clarity: Use serviceSupabase for full access tasks (checking/incrementing usage)
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase environment variables (URL/KEY) are not set.');
+    }
     const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
     // Verify the JWT token and get user using the service client
     const { data: { user }, error: authError } = await serviceSupabase.auth.getUser(token);
@@ -103,7 +244,6 @@ serve(async (req)=>{
       console.error('⚠️ Error checking usage:', usageError);
     }
     const { data: subscriptionData } = await serviceSupabase.from('user_subscriptions').select('*').eq('user_id', userId).single();
-    // ... (Remaining usage logic and Gemini call logic is correct and remains the same)
     let userPlan = 'free';
     if (subscriptionData) {
       if (subscriptionData.status === 'active') {
@@ -119,8 +259,10 @@ serve(async (req)=>{
       business: -1,
       enterprise: -1
     };
+    // Coerce userPlan to a valid key for type safety and defaulting to 'free' if unexpected
+    const validPlan = planLimits[userPlan] !== undefined ? userPlan : 'free';
     const currentUsage = usageData?.insights_count || 0;
-    const limit = planLimits[userPlan];
+    const limit = planLimits[validPlan];
     if (limit !== -1 && currentUsage >= limit) {
       console.warn('⚠️ Usage limit reached');
       return new Response(JSON.stringify({
@@ -141,50 +283,7 @@ serve(async (req)=>{
     } else {
       dataString = String(data);
     }
-    // ... (Prompt definition is correct and omitted for brevity)
-    const prompt = `You are an expert business analyst specializing in customer feedback analysis and user experience insights. Analyze the following user feedback data and provide comprehensive, actionable insights.
-
-Data to analyze:
-${dataString}
-
-Analysis type: ${fileType === 'feedback-analysis' ? 'User Feedback Analysis' : 'General Data Analysis'}
-
-Please provide a detailed analysis in the following JSON format (return ONLY valid JSON, no markdown code blocks):
-
-{
-  "summary": "A comprehensive 2-3 paragraph summary of the key findings and insights from the user feedback. Focus on patterns, pain points, satisfaction levels, and opportunities for improvement.",
-  "key_themes": ["Theme 1", "Theme 2", "Theme 3", "Theme 4", "Theme 5"],
-  "suggested_actions": ["Action 1", "Action 2", "Action 3", "Action 4", "Action 5"],
-  "trends": ["Trend 1", "Trend 2", "Trend 3", "Trend 4"],
-  "performance": {
-    "metrics": ["Metric 1", "Metric 2", "Metric 3", "Metric 4"],
-    "score": 85
-  },
-  "sentiment": {
-    "positive": 65,
-    "negative": 15,
-    "neutral": 20,
-    "overall": "positive"
-  }
-}
-
-Important guidelines:
-- Summary should focus on user experience insights, common issues, and satisfaction patterns
-- Key themes should identify recurring feedback topics, user pain points, and positive experiences
-- Suggested actions should be practical improvements that address user feedback
-- Trends should highlight patterns in user sentiment and feedback
-- Performance score should be 0-100 based on overall feedback sentiment and actionable insights
-- Sentiment percentages must add up to 100
-- Overall sentiment should be "positive", "negative", or "neutral"
-- Return ONLY the JSON object, no markdown formatting or code blocks
-
-Pay special attention to:
-- User pain points and frustrations
-- Feature requests and improvement suggestions
-- Positive experiences and what users appreciate
-- Common patterns across multiple feedback entries
-- Urgency and priority of issues mentioned
-`;
+    const prompt = ANALYSIS_PROMPT_TEMPLATE(dataString, fileType);
     // Get Gemini API key
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     if (!GEMINI_API_KEY) {
@@ -201,8 +300,9 @@ Pay special attention to:
       });
     }
     console.log('🤖 Calling Gemini API...');
-    const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
-    const response = await fetch(geminiUrl, {
+    const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+    // Use the robust fetch function
+    const response = await fetchWithExponentialBackoff(geminiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -223,22 +323,24 @@ Pay special attention to:
           temperature: 0.3,
           topK: 40,
           topP: 0.95,
-          maxOutputTokens: 2048
+          maxOutputTokens: 4096,
+          // *** FIX: Enable Structured Output for reliable JSON response ***
+          responseMimeType: "application/json",
+          responseSchema: ANALYSIS_RESPONSE_SCHEMA
         }
       })
     });
-    // ... (Gemini response handling and parsing is correct and omitted for brevity)
     console.log('📡 Gemini API response status:', response.status);
     if (!response.ok) {
       const errorText = await response.text();
-      // ... (Error handling logic)
       let errorMessage = 'Gemini API request failed';
+      // Enhanced error messages based on status
       if (response.status === 400) {
         errorMessage = 'Bad request to Gemini API. Please check your request format.';
       } else if (response.status === 403) {
         errorMessage = 'Gemini API key is invalid or restricted. Please check your API key permissions.';
       } else if (response.status === 429) {
-        errorMessage = 'Gemini API rate limit exceeded. Please try again later.';
+        errorMessage = 'Gemini API rate limit exceeded even after retries. Please try again later.';
       }
       return new Response(JSON.stringify({
         success: false,
@@ -254,14 +356,30 @@ Pay special attention to:
     }
     const geminiData = await response.json();
     console.log('✅ Gemini API response received');
-    const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+    const candidate = geminiData.candidates?.[0];
+    const text = candidate?.content?.parts?.[0]?.text;
+    const finishReason = candidate?.finishReason;
     if (!text) {
       console.error('❌ No text generated by Gemini');
+      let errorMessage = 'No analysis generated by AI.';
+      let status = 500; // Default to internal error
+      if (finishReason) {
+        errorMessage = `AI generation failed: Reason - ${finishReason}.`;
+        status = 400; // Use 400 for content/limit related issues
+        if (finishReason === 'SAFETY') {
+          errorMessage += ' The prompt or input data violated policy filters. Please adjust your input.';
+        } else if (finishReason === 'RECITATION') {
+          errorMessage += ' The model declined to answer to prevent reciting copyrighted material.';
+        } else if (finishReason === 'MAX_TOKENS') {
+          errorMessage += ' The analysis was too long and hit the output token limit (2048).';
+        }
+      }
       return new Response(JSON.stringify({
         success: false,
-        error: 'No analysis generated by AI'
+        error: errorMessage,
+        details: finishReason
       }), {
-        status: 500,
+        status: status,
         headers: {
           ...corsHeaders,
           'Content-Type': 'application/json'
@@ -270,14 +388,12 @@ Pay special attention to:
     }
     let analysis;
     try {
-      let cleanedText = text.trim().replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No valid JSON found in response');
-      }
-      analysis = JSON.parse(jsonMatch[0]);
+      const analysisText = text.trim();
+      // *** FIX: Rely on structured output to return clean JSON, simplifying parsing. ***
+      analysis = JSON.parse(analysisText);
+      // Manual structure validation remains a good failsafe
       if (!analysis.summary || !analysis.key_themes || !analysis.suggested_actions || !analysis.performance || !analysis.sentiment) {
-        throw new Error('Invalid response structure from AI');
+        throw new Error('Invalid response structure from AI: Missing required top-level fields.');
       }
       console.log('✅ Successfully parsed AI analysis');
       // Normalize sentiment percentages
@@ -294,8 +410,7 @@ Pay special attention to:
       console.error('❌ Error parsing AI response:', parseError);
       return new Response(JSON.stringify({
         success: false,
-        error: 'Failed to parse AI analysis response. The AI did not return valid JSON.',
-        rawResponse: text.substring(0, 500)
+        error: `Failed to parse AI analysis response. ${parseError instanceof Error ? parseError.message : 'The AI did not return a parsable JSON structure.'}`
       }), {
         status: 500,
         headers: {
@@ -306,6 +421,7 @@ Pay special attention to:
     }
     // Increment usage count using the service client
     try {
+      // Assuming 'increment_usage' is a stored procedure in Supabase
       const { error: incrementError } = await serviceSupabase.rpc('increment_usage', {
         p_user_id: userId,
         p_action: 'insights'
