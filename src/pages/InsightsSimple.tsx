@@ -450,28 +450,34 @@ const InsightsSimple: React.FC = () => {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="text-center space-y-4"
+          className="text-center space-y-6"
         >
-          <div className="flex items-center justify-center space-x-3">
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-              <Brain className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+          <div className="flex items-center justify-center space-x-4">
+            <div className="p-4 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl shadow-lg">
+              <Brain className="h-10 w-10 text-blue-600 dark:text-blue-400" />
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              AI-Powered Insights
-            </h1>
+            <div>
+              <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                AI-Powered Insights
+              </h1>
+              <div className="flex items-center justify-center space-x-2 mt-2">
+                <Sparkles className="h-5 w-5 text-yellow-500" />
+                <span className="text-sm font-medium text-muted-foreground">Advanced Analytics</span>
+              </div>
+            </div>
           </div>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Transform your feedback into actionable insights with advanced AI analysis
+          <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+            Transform your feedback into actionable insights with advanced AI analysis and real-time sentiment tracking
           </p>
           {projectIds.length > 0 && (
-            <div className="flex items-center justify-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-              <Badge variant="outline" className="flex items-center space-x-1">
-                <Eye className="h-3 w-3" />
-                <span>{projectIds.length} Project{projectIds.length !== 1 ? 's' : ''}</span>
+            <div className="flex items-center justify-center space-x-6">
+              <Badge variant="outline" className="flex items-center space-x-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <span className="font-medium">{projectIds.length} Project{projectIds.length !== 1 ? 's' : ''}</span>
               </Badge>
-              <Badge variant="outline" className="flex items-center space-x-1">
-                <MessageSquare className="h-3 w-3" />
-                <span>{feedbacks.length} Feedback{feedbacks.length !== 1 ? 's' : ''}</span>
+              <Badge variant="outline" className="flex items-center space-x-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                <MessageSquare className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <span className="font-medium">{feedbacks.length} Feedback{feedbacks.length !== 1 ? 's' : ''}</span>
               </Badge>
             </div>
           )}
@@ -513,14 +519,22 @@ const InsightsSimple: React.FC = () => {
         >
           {/* Feedback Selection Card */}
           <motion.div variants={itemVariants}>
-            <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Filter className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  <span>Select Feedback for Analysis</span>
+            <Card className="border-0 shadow-xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-t-lg">
+                <CardTitle className="flex items-center space-x-3 text-xl">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                    <Filter className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <span>Select Feedback for Analysis</span>
+                    <Badge variant="outline" className="ml-3 bg-blue-100 text-blue-700 border-blue-200">
+                      <Target className="h-3 w-3 mr-1" />
+                      Smart Selection
+                    </Badge>
+                  </div>
                 </CardTitle>
-                <CardDescription>
-                  Choose the feedback entries you want to analyze. You can select individual items or use "Select All".
+                <CardDescription className="text-base">
+                  Choose the feedback entries you want to analyze. You can select individual items or use "Select All" for comprehensive analysis.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -560,17 +574,17 @@ const InsightsSimple: React.FC = () => {
                       onClick={generateInsights}
                       disabled={selectedFeedbacks.size === 0 || generating}
                       size="lg"
-                      className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg"
+                      className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white shadow-xl hover:shadow-2xl transition-all duration-200 transform hover:scale-105 px-8 py-3 text-lg font-semibold"
                     >
                       {generating ? (
                         <>
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <Loader2 className="h-5 w-5 animate-spin mr-3" />
                           <span>Generating Insights...</span>
                         </>
                       ) : (
                         <>
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          <span>Generate Insights</span>
+                          <Sparkles className="h-5 w-5 mr-3" />
+                          <span>Generate AI Insights</span>
                         </>
                       )}
                     </Button>

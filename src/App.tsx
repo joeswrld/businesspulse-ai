@@ -79,6 +79,7 @@ const App = () => (
           <Route path="/community" element={<Community />} />
           <Route path="/templates" element={<Templates />} />
           <Route path="/cookie-policy" element={<CookiePolicy />} />
+          <Route path="/roadmap" element={<Roadmap />} />
 
           {/* 🔒 PROTECTED ROUTES */}
           <Route
@@ -98,6 +99,7 @@ const App = () => (
                       <Route path="/billing" element={<DashboardLayout><Billing /></DashboardLayout>} />
                       <Route path="/feedback-settings" element={<DashboardLayout><FeedbackSettings /></DashboardLayout>} />
                       <Route path="/profile" element={<DashboardLayout><Profile /></DashboardLayout>} />
+                      <Route path="/roadmap" element={<DashboardLayout><Roadmap /></DashboardLayout>} />
                       {/* <Route path="/teams/invite/:token" element={<TeamInvitation />} /> */}
                     </Routes>
                   </ThemeProvider>

@@ -338,94 +338,102 @@ const Profile: React.FC = () => {
   const lockedAchievements = achievements.filter(a => !a.unlocked);
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
-      {/* Header */}
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Your Profile</h1>
-        <p className="text-gray-600">Welcome back! Here's your activity overview and achievements.</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      <div className="container mx-auto p-6 space-y-8">
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <div className="flex items-center justify-center space-x-3">
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+              <User className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+            </div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              Your Profile
+            </h1>
+          </div>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Welcome back! Here's your activity overview and achievements.
+          </p>
+        </div>
 
-      {/* User Info Section */}
-      <Card className="rounded-xl shadow-lg border-2 border-blue-100 max-w-2xl mx-auto">
-        <CardContent className="p-8">
-          <div className="text-center space-y-6">
-            {/* Profile Picture */}
-            <div className="relative mx-auto group">
-              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center overflow-hidden border-4 border-blue-200 shadow-lg transition-all duration-200 group-hover:border-blue-300 group-hover:shadow-xl">
-                {profile?.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt="Profile"
-                    className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
-                    onError={(e) => {
-                      // Fallback to default icon if image fails to load
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      const userIcon = target.parentElement?.querySelector('.user-icon');
-                      if (userIcon) {
-                        userIcon.classList.remove('hidden');
+        {/* User Info Section */}
+        <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm max-w-2xl mx-auto">
+          <CardContent className="p-8">
+            <div className="text-center space-y-6">
+              {/* Profile Picture */}
+              <div className="relative mx-auto group">
+                <div className="w-36 h-36 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center overflow-hidden border-4 border-blue-200 dark:border-blue-800 shadow-xl transition-all duration-300 group-hover:border-blue-300 dark:group-hover:border-blue-700 group-hover:shadow-2xl group-hover:scale-105">
+                  {profile?.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt="Profile"
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      onError={(e) => {
+                        // Fallback to default icon if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const userIcon = target.parentElement?.querySelector('.user-icon');
+                        if (userIcon) {
+                          userIcon.classList.remove('hidden');
+                        }
+                      }}
+                    />
+                  ) : null}
+                  <User className={`user-icon h-20 w-20 text-blue-600 dark:text-blue-400 ${profile?.avatar_url ? 'hidden' : ''}`} />
+                  
+                  {/* Upload Overlay */}
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-full flex items-center justify-center">
+                    <div className="text-white text-center">
+                      <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-2 backdrop-blur-sm">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                      </div>
+                      <span className="text-sm font-medium">Change Photo</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Avatar Status Indicator */}
+                <div className="absolute -bottom-2 -right-2 bg-green-500 text-white p-2 rounded-full shadow-lg border-4 border-white dark:border-slate-800">
+                  <div className="w-4 h-4 bg-white rounded-full"></div>
+                </div>
+              </div>
+            
+              {/* Upload Button */}
+              <div className="text-center mb-6">
+                <label className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl cursor-pointer transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105">
+                  <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Upload Profile Photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        // Handle file upload - you can implement this or redirect to settings
+                        window.location.href = '/settings';
                       }
                     }}
                   />
-                ) : null}
-                <User className={`user-icon h-16 w-16 text-blue-600 ${profile?.avatar_url ? 'hidden' : ''}`} />
-                
-                {/* Upload Overlay */}
-                <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-full flex items-center justify-center">
-                  <div className="text-white text-center">
-                    <div className="w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-2">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                    </div>
-                    <span className="text-xs font-medium">Change Photo</span>
-                  </div>
+                </label>
+              </div>
+              
+              {/* Avatar Instructions */}
+              <div className="text-center space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  {profile?.avatar_url ? 'Profile photo uploaded successfully!' : 'Click the button above to upload your profile photo'}
+                </p>
+                <div className="flex items-center justify-center space-x-4 text-xs text-muted-foreground">
+                  <span>• JPG, PNG, GIF up to 5MB</span>
+                  <span>•</span>
+                  <a href="/settings" className="text-blue-600 hover:text-blue-700 underline font-medium">
+                    Advanced editing in Settings
+                  </a>
                 </div>
               </div>
-              
-              {/* Avatar Status Indicator */}
-              <div className="absolute -bottom-2 -right-2 bg-green-500 text-white p-2 rounded-full shadow-lg">
-                <div className="w-3 h-3 bg-white rounded-full"></div>
-              </div>
-              
-
-            </div>
-            
-            {/* Upload Button */}
-            <div className="text-center mb-4">
-              <label className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-xl cursor-pointer transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105">
-                <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Upload Logo
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      // Handle file upload - you can implement this or redirect to settings
-                      window.location.href = '/settings';
-                    }
-                  }}
-                />
-              </label>
-            </div>
-            
-            {/* Avatar Instructions */}
-            <div className="text-center">
-              <p className="text-sm text-gray-500 mb-2">
-                {profile?.avatar_url ? 'Logo uploaded successfully!' : 'Click the button above to upload your logo'}
-              </p>
-              <div className="flex items-center justify-center space-x-4 text-xs text-gray-400">
-                <span>• JPG, PNG, GIF up to 5MB</span>
-                <span>•</span>
-                <a href="/settings" className="text-blue-600 hover:text-blue-700 underline">
-                  Advanced editing in Settings
-                </a>
-              </div>
-            </div>
 
             {/* Name and Email */}
             <div className="space-y-2">
@@ -471,47 +479,47 @@ const Profile: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Activity Overview */}
-      <div className="max-w-4xl mx-auto">
-        <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Activity Overview</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Total Feedback */}
-          <Card className="rounded-xl shadow-lg border-2 border-blue-100 text-center">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mx-auto mb-4">
-                <MessageSquare className="h-6 w-6 text-blue-600" />
-              </div>
-              <h4 className="text-lg font-semibold text-gray-900 mb-2">Total Feedback</h4>
-              <p className="text-3xl font-bold text-blue-600">{activityStats.totalFeedback}</p>
-              <p className="text-sm text-gray-500 mt-2">pieces collected</p>
-            </CardContent>
-          </Card>
+        {/* Activity Overview */}
+        <div className="max-w-4xl mx-auto">
+          <h3 className="text-3xl font-bold text-center mb-8 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Activity Overview</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+            {/* Total Feedback */}
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-center hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+              <CardContent className="p-8">
+                <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 rounded-2xl mx-auto mb-6 shadow-lg">
+                  <MessageSquare className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h4 className="text-xl font-semibold text-foreground mb-3">Total Feedback</h4>
+                <p className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">{activityStats.totalFeedback}</p>
+                <p className="text-sm text-muted-foreground">pieces collected</p>
+              </CardContent>
+            </Card>
 
-          {/* Total Reports */}
-          <Card className="rounded-xl shadow-lg border-2 border-blue-100 text-center">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mx-auto mb-4">
-                <FileText className="h-6 w-6 text-green-600" />
-              </div>
-              <h4 className="text-lg font-semibold text-gray-900 mb-2">Reports Generated</h4>
-              <p className="text-3xl font-bold text-green-600">{activityStats.totalReports}</p>
-              <p className="text-sm text-gray-500 mt-2">insights created</p>
-            </CardContent>
-          </Card>
+            {/* Total Reports */}
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-center hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+              <CardContent className="p-8">
+                <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-800/30 rounded-2xl mx-auto mb-6 shadow-lg">
+                  <FileText className="h-8 w-8 text-green-600 dark:text-green-400" />
+                </div>
+                <h4 className="text-xl font-semibold text-foreground mb-3">Reports Generated</h4>
+                <p className="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-2">{activityStats.totalReports}</p>
+                <p className="text-sm text-muted-foreground">insights created</p>
+              </CardContent>
+            </Card>
 
-          {/* Team Members */}
-          <Card className="rounded-xl shadow-lg border-2 border-blue-100 text-center">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mx-auto mb-4">
-                <Users className="h-6 w-6 text-purple-600" />
-              </div>
-              <h4 className="text-lg font-semibold text-gray-900 mb-2">Team Members</h4>
-              <p className="text-3xl font-bold text-purple-600">{activityStats.teamMembers}</p>
-              <p className="text-sm text-gray-500 mt-2">collaborators</p>
-            </CardContent>
-          </Card>
-        </div>
+            {/* Team Members */}
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-center hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+              <CardContent className="p-8">
+                <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/30 dark:to-purple-800/30 rounded-2xl mx-auto mb-6 shadow-lg">
+                  <Users className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                </div>
+                <h4 className="text-xl font-semibold text-foreground mb-3">Team Members</h4>
+                <p className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent mb-2">{activityStats.teamMembers}</p>
+                <p className="text-sm text-muted-foreground">collaborators</p>
+              </CardContent>
+            </Card>
+          </div>
 
         {/* Last Active */}
         {activityStats.lastActive && (
@@ -731,6 +739,7 @@ const Profile: React.FC = () => {
             </a>
           </Button>
         </div>
+      </div>
       </div>
     </div>
   );
