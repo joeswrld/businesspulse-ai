@@ -575,8 +575,8 @@ const Settings = () => {
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Account Settings</h1>
-        <p className="text-gray-600">Manage your profile, security, and preferences</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Account Settings</h1>
+        <p className="text-gray-600 dark:text-gray-400">Manage your profile, security, and preferences</p>
       </div>
 
       {/* Settings Grid */}
@@ -584,9 +584,9 @@ const Settings = () => {
         {/* Left Column */}
         <div className="space-y-6">
           {/* Profile Settings */}
-          <Card className="rounded-xl shadow-lg border-2 border-blue-100">
-            <CardHeader className="bg-blue-50 rounded-t-xl">
-              <CardTitle className="flex items-center space-x-2 text-blue-900">
+          <Card className="rounded-xl shadow-lg border-2 border-blue-100 dark:border-blue-900/50 bg-white dark:bg-slate-900">
+            <CardHeader className="bg-blue-50 dark:bg-slate-900/60 rounded-t-xl">
+              <CardTitle className="flex items-center space-x-2 text-blue-900 dark:text-blue-200">
                 <User className="h-5 w-5" />
                 <span>Profile Settings</span>
               </CardTitle>
@@ -595,7 +595,7 @@ const Settings = () => {
               {/* Avatar Upload */}
               <div className="flex items-center space-x-4">
                 <div className="relative">
-                  <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                  <div className="w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
                     {profile?.avatar_url || avatarPreview ? (
                       <img
                         src={avatarPreview || profile?.avatar_url}
@@ -603,7 +603,7 @@ const Settings = () => {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <User className="h-10 w-10 text-gray-400" />
+                      <User className="h-10 w-10 text-gray-400 dark:text-gray-300" />
                     )}
                   </div>
                   <label className="absolute bottom-0 right-0 bg-blue-500 text-white p-1 rounded-full cursor-pointer hover:bg-blue-600 transition-colors">
@@ -618,7 +618,7 @@ const Settings = () => {
                 </div>
                 
                 <div className="flex-1">
-                  <p className="text-sm text-gray-600 mb-2">Profile Picture</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Profile Picture</p>
                   {avatarFile && (
                     <Button
                       size="sm"
@@ -680,9 +680,9 @@ const Settings = () => {
               {/* Email Display */}
               <div>
                 <Label className="text-sm font-medium">Email</Label>
-                <div className="flex items-center space-x-2 mt-1 p-3 bg-gray-50 rounded-md border">
+                <div className="flex items-center space-x-2 mt-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
                   <Mail className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-700">{user.email}</span>
+                  <span className="text-gray-700 dark:text-gray-300">{user.email}</span>
                   <Badge variant="outline" className="text-xs">Non-editable</Badge>
                 </div>
               </div>
@@ -709,9 +709,9 @@ const Settings = () => {
           </Card>
 
           {/* Password & Security */}
-          <Card className="rounded-xl shadow-lg border-2 border-blue-100">
-            <CardHeader className="bg-blue-50 rounded-t-xl">
-              <CardTitle className="flex items-center space-x-2 text-blue-900">
+          <Card className="rounded-xl shadow-lg border-2 border-blue-100 dark:border-blue-900/50 bg-white dark:bg-slate-900">
+            <CardHeader className="bg-blue-50 dark:bg-slate-900/60 rounded-t-xl">
+              <CardTitle className="flex items-center space-x-2 text-blue-900 dark:text-blue-200">
                 <Shield className="h-5 w-5" />
                 <span>Password & Security</span>
               </CardTitle>
@@ -719,7 +719,7 @@ const Settings = () => {
             <CardContent className="p-6 space-y-4">
               {/* Last Login */}
               {lastLogin && (
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
                   <Clock className="h-4 w-4" />
                   <span>Last login: {lastLogin}</span>
                 </div>
@@ -727,7 +727,7 @@ const Settings = () => {
 
               {/* Change Password Form */}
               <div className="space-y-4">
-                <h4 className="font-medium text-gray-900">Change Password</h4>
+                <h4 className="font-medium text-gray-900 dark:text-gray-100">Change Password</h4>
                 
                 <div className="relative">
                   <Label htmlFor="currentPassword" className="text-sm font-medium">
@@ -837,7 +837,7 @@ const Settings = () => {
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <Label className="text-sm font-medium">Two-Factor Authentication</Label>
-                  <p className="text-xs text-gray-500">Add an extra layer of security to your account</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Add an extra layer of security to your account</p>
                 </div>
                 <Switch disabled />
                 <Badge variant="outline" className="text-xs">Coming Soon</Badge>
@@ -846,9 +846,9 @@ const Settings = () => {
           </Card>
 
           {/* Notifications Preferences */}
-          <Card className="rounded-xl shadow-lg border-2 border-blue-100">
-            <CardHeader className="bg-blue-50 rounded-t-xl">
-              <CardTitle className="flex items-center space-x-2 text-blue-900">
+          <Card className="rounded-xl shadow-lg border-2 border-blue-100 dark:border-blue-900/50 bg-white dark:bg-slate-900">
+            <CardHeader className="bg-blue-50 dark:bg-slate-900/60 rounded-t-xl">
+              <CardTitle className="flex items-center space-x-2 text-blue-900 dark:text-blue-200">
                 <Bell className="h-5 w-5" />
                 <span>Notifications Preferences</span>
               </CardTitle>
@@ -857,7 +857,7 @@ const Settings = () => {
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <Label className="text-sm font-medium">Feedback Alerts</Label>
-                  <p className="text-xs text-gray-500">Get notified when new feedback is submitted</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Get notified when new feedback is submitted</p>
                 </div>
                 <Switch
                   checked={notifications?.feedback_alerts ?? true}
@@ -868,7 +868,7 @@ const Settings = () => {
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <Label className="text-sm font-medium">Weekly Report Emails</Label>
-                  <p className="text-xs text-gray-500">Receive weekly summaries of your feedback analytics</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Receive weekly summaries of your feedback analytics</p>
                 </div>
                 <Switch
                   checked={notifications?.weekly_reports ?? true}
@@ -879,7 +879,7 @@ const Settings = () => {
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <Label className="text-sm font-medium">System Updates & News</Label>
-                  <p className="text-xs text-gray-500">Stay informed about new features and improvements</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Stay informed about new features and improvements</p>
                 </div>
                 <Switch
                   checked={notifications?.system_updates ?? true}
@@ -1000,18 +1000,18 @@ const Settings = () => {
           </Card>
 
           {/* Danger Zone */}
-          <Card className="rounded-xl shadow-lg border-2 border-red-100">
-            <CardHeader className="bg-red-50 rounded-t-xl">
-              <CardTitle className="flex items-center space-x-2 text-red-900">
+          <Card className="rounded-xl shadow-lg border-2 border-red-100 dark:border-red-900/50 bg-white dark:bg-slate-900">
+            <CardHeader className="bg-red-50 dark:bg-red-950/30 rounded-t-xl">
+              <CardTitle className="flex items-center space-x-2 text-red-900 dark:text-red-200">
                 <AlertTriangle className="h-5 w-5" />
                 <span>Danger Zone</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
-              <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
+              <div className="text-center p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-900/60">
                 <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-3" />
-                <h4 className="font-medium text-red-900 mb-2">Delete Account</h4>
-                <p className="text-sm text-red-700 mb-4">
+                <h4 className="font-medium text-red-900 dark:text-red-200 mb-2">Delete Account</h4>
+                <p className="text-sm text-red-700 dark:text-red-300 mb-4">
                   This action cannot be undone. This will permanently delete your account and all associated data.
                 </p>
                 <Button
@@ -1031,18 +1031,18 @@ const Settings = () => {
       {/* Delete Account Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl max-w-md w-full">
             <div className="p-6">
               <div className="text-center mb-6">
                 <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Delete Account</h3>
-                <p className="text-gray-600">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Delete Account</h3>
+                <p className="text-gray-600 dark:text-gray-300">
                   Are you absolutely sure? This action cannot be undone and will permanently delete:
                 </p>
               </div>
               
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                <ul className="text-sm text-red-800 space-y-1">
+              <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/60 rounded-lg p-4 mb-6">
+                <ul className="text-sm text-red-800 dark:text-red-300 space-y-1">
                   <li>• Your account and profile</li>
                   <li>• All feedback data</li>
                   <li>• Settings and preferences</li>
