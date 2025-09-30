@@ -1,3 +1,4 @@
+import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { UnifiedTrialProvider } from "@/contexts/UnifiedTrialContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
 // Direct imports
@@ -52,65 +54,60 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          {/* 🌍 PUBLIC ROUTES */}
-          <Route path="/" element={<Index />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="/trial-expired" element={<TrialExpired />} />
-          <Route path="/testimonials" element={<Testimonials />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-          <Route path="/terms-of-service" element={<TermsOfService />} />
-          <Route path="/help" element={<HelpCenter />} />
-          <Route path="/integrations" element={<Integrations />} />
-          <Route path="/api" element={<API />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/careers" element={<Careers />} />
-          <Route path="/press" element={<Press />} />
-          <Route path="/partners" element={<Partners />} />
-          <Route path="/documentation" element={<Documentation />} />
-          <Route path="/guides" element={<Guides />} />
-          <Route path="/community" element={<Community />} />
-          <Route path="/templates" element={<Templates />} />
-          <Route path="/cookie-policy" element={<CookiePolicy />} />
+      <AuthProvider>
+        <UnifiedTrialProvider>
+          <ThemeProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <ErrorBoundary>
+                <Routes>
+                  {/* 🌍 PUBLIC ROUTES */}
+                  <Route path="/" element={<Index />} />
+                  <Route path="/signup" element={<Signup />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/verify-email" element={<VerifyEmail />} />
+                  <Route path="/trial-expired" element={<TrialExpired />} />
+                  <Route path="/testimonials" element={<Testimonials />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                  <Route path="/terms-of-service" element={<TermsOfService />} />
+                  <Route path="/help" element={<HelpCenter />} />
+                  <Route path="/integrations" element={<Integrations />} />
+                  <Route path="/api" element={<API />} />
+                  <Route path="/blog" element={<Blog />} />
+                  <Route path="/careers" element={<Careers />} />
+                  <Route path="/press" element={<Press />} />
+                  <Route path="/partners" element={<Partners />} />
+                  <Route path="/documentation" element={<Documentation />} />
+                  <Route path="/guides" element={<Guides />} />
+                  <Route path="/community" element={<Community />} />
+                  <Route path="/templates" element={<Templates />} />
+                  <Route path="/cookie-policy" element={<CookiePolicy />} />
 
-          {/* 🔒 PROTECTED ROUTES */}
-          <Route
-            path="/*"
-            element={
-              <AuthProvider>
-                <UnifiedTrialProvider>
-                  <ThemeProvider>
-                    <Routes>
-                      <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
-                      <Route path="/insights" element={<DashboardLayout><Insights /></DashboardLayout>} />
-                      <Route path="/insights-simple" element={<DashboardLayout><InsightsSimple /></DashboardLayout>} />
-                      <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
-                      <Route path="/feedback" element={<DashboardLayout><Feedback /></DashboardLayout>} />
-                      <Route path="/roadmap" element={<DashboardLayout><Roadmap /></DashboardLayout>} />
-                      <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
-                      <Route path="/teams" element={<DashboardLayout><Teams /></DashboardLayout>} />
-                      <Route path="/billing" element={<DashboardLayout><Billing /></DashboardLayout>} />
-                      <Route path="/feedback-settings" element={<DashboardLayout><FeedbackSettings /></DashboardLayout>} />
-                      <Route path="/profile" element={<DashboardLayout><Profile /></DashboardLayout>} />
-                      {/* <Route path="/teams/invite/:token" element={<TeamInvitation />} /> */}
-                    </Routes>
-                  </ThemeProvider>
-                </UnifiedTrialProvider>
-              </AuthProvider>
-            }
-          />
+                  {/* 🔒 PROTECTED ROUTES */}
+                  <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
+                  <Route path="/insights" element={<DashboardLayout><Insights /></DashboardLayout>} />
+                  <Route path="/insights-simple" element={<DashboardLayout><InsightsSimple /></DashboardLayout>} />
+                  <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
+                  <Route path="/feedback" element={<DashboardLayout><Feedback /></DashboardLayout>} />
+                  <Route path="/roadmap" element={<DashboardLayout><Roadmap /></DashboardLayout>} />
+                  <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
+                  <Route path="/teams" element={<DashboardLayout><Teams /></DashboardLayout>} />
+                  <Route path="/billing" element={<DashboardLayout><Billing /></DashboardLayout>} />
+                  <Route path="/feedback-settings" element={<DashboardLayout><FeedbackSettings /></DashboardLayout>} />
+                  <Route path="/profile" element={<DashboardLayout><Profile /></DashboardLayout>} />
+                  {/* <Route path="/teams/invite/:token" element={<TeamInvitation />} /> */}
 
-          {/* ❌ CATCH-ALL */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+                  {/* ❌ CATCH-ALL */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </ErrorBoundary>
+            </BrowserRouter>
+          </ThemeProvider>
+        </UnifiedTrialProvider>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
