@@ -49,7 +49,8 @@ import Billing from "./pages/Billing";
 import FeedbackSettings from "./pages/FeedbackSettings";
 import CSATSurvey from "./pages/CSATSurvey";
 import ProductFeedback from "./pages/ProductFeedback";
-
+import CSATForm from './pages/CSATForm';
+import ProductFeedbackForm from './pages/ProductFeedback';
 
 const queryClient = new QueryClient();
 
@@ -90,7 +91,9 @@ const App = () => (
                   
                   {/* 📝 PUBLIC FEEDBACK ROUTES */}
                   <Route path="/survey/:projectId" element={<CSATSurvey />} />
+                  <Route path="/csat/:projectId" element={<CSATForm />} />
                   <Route path="/feedback/:projectId" element={<ProductFeedback />} />
+                  <Route path="/product-feedback/:projectId" element={<ProductFeedbackForm />} />
 
                   {/* 🔒 PROTECTED ROUTES */}
                   <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
