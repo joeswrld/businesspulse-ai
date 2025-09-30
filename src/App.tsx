@@ -47,6 +47,8 @@ import NotFound from "./pages/NotFound";
 import TeamInvitation from "./pages/DashboardEnhanced";
 import Billing from "./pages/Billing";
 import FeedbackSettings from "./pages/FeedbackSettings";
+import CSATSurvey from "./pages/CSATSurvey";
+import ProductFeedback from "./pages/ProductFeedback";
 
 
 const queryClient = new QueryClient();
@@ -85,6 +87,10 @@ const App = () => (
                   <Route path="/community" element={<Community />} />
                   <Route path="/templates" element={<Templates />} />
                   <Route path="/cookie-policy" element={<CookiePolicy />} />
+                  
+                  {/* 📝 PUBLIC FEEDBACK ROUTES */}
+                  <Route path="/survey/:projectId" element={<CSATSurvey />} />
+                  <Route path="/feedback/:projectId" element={<ProductFeedback />} />
 
                   {/* 🔒 PROTECTED ROUTES */}
                   <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
