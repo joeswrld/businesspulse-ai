@@ -262,7 +262,7 @@ const InsightsSimple: React.FC = () => {
       const selectedFeedbackData = feedbacks.filter(f => selectedIds.includes(f.id));
 
       // Create enhanced feedback text with context
-      const feedbackText = selectedFeedbackData.map(f => {
+      let feedbackText = selectedFeedbackData.map(f => {
         const behaviorAnalysis = behaviorAnalyses.find(b => b.feedback_id === f.id);
         let behaviorContext = '';
         
@@ -275,6 +275,15 @@ const InsightsSimple: React.FC = () => {
         
         return `[Feedback] ${f.message}${ratingText}${formType}${behaviorContext}`;
       }).join('\n\n');
+
+      // Truncate input if too large to prevent MAX_TOKENS errors
+      const MAX_INPUT_LENGTH = 8000; // characters
+      if (feedbackText.length > MAX_INPUT_LENGTH) {
+        const originalLength = feedbackText.length;
+        feedbackText = feedbackText.substring(0, MAX_INPUT_LENGTH) + '\n...[truncated for length]';
+        console.log(`⚠️ Input truncated from ${originalLength} to ${MAX_INPUT_LENGTH} characters`);
+        toast.warning('Large dataset detected, generating condensed insights...', { duration: 3000 });
+      }
 
       console.log('🤖 Generating AI insights for', selectedIds.length, 'feedbacks');
       console.log('📝 Feedback text length:', feedbackText.length, 'characters');
@@ -362,6 +371,8 @@ const InsightsSimple: React.FC = () => {
           userMessage += 'Authentication failed. Please check your API keys and permissions.';
         } else if (response.status === 500) {
           userMessage += 'Server error. The issue might be with the Gemini API key or configuration. Please contact support.';
+        } else if (errorText.includes('MAX_TOKENS') || errorText.includes('output token limit')) {
+          userMessage = 'Large dataset detected. The analysis exceeded the token limit. Please try with fewer feedback entries (recommended: 10-15 items) or contact support for large datasets.';
         } else {
           userMessage += `Error ${response.status}: ${errorText}`;
         }
@@ -538,24 +549,32 @@ const InsightsSimple: React.FC = () => {
                       <span>{selectedFeedbacks.size} of {feedbacks.length} selected</span>
                     </Badge>
                   </div>
-                  <Button
-                    onClick={generateInsights}
-                    disabled={selectedFeedbacks.size === 0 || generating}
-                    size="lg"
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg"
-                  >
-                    {generating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        <span>Generating Insights...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        <span>Generate Insights</span>
-                      </>
+                  <div className="flex flex-col items-end space-y-2">
+                    {selectedFeedbacks.size > 20 && (
+                      <div className="text-sm text-amber-600 dark:text-amber-400 flex items-center space-x-1">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>Large selection detected. Analysis may take longer.</span>
+                      </div>
                     )}
-                  </Button>
+                    <Button
+                      onClick={generateInsights}
+                      disabled={selectedFeedbacks.size === 0 || generating}
+                      size="lg"
+                      className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg"
+                    >
+                      {generating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span>Generating Insights...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          <span>Generate Insights</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
 
                 <Separator />
