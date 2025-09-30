@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+// Create this file: src/hooks/useFeedbackSettings.ts
+
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -9,6 +11,11 @@ interface FeedbackSettings {
   customer_survey_url: string;
   product_feedback_url: string;
   widget_code: string;
+  widget_title: string;
+  widget_color: string;
+  greeting_text: string;
+  customer_satisfaction_enabled: boolean;
+  product_feedback_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -19,139 +26,147 @@ export const useFeedbackSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Load settings on mount
-  useEffect(() => {
-    if (user) {
-      loadSettings();
+  const loadSettings = useCallback(async () => {
+    if (!user) {
+      setLoading(false);
+      return;
     }
-  }, [user]);
-
-  const loadSettings = async () => {
-    if (!user) return;
 
     try {
       setLoading(true);
+      console.log('🔄 Loading feedback settings for user:', user.id);
 
-      // Try to fetch existing settings
-      const { data: existingSettings, error: fetchError } = await supabase
+      const { data: existingSettings, error } = await supabase
         .from('feedback_settings')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (fetchError) {
-        console.error('Error fetching settings:', fetchError);
-        throw fetchError;
+      if (error) {
+        console.error('❌ Error loading settings:', error);
+        throw error;
       }
 
-      if (existingSettings) {
-        setSettings(existingSettings);
-      } else {
-        // Create new settings if they don't exist
+      if (!existingSettings) {
+        console.log('📝 Creating new feedback settings...');
+        
         const newProjectId = crypto.randomUUID();
         const baseUrl = window.location.origin;
 
         const newSettings = {
           user_id: user.id,
           project_id: newProjectId,
-          customer_survey_url: `${baseUrl}/survey/${newProjectId}?type=satisfaction`,
-          product_feedback_url: `${baseUrl}/survey/${newProjectId}?type=product`,
-          widget_code: `<script src="${baseUrl}/widget.js" data-project-id="${newProjectId}"></script>`
+          customer_survey_url: `${baseUrl}/csat/${newProjectId}`,
+          product_feedback_url: `${baseUrl}/product-feedback/${newProjectId}`,
+          widget_code: `<script src="${baseUrl}/widget.js" data-project-id="${newProjectId}"></script>`,
+          widget_title: 'Share Your Feedback',
+          widget_color: '#3B82F6',
+          greeting_text: 'We value your feedback!',
+          customer_satisfaction_enabled: true,
+          product_feedback_enabled: true
         };
 
-        const { data: createdSettings, error: createError } = await supabase
+        const { data: created, error: createError } = await supabase
           .from('feedback_settings')
           .insert(newSettings)
           .select()
           .single();
 
         if (createError) {
-          console.error('Error creating settings:', createError);
+          console.error('❌ Error creating settings:', createError);
           throw createError;
         }
 
-        setSettings(createdSettings);
+        setSettings(created);
+        console.log('✅ Created settings:', created);
+      } else {
+        setSettings(existingSettings);
+        console.log('✅ Loaded existing settings:', existingSettings);
       }
     } catch (error) {
-      console.error('Error loading feedback settings:', error);
+      console.error('❌ Failed to load settings:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const saveSettings = async (updatedSettings: FeedbackSettings) => {
-    if (!user || !updatedSettings.id) return;
+  const saveSettings = useCallback(async (updatedSettings: FeedbackSettings) => {
+    if (!user) return;
 
     try {
       setSaving(true);
+      console.log('💾 Saving settings...', updatedSettings);
 
       const { error } = await supabase
         .from('feedback_settings')
         .update({
-          customer_survey_url: updatedSettings.customer_survey_url,
-          product_feedback_url: updatedSettings.product_feedback_url,
-          widget_code: updatedSettings.widget_code,
+          widget_title: updatedSettings.widget_title,
+          widget_color: updatedSettings.widget_color,
+          greeting_text: updatedSettings.greeting_text,
+          customer_satisfaction_enabled: updatedSettings.customer_satisfaction_enabled,
+          product_feedback_enabled: updatedSettings.product_feedback_enabled,
           updated_at: new Date().toISOString()
         })
-        .eq('id', updatedSettings.id);
+        .eq('user_id', user.id);
 
       if (error) {
-        console.error('Error saving settings:', error);
+        console.error('❌ Error saving settings:', error);
         throw error;
       }
 
       setSettings(updatedSettings);
+      console.log('✅ Settings saved successfully');
     } catch (error) {
-      console.error('Error saving settings:', error);
+      console.error('❌ Failed to save settings:', error);
       throw error;
     } finally {
       setSaving(false);
     }
-  };
+  }, [user]);
 
-  const regenerateUrls = async () => {
+  const regenerateUrls = useCallback(async () => {
     if (!user || !settings) return;
 
     try {
       setSaving(true);
+      console.log('🔄 Regenerating URLs...');
 
-      // Generate new project ID
       const newProjectId = crypto.randomUUID();
       const baseUrl = window.location.origin;
 
       const updatedSettings = {
-        ...settings,
         project_id: newProjectId,
-        customer_survey_url: `${baseUrl}/survey/${newProjectId}?type=satisfaction`,
-        product_feedback_url: `${baseUrl}/survey/${newProjectId}?type=product`,
+        customer_survey_url: `${baseUrl}/csat/${newProjectId}`,
+        product_feedback_url: `${baseUrl}/product-feedback/${newProjectId}`,
         widget_code: `<script src="${baseUrl}/widget.js" data-project-id="${newProjectId}"></script>`,
         updated_at: new Date().toISOString()
       };
 
       const { error } = await supabase
         .from('feedback_settings')
-        .update({
-          project_id: updatedSettings.project_id,
-          customer_survey_url: updatedSettings.customer_survey_url,
-          product_feedback_url: updatedSettings.product_feedback_url,
-          widget_code: updatedSettings.widget_code,
-          updated_at: updatedSettings.updated_at
-        })
-        .eq('id', settings.id);
+        .update(updatedSettings)
+        .eq('user_id', user.id);
 
       if (error) {
-        console.error('Error regenerating URLs:', error);
+        console.error('❌ Error regenerating URLs:', error);
         throw error;
       }
 
-      setSettings(updatedSettings);
+      setSettings({ ...settings, ...updatedSettings });
+      console.log('✅ URLs regenerated successfully');
     } catch (error) {
-      console.error('Error regenerating URLs:', error);
+      console.error('❌ Failed to regenerate URLs:', error);
       throw error;
     } finally {
       setSaving(false);
     }
-  };
+  }, [user, settings]);
+
+  useEffect(() => {
+    if (user) {
+      loadSettings();
+    }
+  }, [user, loadSettings]);
 
   return {
     settings,
