@@ -93,6 +93,7 @@ const App = () => (
                       <Route path="/insights-simple" element={<DashboardLayout><InsightsSimple /></DashboardLayout>} />
                       <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
                       <Route path="/feedback" element={<DashboardLayout><Feedback /></DashboardLayout>} />
+                      <Route path="/roadmap" element={<DashboardLayout><Roadmap /></DashboardLayout>} />
                       <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
                       <Route path="/teams" element={<DashboardLayout><Teams /></DashboardLayout>} />
                       <Route path="/billing" element={<DashboardLayout><Billing /></DashboardLayout>} />
