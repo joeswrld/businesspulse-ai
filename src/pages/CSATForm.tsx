@@ -144,7 +144,7 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
     try {
       // Get the project's internal UUID for the feedback table
       const { data: projectData, error: projectError } = await supabase
-        .from('projects')
+        .from('feedback')
         .select('id')
         .eq('project_id', projectId)
         .single();
