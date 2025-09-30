@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import CSATForm from '@/components/forms/CSATForm';
+import CSATForm from './CSATForm';
 
 const CSATSurvey: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -10,10 +10,7 @@ const CSATSurvey: React.FC = () => {
       <div className="w-full max-w-md">
         <CSATForm
           projectId={projectId}
-          title="Customer Satisfaction Survey"
-          greetingText="How satisfied are you with our service? Your feedback helps us improve."
-          color="#3B82F6"
-          onSuccess={(data) => {
+          onSubmitted={(data) => {
             console.log('CSAT feedback submitted:', data);
           }}
         />
