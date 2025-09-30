@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { 
   User, 
   Mail, 
@@ -13,92 +16,358 @@ import {
   Clock,
   CheckCircle,
   Sparkles,
-  Target
+  Target,
+  RefreshCw,
+  Loader2,
+  Zap
 } from 'lucide-react';
 
-// Mock data
-const mockUser = {
-  email: 'user@example.com',
-  firstName: 'John',
-  lastName: 'Doe',
-  company: 'Acme Inc.',
-  avatarUrl: null
-};
+// Types
+interface UserProfile {
+  id: string;
+  user_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  avatar_url: string | null;
+  company_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
-const mockStats = {
-  totalFeedback: 45,
-  totalReports: 12,
-  teamMembers: 3,
-  lastActive: new Date().toLocaleString()
-};
+interface UserSubscription {
+  id: string;
+  user_id: string;
+  plan_name: string;
+  plan_type: string;
+  status: string;
+  current_period_start: string;
+  current_period_end: string;
+  trial_end?: string;
+  created_at: string;
+  updated_at: string;
+}
 
-const mockPlan = {
-  name: 'Pro',
-  type: 'pro',
-  daysLeft: 0,
-  isTrial: false
-};
+interface ActivityStats {
+  totalFeedback: number;
+  totalReports: number;
+  teamMembers: number;
+  lastActive: string | null;
+}
+
+interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  unlocked: boolean;
+  progress: number;
+  maxProgress: number;
+}
 
 export default function EnhancedProfilePage() {
+  const { user } = useAuth();
+  
+  // State management
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
+  const [activityStats, setActivityStats] = useState<ActivityStats>({
+    totalFeedback: 0,
+    totalReports: 0,
+    teamMembers: 0,
+    lastActive: null
+  });
+  const [loading, setLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
-  const achievements = [
-    {
-      id: 'first-feedback',
-      title: 'First Feedback',
-      description: 'Submit your first piece of feedback',
-      icon: <MessageSquare className="h-5 w-5" />,
-      unlocked: true,
-      progress: 1,
-      maxProgress: 1
-    },
-    {
-      id: 'feedback-collector',
-      title: 'Feedback Collector',
-      description: 'Collect 10 pieces of feedback',
-      icon: <MessageSquare className="h-5 w-5" />,
-      unlocked: true,
-      progress: 10,
-      maxProgress: 10
-    },
-    {
-      id: 'first-report',
-      title: 'First Report',
-      description: 'Generate your first insights report',
-      icon: <FileText className="h-5 w-5" />,
-      unlocked: true,
-      progress: 1,
-      maxProgress: 1
-    },
-    {
-      id: 'report-master',
-      title: 'Report Master',
-      description: 'Generate 5 insights reports',
-      icon: <FileText className="h-5 w-5" />,
-      unlocked: true,
-      progress: 5,
-      maxProgress: 5
-    },
-    {
-      id: 'team-player',
-      title: 'Team Player',
-      description: 'Invite your first team member',
-      icon: <Users className="h-5 w-5" />,
-      unlocked: true,
-      progress: 1,
-      maxProgress: 1
-    },
-    {
-      id: 'power-user',
-      title: 'Power User',
-      description: 'Use all major features',
-      icon: <Trophy className="h-5 w-5" />,
-      unlocked: false,
-      progress: 5,
-      maxProgress: 7
+  // Load user data
+  const loadUserData = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+      
+      // Fetch profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error('Error loading profile:', profileError);
+      }
+
+      if (profileData) {
+        setProfile(profileData);
+      }
+
+      // Fetch subscription
+      const { data: subscriptionData, error: subscriptionError } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (subscriptionError && subscriptionError.code !== 'PGRST116') {
+        console.error('Error loading subscription:', subscriptionError);
+      }
+
+      if (subscriptionData) {
+        setSubscription(subscriptionData as any);
+      }
+
+      // Fetch activity stats
+      await loadActivityStats();
+
+    } catch (error) {
+      console.error('Error loading user data:', error);
+      toast.error('Failed to load profile data');
+    } finally {
+      setLoading(false);
     }
-  ];
+  }, [user]);
 
+  // Load activity statistics
+  const loadActivityStats = async () => {
+    if (!user) return;
+
+    try {
+      // Get last login from session
+      const { data: { session } } = await supabase.auth.getSession();
+      const lastActive = session?.user?.last_sign_in_at;
+
+      // Get user's project IDs
+      const { data: settingsData } = await supabase
+        .from('feedback_settings')
+        .select('project_id')
+        .eq('user_id', user.id);
+
+      const projectIds = settingsData?.map(s => s.project_id) || [];
+
+      // Count feedback entries
+      let feedbackCount = 0;
+      if (projectIds.length > 0) {
+        const { count } = await supabase
+          .from('feedback')
+          .select('*', { count: 'exact', head: true })
+          .in('project_id', projectIds);
+        feedbackCount = count || 0;
+      }
+
+      // Count reports
+      const { count: reportsCount } = await supabase
+        .from('reports')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      // Count team members (placeholder for now)
+      const teamMembers = 0; // This would come from a teams table
+
+      setActivityStats({
+        totalFeedback: feedbackCount,
+        totalReports: reportsCount || 0,
+        teamMembers,
+        lastActive: lastActive ? new Date(lastActive).toLocaleString() : null
+      });
+
+    } catch (error) {
+      console.error('Error loading activity stats:', error);
+    }
+  };
+
+  // Load data on mount
+  useEffect(() => {
+    loadUserData();
+  }, [loadUserData]);
+
+  // Handle file upload
+  const handleFileUpload = async (file: File) => {
+    if (!user || !file) return;
+
+    try {
+      setUploading(true);
+
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Update profile with avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .upsert({
+          user_id: user.id,
+          avatar_url: publicUrl,
+          updated_at: new Date().toISOString()
+        });
+
+      if (updateError) throw updateError;
+
+      toast.success('Avatar uploaded successfully!');
+      loadUserData(); // Reload profile data
+
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast.error('Failed to upload avatar');
+    } finally {
+      setUploading(false);
+      setSelectedFile(null);
+    }
+  };
+
+  // Get plan info for display
+  const getPlanInfo = () => {
+    if (!subscription) {
+      return {
+        planName: 'Free Trial',
+        planType: 'trial',
+        isTrial: true,
+        daysLeft: 0,
+        planIcon: <Star className="h-4 w-4" />
+      };
+    }
+
+    const planName = subscription.plan_name?.toLowerCase() || subscription.plan_type?.toLowerCase() || '';
+    const planType = planName.includes('business') ? 'business'
+      : (planName.includes('pro') || planName.includes('premium')) ? 'pro'
+      : subscription.plan_type || 'free';
+    const isTrial = planType === 'trial' || subscription.status === 'trialing';
+    
+    if (isTrial && subscription.trial_end) {
+      const trialEnd = new Date(subscription.trial_end);
+      const now = new Date();
+      const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
+      return {
+        planName: 'Free Trial',
+        planType: 'trial',
+        isTrial: true,
+        daysLeft: Math.max(0, daysLeft),
+        planIcon: <Star className="h-4 w-4" />
+      };
+    }
+
+    if (planType === 'pro') {
+      return {
+        planName: 'Pro',
+        planType: 'pro',
+        isTrial: false,
+        daysLeft: 0,
+        planIcon: <Zap className="h-4 w-4" />
+      };
+    }
+
+    return {
+      planName: 'Business',
+      planType: 'business',
+      isTrial: false,
+      daysLeft: 0,
+      planIcon: <Crown className="h-4 w-4" />
+    };
+  };
+
+  // Generate achievements based on user activity
+  const generateAchievements = (): Achievement[] => {
+    const achievements: Achievement[] = [
+      {
+        id: 'first-feedback',
+        title: 'First Feedback',
+        description: 'Submit your first piece of feedback',
+        icon: <MessageSquare className="h-5 w-5" />,
+        unlocked: activityStats.totalFeedback >= 1,
+        progress: Math.min(activityStats.totalFeedback, 1),
+        maxProgress: 1
+      },
+      {
+        id: 'feedback-collector',
+        title: 'Feedback Collector',
+        description: 'Collect 10 pieces of feedback',
+        icon: <MessageSquare className="h-5 w-5" />,
+        unlocked: activityStats.totalFeedback >= 10,
+        progress: Math.min(activityStats.totalFeedback, 10),
+        maxProgress: 10
+      },
+      {
+        id: 'first-report',
+        title: 'First Report',
+        description: 'Generate your first insights report',
+        icon: <FileText className="h-5 w-5" />,
+        unlocked: activityStats.totalReports >= 1,
+        progress: Math.min(activityStats.totalReports, 1),
+        maxProgress: 1
+      },
+      {
+        id: 'report-master',
+        title: 'Report Master',
+        description: 'Generate 5 insights reports',
+        icon: <FileText className="h-5 w-5" />,
+        unlocked: activityStats.totalReports >= 5,
+        progress: Math.min(activityStats.totalReports, 5),
+        maxProgress: 5
+      },
+      {
+        id: 'team-player',
+        title: 'Team Player',
+        description: 'Invite your first team member',
+        icon: <Users className="h-5 w-5" />,
+        unlocked: activityStats.teamMembers >= 1,
+        progress: Math.min(activityStats.teamMembers, 1),
+        maxProgress: 1
+      },
+      {
+        id: 'power-user',
+        title: 'Power User',
+        description: 'Use all major features',
+        icon: <Trophy className="h-5 w-5" />,
+        unlocked: activityStats.totalFeedback >= 5 && activityStats.totalReports >= 2,
+        progress: Math.min(activityStats.totalFeedback + activityStats.totalReports, 7),
+        maxProgress: 7
+      }
+    ];
+
+    return achievements;
+  };
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950">
+        <div className="rounded-xl border-2 border-blue-200 dark:border-blue-800 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm p-8 max-w-md">
+          <div className="text-center">
+            <User className="h-12 w-12 text-blue-500 dark:text-blue-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Authentication Required</h2>
+            <p className="text-gray-600 dark:text-gray-400">Please log in to view your profile.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950">
+        <div className="text-center">
+          <RefreshCw className="h-12 w-12 animate-spin text-blue-500 dark:text-blue-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Loading Profile...</h2>
+          <p className="text-gray-600 dark:text-gray-400">Please wait while we fetch your information.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const planInfo = getPlanInfo();
+  const achievements = generateAchievements();
   const unlockedCount = achievements.filter(a => a.unlocked).length;
 
   return (
@@ -118,8 +387,8 @@ export default function EnhancedProfilePage() {
                 {/* Profile Picture */}
                 <div className="relative mx-auto group w-32 h-32">
                   <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/40 dark:to-blue-800/40 flex items-center justify-center overflow-hidden border-4 border-blue-200 dark:border-blue-800 shadow-lg transition-all duration-200 group-hover:border-blue-300 dark:group-hover:border-blue-600 group-hover:shadow-xl">
-                    {mockUser.avatarUrl ? (
-                      <img src={mockUser.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                    {profile?.avatar_url ? (
+                      <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
                       <User className="h-16 w-16 text-blue-600 dark:text-blue-400" />
                     )}
@@ -142,18 +411,39 @@ export default function EnhancedProfilePage() {
                 </div>
 
                 {/* Upload Button */}
-                <label className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 text-white font-semibold rounded-xl cursor-pointer transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105">
-                  <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Upload Logo
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
+                <label className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600 dark:hover:from-blue-600 dark:hover:to-blue-700 text-white font-semibold rounded-xl cursor-pointer transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                  {uploading ? (
+                    <>
+                      <Loader2 className="w-6 h-6 mr-3 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Upload Logo
+                    </>
+                  )}
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    disabled={uploading}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setSelectedFile(file);
+                        handleFileUpload(file);
+                      }
+                    }}
+                  />
                 </label>
 
                 {/* Upload Instructions */}
                 <div className="text-center">
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                    {selectedFile ? `Selected: ${selectedFile.name}` : 'Click the button above to upload your logo'}
+                    {profile?.avatar_url ? 'Logo uploaded successfully!' : 'Click the button above to upload your logo'}
                   </p>
                   <div className="flex items-center justify-center space-x-4 text-xs text-gray-400 dark:text-gray-500">
                     <span>• JPG, PNG, GIF up to 5MB</span>
@@ -163,31 +453,36 @@ export default function EnhancedProfilePage() {
                 {/* Name and Email */}
                 <div className="space-y-2">
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                    {mockUser.firstName} {mockUser.lastName}
+                    {profile?.first_name && profile?.last_name
+                      ? `${profile.first_name} ${profile.last_name}`
+                      : 'Your Name'
+                    }
                   </h2>
                   <div className="flex items-center justify-center space-x-2 text-gray-600 dark:text-gray-400">
                     <Mail className="h-4 w-4" />
-                    <span>{mockUser.email}</span>
+                    <span>{user.email}</span>
                   </div>
-                  <div className="flex items-center justify-center space-x-2 text-gray-600 dark:text-gray-400">
-                    <Building className="h-4 w-4" />
-                    <span>{mockUser.company}</span>
-                  </div>
+                  {profile?.company_name && (
+                    <div className="flex items-center justify-center space-x-2 text-gray-600 dark:text-gray-400">
+                      <Building className="h-4 w-4" />
+                      <span>{profile.company_name}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Plan Badge */}
                 <div className="flex items-center justify-center">
                   <div className="px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-2 border-blue-200 dark:border-blue-800 rounded-full text-sm font-medium flex items-center space-x-2">
-                    <Crown className="h-4 w-4" />
-                    <span>{mockPlan.name} Plan</span>
+                    {planInfo.planIcon}
+                    <span>{planInfo.planName}</span>
                   </div>
                 </div>
 
                 {/* Edit Button */}
-                <button className="flex items-center space-x-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors mx-auto">
+                <a href="/settings" className="inline-flex items-center space-x-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors">
                   <Settings className="h-4 w-4" />
                   <span>Edit Profile</span>
-                </button>
+                </a>
               </div>
             </div>
           </div>
@@ -205,7 +500,7 @@ export default function EnhancedProfilePage() {
                   <MessageSquare className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Total Feedback</h4>
-                <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{mockStats.totalFeedback}</p>
+                <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{activityStats.totalFeedback}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">pieces collected</p>
               </div>
             </div>
@@ -217,7 +512,7 @@ export default function EnhancedProfilePage() {
                   <FileText className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
                 <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Reports Generated</h4>
-                <p className="text-3xl font-bold text-green-600 dark:text-green-400">{mockStats.totalReports}</p>
+                <p className="text-3xl font-bold text-green-600 dark:text-green-400">{activityStats.totalReports}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">insights created</p>
               </div>
             </div>
@@ -229,19 +524,21 @@ export default function EnhancedProfilePage() {
                   <Users className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                 </div>
                 <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Team Members</h4>
-                <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{mockStats.teamMembers}</p>
+                <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{activityStats.teamMembers}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">collaborators</p>
               </div>
             </div>
           </div>
 
           {/* Last Active */}
-          <div className="text-center">
-            <div className="inline-flex items-center space-x-2 text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-full border border-gray-200 dark:border-gray-700">
-              <Clock className="h-4 w-4" />
-              <span>Last active: {mockStats.lastActive}</span>
+          {activityStats.lastActive && (
+            <div className="text-center">
+              <div className="inline-flex items-center space-x-2 text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-full border border-gray-200 dark:border-gray-700">
+                <Clock className="h-4 w-4" />
+                <span>Last active: {activityStats.lastActive}</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Achievements Section */}
@@ -335,25 +632,25 @@ export default function EnhancedProfilePage() {
           <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6 text-center">Quick Actions</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button className="h-16 text-lg border-2 border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-all flex items-center justify-center space-x-2 text-gray-900 dark:text-gray-100">
+            <a href="/feedback" className="h-16 text-lg border-2 border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-all flex items-center justify-center space-x-2 text-gray-900 dark:text-gray-100">
               <MessageSquare className="h-5 w-5" />
               <span>View Feedback</span>
-            </button>
+            </a>
             
-            <button className="h-16 text-lg border-2 border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-all flex items-center justify-center space-x-2 text-gray-900 dark:text-gray-100">
+            <a href="/insights-simple" className="h-16 text-lg border-2 border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-all flex items-center justify-center space-x-2 text-gray-900 dark:text-gray-100">
               <Sparkles className="h-5 w-5" />
               <span>Generate Insights</span>
-            </button>
+            </a>
             
-            <button className="h-16 text-lg border-2 border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-all flex items-center justify-center space-x-2 text-gray-900 dark:text-gray-100">
+            <a href="/reports" className="h-16 text-lg border-2 border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-all flex items-center justify-center space-x-2 text-gray-900 dark:text-gray-100">
               <FileText className="h-5 w-5" />
               <span>View Reports</span>
-            </button>
+            </a>
             
-            <button className="h-16 text-lg border-2 border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-all flex items-center justify-center space-x-2 text-gray-900 dark:text-gray-100">
+            <a href="/billing" className="h-16 text-lg border-2 border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-all flex items-center justify-center space-x-2 text-gray-900 dark:text-gray-100">
               <Crown className="h-5 w-5" />
               <span>Manage Plan</span>
-            </button>
+            </a>
           </div>
         </div>
       </div>
