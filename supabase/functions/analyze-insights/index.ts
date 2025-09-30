@@ -7,25 +7,25 @@ const ANALYSIS_RESPONSE_SCHEMA = {
   properties: {
     summary: {
       type: "STRING",
-      description: "A comprehensive 2-3 paragraph summary of the key findings and insights from the user feedback. Focus on patterns, pain points, satisfaction levels, and opportunities for improvement."
+      description: "A concise 2-paragraph summary of key findings and insights from the user feedback. Focus on patterns, pain points, satisfaction levels, and opportunities for improvement."
     },
     key_themes: {
       type: "ARRAY",
-      description: "Five recurring feedback topics, user pain points, and positive experiences.",
+      description: "Three to four recurring feedback topics, user pain points, and positive experiences (max 15 words each).",
       items: {
         type: "STRING"
       }
     },
     suggested_actions: {
       type: "ARRAY",
-      description: "Five practical improvements that address user feedback.",
+      description: "Three to four practical improvements that address user feedback (max 15 words each).",
       items: {
         type: "STRING"
       }
     },
     trends: {
       type: "ARRAY",
-      description: "Four highlight patterns in user sentiment and feedback.",
+      description: "Two to three patterns in user sentiment and feedback (max 15 words each).",
       items: {
         type: "STRING"
       }
@@ -35,7 +35,7 @@ const ANALYSIS_RESPONSE_SCHEMA = {
       properties: {
         metrics: {
           type: "ARRAY",
-          description: "Four key metrics derived from the data.",
+          description: "Two to three key metrics derived from the data (max 15 words each).",
           items: {
             type: "STRING"
           }
@@ -93,22 +93,20 @@ const corsHeaders = {
 };
 // --- AI Prompt Definition ---
 // Simplified prompt—the JSON structure is now defined by the schema (ANALYSIS_RESPONSE_SCHEMA)
-const ANALYSIS_PROMPT_TEMPLATE = (dataString, fileType)=>`You are an expert business analyst specializing in customer feedback analysis and user experience insights. Analyze the following user feedback data and provide comprehensive, actionable insights in the required JSON format.
+const ANALYSIS_PROMPT_TEMPLATE = (dataString, fileType)=>`Analyze this feedback data concisely.
 
-Data to analyze:
+Data:
 ${dataString}
 
-Analysis type: ${fileType === 'feedback-analysis' ? 'User Feedback Analysis' : 'General Data Analysis'}
+Provide a JSON response with:
+1. Summary: 2 concise paragraphs highlighting key insights
+2. Key themes: 3-4 recurring topics (max 15 words each)
+3. Suggested actions: 3-4 practical improvements (max 15 words each)
+4. Trends: 2-3 patterns in sentiment (max 15 words each)
+5. Performance score: 0-100 based on feedback sentiment
+6. Sentiment: Calculate positive, negative, neutral percentages (must sum to 100)
 
-Important guidelines for analysis:
-- Summary should focus on user experience insights, common issues, and satisfaction patterns.
-- Key themes should identify recurring feedback topics, user pain points, and positive experiences.
-- Suggested actions should be practical improvements that address user feedback.
-- Trends should highlight patterns in user sentiment and feedback.
-- Performance score should be 0-100 based on overall feedback sentiment and actionable insights.
-- Sentiment percentages must reflect the proportion of positive, negative, and neutral entries.
-- The output MUST strictly follow the requested JSON schema.
-`;
+Be concise and actionable.`;
 // --- Utility Function for Resilient Fetching ---
 /**
  * Fetches an API endpoint with exponential backoff for transient errors (5xx and 429 status codes).
@@ -371,7 +369,7 @@ serve(async (req)=>{
         } else if (finishReason === 'RECITATION') {
           errorMessage += ' The model declined to answer to prevent reciting copyrighted material.';
         } else if (finishReason === 'MAX_TOKENS') {
-          errorMessage += ' The analysis was too long and hit the output token limit (2048).';
+          errorMessage += ' The analysis was too long and hit the output token limit (4096). Please try with fewer feedback entries or contact support for large datasets.';
         }
       }
       return new Response(JSON.stringify({
