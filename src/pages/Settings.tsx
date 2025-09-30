@@ -572,150 +572,185 @@ const Settings = () => {
   const planInfo = getPlanInfo();
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Account Settings</h1>
-        <p className="text-gray-600">Manage your profile, security, and preferences</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      <div className="container mx-auto p-6 space-y-8">
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <div className="flex items-center justify-center space-x-3">
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+              <SettingsIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+            </div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              Account Settings
+            </h1>
+          </div>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Manage your profile, security, and preferences to customize your NoteX experience
+          </p>
+        </div>
 
-      {/* Settings Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left Column */}
-        <div className="space-y-6">
-          {/* Profile Settings */}
-          <Card className="rounded-xl shadow-lg border-2 border-blue-100">
-            <CardHeader className="bg-blue-50 rounded-t-xl">
-              <CardTitle className="flex items-center space-x-2 text-blue-900">
-                <User className="h-5 w-5" />
-                <span>Profile Settings</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              {/* Avatar Upload */}
-              <div className="flex items-center space-x-4">
-                <div className="relative">
-                  <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                    {profile?.avatar_url || avatarPreview ? (
-                      <img
-                        src={avatarPreview || profile?.avatar_url}
-                        alt="Profile"
-                        className="w-full h-full object-cover"
+        {/* Settings Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+          {/* Left Column */}
+          <div className="space-y-8">
+            {/* Profile Settings */}
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-t-lg">
+                <CardTitle className="flex items-center space-x-3 text-xl">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                    <User className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <span>Profile Settings</span>
+                    <Badge variant="outline" className="ml-3 bg-blue-100 text-blue-700 border-blue-200">
+                      <User className="h-3 w-3 mr-1" />
+                      Personal
+                    </Badge>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-8 space-y-6">
+                {/* Avatar Upload */}
+                <div className="flex items-center space-x-6">
+                  <div className="relative group">
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center overflow-hidden border-4 border-blue-200 dark:border-blue-800 shadow-lg transition-all duration-200 group-hover:shadow-xl">
+                      {profile?.avatar_url || avatarPreview ? (
+                        <img
+                          src={avatarPreview || profile?.avatar_url}
+                          alt="Profile"
+                          className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                        />
+                      ) : (
+                        <User className="h-12 w-12 text-blue-600 dark:text-blue-400" />
+                      )}
+                    </div>
+                    <label className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl">
+                      <Camera className="h-4 w-4" />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                        className="hidden"
                       />
-                    ) : (
-                      <User className="h-10 w-10 text-gray-400" />
+                    </label>
+                  </div>
+                  
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <p className="text-sm font-semibold text-muted-foreground mb-1">Profile Picture</p>
+                      <p className="text-xs text-muted-foreground">Upload a professional photo for your profile</p>
+                    </div>
+                    {avatarFile && (
+                      <Button
+                        size="sm"
+                        onClick={uploadAvatar}
+                        disabled={uploadingAvatar}
+                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                      >
+                        {uploadingAvatar ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4 mr-2" />
+                        )}
+                        {uploadingAvatar ? 'Uploading...' : 'Upload Photo'}
+                      </Button>
                     )}
                   </div>
-                  <label className="absolute bottom-0 right-0 bg-blue-500 text-white p-1 rounded-full cursor-pointer hover:bg-blue-600 transition-colors">
-                    <Camera className="h-3 w-3" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarChange}
-                      className="hidden"
+                </div>
+
+                {/* Name Fields */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName" className="text-sm font-semibold text-muted-foreground">
+                      First Name
+                    </Label>
+                    <Input
+                      id="firstName"
+                      value={profile?.first_name || ''}
+                      onChange={(e) => setProfile(prev => prev ? { ...prev, first_name: e.target.value } : null)}
+                      className="border-2 focus:border-blue-500 transition-colors"
+                      placeholder="Enter your first name"
                     />
-                  </label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName" className="text-sm font-semibold text-muted-foreground">
+                      Last Name
+                    </Label>
+                    <Input
+                      id="lastName"
+                      value={profile?.last_name || ''}
+                      onChange={(e) => setProfile(prev => prev ? { ...prev, last_name: e.target.value } : null)}
+                      className="border-2 focus:border-blue-500 transition-colors"
+                      placeholder="Enter your last name"
+                    />
+                  </div>
                 </div>
-                
-                <div className="flex-1">
-                  <p className="text-sm text-gray-600 mb-2">Profile Picture</p>
-                  {avatarFile && (
-                    <Button
-                      size="sm"
-                      onClick={uploadAvatar}
-                      disabled={uploadingAvatar}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      {uploadingAvatar ? (
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Upload className="h-4 w-4 mr-2" />
-                      )}
-                      {uploadingAvatar ? 'Uploading...' : 'Upload'}
-                    </Button>
+
+                {/* Company Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="companyName" className="text-sm font-semibold text-muted-foreground">
+                    Company Name
+                  </Label>
+                  <Input
+                    id="companyName"
+                    value={profile?.company_name || ''}
+                    onChange={(e) => setProfile(prev => prev ? { ...prev, company_name: e.target.value } : null)}
+                    className="border-2 focus:border-blue-500 transition-colors"
+                    placeholder="Enter your company name (optional)"
+                  />
+                </div>
+
+                {/* Email Display */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-muted-foreground">Email Address</Label>
+                  <div className="flex items-center space-x-3 p-4 bg-muted/30 rounded-lg border-2 border-muted">
+                    <Mail className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-foreground font-medium">{user.email}</span>
+                    <Badge variant="outline" className="ml-auto bg-blue-100 text-blue-700 border-blue-200">
+                      <Shield className="h-3 w-3 mr-1" />
+                      Verified
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Email address cannot be changed for security reasons</p>
+                </div>
+
+                {/* Save Button */}
+                <Button
+                  onClick={handleSaveProfile}
+                  disabled={saving}
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 py-3"
+                >
+                  {saving ? (
+                    <>
+                      <RefreshCw className="h-5 w-5 mr-3 animate-spin" />
+                      Saving Changes...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-5 w-5 mr-3" />
+                      Save Profile Changes
+                    </>
                   )}
-                </div>
-              </div>
-
-              {/* Name Fields */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="firstName" className="text-sm font-medium">
-                    First Name
-                  </Label>
-                  <Input
-                    id="firstName"
-                    value={profile?.first_name || ''}
-                    onChange={(e) => setProfile(prev => prev ? { ...prev, first_name: e.target.value } : null)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="lastName" className="text-sm font-medium">
-                    Last Name
-                  </Label>
-                  <Input
-                    id="lastName"
-                    value={profile?.last_name || ''}
-                    onChange={(e) => setProfile(prev => prev ? { ...prev, last_name: e.target.value } : null)}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-
-              {/* Company Name */}
-              <div>
-                <Label htmlFor="companyName" className="text-sm font-medium">
-                  Company Name
-                </Label>
-                <Input
-                  id="companyName"
-                  value={profile?.company_name || ''}
-                  onChange={(e) => setProfile(prev => prev ? { ...prev, company_name: e.target.value } : null)}
-                  className="mt-1"
-                  placeholder="Optional"
-                />
-              </div>
-
-              {/* Email Display */}
-              <div>
-                <Label className="text-sm font-medium">Email</Label>
-                <div className="flex items-center space-x-2 mt-1 p-3 bg-gray-50 rounded-md border">
-                  <Mail className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-700">{user.email}</span>
-                  <Badge variant="outline" className="text-xs">Non-editable</Badge>
-                </div>
-              </div>
-
-              {/* Save Button */}
-              <Button
-                onClick={handleSaveProfile}
-                disabled={saving}
-                className="w-full bg-blue-600 hover:bg-blue-700"
-              >
-                {saving ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </>
-                )}
-              </Button>
+                </Button>
             </CardContent>
           </Card>
 
-          {/* Password & Security */}
-          <Card className="rounded-xl shadow-lg border-2 border-blue-100">
-            <CardHeader className="bg-blue-50 rounded-t-xl">
-              <CardTitle className="flex items-center space-x-2 text-blue-900">
-                <Shield className="h-5 w-5" />
-                <span>Password & Security</span>
-              </CardTitle>
-            </CardHeader>
+            {/* Password & Security */}
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+              <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-t-lg">
+                <CardTitle className="flex items-center space-x-3 text-xl">
+                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                    <Shield className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div>
+                    <span>Password & Security</span>
+                    <Badge variant="outline" className="ml-3 bg-green-100 text-green-700 border-green-200">
+                      <Lock className="h-3 w-3 mr-1" />
+                      Secure
+                    </Badge>
+                  </div>
+                </CardTitle>
+              </CardHeader>
             <CardContent className="p-6 space-y-4">
               {/* Last Login */}
               {lastLogin && (
@@ -1081,6 +1116,7 @@ const Settings = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

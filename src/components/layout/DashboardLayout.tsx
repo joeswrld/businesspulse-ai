@@ -163,7 +163,7 @@ const navigation = [
 
       {/* Sidebar */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-50 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950 border-r border-slate-200 dark:border-slate-800 transform transition-all duration-300 ease-in-out lg:translate-x-0 shadow-xl max-h-screen",
+        "fixed inset-y-0 left-0 z-50 bg-gradient-to-b from-slate-50/95 to-white/95 dark:from-slate-900/95 dark:to-slate-950/95 backdrop-blur-sm border-r border-slate-200/50 dark:border-slate-800/50 transform transition-all duration-300 ease-in-out lg:translate-x-0 shadow-2xl max-h-screen",
         sidebarCollapsed ? "w-16" : "w-72",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
@@ -350,7 +350,7 @@ const navigation = [
 
       {/* Main content */}
       <div className={cn(
-        "min-h-screen bg-background transition-all duration-300",
+        "min-h-screen bg-gradient-to-br from-slate-50/50 via-white to-blue-50/30 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-all duration-300",
         sidebarCollapsed ? "lg:pl-16" : "lg:pl-72"
       )}>
         {/* Top Navigation Bar */}
@@ -358,11 +358,11 @@ const navigation = [
         {/* Mobile menu button */}
         <div className="lg:hidden px-4 pt-2">
           <button
-            className="p-2 -ml-2 hover:bg-slate-100 rounded-lg transition-colors"
+            className="p-2 -ml-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             onClick={() => setSidebarOpen(true)}
             aria-label="Open sidebar"
           >
-            <Menu className="h-5 w-5 text-slate-600" />
+            <Menu className="h-5 w-5 text-slate-600 dark:text-slate-300" />
           </button>
         </div>
         
