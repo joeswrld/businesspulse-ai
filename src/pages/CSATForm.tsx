@@ -23,6 +23,8 @@ interface FeedbackSettings {
   widget_color: string;
   greeting_text: string;
   customer_satisfaction_enabled: boolean;
+  business_name?: string | null;
+  logo_url?: string | null;
 }
 
 const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
