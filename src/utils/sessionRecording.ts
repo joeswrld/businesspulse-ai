@@ -18,7 +18,7 @@ export interface SessionEvent {
 }
 
 export class SessionRecorder {
-  private stopRecording: (() => void) | null = null;
+  private stopRecordingFn: (() => void) | null = null;
   private events: SessionEvent[] = [];
   private sessionId: string | null = null;
   private projectId: string;
@@ -41,7 +41,7 @@ export class SessionRecorder {
    * Start recording user session
    */
   async startRecording(): Promise<string> {
-    if (this.stopRecording) {
+    if (this.stopRecordingFn) {
       console.warn('Session recording already in progress');
       return this.sessionId!;
     }
@@ -67,7 +67,7 @@ export class SessionRecorder {
       }
 
       // Start rrweb recording
-      this.stopRecording = record({
+      this.stopRecordingFn = record({
         emit: (event) => {
           this.events.push({
             type: event.type,
@@ -128,15 +128,15 @@ export class SessionRecorder {
    * Stop recording and save session data
    */
   async stopRecording(): Promise<void> {
-    if (!this.stopRecording) {
+    if (!this.stopRecordingFn) {
       console.warn('No active session recording to stop');
       return;
     }
 
     try {
       // Stop the recording
-      this.stopRecording();
-      this.stopRecording = null;
+      this.stopRecordingFn();
+      this.stopRecordingFn = null;
 
       const duration = Math.round((Date.now() - this.startTime) / 1000);
       
@@ -203,7 +203,7 @@ export class SessionRecorder {
    * Check if recording is active
    */
   isRecording(): boolean {
-    return this.stopRecording !== null;
+    return this.stopRecordingFn !== null;
   }
 
   /**

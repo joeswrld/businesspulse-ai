@@ -7,7 +7,12 @@ export interface Feedback {
   form_type: 'customer_satisfaction' | 'product_feedback';
   message: string;
   rating: number | null;
-  metadata: any;
+  metadata: {
+    email?: string | null;
+    page_url?: string | null;
+    user_agent?: string | null;
+    [key: string]: unknown;
+  } | null;
   created_at: string;
 }
 

@@ -69,7 +69,7 @@ const UsageBar: React.FC = () => {
       setLoading(true);
       
       const { data, error } = await supabase
-        .from('user_billing_dashboard')
+        .from('user_usage_summary')
         .select('*')
         .eq('user_id', user.id)
         .single();
