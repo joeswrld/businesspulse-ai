@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { QRCodeSVG } from 'qrcode.react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   Copy, 
   Check, 
@@ -20,17 +22,23 @@ import {
   Link as LinkIcon,
   Sparkles,
   Eye,
-  Palette
+  Palette,
+  Upload,
+  X,
+  Building2
 } from 'lucide-react';
 import { useFeedbackSettings } from '@/hooks/useFeedbackSettings';
 import { useToast } from '@/hooks/use-toast';
 
 const FeedbackSettings: React.FC = () => {
+  const { user } = useAuth();
   const { settings, loading, saving, saveSettings, regenerateUrls, setSettings } = useFeedbackSettings();
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const { toast } = useToast();
   const csatQrRef = useRef<HTMLDivElement>(null);
   const productQrRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const copyToClipboard = async (text: string, fieldName: string) => {
     try {
@@ -46,6 +54,120 @@ const FeedbackSettings: React.FC = () => {
       toast({
         title: "Copy Failed",
         description: "Failed to copy to clipboard. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid File",
+        description: "Please upload an image file (PNG, JPG, SVG, etc.)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "File Too Large",
+        description: "Please upload an image smaller than 2MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingLogo(true);
+
+    try {
+      console.log('📤 Uploading logo...', file.name);
+
+      // Delete old logo if exists
+      if (settings?.logo_url) {
+        const oldPath = settings.logo_url.split('/').pop();
+        if (oldPath) {
+          await supabase.storage
+            .from('feedback-logos')
+            .remove([`${user.id}/${oldPath}`]);
+        }
+      }
+
+      // Upload new logo
+      const fileExt = file.name.split('.').pop();
+      const fileName = `logo-${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('feedback-logos')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('❌ Upload error:', uploadError);
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('feedback-logos')
+        .getPublicUrl(filePath);
+
+      console.log('✅ Logo uploaded:', publicUrl);
+
+      // Update settings
+      setSettings({ ...settings!, logo_url: publicUrl });
+
+      toast({
+        title: "Logo Uploaded!",
+        description: "Your logo has been uploaded successfully.",
+      });
+    } catch (error) {
+      console.error('❌ Failed to upload logo:', error);
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload logo. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingLogo(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (!settings?.logo_url || !user) return;
+
+    try {
+      console.log('🗑️ Removing logo...');
+
+      const oldPath = settings.logo_url.split('/').pop();
+      if (oldPath) {
+        await supabase.storage
+          .from('feedback-logos')
+          .remove([`${user.id}/${oldPath}`]);
+      }
+
+      setSettings({ ...settings, logo_url: null });
+
+      toast({
+        title: "Logo Removed",
+        description: "Your logo has been removed.",
+      });
+    } catch (error) {
+      console.error('❌ Failed to remove logo:', error);
+      toast({
+        title: "Removal Failed",
+        description: "Failed to remove logo. Please try again.",
         variant: "destructive",
       });
     }
@@ -67,7 +189,6 @@ const FeedbackSettings: React.FC = () => {
 
     img.onload = () => {
       if (ctx) {
-        // White background for better visibility
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, 400, 400);
@@ -175,8 +296,13 @@ const FeedbackSettings: React.FC = () => {
         </Button>
       </div>
 
-      <Tabs defaultValue="links" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
+      <Tabs defaultValue="branding" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto">
+          <TabsTrigger value="branding" className="gap-2">
+            <Building2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Branding</span>
+            <span className="sm:hidden">Brand</span>
+          </TabsTrigger>
           <TabsTrigger value="links" className="gap-2">
             <LinkIcon className="h-4 w-4" />
             <span className="hidden sm:inline">Survey Links</span>
@@ -193,6 +319,181 @@ const FeedbackSettings: React.FC = () => {
             <span className="sm:hidden">Project</span>
           </TabsTrigger>
         </TabsList>
+
+        {/* Branding Tab */}
+        <TabsContent value="branding" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+                  <Building2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                Brand Customization
+              </CardTitle>
+              <CardDescription>
+                Customize how your feedback forms look with your logo and business name
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Business Name */}
+              <div className="space-y-3">
+                <Label htmlFor="business-name" className="text-sm font-medium">
+                  Business Name
+                </Label>
+                <Input
+                  id="business-name"
+                  placeholder="Enter your business name"
+                  value={settings.business_name || ''}
+                  onChange={(e) => setSettings({ ...settings, business_name: e.target.value })}
+                  className="max-w-md"
+                />
+                <p className="text-xs text-muted-foreground">
+                  This will be displayed at the top of your feedback forms
+                </p>
+              </div>
+
+              <Separator />
+
+              {/* Logo Upload */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Business Logo</Label>
+                
+                {settings.logo_url ? (
+                  <div className="flex flex-col sm:flex-row items-start gap-4">
+                    <div className="relative group">
+                      <img
+                        src={settings.logo_url}
+                        alt="Business Logo"
+                        className="h-24 w-24 object-contain border-2 rounded-lg bg-white dark:bg-gray-900 p-2"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={handleRemoveLogo}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Your logo is uploaded and will appear on all feedback forms
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploadingLogo}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Replace Logo
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRemoveLogo}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="p-3 bg-muted rounded-full">
+                        <Upload className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">Upload your business logo</p>
+                        <p className="text-xs text-muted-foreground">
+                          PNG, JPG, SVG up to 2MB
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingLogo}
+                      >
+                        {uploadingLogo ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Choose File
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                />
+              </div>
+
+              <Separator />
+
+              {/* Preview */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Preview</Label>
+                <div className="border rounded-lg p-6 bg-muted/30">
+                  <div className="flex flex-col items-center gap-4 max-w-md mx-auto">
+                    {settings.logo_url && (
+                      <img
+                        src={settings.logo_url}
+                        alt="Logo Preview"
+                        className="h-16 w-auto object-contain"
+                      />
+                    )}
+                    {settings.business_name && (
+                      <h3 className="text-xl font-semibold text-center">
+                        {settings.business_name}
+                      </h3>
+                    )}
+                    {!settings.logo_url && !settings.business_name && (
+                      <p className="text-sm text-muted-foreground text-center">
+                        Add your logo and business name to see a preview
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  This is how your branding will appear on feedback forms
+                </p>
+              </div>
+
+              {/* Tips */}
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100">
+                      Branding Tips
+                    </h4>
+                    <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1 ml-1">
+                      <li>• Use a square or horizontal logo for best results</li>
+                      <li>• Transparent PNG files work best for logos</li>
+                      <li>• Keep your business name concise (2-4 words)</li>
+                      <li>• Changes apply to both CSAT and Product Feedback forms</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Survey Links Tab */}
         <TabsContent value="links" className="space-y-6">
