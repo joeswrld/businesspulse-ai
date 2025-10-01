@@ -404,4 +404,470 @@ const FeedbackSettings: React.FC = () => {
                       <p className="text-sm text-muted-foreground">
                         Your logo is uploaded and will appear on all feedback forms
                       </p>
-                      <div className="flex
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploadingLogo}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Replace Logo
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRemoveLogo}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="p-3 bg-muted rounded-full">
+                        <Upload className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">Upload your business logo</p>
+                        <p className="text-xs text-muted-foreground">
+                          PNG, JPG, SVG up to 2MB
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingLogo}
+                      >
+                        {uploadingLogo ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Choose File
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                />
+              </div>
+
+              <Separator />
+
+              {/* Preview */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Preview</Label>
+                <div className="border rounded-lg p-6 bg-muted/30">
+                  <div className="flex flex-col items-center gap-4 max-w-md mx-auto">
+                    {settings.logo_url && (
+                      <img
+                        src={settings.logo_url}
+                        alt="Logo Preview"
+                        className="h-16 w-auto object-contain"
+                      />
+                    )}
+                    {settings.business_name && (
+                      <h3 className="text-xl font-semibold text-center">
+                        {settings.business_name}
+                      </h3>
+                    )}
+                    {!settings.logo_url && !settings.business_name && (
+                      <p className="text-sm text-muted-foreground text-center">
+                        Add your logo and business name to see a preview
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  This is how your branding will appear on feedback forms
+                </p>
+              </div>
+
+              {/* Tips */}
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100">
+                      Branding Tips
+                    </h4>
+                    <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1 ml-1">
+                      <li>• Use a square or horizontal logo for best results</li>
+                      <li>• Transparent PNG files work best for logos</li>
+                      <li>• Keep your business name concise (2-4 words)</li>
+                      <li>• Changes apply to both CSAT and Product Feedback forms</li>
+                      <li>• Click "Save Settings" after making changes</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Survey Links Tab - Keeping existing code */}
+        <TabsContent value="links" className="space-y-6">
+          {/* Customer Satisfaction Survey */}
+          <Card className="border-2 border-primary/20 dark:border-primary/30">
+            <CardHeader className="space-y-1">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                    <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  Customer Satisfaction Survey
+                </CardTitle>
+                <Badge variant="secondary">CSAT</Badge>
+              </div>
+              <CardDescription className="text-sm">
+                Simple rating-based survey to measure customer satisfaction
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <Label htmlFor="survey-url" className="text-sm font-medium">
+                  Survey URL
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="survey-url"
+                    value={settings.customer_survey_url}
+                    className="flex-1 font-mono text-xs sm:text-sm bg-muted/50"
+                    readOnly
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => copyToClipboard(settings.customer_survey_url, 'Survey URL')}
+                    className="flex-shrink-0"
+                  >
+                    {copiedField === 'Survey URL' ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => window.open(settings.customer_survey_url, '_blank')}
+                    className="flex-shrink-0"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">QR Code</Label>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div 
+                    ref={csatQrRef}
+                    className="p-4 bg-white dark:bg-gray-900 border-2 rounded-xl shadow-sm"
+                  >
+                    <QRCodeSVG 
+                      value={settings.customer_survey_url} 
+                      size={120}
+                      level="H"
+                      includeMargin
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Share this QR code in emails, print materials, or display it in your physical location
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadQRCode(csatQrRef, 'csat-survey-qr-code')}
+                      className="w-full sm:w-auto"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download QR Code
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-muted/50 p-4 rounded-lg border">
+                <div className="flex items-start gap-3">
+                  <Eye className="h-5 w-5 text-primary mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="font-medium text-sm">Preview</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Customers will rate their satisfaction on a 1-5 scale and optionally provide comments
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Product Feedback Form */}
+          <Card className="border-2 border-green-500/20 dark:border-green-500/30">
+            <CardHeader className="space-y-1">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                    <QrCode className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  Product Feedback Form
+                </CardTitle>
+                <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                  Feedback
+                </Badge>
+              </div>
+              <CardDescription className="text-sm">
+                Detailed form for bug reports, feature requests, and general feedback
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <Label htmlFor="feedback-url" className="text-sm font-medium">
+                  Feedback URL
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="feedback-url"
+                    value={settings.product_feedback_url}
+                    className="flex-1 font-mono text-xs sm:text-sm bg-muted/50"
+                    readOnly
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => copyToClipboard(settings.product_feedback_url, 'Feedback URL')}
+                    className="flex-shrink-0"
+                  >
+                    {copiedField === 'Feedback URL' ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => window.open(settings.product_feedback_url, '_blank')}
+                    className="flex-shrink-0"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">QR Code</Label>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div 
+                    ref={productQrRef}
+                    className="p-4 bg-white dark:bg-gray-900 border-2 rounded-xl shadow-sm"
+                  >
+                    <QRCodeSVG 
+                      value={settings.product_feedback_url} 
+                      size={120}
+                      level="H"
+                      includeMargin
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Perfect for product packaging, user manuals, or support documentation
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadQRCode(productQrRef, 'product-feedback-qr-code')}
+                      className="w-full sm:w-auto"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download QR Code
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-muted/50 p-4 rounded-lg border">
+                <div className="flex items-start gap-3">
+                  <Eye className="h-5 w-5 text-primary mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="font-medium text-sm">Preview</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Customers can submit detailed feedback with type categorization and priority levels
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Widget Code Tab - Keep existing code */}
+        <TabsContent value="widget" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                  <Code className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                </div>
+                Feedback Widget Embed Code
+              </CardTitle>
+              <CardDescription>
+                Add this code to your website to display an interactive feedback widget
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <Label htmlFor="widget-code" className="text-sm font-medium">
+                  Embed Code
+                </Label>
+                <Textarea
+                  id="widget-code"
+                  value={settings.widget_code}
+                  rows={5}
+                  className="font-mono text-xs sm:text-sm bg-muted/50"
+                  readOnly
+                />
+                <div className="flex justify-end">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => copyToClipboard(settings.widget_code, 'Widget Code')}
+                  >
+                    {copiedField === 'Widget Code' ? (
+                      <>
+                        <Check className="h-4 w-4 mr-2 text-white" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Code
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg space-y-3">
+                <h4 className="font-semibold text-sm flex items-center gap-2 text-blue-900 dark:text-blue-100">
+                  <Sparkles className="h-4 w-4" />
+                  Installation Instructions
+                </h4>
+                <ol className="space-y-2 text-sm text-blue-800 dark:text-blue-200 ml-1">
+                  <li className="flex gap-2">
+                    <span className="font-semibold min-w-[1.5rem]">1.</span>
+                    <span>Copy the embed code above</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-semibold min-w-[1.5rem]">2.</span>
+                    <span>Open your website's HTML file</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-semibold min-w-[1.5rem]">3.</span>
+                    <span>Paste the code before the closing <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900/50 rounded text-xs">&lt;/body&gt;</code> tag</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-semibold min-w-[1.5rem]">4.</span>
+                    <span>Save and refresh your website to see the widget</span>
+                  </li>
+                </ol>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Project ID Tab - Keep existing code */}
+        <TabsContent value="project" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                  <Settings className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                Project Configuration
+              </CardTitle>
+              <CardDescription>
+                Your unique project identifier for all feedback collection
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <Label htmlFor="project-id" className="text-sm font-medium">
+                  Project ID
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="project-id"
+                    value={settings.project_id}
+                    readOnly
+                    className="flex-1 font-mono text-xs sm:text-sm bg-muted/50"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => copyToClipboard(settings.project_id, 'Project ID')}
+                    className="flex-shrink-0"
+                  >
+                    {copiedField === 'Project ID' ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <RefreshCw className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                  <div className="space-y-2 flex-1">
+                    <h4 className="font-semibold text-sm text-amber-900 dark:text-amber-100">
+                      Regenerate URLs
+                    </h4>
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      This will generate new URLs and invalidate all existing links. Use this if your current links have been compromised or shared publicly by mistake.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRegenerateUrls}
+                      className="border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Regenerate All URLs
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default FeedbackSettings;
