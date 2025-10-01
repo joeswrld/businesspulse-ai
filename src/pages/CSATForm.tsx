@@ -1,3 +1,6 @@
+// src/pages/CSATForm.tsx
+// Redesigned with better branding display
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle, AlertCircle, Star, MessageSquare } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, Star } from 'lucide-react';
 
 interface CustomerSatisfactionFormProps {
   projectId?: string;
@@ -46,8 +49,12 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
   const [validationError, setValidationError] = useState<string>('');
 
   const [rating, setRating] = useState<number | null>(null);
+  const [hoveredRating, setHoveredRating] = useState<number | null>(null);
   const [email, setEmail] = useState('');
   const [comments, setComments] = useState('');
+
+  const ratingLabels = ['Very Poor', 'Poor', 'Average', 'Good', 'Excellent'];
+  const ratingEmojis = ['😞', '🙁', '😐', '🙂', '😄'];
 
   useEffect(() => {
     if (projectId && !previewMode) {
@@ -74,42 +81,31 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
     }
 
     setIsValidating(true);
-    console.log('🔍 Validating project ID:', projectId);
 
     try {
-      // Query feedback_settings by project_id
       const { data, error } = await supabase
         .from('feedback_settings')
         .select('*')
         .eq('project_id', projectId)
         .maybeSingle();
 
-      console.log('📊 Query result:', { data, error });
-
-      if (error) {
-        console.error('❌ Validation error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
       if (!data) {
         setIsValid(false);
         setValidationError('Project not found. Please check your survey link.');
-        console.log('❌ No feedback_settings found for project_id:', projectId);
         return;
       }
 
-      // Check if customer satisfaction is enabled
       if (!data.customer_satisfaction_enabled) {
         setIsValid(false);
         setValidationError('Customer satisfaction survey is currently disabled for this project.');
-        console.log('❌ Customer satisfaction disabled for project');
         return;
       }
 
       setSettings(data);
       setIsValid(true);
       setValidationError('');
-      console.log('✅ Project validated successfully:', data);
 
     } catch (err) {
       console.error('❌ Error validating project:', err);
@@ -158,7 +154,7 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
 
     try {
       const feedbackData = {
-        project_id: settings.project_id, // Use project_id from feedback_settings
+        project_id: settings.project_id,
         form_type: 'customer_satisfaction',
         message: comments.trim() || `Customer satisfaction rating: ${rating}/5`,
         rating: rating,
@@ -170,15 +166,11 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
         }
       };
 
-      console.log('📤 Submitting feedback:', feedbackData);
-
       const { error } = await supabase
         .from('feedback')
         .insert([feedbackData]);
 
       if (error) {
-        console.error('❌ Error submitting feedback:', error);
-        
         let errorMessage = 'Failed to submit feedback.';
         if (error.code === '23503') {
           errorMessage = 'Invalid project reference. Please contact support.';
@@ -194,7 +186,6 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
         return;
       }
 
-      console.log('✅ Feedback submitted successfully');
       setIsSubmitted(true);
       
       if (onSubmitted) {
@@ -219,10 +210,10 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
 
   if (isValidating) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-950 dark:to-indigo-950">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading survey...</p>
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600 dark:text-gray-400">Loading survey...</p>
         </div>
       </div>
     );
@@ -230,12 +221,14 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
 
   if (!isValid && !previewMode) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <CardTitle className="text-xl">Survey Not Available</CardTitle>
-            <CardDescription className="text-base mt-2">{validationError}</CardDescription>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 dark:from-gray-900 dark:to-red-950 p-4">
+        <Card className="w-full max-w-md shadow-2xl">
+          <CardHeader className="text-center space-y-4">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
+              <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+            <CardTitle className="text-2xl">Survey Not Available</CardTitle>
+            <CardDescription className="text-base">{validationError}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={() => navigate('/')} className="w-full" variant="outline">
@@ -249,16 +242,18 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
 
   if (isSubmitted && !previewMode) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <CardTitle className="text-xl">Thank you for your feedback! 🎉</CardTitle>
-            <CardDescription>Your satisfaction rating has been recorded.</CardDescription>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 dark:from-gray-900 dark:to-green-950 p-4">
+        <Card className="w-full max-w-md shadow-2xl">
+          <CardHeader className="text-center space-y-4">
+            <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle className="h-10 w-10 text-green-600 dark:text-green-400" />
+            </div>
+            <CardTitle className="text-3xl">Thank You! 🎉</CardTitle>
+            <CardDescription className="text-base">Your feedback has been submitted successfully.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => window.close()} className="w-full">
-              Close
+            <Button onClick={() => window.close()} className="w-full" size="lg">
+              Close Window
             </Button>
           </CardContent>
         </Card>
@@ -267,142 +262,178 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
   }
 
   const containerClass = previewMode 
-    ? "w-full" 
-    : "min-h-screen bg-background flex items-center justify-center p-4";
+    ? "w-full p-4" 
+    : "min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-950 dark:to-indigo-950 flex items-center justify-center p-4";
 
   return (
     <div className={containerClass}>
-      <Card className="w-full max-w-lg">
-        <CardHeader className="text-center">
-          {/* Business Logo */}
+      <Card className="w-full max-w-2xl shadow-2xl border-0 overflow-hidden">
+        {/* Header with Branding */}
+        <div 
+          className="relative pt-10 pb-8 px-8"
+          style={{ 
+            background: `linear-gradient(135deg, ${settings?.widget_color || '#3B82F6'}15 0%, ${settings?.widget_color || '#3B82F6'}05 100%)`
+          }}
+        >
+          {/* Logo */}
           {settings?.logo_url && (
-            <div className="flex justify-center mb-4">
-              <img
-                src={settings.logo_url}
-                alt="Business Logo"
-                className="h-16 w-auto object-contain"
-              />
+            <div className="flex justify-center mb-6">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 border-2 border-white dark:border-gray-700">
+                <img
+                  src={settings.logo_url}
+                  alt="Business Logo"
+                  className="h-16 w-auto object-contain max-w-[200px]"
+                />
+              </div>
             </div>
           )}
           
           {/* Business Name */}
           {settings?.business_name && (
-            <h2 className="text-2xl font-bold mb-4">{settings.business_name}</h2>
+            <h1 className="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white">
+              {settings.business_name}
+            </h1>
           )}
           
-          <div className="flex items-center justify-center mb-4">
-            <MessageSquare 
-              className="h-8 w-8 mr-2" 
-              style={{ color: settings?.widget_color || '#3B82F6' }}
-            />
-            <CardTitle className="text-2xl">
+          {/* Title & Description */}
+          <div className="text-center space-y-3">
+            <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
               {settings?.widget_title || 'Customer Satisfaction Survey'}
-            </CardTitle>
+            </h2>
+            <p className="text-lg text-gray-600 dark:text-gray-400">
+              {settings?.greeting_text || 'How satisfied are you with our service?'}
+            </p>
           </div>
-          <CardDescription>
-            {settings?.greeting_text || 'How satisfied are you with our service?'}
-          </CardDescription>
+
           {previewMode && (
-            <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
-              Preview Mode - Form will not submit
+            <div className="mt-6 text-center">
+              <span className="inline-block px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full text-sm font-medium border border-orange-200 dark:border-orange-800">
+                👁️ Preview Mode
+              </span>
             </div>
           )}
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-4">
-              <Label className="text-base font-medium">
-                How satisfied are you with our service? *
-              </Label>
-              <div className="flex justify-center">
-                <div className="flex space-x-2">
-                  {[1, 2, 3, 4, 5].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => handleRatingClick(value)}
-                      className="flex flex-col items-center cursor-pointer hover:opacity-80 transition-all p-2 rounded-lg hover:bg-gray-50"
-                    >
-                      <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-colors ${
-                        rating && rating >= value 
-                          ? `border-2` 
-                          : 'border-gray-300'
-                      }`} style={{
-                        borderColor: rating && rating >= value ? settings?.widget_color || '#3B82F6' : undefined,
-                        backgroundColor: rating && rating >= value ? `${settings?.widget_color || '#3B82F6'}15` : undefined
-                      }}>
-                        <Star
-                          className={`h-6 w-6 transition-colors ${
-                            rating && rating >= value 
-                              ? 'fill-current' 
-                              : 'text-gray-400'
-                          }`}
-                          style={{ 
-                            color: rating && rating >= value ? settings?.widget_color || '#3B82F6' : undefined 
-                          }}
-                        />
-                      </div>
-                      <span className="text-sm text-muted-foreground mt-1">{value}</span>
-                    </button>
-                  ))}
+        </div>
+
+        {/* Form Content */}
+        <CardContent className="p-8">
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Rating Section */}
+            <div className="space-y-6">
+              <div className="text-center space-y-2">
+                <Label className="text-xl font-semibold text-gray-900 dark:text-white block">
+                  Rate Your Experience
+                </Label>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Click on a star to rate us</p>
+              </div>
+              
+              {/* Star Rating */}
+              <div className="flex justify-center items-center gap-2 md:gap-3">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => handleRatingClick(value)}
+                    onMouseEnter={() => setHoveredRating(value)}
+                    onMouseLeave={() => setHoveredRating(null)}
+                    className="group transition-transform hover:scale-110 active:scale-95 focus:outline-none"
+                  >
+                    <Star
+                      className="w-12 h-12 md:w-14 md:h-14 transition-all"
+                      fill={(hoveredRating !== null ? value <= hoveredRating : rating !== null && value <= rating) 
+                        ? settings?.widget_color || '#3B82F6' 
+                        : 'none'}
+                      stroke={(hoveredRating !== null ? value <= hoveredRating : rating !== null && value <= rating) 
+                        ? settings?.widget_color || '#3B82F6' 
+                        : '#D1D5DB'}
+                      strokeWidth="2"
+                    />
+                  </button>
+                ))}
+              </div>
+
+              {/* Rating Feedback */}
+              {(rating !== null || hoveredRating !== null) && (
+                <div className="text-center space-y-2 animate-in fade-in duration-300">
+                  <div className="text-5xl">
+                    {ratingEmojis[(hoveredRating || rating || 1) - 1]}
+                  </div>
+                  <p 
+                    className="text-lg font-semibold"
+                    style={{ color: settings?.widget_color || '#3B82F6' }}
+                  >
+                    {ratingLabels[(hoveredRating || rating || 1) - 1]}
+                  </p>
                 </div>
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground px-4">
-                <span>Very Dissatisfied</span>
-                <span>Very Satisfied</span>
-              </div>
+              )}
             </div>
 
+            <div className="border-t border-gray-200 dark:border-gray-700"></div>
+
+            {/* Email Field */}
             <div className="space-y-2">
-              <Label htmlFor="email">Email (optional)</Label>
+              <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Email Address <span className="text-gray-400">(Optional)</span>
+              </Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="your@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="h-12 text-base"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 We'll only use this to follow up if needed
               </p>
             </div>
 
+            {/* Comments Field */}
             <div className="space-y-2">
-              <Label htmlFor="comments">Additional Comments (optional)</Label>
+              <Label htmlFor="comments" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Additional Comments <span className="text-gray-400">(Optional)</span>
+              </Label>
               <Textarea
                 id="comments"
                 placeholder="Tell us more about your experience..."
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
                 rows={4}
-                className="resize-none"
+                className="resize-none text-base"
               />
             </div>
 
+            {/* Submit Button */}
             <Button 
               type="submit" 
               disabled={!rating || isSubmitting || previewMode} 
-              className="w-full" 
-              size="lg"
-              style={{ 
+              className="w-full h-14 text-lg font-semibold shadow-lg hover:shadow-xl transition-all"
+              style={{
                 backgroundColor: !rating || isSubmitting || previewMode 
                   ? undefined 
-                  : settings?.widget_color || '#3B82F6' 
+                  : settings?.widget_color || '#3B82F6',
+                opacity: !rating || isSubmitting || previewMode ? 0.5 : 1
               }}
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
                   Submitting...
                 </>
               ) : previewMode ? (
-                'Preview Mode - Cannot Submit'
+                '👁️ Preview Mode - Cannot Submit'
               ) : (
                 'Submit Feedback'
               )}
             </Button>
           </form>
         </CardContent>
+
+        {/* Footer */}
+        <div className="bg-gray-50 dark:bg-gray-800/50 px-8 py-4 text-center border-t border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Your feedback helps us improve our service
+          </p>
+        </div>
       </Card>
     </div>
   );
