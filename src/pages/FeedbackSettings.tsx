@@ -1,5 +1,5 @@
 // src/pages/FeedbackSettings.tsx
-// This file has been fixed to properly save logo_url and business_name to the database
+// Fixed version with on-demand QR code generation
 
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,6 +38,8 @@ const FeedbackSettings: React.FC = () => {
   const { settings, loading, saving, saveSettings, regenerateUrls, setSettings } = useFeedbackSettings();
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [showCsatQr, setShowCsatQr] = useState(false);
+  const [showProductQr, setShowProductQr] = useState(false);
   const { toast } = useToast();
   const csatQrRef = useRef<HTMLDivElement>(null);
   const productQrRef = useRef<HTMLDivElement>(null);
@@ -66,7 +68,6 @@ const FeedbackSettings: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast({
         title: "Invalid File",
@@ -76,7 +77,6 @@ const FeedbackSettings: React.FC = () => {
       return;
     }
 
-    // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       toast({
         title: "File Too Large",
@@ -89,54 +89,33 @@ const FeedbackSettings: React.FC = () => {
     setUploadingLogo(true);
 
     try {
-      console.log('📤 Uploading logo...', file.name);
-
-      // Delete old logo if exists
       if (settings?.logo_url) {
         try {
           const urlParts = settings.logo_url.split('/');
           const fileName = urlParts[urlParts.length - 1];
           const oldPath = `${user.id}/${fileName}`;
-          
-          await supabase.storage
-            .from('feedback-logos')
-            .remove([oldPath]);
-          
-          console.log('🗑️ Old logo deleted:', oldPath);
+          await supabase.storage.from('feedback-logos').remove([oldPath]);
         } catch (deleteError) {
           console.warn('⚠️ Could not delete old logo:', deleteError);
         }
       }
 
-      // Upload new logo
       const fileExt = file.name.split('.').pop();
       const fileName = `logo-${Date.now()}.${fileExt}`;
       const filePath = `${user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('feedback-logos')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
+        .upload(filePath, file, { cacheControl: '3600', upsert: true });
 
-      if (uploadError) {
-        console.error('❌ Upload error:', uploadError);
-        throw uploadError;
-      }
+      if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('feedback-logos')
         .getPublicUrl(filePath);
 
-      console.log('✅ Logo uploaded:', publicUrl);
-
-      // Update settings in state
       const updatedSettings = { ...settings!, logo_url: publicUrl };
       setSettings(updatedSettings);
-
-      // ✅ CRITICAL FIX: Save to database immediately
       await saveSettings(updatedSettings);
 
       toast({
@@ -152,9 +131,7 @@ const FeedbackSettings: React.FC = () => {
       });
     } finally {
       setUploadingLogo(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -162,26 +139,17 @@ const FeedbackSettings: React.FC = () => {
     if (!settings?.logo_url || !user) return;
 
     try {
-      console.log('🗑️ Removing logo...');
-
       try {
         const urlParts = settings.logo_url.split('/');
         const fileName = urlParts[urlParts.length - 1];
         const oldPath = `${user.id}/${fileName}`;
-        
-        await supabase.storage
-          .from('feedback-logos')
-          .remove([oldPath]);
-        
-        console.log('🗑️ Logo file deleted from storage');
+        await supabase.storage.from('feedback-logos').remove([oldPath]);
       } catch (deleteError) {
         console.warn('⚠️ Could not delete logo file:', deleteError);
       }
 
       const updatedSettings = { ...settings, logo_url: null };
       setSettings(updatedSettings);
-
-      // ✅ CRITICAL FIX: Save to database immediately
       await saveSettings(updatedSettings);
 
       toast({
@@ -242,6 +210,8 @@ const FeedbackSettings: React.FC = () => {
   const handleRegenerateUrls = async () => {
     try {
       await regenerateUrls();
+      setShowCsatQr(false);
+      setShowProductQr(false);
       toast({
         title: "URLs Regenerated!",
         description: "New project ID and URLs have been generated.",
@@ -360,6 +330,140 @@ const FeedbackSettings: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <Label htmlFor="widget-code" className="text-sm font-medium">
+                  Embed Code
+                </Label>
+                <Textarea
+                  id="widget-code"
+                  value={settings.widget_code}
+                  rows={5}
+                  className="font-mono text-xs sm:text-sm bg-muted/50"
+                  readOnly
+                />
+                <div className="flex justify-end">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => copyToClipboard(settings.widget_code, 'Widget Code')}
+                  >
+                    {copiedField === 'Widget Code' ? (
+                      <>
+                        <Check className="h-4 w-4 mr-2 text-white" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Code
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg space-y-3">
+                <h4 className="font-semibold text-sm flex items-center gap-2 text-blue-900 dark:text-blue-100">
+                  <Sparkles className="h-4 w-4" />
+                  Installation Instructions
+                </h4>
+                <ol className="space-y-2 text-sm text-blue-800 dark:text-blue-200 ml-1">
+                  <li className="flex gap-2">
+                    <span className="font-semibold min-w-[1.5rem]">1.</span>
+                    <span>Copy the embed code above</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-semibold min-w-[1.5rem]">2.</span>
+                    <span>Open your website's HTML file</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-semibold min-w-[1.5rem]">3.</span>
+                    <span>Paste the code before the closing &lt;/body&gt; tag</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-semibold min-w-[1.5rem]">4.</span>
+                    <span>Save and refresh your website to see the widget</span>
+                  </li>
+                </ol>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Project ID Tab */}
+        <TabsContent value="project" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                  <Settings className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                Project Configuration
+              </CardTitle>
+              <CardDescription>
+                Your unique project identifier for all feedback collection
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <Label htmlFor="project-id" className="text-sm font-medium">
+                  Project ID
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="project-id"
+                    value={settings.project_id}
+                    readOnly
+                    className="flex-1 font-mono text-xs sm:text-sm bg-muted/50"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => copyToClipboard(settings.project_id, 'Project ID')}
+                    className="flex-shrink-0"
+                  >
+                    {copiedField === 'Project ID' ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <RefreshCw className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                  <div className="space-y-2 flex-1">
+                    <h4 className="font-semibold text-sm text-amber-900 dark:text-amber-100">
+                      Regenerate URLs
+                    </h4>
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      This will generate new URLs and invalidate all existing links. Use this if your current links have been compromised or shared publicly by mistake.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRegenerateUrls}
+                      className="border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Regenerate All URLs
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default FeedbackSettings;-y-6">
               {/* Business Name */}
               <div className="space-y-3">
                 <Label htmlFor="business-name" className="text-sm font-medium">
@@ -476,14 +580,16 @@ const FeedbackSettings: React.FC = () => {
                 <div className="border rounded-lg p-6 bg-muted/30">
                   <div className="flex flex-col items-center gap-4 max-w-md mx-auto">
                     {settings.logo_url && (
-                      <img
-                        src={settings.logo_url}
-                        alt="Logo Preview"
-                        className="h-16 w-auto object-contain"
-                      />
+                      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4">
+                        <img
+                          src={settings.logo_url}
+                          alt="Logo Preview"
+                          className="h-16 w-auto object-contain max-w-[200px]"
+                        />
+                      </div>
                     )}
                     {settings.business_name && (
-                      <h3 className="text-xl font-semibold text-center">
+                      <h3 className="text-2xl font-bold text-center">
                         {settings.business_name}
                       </h3>
                     )}
@@ -521,7 +627,7 @@ const FeedbackSettings: React.FC = () => {
           </Card>
         </TabsContent>
 
-        {/* Survey Links Tab - Keeping existing code */}
+        {/* Survey Links Tab */}
         <TabsContent value="links" className="space-y-6">
           {/* Customer Satisfaction Survey */}
           <Card className="border-2 border-primary/20 dark:border-primary/30">
@@ -576,35 +682,63 @@ const FeedbackSettings: React.FC = () => {
 
               <Separator />
 
+              {/* QR Code Section */}
               <div className="space-y-3">
                 <Label className="text-sm font-medium">QR Code</Label>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                  <div 
-                    ref={csatQrRef}
-                    className="p-4 bg-white dark:bg-gray-900 border-2 rounded-xl shadow-sm"
-                  >
-                    <QRCodeSVG 
-                      value={settings.customer_survey_url} 
-                      size={120}
-                      level="H"
-                      includeMargin
-                    />
+                {showCsatQr ? (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div 
+                      ref={csatQrRef}
+                      className="p-4 bg-white dark:bg-gray-900 border-2 rounded-xl shadow-sm"
+                    >
+                      <QRCodeSVG 
+                        value={settings.customer_survey_url} 
+                        size={120}
+                        level="H"
+                        includeMargin
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Share this QR code in emails, print materials, or display it in your physical location
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => downloadQRCode(csatQrRef, 'csat-survey-qr-code')}
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Download
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowCsatQr(false)}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Hide
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1 space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      Share this QR code in emails, print materials, or display it in your physical location
+                ) : (
+                  <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                    <QrCode className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
+                    <p className="text-sm font-medium mb-2">Generate QR Code</p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Create a scannable QR code for your survey link
                     </p>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => downloadQRCode(csatQrRef, 'csat-survey-qr-code')}
-                      className="w-full sm:w-auto"
+                      onClick={() => setShowCsatQr(true)}
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download QR Code
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate QR Code
                     </Button>
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="bg-muted/50 p-4 rounded-lg border">
@@ -676,35 +810,63 @@ const FeedbackSettings: React.FC = () => {
 
               <Separator />
 
+              {/* QR Code Section */}
               <div className="space-y-3">
                 <Label className="text-sm font-medium">QR Code</Label>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                  <div 
-                    ref={productQrRef}
-                    className="p-4 bg-white dark:bg-gray-900 border-2 rounded-xl shadow-sm"
-                  >
-                    <QRCodeSVG 
-                      value={settings.product_feedback_url} 
-                      size={120}
-                      level="H"
-                      includeMargin
-                    />
+                {showProductQr ? (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div 
+                      ref={productQrRef}
+                      className="p-4 bg-white dark:bg-gray-900 border-2 rounded-xl shadow-sm"
+                    >
+                      <QRCodeSVG 
+                        value={settings.product_feedback_url} 
+                        size={120}
+                        level="H"
+                        includeMargin
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Perfect for product packaging, user manuals, or support documentation
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => downloadQRCode(productQrRef, 'product-feedback-qr-code')}
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Download
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowProductQr(false)}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Hide
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1 space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      Perfect for product packaging, user manuals, or support documentation
+                ) : (
+                  <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                    <QrCode className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
+                    <p className="text-sm font-medium mb-2">Generate QR Code</p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Create a scannable QR code for your feedback link
                     </p>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => downloadQRCode(productQrRef, 'product-feedback-qr-code')}
-                      className="w-full sm:w-auto"
+                      onClick={() => setShowProductQr(true)}
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download QR Code
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate QR Code
                     </Button>
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="bg-muted/50 p-4 rounded-lg border">
@@ -722,7 +884,7 @@ const FeedbackSettings: React.FC = () => {
           </Card>
         </TabsContent>
 
-        {/* Widget Code Tab - Keep existing code */}
+        {/* Widget Code Tab */}
         <TabsContent value="widget" className="space-y-6">
           <Card>
             <CardHeader>
@@ -736,138 +898,4 @@ const FeedbackSettings: React.FC = () => {
                 Add this code to your website to display an interactive feedback widget
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-3">
-                <Label htmlFor="widget-code" className="text-sm font-medium">
-                  Embed Code
-                </Label>
-                <Textarea
-                  id="widget-code"
-                  value={settings.widget_code}
-                  rows={5}
-                  className="font-mono text-xs sm:text-sm bg-muted/50"
-                  readOnly
-                />
-                <div className="flex justify-end">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => copyToClipboard(settings.widget_code, 'Widget Code')}
-                  >
-                    {copiedField === 'Widget Code' ? (
-                      <>
-                        <Check className="h-4 w-4 mr-2 text-white" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy Code
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg space-y-3">
-                <h4 className="font-semibold text-sm flex items-center gap-2 text-blue-900 dark:text-blue-100">
-                  <Sparkles className="h-4 w-4" />
-                  Installation Instructions
-                </h4>
-                <ol className="space-y-2 text-sm text-blue-800 dark:text-blue-200 ml-1">
-                  <li className="flex gap-2">
-                    <span className="font-semibold min-w-[1.5rem]">1.</span>
-                    <span>Copy the embed code above</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-semibold min-w-[1.5rem]">2.</span>
-                    <span>Open your website's HTML file</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-semibold min-w-[1.5rem]">3.</span>
-                    <span>Paste the code before the closing <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900/50 rounded text-xs">&lt;/body&gt;</code> tag</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-semibold min-w-[1.5rem]">4.</span>
-                    <span>Save and refresh your website to see the widget</span>
-                  </li>
-                </ol>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Project ID Tab - Keep existing code */}
-        <TabsContent value="project" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-                  <Settings className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                </div>
-                Project Configuration
-              </CardTitle>
-              <CardDescription>
-                Your unique project identifier for all feedback collection
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-3">
-                <Label htmlFor="project-id" className="text-sm font-medium">
-                  Project ID
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="project-id"
-                    value={settings.project_id}
-                    readOnly
-                    className="flex-1 font-mono text-xs sm:text-sm bg-muted/50"
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => copyToClipboard(settings.project_id, 'Project ID')}
-                    className="flex-shrink-0"
-                  >
-                    {copiedField === 'Project ID' ? (
-                      <Check className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <RefreshCw className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
-                  <div className="space-y-2 flex-1">
-                    <h4 className="font-semibold text-sm text-amber-900 dark:text-amber-100">
-                      Regenerate URLs
-                    </h4>
-                    <p className="text-xs text-amber-800 dark:text-amber-200">
-                      This will generate new URLs and invalidate all existing links. Use this if your current links have been compromised or shared publicly by mistake.
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleRegenerateUrls}
-                      className="border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-900/30"
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Regenerate All URLs
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-};
-
-export default FeedbackSettings;
+            <CardContent className="space
