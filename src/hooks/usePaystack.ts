@@ -56,69 +56,6 @@ export function usePaystack(): PaystackActions {
     });
   }, []);
 
-  // Initialize payment
-  const initializePayment = useCallback(async (config: Omit<PaystackConfig, 'key' | 'callback' | 'onClose'>) => {
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Ensure Paystack is ready
-      if (!isPaystackReady) {
-        await initializePaystack();
-      }
-
-      if (!window.PaystackPop || typeof window.PaystackPop.setup !== 'function') {
-        throw new Error('Paystack payment system not properly initialized');
-      }
-
-      // Validate Paystack key
-      const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
-      if (!paystackKey || paystackKey === 'pk_test_...' || paystackKey.includes('your_actual_paystack')) {
-        throw new Error('Paystack public key not configured. Please check your environment variables.');
-      }
-
-      // Create payment callback
-      const paymentCallback = (response: any) => {
-        console.log('Paystack response received:', response);
-        
-        if (response.status === 'success') {
-          // Handle success asynchronously
-          verifyPayment(response.reference, 'business', config.amount);
-        } else {
-          setError('Payment was not successful');
-          setLoading(false);
-        }
-      };
-
-      const paystackConfig: PaystackConfig = {
-        key: paystackKey,
-        email: config.email,
-        amount: config.amount,
-        currency: config.currency,
-        reference: config.reference,
-        callback: paymentCallback,
-        onClose: () => {
-          setLoading(false);
-          toast.info('Payment cancelled');
-        },
-      };
-
-      // Initialize Paystack payment
-      const handler = window.PaystackPop.setup(paystackConfig);
-      handler.openIframe();
-    } catch (err) {
-      console.error('Payment initialization error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment';
-      setError(errorMessage);
-      setLoading(false);
-      throw err;
-    }
-  }, [user, isPaystackReady, initializePaystack, verifyPayment]);
-
   // Verify payment with backend
   const verifyPayment = useCallback(async (reference: string, plan: string, amount: number): Promise<boolean> => {
     if (!user) {
@@ -221,6 +158,70 @@ export function usePaystack(): PaystackActions {
       return false;
     }
   }, [user]);
+
+  // Initialize payment
+  const initializePayment = useCallback(async (config: Omit<PaystackConfig, 'key' | 'callback' | 'onClose'>) => {
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Ensure Paystack is ready
+      if (!isPaystackReady) {
+        await initializePaystack();
+      }
+
+      if (!window.PaystackPop || typeof window.PaystackPop.setup !== 'function') {
+        throw new Error('Paystack payment system not properly initialized');
+      }
+
+      // Validate Paystack key
+      const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+      if (!paystackKey || paystackKey === 'pk_test_...' || paystackKey.includes('your_actual_paystack')) {
+        throw new Error('Paystack public key not configured. Please check your environment variables.');
+      }
+
+      // Create payment callback
+      const paymentCallback = (response: any) => {
+        console.log('Paystack response received:', response);
+        
+        if (response.status === 'success') {
+          // Handle success asynchronously
+          verifyPayment(response.reference, 'business', config.amount);
+        } else {
+          setError('Payment was not successful');
+          setLoading(false);
+        }
+      };
+
+      const paystackConfig: PaystackConfig = {
+        key: paystackKey,
+        email: config.email,
+        amount: config.amount,
+        currency: config.currency,
+        reference: config.reference,
+        callback: paymentCallback,
+        onClose: () => {
+          setLoading(false);
+          toast.info('Payment cancelled');
+        },
+      };
+
+      // Initialize Paystack payment
+      const handler = window.PaystackPop.setup(paystackConfig);
+      handler.openIframe();
+    } catch (err) {
+      console.error('Payment initialization error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment';
+      setError(errorMessage);
+      setLoading(false);
+      throw err;
+    }
+  }, [user, isPaystackReady, initializePaystack, verifyPayment]);
+
 
   return {
     initializePayment,

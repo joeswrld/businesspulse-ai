@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Filter, Search, Calendar as CalendarIcon, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { FeedbackFilters } from '@/utils/feedbackUtils';
+import type { FeedbackFilters } from '@/utils/feedbackUtils';
 
 interface FeedbackFiltersProps {
   filters: FeedbackFilters;
