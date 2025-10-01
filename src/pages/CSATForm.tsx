@@ -272,6 +272,22 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
     <div className={containerClass}>
       <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
+          {/* Business Logo */}
+          {settings?.logo_url && (
+            <div className="flex justify-center mb-4">
+              <img
+                src={settings.logo_url}
+                alt="Business Logo"
+                className="h-16 w-auto object-contain"
+              />
+            </div>
+          )}
+          
+          {/* Business Name */}
+          {settings?.business_name && (
+            <h2 className="text-2xl font-bold mb-4">{settings.business_name}</h2>
+          )}
+          
           <div className="flex items-center justify-center mb-4">
             <MessageSquare 
               className="h-8 w-8 mr-2" 
