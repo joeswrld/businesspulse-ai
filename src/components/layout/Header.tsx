@@ -119,7 +119,7 @@ const Header = () => {
                     className="flex items-center space-x-2 px-3"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                    <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center ">
                       {profile?.avatar_url ? (
                         <img 
                           src={profile.avatar_url} 
