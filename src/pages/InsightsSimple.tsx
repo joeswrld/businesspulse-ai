@@ -8,7 +8,6 @@ import {
   Loader2, 
   MessageSquare,
   Sparkles,
-  RefreshCw,
   Save,
   Download,
   Clock,
@@ -254,22 +253,34 @@ export default function InsightsPage() {
   };
 
   const saveInsight = async () => {
-    if (!currentInsight || !user) return;
+    if (!currentInsight || !user) {
+      toast({
+        title: 'Error',
+        description: 'No insight to save or user not authenticated',
+        variant: 'destructive'
+      });
+      return;
+    }
 
     setSaving(true);
     try {
       const detailsText = `Summary:\n${currentInsight.summary}\n\nKey Themes:\n• ${currentInsight.key_themes.join('\n• ')}\n\nSuggested Actions:\n• ${currentInsight.suggested_actions.join('\n• ')}\n\nTrends:\n• ${currentInsight.trends.join('\n• ')}\n\nPerformance Score: ${currentInsight.performance.score}/100\nSentiment: ${currentInsight.sentiment.overall} (${currentInsight.sentiment.positive}% positive, ${currentInsight.sentiment.neutral}% neutral, ${currentInsight.sentiment.negative}% negative)`;
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('insights')
         .insert({
           user_id: user.id,
           title: currentInsight.title,
           details: detailsText,
           feedback_count: selectedFeedbacks.size
-        });
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       toast({
         title: '💾 Saved!',
@@ -280,12 +291,26 @@ export default function InsightsPage() {
       if (activeTab === 'history') {
         fetchHistory();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving insight:', error);
+      
+      let errorMessage = 'Failed to save insight';
+      
+      if (error.message?.includes('permission') || error.code === 'PGRST301') {
+        errorMessage = 'Permission denied. Please check your account settings or contact support.';
+      } else if (error.code === '23505') {
+        errorMessage = 'This insight already exists.';
+      } else if (error.message?.includes('JWT')) {
+        errorMessage = 'Session expired. Please refresh the page and try again.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: 'Error',
-        description: 'Failed to save insight',
-        variant: 'destructive'
+        description: errorMessage,
+        variant: 'destructive',
+        duration: 5000
       });
     } finally {
       setSaving(false);
@@ -296,26 +321,48 @@ export default function InsightsPage() {
     try {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 20;
       const maxWidth = pageWidth - (margin * 2);
+      let yPosition = 20;
       
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text(title, margin, 20);
+      const titleLines = doc.splitTextToSize(title, maxWidth);
+      doc.text(titleLines, margin, yPosition);
+      yPosition += titleLines.length * 7 + 3;
       
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Generated: ${new Date().toLocaleString()}`, margin, 30);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, margin, yPosition);
+      yPosition += 15;
       
       doc.setFontSize(11);
-      const lines = doc.splitTextToSize(content, maxWidth);
-      doc.text(lines, margin, 40);
+      const contentLines = doc.splitTextToSize(content, maxWidth);
       
-      const pageCount = doc.getNumberOfPages();
-      doc.setFontSize(8);
-      doc.text(`NoteX AI Insights | Page ${pageCount}`, margin, doc.internal.pageSize.getHeight() - 10);
+      contentLines.forEach((line: string) => {
+        if (yPosition > pageHeight - 30) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        doc.text(line, margin, yPosition);
+        yPosition += 7;
+      });
       
-      doc.save(`${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`);
+      const totalPages = doc.internal.pages.length - 1;
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(
+          `NoteX AI Insights | Page ${i} of ${totalPages}`,
+          margin,
+          pageHeight - 10
+        );
+      }
+      
+      const filename = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+      doc.save(filename);
       
       toast({
         title: '📥 Downloaded!',
@@ -326,7 +373,7 @@ export default function InsightsPage() {
       console.error('Error generating PDF:', error);
       toast({
         title: 'Error',
-        description: 'Failed to generate PDF',
+        description: 'Failed to generate PDF. Please try again.',
         variant: 'destructive'
       });
     }
@@ -362,32 +409,43 @@ export default function InsightsPage() {
   const exportAllAsCSV = () => {
     if (savedInsights.length === 0) return;
 
-    const headers = ['Title', 'Details', 'Feedback Count', 'Created At'];
-    const rows = savedInsights.map(insight => [
-      insight.title,
-      insight.details.replace(/\n/g, ' '),
-      insight.feedback_count || 0,
-      new Date(insight.created_at).toLocaleString()
-    ]);
+    try {
+      const headers = ['Title', 'Details', 'Feedback Count', 'Created At'];
+      const rows = savedInsights.map(insight => [
+        insight.title,
+        insight.details.replace(/\n/g, ' ').replace(/"/g, '""'),
+        insight.feedback_count || 0,
+        new Date(insight.created_at).toLocaleString()
+      ]);
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `notex_insights_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `notex_insights_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
 
-    toast({
-      title: '📥 Exported!',
-      description: `${savedInsights.length} insights exported to CSV`,
-      duration: 2000
-    });
+      toast({
+        title: '📥 Exported!',
+        description: `${savedInsights.length} insights exported to CSV`,
+        duration: 2000
+      });
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to export CSV',
+        variant: 'destructive'
+      });
+    }
   };
 
   const exportAllAsPDF = () => {
@@ -397,6 +455,7 @@ export default function InsightsPage() {
       const doc = new jsPDF();
       const margin = 20;
       const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
       const maxWidth = pageWidth - (margin * 2);
       let yPosition = 20;
 
@@ -408,33 +467,58 @@ export default function InsightsPage() {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Generated: ${new Date().toLocaleString()}`, margin, yPosition);
-      doc.text(`Total Insights: ${savedInsights.length}`, margin, yPosition + 5);
+      yPosition += 5;
+      doc.text(`Total Insights: ${savedInsights.length}`, margin, yPosition);
+      yPosition += 10;
 
       savedInsights.forEach((insight, index) => {
-        if (yPosition > doc.internal.pageSize.getHeight() - 40) {
+        if (yPosition > pageHeight - 40) {
           doc.addPage();
           yPosition = 20;
         }
 
-        yPosition += 15;
+        yPosition += 10;
         
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         const titleLines = doc.splitTextToSize(`${index + 1}. ${insight.title}`, maxWidth);
         doc.text(titleLines, margin, yPosition);
-        yPosition += titleLines.length * 7;
+        yPosition += titleLines.length * 7 + 3;
 
         doc.setFontSize(9);
         doc.setFont('helvetica', 'italic');
+        doc.setTextColor(100, 100, 100);
         doc.text(new Date(insight.created_at).toLocaleString(), margin, yPosition);
         yPosition += 7;
 
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
         const contentLines = doc.splitTextToSize(insight.details, maxWidth);
-        doc.text(contentLines, margin, yPosition);
-        yPosition += contentLines.length * 5 + 5;
+        
+        contentLines.forEach((line: string) => {
+          if (yPosition > pageHeight - 30) {
+            doc.addPage();
+            yPosition = 20;
+          }
+          doc.text(line, margin, yPosition);
+          yPosition += 5;
+        });
+        
+        yPosition += 5;
       });
+
+      const totalPages = doc.internal.pages.length - 1;
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(
+          `NoteX Insights Report | Page ${i} of ${totalPages}`,
+          margin,
+          pageHeight - 10
+        );
+      }
 
       doc.save(`notex_all_insights_${new Date().toISOString().split('T')[0]}.pdf`);
       
@@ -475,7 +559,6 @@ export default function InsightsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950">
       <div className="container mx-auto p-6 max-w-6xl">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -504,7 +587,6 @@ export default function InsightsPage() {
           </div>
         </motion.div>
 
-        {/* Tabs */}
         <div className="flex items-center justify-center space-x-2 mb-8">
           <button
             onClick={() => setActiveTab('generate')}
@@ -535,7 +617,6 @@ export default function InsightsPage() {
           </button>
         </div>
 
-        {/* Generate Tab */}
         {activeTab === 'generate' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -561,7 +642,6 @@ export default function InsightsPage() {
               </div>
             ) : (
               <>
-                {/* Feedback Selection */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
                   <div className="flex items-center space-x-2 mb-4 border-b border-gray-200 dark:border-gray-700 pb-4">
                     <Filter className="h-5 w-5 text-blue-600" />
@@ -651,7 +731,6 @@ export default function InsightsPage() {
                   </div>
                 </div>
 
-                {/* Generated Insights Display */}
                 <AnimatePresence>
                   {currentInsight && (
                     <motion.div
@@ -660,12 +739,11 @@ export default function InsightsPage() {
                       exit={{ opacity: 0, y: -20 }}
                       className="space-y-6"
                     >
-                      {/* Action Buttons */}
                       <div className="flex justify-end gap-3">
                         <button
                           onClick={saveInsight}
                           disabled={saving}
-                          className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                          className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg transition-colors disabled:cursor-not-allowed"
                         >
                           {saving ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -676,7 +754,7 @@ export default function InsightsPage() {
                         </button>
                         <button
                           onClick={() => {
-                            const content = `Summary:\n${currentInsight.summary}\n\nKey Themes:\n• ${currentInsight.key_themes.join('\n• ')}\n\nSuggested Actions:\n• ${currentInsight.suggested_actions.join('\n• ')}\n\nTrends:\n• ${currentInsight.trends.join('\n• ')}\n\nPerformance: ${currentInsight.performance.score}/100`;
+                            const content = `Summary:\n${currentInsight.summary}\n\nKey Themes:\n• ${currentInsight.key_themes.join('\n• ')}\n\nSuggested Actions:\n• ${currentInsight.suggested_actions.join('\n• ')}\n\nTrends:\n• ${currentInsight.trends.join('\n• ')}\n\nPerformance: ${currentInsight.performance.score}/100\nSentiment: ${currentInsight.sentiment.overall}`;
                             downloadPDF(currentInsight.title, content);
                           }}
                           className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -686,7 +764,6 @@ export default function InsightsPage() {
                         </button>
                       </div>
 
-                      {/* Summary */}
                       <div className="rounded-xl border border-blue-200 dark:border-blue-800 shadow-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
                         <div className="flex items-center space-x-2 mb-4">
                           <div className="p-2 bg-blue-600 rounded-lg">
@@ -699,7 +776,6 @@ export default function InsightsPage() {
                         </p>
                       </div>
 
-                      {/* Performance & Sentiment */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
                           <div className="flex items-center space-x-2 mb-6">
@@ -786,7 +862,6 @@ export default function InsightsPage() {
                         </div>
                       </div>
 
-                      {/* Key Themes */}
                       <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
                         <div className="flex items-center space-x-2 mb-6">
                           <Lightbulb className="h-5 w-5 text-orange-600 dark:text-orange-400" />
@@ -807,7 +882,6 @@ export default function InsightsPage() {
                         </div>
                       </div>
 
-                      {/* Suggested Actions */}
                       <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
                         <div className="flex items-center space-x-2 mb-6">
                           <Target className="h-5 w-5 text-red-600 dark:text-red-400" />
@@ -830,7 +904,6 @@ export default function InsightsPage() {
                         </div>
                       </div>
 
-                      {/* Trends */}
                       <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
                         <div className="flex items-center space-x-2 mb-6">
                           <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -858,7 +931,6 @@ export default function InsightsPage() {
           </motion.div>
         )}
 
-        {/* History Tab */}
         {activeTab === 'history' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
