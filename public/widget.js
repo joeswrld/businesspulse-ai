@@ -1,7 +1,6 @@
 // public/widget.js
-// NoteX Feedback Widget - Fixed Version
+// NoteX Feedback Widget - Enhanced Version with Branding
 
-// Suppress MetaMask/Ethereum injection warnings
 if (typeof window !== 'undefined' && !window.ethereum) {
   console.info("NoteX: No Ethereum provider found, skipping Web3 init...");
 }
@@ -9,7 +8,6 @@ if (typeof window !== 'undefined' && !window.ethereum) {
 (function() {
   'use strict';
 
-  // Widget configuration
   var config = {
     projectId: null,
     theme: 'light',
@@ -19,7 +17,6 @@ if (typeof window !== 'undefined' && !window.ethereum) {
     supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84'
   };
 
-  // Initialize widget
   function initWidget() {
     var script = document.currentScript || getCurrentScript();
     if (script) {
@@ -37,69 +34,64 @@ if (typeof window !== 'undefined' && !window.ethereum) {
     createWidget();
   }
 
-  // Fallback for older browsers
   function getCurrentScript() {
     var scripts = document.getElementsByTagName('script');
     return scripts[scripts.length - 1];
   }
 
-  // Create widget DOM
   function createWidget() {
-    // Create floating button
+    // Create floating button with text
     var button = document.createElement('button');
     button.id = 'notex-feedback-button';
-    button.innerHTML = '💬';
-    button.setAttribute('aria-label', 'Open feedback widget');
+    button.setAttribute('aria-label', 'Share your feedback');
     
-    // Button styles
+    // Button content with emoji and text
+    button.innerHTML = '<span style="margin-right: 6px;">💬</span><span>Feedback</span>';
+    
     var buttonStyles = {
       position: 'fixed',
       bottom: '20px',
       right: '20px',
-      width: '60px',
-      height: '60px',
-      borderRadius: '50%',
+      padding: '12px 20px',
+      borderRadius: '25px',
       backgroundColor: config.brandColor,
       color: 'white',
       border: 'none',
-      fontSize: '24px',
+      fontSize: '14px',
+      fontWeight: '600',
       cursor: 'pointer',
       boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
       zIndex: '10000',
       transition: 'all 0.3s ease',
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'center'
+      justifyContent: 'center',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
     };
 
     Object.assign(button.style, buttonStyles);
 
-    // Hover effects
     button.addEventListener('mouseenter', function() {
-      button.style.transform = 'scale(1.1)';
+      button.style.transform = 'translateY(-2px)';
       button.style.boxShadow = '0 6px 20px rgba(0,0,0,0.25)';
     });
 
     button.addEventListener('mouseleave', function() {
-      button.style.transform = 'scale(1)';
+      button.style.transform = 'translateY(0)';
       button.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
     });
 
-    // Click handler
     button.addEventListener('click', openFeedbackModal);
 
     document.body.appendChild(button);
   }
 
-  // Open feedback modal
   function openFeedbackModal() {
-    // Remove existing modal if present
     var existing = document.getElementById('notex-feedback-modal');
     if (existing) {
       existing.remove();
     }
 
-    // Create modal
     var modal = document.createElement('div');
     modal.id = 'notex-feedback-modal';
     
@@ -119,12 +111,11 @@ if (typeof window !== 'undefined' && !window.ethereum) {
 
     Object.assign(modal.style, modalStyles);
 
-    // Create modal content
     var content = document.createElement('div');
     var contentStyles = {
       backgroundColor: config.theme === 'dark' ? '#1f2937' : 'white',
       borderRadius: '12px',
-      padding: '24px',
+      padding: '0',
       maxWidth: '500px',
       width: '90%',
       maxHeight: '80vh',
@@ -135,82 +126,85 @@ if (typeof window !== 'undefined' && !window.ethereum) {
 
     Object.assign(content.style, contentStyles);
 
-    // Modal HTML
     content.innerHTML = createModalHTML();
 
     modal.appendChild(content);
     document.body.appendChild(modal);
 
-    // Add CSS animations
     addCSS();
-
-    // Add event listeners
     setupModalEvents(modal);
   }
 
-  // Create modal HTML
   function createModalHTML() {
     var textColor = config.theme === 'dark' ? '#ffffff' : '#1f2937';
     var inputBg = config.theme === 'dark' ? '#374151' : '#ffffff';
     var borderColor = config.theme === 'dark' ? '#4b5563' : '#d1d5db';
 
     return `
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="margin: 0; color: ${textColor}; font-size: 20px; font-weight: 600;">
-          ${config.greeting}
-        </h2>
-        <button id="notex-close-btn" style="background: none; border: none; font-size: 24px; cursor: pointer; color: ${textColor}; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">
-          ×
-        </button>
+      <div style="padding: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; color: ${textColor}; font-size: 20px; font-weight: 600;">
+            ${config.greeting}
+          </h2>
+          <button id="notex-close-btn" style="background: none; border: none; font-size: 24px; cursor: pointer; color: ${textColor}; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">
+            ×
+          </button>
+        </div>
+
+        <form id="notex-feedback-form">
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
+              Feedback Type
+            </label>
+            <select id="feedback-type" style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 6px; background-color: ${inputBg}; color: ${textColor}; font-size: 14px;">
+              <option value="satisfaction">Customer Satisfaction</option>
+              <option value="product">Product Feedback</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
+              Rating
+            </label>
+            <div id="rating-stars" style="display: flex; gap: 4px; margin-bottom: 8px;">
+              ${[1,2,3,4,5].map(i => `<span class="star" data-rating="${i}" style="font-size: 24px; cursor: pointer; color: #d1d5db;">⭐</span>`).join('')}
+            </div>
+          </div>
+
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
+              Your Feedback
+            </label>
+            <textarea id="feedback-message" placeholder="Tell us what you think..." style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 6px; background-color: ${inputBg}; color: ${textColor}; font-size: 14px; min-height: 100px; resize: vertical; font-family: inherit;"></textarea>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
+              Email (Optional)
+            </label>
+            <input type="email" id="feedback-email" placeholder="your@email.com" style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 6px; background-color: ${inputBg}; color: ${textColor}; font-size: 14px;">
+          </div>
+
+          <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button type="button" id="notex-cancel-btn" style="padding: 10px 20px; border: 1px solid ${borderColor}; background-color: transparent; color: ${textColor}; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">
+              Cancel
+            </button>
+            <button type="submit" style="padding: 10px 20px; background-color: ${config.brandColor}; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">
+              Submit Feedback
+            </button>
+          </div>
+        </form>
       </div>
 
-      <form id="notex-feedback-form">
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
-            Feedback Type
-          </label>
-          <select id="feedback-type" style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 6px; background-color: ${inputBg}; color: ${textColor}; font-size: 14px;">
-            <option value="satisfaction">Customer Satisfaction</option>
-            <option value="product">Product Feedback</option>
-          </select>
-        </div>
-
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
-            Rating
-          </label>
-          <div id="rating-stars" style="display: flex; gap: 4px; margin-bottom: 8px;">
-            ${[1,2,3,4,5].map(i => `<span class="star" data-rating="${i}" style="font-size: 24px; cursor: pointer; color: #d1d5db;">⭐</span>`).join('')}
-          </div>
-        </div>
-
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
-            Your Feedback
-          </label>
-          <textarea id="feedback-message" placeholder="Tell us what you think..." style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 6px; background-color: ${inputBg}; color: ${textColor}; font-size: 14px; min-height: 100px; resize: vertical; font-family: inherit;"></textarea>
-        </div>
-
-        <div style="margin-bottom: 20px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
-            Email (Optional)
-          </label>
-          <input type="email" id="feedback-email" placeholder="your@email.com" style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 6px; background-color: ${inputBg}; color: ${textColor}; font-size: 14px;">
-        </div>
-
-        <div style="display: flex; gap: 12px; justify-content: flex-end;">
-          <button type="button" id="notex-cancel-btn" style="padding: 10px 20px; border: 1px solid ${borderColor}; background-color: transparent; color: ${textColor}; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">
-            Cancel
-          </button>
-          <button type="submit" style="padding: 10px 20px; background-color: ${config.brandColor}; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">
-            Submit Feedback
-          </button>
-        </div>
-      </form>
+      <!-- Powered by NoteX -->
+      <div style="background-color: ${config.theme === 'dark' ? '#111827' : '#f3f4f6'}; padding: 12px; text-align: center; border-top: 1px solid ${borderColor}; border-radius: 0 0 12px 12px;">
+        <a href="https://notex.com.ng/" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #6b7280; text-decoration: none; transition: color 0.2s ease;">
+          Powered by <span style="font-weight: 600;">NoteX</span>
+        </a>
+      </div>
     `;
   }
 
-  // Add CSS animations
   function addCSS() {
     if (document.getElementById('notex-css')) return;
 
@@ -228,18 +222,19 @@ if (typeof window !== 'undefined' && !window.ethereum) {
       .star:hover, .star.active {
         color: #fbbf24 !important;
       }
+      #notex-feedback-modal a:hover {
+        color: #3b82f6 !important;
+      }
     `;
     document.head.appendChild(style);
   }
 
-  // Setup modal event listeners
   function setupModalEvents(modal) {
     var closeBtn = document.getElementById('notex-close-btn');
     var cancelBtn = document.getElementById('notex-cancel-btn');
     var form = document.getElementById('notex-feedback-form');
     var stars = document.querySelectorAll('.star');
 
-    // Close modal
     function closeModal() {
       modal.remove();
     }
@@ -250,7 +245,6 @@ if (typeof window !== 'undefined' && !window.ethereum) {
       if (e.target === modal) closeModal();
     });
 
-    // Star rating
     var selectedRating = 0;
     stars.forEach(function(star) {
       star.addEventListener('click', function() {
@@ -278,14 +272,12 @@ if (typeof window !== 'undefined' && !window.ethereum) {
       });
     }
 
-    // Form submission
     form.addEventListener('submit', function(e) {
       e.preventDefault();
       submitFeedback(selectedRating, closeModal);
     });
   }
 
-  // Submit feedback
   function submitFeedback(rating, closeCallback) {
     var type = document.getElementById('feedback-type').value;
     var message = document.getElementById('feedback-message').value.trim();
@@ -296,59 +288,51 @@ if (typeof window !== 'undefined' && !window.ethereum) {
       return;
     }
 
-    // Fixed data structure to match the feedback table schema
     var feedbackData = {
       project_id: config.projectId,
-      message: message, // This matches your 'message' column
-      form_type: type === 'satisfaction' ? 'customer_satisfaction' : 'product_feedback', // Must match your CHECK constraint
-      rating: rating || null, // This matches your 'rating' column
+      message: message,
+      form_type: type === 'satisfaction' ? 'customer_satisfaction' : 'product_feedback',
+      rating: rating || null,
       metadata: {
         email: email || null,
         user_agent: navigator.userAgent,
         page_url: window.location.href,
-        original_type: type // Store the original type in metadata
+        original_type: type
       }
     };
 
-    // Show loading state
     var submitBtn = document.querySelector('#notex-feedback-form button[type="submit"]');
     var originalText = submitBtn.textContent;
     submitBtn.textContent = 'Submitting...';
     submitBtn.disabled = true;
 
-    // Submit to Supabase with better error handling
     fetch(config.supabaseUrl + '/rest/v1/feedback', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'apikey': config.supabaseKey,
         'Authorization': 'Bearer ' + config.supabaseKey,
-        'Prefer': 'return=minimal' // Don't return the inserted row
+        'Prefer': 'return=minimal'
       },
       body: JSON.stringify(feedbackData)
     })
     .then(function(response) {
-      // Check if the response is ok
       if (!response.ok) {
-        // Try to get error details from response
         return response.text().then(function(text) {
           var errorMessage = 'HTTP ' + response.status;
           try {
             var errorData = JSON.parse(text);
             errorMessage = errorData.message || errorData.hint || errorMessage;
           } catch (e) {
-            // If not JSON, use the text as error message
             if (text) errorMessage = text;
           }
           throw new Error(errorMessage);
         });
       }
       
-      // For successful responses, we don't need to parse JSON if using Prefer: return=minimal
       return response.status === 201 ? { success: true } : response.json();
     })
     .then(function(data) {
-      // Success
       console.log('Feedback submitted successfully');
       showSuccessMessage();
       setTimeout(closeCallback, 2000);
@@ -356,7 +340,6 @@ if (typeof window !== 'undefined' && !window.ethereum) {
     .catch(function(error) {
       console.error('Error submitting feedback:', error);
       
-      // Show more specific error messages
       var errorMessage = 'Failed to submit feedback. Please try again.';
       
       if (error.message.includes('JWT')) {
@@ -373,13 +356,11 @@ if (typeof window !== 'undefined' && !window.ethereum) {
       
       alert(errorMessage);
       
-      // Reset button
       submitBtn.textContent = originalText;
       submitBtn.disabled = false;
     });
   }
 
-  // Show success message
   function showSuccessMessage() {
     var form = document.getElementById('notex-feedback-form');
     var textColor = config.theme === 'dark' ? '#ffffff' : '#1f2937';
@@ -397,7 +378,6 @@ if (typeof window !== 'undefined' && !window.ethereum) {
     `;
   }
 
-  // Initialize when DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initWidget);
   } else {
