@@ -1,5 +1,5 @@
 // public/widget.js
-// NoteX Feedback Widget - Fixed Version
+// NoteX Feedback Widget - With Trial Access Control
 
 if (typeof window !== 'undefined' && !window.ethereum) {
   console.info("NoteX: No Ethereum provider found, skipping Web3 init...");
@@ -15,6 +15,12 @@ if (typeof window !== 'undefined' && !window.ethereum) {
     greeting: 'We value your feedback!',
     supabaseUrl: 'https://xjbrqeqizpoqdjkiyqzt.supabase.co',
     supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84'
+  };
+
+  var widgetState = {
+    isAccessValid: false,
+    isChecking: true,
+    errorMessage: null
   };
 
   function initWidget() {
@@ -38,7 +44,8 @@ if (typeof window !== 'undefined' && !window.ethereum) {
       return;
     }
 
-    createWidget();
+    // Check access before creating widget
+    checkWidgetAccess();
   }
 
   function getCurrentScript() {
@@ -46,7 +53,49 @@ if (typeof window !== 'undefined' && !window.ethereum) {
     return scripts[scripts.length - 1];
   }
 
+  function checkWidgetAccess() {
+    // Check if the project owner has an active subscription or valid trial
+    fetch(config.supabaseUrl + '/rest/v1/rpc/check_widget_access', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': config.supabaseKey,
+        'Authorization': 'Bearer ' + config.supabaseKey
+      },
+      body: JSON.stringify({ project_id_param: config.projectId })
+    })
+    .then(function(response) {
+      if (!response.ok) {
+        throw new Error('Access check failed');
+      }
+      return response.json();
+    })
+    .then(function(data) {
+      widgetState.isAccessValid = data === true || (data && data.has_access === true);
+      widgetState.isChecking = false;
+      
+      if (widgetState.isAccessValid) {
+        createWidget();
+      } else {
+        console.warn('NoteX: Widget disabled - Trial expired or subscription inactive');
+        widgetState.errorMessage = 'Trial expired';
+      }
+    })
+    .catch(function(error) {
+      console.error('NoteX: Access check error:', error);
+      // Fail open - create widget anyway if check fails
+      widgetState.isAccessValid = true;
+      widgetState.isChecking = false;
+      createWidget();
+    });
+  }
+
   function createWidget() {
+    if (!widgetState.isAccessValid) {
+      console.warn('NoteX: Widget access denied');
+      return;
+    }
+
     // Create floating button with text
     var button = document.createElement('button');
     button.id = 'notex-feedback-button';
@@ -303,7 +352,6 @@ if (typeof window !== 'undefined' && !window.ethereum) {
       return;
     }
 
-    // Validate project_id before submission
     if (!config.projectId) {
       alert('Invalid project configuration. Please contact support.');
       return;
