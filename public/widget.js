@@ -1,5 +1,5 @@
 // public/widget.js
-// NoteX Feedback Widget - Enhanced Version with Branding
+// NoteX Feedback Widget - Fixed Version
 
 if (typeof window !== 'undefined' && !window.ethereum) {
   console.info("NoteX: No Ethereum provider found, skipping Web3 init...");
@@ -28,6 +28,13 @@ if (typeof window !== 'undefined' && !window.ethereum) {
 
     if (!config.projectId) {
       console.error('NoteX: data-project-id attribute is required');
+      return;
+    }
+
+    // Validate project ID format (UUID)
+    var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(config.projectId)) {
+      console.error('NoteX: Invalid project ID format. Must be a valid UUID.');
       return;
     }
 
@@ -166,8 +173,8 @@ if (typeof window !== 'undefined' && !window.ethereum) {
             <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
               Rating
             </label>
-            <div id="rating-stars" style="display: flex; gap: 4px; margin-bottom: 8px;">
-              ${[1,2,3,4,5].map(i => `<span class="star" data-rating="${i}" style="font-size: 24px; cursor: pointer; color: #d1d5db;">⭐</span>`).join('')}
+            <div id="rating-stars" style="display: flex; gap: 8px; margin-bottom: 8px;">
+              ${[1,2,3,4,5].map(i => `<span class="star" data-rating="${i}" style="font-size: 32px; cursor: pointer; color: #d1d5db; transition: color 0.2s ease;">☆</span>`).join('')}
             </div>
           </div>
 
@@ -219,8 +226,14 @@ if (typeof window !== 'undefined' && !window.ethereum) {
         from { transform: translateY(20px); opacity: 0; }
         to { transform: translateY(0); opacity: 1; }
       }
-      .star:hover, .star.active {
+      .star.active {
         color: #fbbf24 !important;
+      }
+      .star.active::before {
+        content: '★';
+      }
+      .star:not(.active)::before {
+        content: '☆';
       }
       #notex-feedback-modal a:hover {
         color: #3b82f6 !important;
@@ -266,8 +279,10 @@ if (typeof window !== 'undefined' && !window.ethereum) {
       stars.forEach(function(star, index) {
         if (index < rating) {
           star.classList.add('active');
+          star.textContent = '★';
         } else {
           star.classList.remove('active');
+          star.textContent = '☆';
         }
       });
     }
@@ -285,6 +300,12 @@ if (typeof window !== 'undefined' && !window.ethereum) {
 
     if (!message) {
       alert('Please provide your feedback message.');
+      return;
+    }
+
+    // Validate project_id before submission
+    if (!config.projectId) {
+      alert('Invalid project configuration. Please contact support.');
       return;
     }
 
@@ -348,8 +369,9 @@ if (typeof window !== 'undefined' && !window.ethereum) {
         errorMessage = 'Permission denied. Please contact support.';
       } else if (error.message.includes('duplicate') || error.message.includes('unique')) {
         errorMessage = 'This feedback has already been submitted.';
-      } else if (error.message.includes('project_id')) {
-        errorMessage = 'Invalid project configuration. Please contact support.';
+      } else if (error.message.includes('violates foreign key constraint') || 
+                 error.message.includes('project_id')) {
+        errorMessage = 'Invalid project ID. Please verify your widget configuration.';
       } else if (error.message && error.message !== 'Failed to fetch') {
         errorMessage = error.message;
       }
