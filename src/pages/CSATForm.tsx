@@ -431,12 +431,25 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
         {/* Footer */}
         <div className="bg-gray-50 dark:bg-gray-800/50 px-8 py-4 text-center border-t border-gray-200 dark:border-gray-700">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Your feedback helps us improve our service
+            Thank you for helping us improve our product
           </p>
+        </div>
+
+        {/* Powered by NoteX */}
+        <div className="bg-gray-100 dark:bg-gray-900/50 px-4 py-3 text-center border-t border-gray-200 dark:border-gray-700">
+          <a 
+            href="https://notex.com.ng/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+          >
+            Powered by <span className="font-semibold">NoteX</span>
+          </a>
         </div>
       </Card>
     </div>
   );
 };
+
 
 export default CustomerSatisfactionForm;
