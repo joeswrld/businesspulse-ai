@@ -77,7 +77,6 @@ export const TrialProvider: React.FC<TrialProviderProps> = ({ children }) => {
     }
 
     try {
-      // Get billing profile
       const { data: billingProfile, error: billingError } = await supabase
         .from('billing_profiles')
         .select('*')
@@ -85,7 +84,6 @@ export const TrialProvider: React.FC<TrialProviderProps> = ({ children }) => {
         .single();
 
       if (billingError && billingError.code === 'PGRST116') {
-        // No billing profile exists, create default trial
         const trialEndDate = new Date(Date.now() + 8 * 24 * 60 * 60 * 1000);
         const { error: createError } = await supabase
           .from('billing_profiles')
@@ -132,7 +130,6 @@ export const TrialProvider: React.FC<TrialProviderProps> = ({ children }) => {
   }, [user]);
 
   const checkFeatureAccess = (feature: string): boolean => {
-    // List of features that require active subscription or valid trial
     const protectedFeatures = [
       'feedback',
       'feedback-settings',
