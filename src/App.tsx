@@ -9,7 +9,7 @@ import { UnifiedTrialProvider } from "@/contexts/UnifiedTrialContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-
+import { TrialProvider } from '@/contexts/TrialContext';
 // Direct imports
 import Index from "./pages/Index";
 import Signup from "./pages/Signup";
@@ -58,7 +58,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
-        <UnifiedTrialProvider>
+        <TrialProvider>  {/* Add this */}
           <ThemeProvider>
             <Toaster />
             <Sonner />
@@ -115,7 +115,7 @@ const App = () => (
               </ErrorBoundary>
             </BrowserRouter>
           </ThemeProvider>
-        </UnifiedTrialProvider>
+        </TrialProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
