@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 // --- Configuration Constants ---
-// Define the full JSON schema for structured output to ensure reliability
 const ANALYSIS_RESPONSE_SCHEMA = {
   type: "OBJECT",
   properties: {
@@ -87,83 +87,96 @@ const ANALYSIS_RESPONSE_SCHEMA = {
     "sentiment"
   ]
 };
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
-// --- AI Prompt Definition ---
-// Simplified prompt—the JSON structure is now defined by the schema (ANALYSIS_RESPONSE_SCHEMA)
-const ANALYSIS_PROMPT_TEMPLATE = (dataString, fileType)=>`Analyze this feedback data concisely.
+
+// --- Enhanced AI Prompt ---
+const ANALYSIS_PROMPT_TEMPLATE = (dataString: string, fileType: string) => `Analyze the following raw user feedback data. Each entry may include rating, sentiment, text, and metadata.
 
 Data:
 ${dataString}
 
-Provide a JSON response with:
-1. Summary: 2 concise paragraphs highlighting key insights
-2. Key themes: 3-4 recurring topics (max 15 words each)
-3. Suggested actions: 3-4 practical improvements (max 15 words each)
-4. Trends: 2-3 patterns in sentiment (max 15 words each)
-5. Performance score: 0-100 based on feedback sentiment
-6. Sentiment: Calculate positive, negative, neutral percentages (must sum to 100)
+Your task: Generate insights **only from this dataset**. Do not invent or assume information not present.
 
-Be concise and actionable.`;
+Return a JSON object following the exact schema provided. Ensure each field is derived directly from the data:
+
+1. **summary**: Two concise paragraphs describing recurring themes, satisfaction levels, pain points, and opportunities. Base this on actual feedback content, not assumptions.
+
+2. **key_themes**: 3–4 recurring feedback topics (≤ 15 words each). Identify patterns from the actual messages, not generic themes.
+
+3. **suggested_actions**: 3–4 practical improvements clearly addressing user pain points mentioned in the feedback (≤ 15 words each).
+
+4. **trends**: 2–3 patterns in sentiment or behavior based on ratings and message content (≤ 15 words each).
+
+5. **performance**:
+   - **metrics**: 2–3 quantifiable metrics calculated from the data (e.g., "Average rating 3.8/5", "45% mentioned bugs", "Response time complaints 25%").
+   - **score**: Overall performance score (0–100) based strictly on aggregated sentiment and ratings.
+
+6. **sentiment**:
+   - Calculate exact percentages of positive, negative, and neutral feedback based on ratings and message tone (sum = 100).
+   - Positive: ratings 4-5 or clearly positive messages
+   - Negative: ratings 1-2 or clearly negative messages
+   - Neutral: rating 3 or neutral-toned messages
+   - Label overall sentiment as "positive", "negative", or "neutral" based on the majority.
+
+Rules:
+- Base all insights on the provided data only.
+- If data is insufficient, reflect that in the output instead of fabricating information.
+- Use actual numbers and percentages from the dataset.
+- Keep the tone professional and actionable.
+- Ensure valid JSON output strictly matching the schema.
+- If no ratings are present, base sentiment purely on message tone analysis.`;
+
 // --- Utility Function for Resilient Fetching ---
-/**
- * Fetches an API endpoint with exponential backoff for transient errors (5xx and 429 status codes).
- * @param url The API URL.
- * @param options Fetch request options.
- * @param maxRetries The maximum number of retry attempts.
- * @returns The Response object.
- */ async function fetchWithExponentialBackoff(url, options, maxRetries = 3) {
+async function fetchWithExponentialBackoff(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
   let attempt = 0;
-  while(attempt < maxRetries){
+  while (attempt < maxRetries) {
     attempt++;
-    const delay = Math.pow(2, attempt) * 100 + Math.random() * 100; // 300ms, 700ms, 1500ms...
+    const delay = Math.pow(2, attempt) * 100 + Math.random() * 100;
+    
     try {
       const response = await fetch(url, options);
-      // Successful response or client error (4xx) that shouldn't be retried (except 429)
-      if (response.ok || response.status >= 400 && response.status !== 429) {
+      
+      if (response.ok || (response.status >= 400 && response.status !== 429)) {
         return response;
       }
-      // Server error (5xx) or Rate Limit (429) - retry
+      
       console.warn(`[Attempt ${attempt}/${maxRetries}] API call failed with status ${response.status}. Retrying in ${delay.toFixed(0)}ms...`);
     } catch (error) {
-      // Network error (e.g., Deno.errors.Http or connection loss) - retry
       console.warn(`[Attempt ${attempt}/${maxRetries}] API call failed with network error: ${error.message}. Retrying in ${delay.toFixed(0)}ms...`);
     }
+    
     if (attempt < maxRetries) {
-      await new Promise((resolve)=>setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
-  // Final attempt failed, throw an error or return the last non-ok response
+  
   console.error(`[Attempt ${attempt}/${maxRetries}] Max retries reached. Final API call failed.`);
-  // Re-run the last fetch outside the loop to get the final response/error for robust handling downstream
   return fetch(url, options);
 }
+
 // --- Main Handler ---
-serve(async (req)=>{
-  // Handle CORS preflight requests
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: corsHeaders
-    });
+    return new Response('ok', { headers: corsHeaders });
   }
+
   try {
     console.log('🚀 Analyze Insights function called');
-    // Only allow POST requests
+
     if (req.method !== 'POST') {
       return new Response(JSON.stringify({
         success: false,
         error: 'Method not allowed'
       }), {
         status: 405,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-    // Get the authorization header
+
     const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.error('❌ Missing or invalid authorization header');
@@ -172,22 +185,23 @@ serve(async (req)=>{
         error: 'Unauthorized'
       }), {
         status: 401,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
     const token = authHeader.substring(7);
-    // Initialize Supabase Service Role client for system operations (usage tracking)
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Supabase environment variables (URL/KEY) are not set.');
     }
+
     const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
-    // Verify the JWT token and get user using the service client
+
     const { data: { user }, error: authError } = await serviceSupabase.auth.getUser(token);
+    
     if (authError || !user) {
       console.error('❌ Invalid token:', authError);
       return new Response(JSON.stringify({
@@ -195,16 +209,14 @@ serve(async (req)=>{
         error: 'Invalid token'
       }), {
         status: 401,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
     console.log('✅ User authenticated:', user.id);
-    // Parse request body
+
     const { data, userId, fileType } = await req.json();
-    // Validate request body and user ID match
+
     if (!data || !userId) {
       console.error('❌ Missing required fields');
       return new Response(JSON.stringify({
@@ -212,12 +224,10 @@ serve(async (req)=>{
         error: 'Missing required fields'
       }), {
         status: 400,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
     if (user.id !== userId) {
       console.error('❌ User ID mismatch');
       return new Response(JSON.stringify({
@@ -225,23 +235,33 @@ serve(async (req)=>{
         error: 'Forbidden'
       }), {
         status: 403,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
     console.log('📊 Analysis request:', {
       userId,
       fileType,
-      dataLength: typeof data === 'string' ? data.length : JSON.stringify(data).length
+      dataLength: Array.isArray(data) ? data.length : typeof data === 'string' ? data.length : JSON.stringify(data).length
     });
-    // Check usage limits using the service client
-    const { data: usageData, error: usageError } = await serviceSupabase.from('usage_tracking').select('insights_count').eq('user_id', userId).single();
+
+    // Check usage limits
+    const { data: usageData, error: usageError } = await serviceSupabase
+      .from('usage_tracking')
+      .select('insights_count')
+      .eq('user_id', userId)
+      .single();
+
     if (usageError && usageError.code !== 'PGRST116') {
       console.error('⚠️ Error checking usage:', usageError);
     }
-    const { data: subscriptionData } = await serviceSupabase.from('user_subscriptions').select('*').eq('user_id', userId).single();
+
+    const { data: subscriptionData } = await serviceSupabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
     let userPlan = 'free';
     if (subscriptionData) {
       if (subscriptionData.status === 'active') {
@@ -250,17 +270,20 @@ serve(async (req)=>{
         userPlan = 'free';
       }
     }
+
     console.log('👤 User plan:', userPlan);
-    const planLimits = {
+
+    const planLimits: Record<string, number> = {
       free: 5,
       pro: 50,
       business: -1,
       enterprise: -1
     };
-    // Coerce userPlan to a valid key for type safety and defaulting to 'free' if unexpected
+
     const validPlan = planLimits[userPlan] !== undefined ? userPlan : 'free';
     const currentUsage = usageData?.insights_count || 0;
     const limit = planLimits[validPlan];
+
     if (limit !== -1 && currentUsage >= limit) {
       console.warn('⚠️ Usage limit reached');
       return new Response(JSON.stringify({
@@ -268,12 +291,10 @@ serve(async (req)=>{
         error: `Usage limit reached. Current: ${currentUsage}, Limit: ${limit}. Please upgrade your plan.`
       }), {
         status: 429,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
     // Prepare data for Gemini AI
     let dataString = '';
     if (typeof data === 'object') {
@@ -281,8 +302,9 @@ serve(async (req)=>{
     } else {
       dataString = String(data);
     }
-    const prompt = ANALYSIS_PROMPT_TEMPLATE(dataString, fileType);
-    // Get Gemini API key
+
+    const prompt = ANALYSIS_PROMPT_TEMPLATE(dataString, fileType || 'feedback');
+
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     if (!GEMINI_API_KEY) {
       console.error('❌ GEMINI_API_KEY not found in environment');
@@ -291,15 +313,13 @@ serve(async (req)=>{
         error: 'Gemini API key is not configured. Please set GEMINI_API_KEY in your Supabase environment variables.'
       }), {
         status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-    console.log('🤖 Calling Gemini API...');
-    const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
-    // Use the robust fetch function
+
+    console.log('🤖 Calling Gemini API with enhanced prompt...');
+    const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent";
+
     const response = await fetchWithExponentialBackoff(geminiUrl, {
       method: "POST",
       headers: {
@@ -310,90 +330,91 @@ serve(async (req)=>{
         contents: [
           {
             role: "user",
-            parts: [
-              {
-                text: prompt
-              }
-            ]
+            parts: [{ text: prompt }]
           }
         ],
         generationConfig: {
-          temperature: 0.3,
+          temperature: 0.2,
           topK: 40,
           topP: 0.95,
           maxOutputTokens: 4096,
-          // *** FIX: Enable Structured Output for reliable JSON response ***
           responseMimeType: "application/json",
           responseSchema: ANALYSIS_RESPONSE_SCHEMA
         }
       })
     });
+
     console.log('📡 Gemini API response status:', response.status);
+
     if (!response.ok) {
       const errorText = await response.text();
       let errorMessage = 'Gemini API request failed';
-      // Enhanced error messages based on status
+      
       if (response.status === 400) {
         errorMessage = 'Bad request to Gemini API. Please check your request format.';
       } else if (response.status === 403) {
         errorMessage = 'Gemini API key is invalid or restricted. Please check your API key permissions.';
       } else if (response.status === 429) {
-        errorMessage = 'Gemini API rate limit exceeded even after retries. Please try again later.';
+        errorMessage = 'Gemini API rate limit exceeded. Please try again later.';
       }
+
       return new Response(JSON.stringify({
         success: false,
         error: `${errorMessage} (Status: ${response.status})`,
         details: errorText.substring(0, 500)
       }), {
         status: response.status,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
     const geminiData = await response.json();
     console.log('✅ Gemini API response received');
+
     const candidate = geminiData.candidates?.[0];
     const text = candidate?.content?.parts?.[0]?.text;
     const finishReason = candidate?.finishReason;
+
     if (!text) {
       console.error('❌ No text generated by Gemini');
       let errorMessage = 'No analysis generated by AI.';
-      let status = 500; // Default to internal error
+      let status = 500;
+      
       if (finishReason) {
         errorMessage = `AI generation failed: Reason - ${finishReason}.`;
-        status = 400; // Use 400 for content/limit related issues
+        status = 400;
+        
         if (finishReason === 'SAFETY') {
           errorMessage += ' The prompt or input data violated policy filters. Please adjust your input.';
         } else if (finishReason === 'RECITATION') {
           errorMessage += ' The model declined to answer to prevent reciting copyrighted material.';
         } else if (finishReason === 'MAX_TOKENS') {
-          errorMessage += ' The analysis was too long and hit the output token limit (4096). Please try with fewer feedback entries or contact support for large datasets.';
+          errorMessage += ' The analysis was too long. Please try with fewer feedback entries.';
         }
       }
+
       return new Response(JSON.stringify({
         success: false,
         error: errorMessage,
         details: finishReason
       }), {
         status: status,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
     let analysis;
     try {
       const analysisText = text.trim();
-      // *** FIX: Rely on structured output to return clean JSON, simplifying parsing. ***
       analysis = JSON.parse(analysisText);
-      // Manual structure validation remains a good failsafe
-      if (!analysis.summary || !analysis.key_themes || !analysis.suggested_actions || !analysis.performance || !analysis.sentiment) {
+      
+      if (!analysis.summary || !analysis.key_themes || !analysis.suggested_actions || 
+          !analysis.performance || !analysis.sentiment) {
         throw new Error('Invalid response structure from AI: Missing required top-level fields.');
       }
+
       console.log('✅ Successfully parsed AI analysis');
+
       // Normalize sentiment percentages
       const totalSentiment = analysis.sentiment.positive + analysis.sentiment.negative + analysis.sentiment.neutral;
       if (Math.abs(totalSentiment - 100) > 1) {
@@ -403,7 +424,8 @@ serve(async (req)=>{
         analysis.sentiment.neutral = 100 - analysis.sentiment.positive - analysis.sentiment.negative;
         console.log('📊 Normalized sentiment percentages');
       }
-      analysis.performance.score = Math.max(0, Math.min(100, analysis.performance.score));
+
+      analysis.performance.score = Math.max(0, Math.min(100, Math.round(analysis.performance.score)));
     } catch (parseError) {
       console.error('❌ Error parsing AI response:', parseError);
       return new Response(JSON.stringify({
@@ -411,19 +433,17 @@ serve(async (req)=>{
         error: `Failed to parse AI analysis response. ${parseError instanceof Error ? parseError.message : 'The AI did not return a parsable JSON structure.'}`
       }), {
         status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-    // Increment usage count using the service client
+
+    // Increment usage count
     try {
-      // Assuming 'increment_usage' is a stored procedure in Supabase
       const { error: incrementError } = await serviceSupabase.rpc('increment_usage', {
         p_user_id: userId,
         p_action: 'insights'
       });
+      
       if (incrementError) {
         console.error('⚠️ Error incrementing usage:', incrementError);
       } else {
@@ -432,16 +452,15 @@ serve(async (req)=>{
     } catch (usageErr) {
       console.error('⚠️ Usage tracking error:', usageErr);
     }
+
     console.log('🎉 Analysis completed successfully');
+
     return new Response(JSON.stringify({
       success: true,
       analysis
     }), {
       status: 200,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
-      }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (error) {
     console.error('💥 Unexpected error:', error);
@@ -451,10 +470,7 @@ serve(async (req)=>{
       stack: error instanceof Error ? error.stack : undefined
     }), {
       status: 500,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
-      }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
