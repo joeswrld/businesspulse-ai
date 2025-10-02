@@ -1,5 +1,5 @@
 // src/pages/InsightsSimple.tsx
-// Fixed to use real feedback data from Supabase
+// Fixed version with correct JSX structure
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -71,7 +71,6 @@ export default function EnhancedInsightsPage() {
 
     setLoading(true);
     try {
-      // Get user's project_id from feedback_settings
       const { data: settingsData, error: settingsError } = await supabase
         .from('feedback_settings')
         .select('project_id')
@@ -80,7 +79,6 @@ export default function EnhancedInsightsPage() {
 
       if (settingsError) throw settingsError;
 
-      // Fetch all feedback for this project
       const { data: feedbackData, error: feedbackError } = await supabase
         .from('feedback')
         .select('*')
@@ -126,10 +124,8 @@ export default function EnhancedInsightsPage() {
     setGenerating(true);
 
     try {
-      // Get selected feedback items
       const selectedItems = feedbacks.filter(f => selectedFeedbacks.has(f.id));
       
-      // Calculate metrics
       const totalRatings = selectedItems.filter(f => f.rating !== null).length;
       const avgRating = totalRatings > 0
         ? selectedItems.reduce((sum, f) => sum + (f.rating || 0), 0) / totalRatings
@@ -139,7 +135,6 @@ export default function EnhancedInsightsPage() {
         ? Math.round((selectedItems.filter(f => f.rating && f.rating >= 4).length / totalRatings) * 100)
         : 0;
 
-      // Calculate sentiment
       const positive = selectedItems.filter(f => f.rating && f.rating >= 4).length;
       const negative = selectedItems.filter(f => f.rating && f.rating <= 2).length;
       const neutral = selectedItems.filter(f => !f.rating || f.rating === 3).length;
@@ -151,7 +146,6 @@ export default function EnhancedInsightsPage() {
 
       const overallSentiment = positivePercent > 50 ? 'positive' : negativePercent > 50 ? 'negative' : 'neutral';
 
-      // Extract key themes from messages
       const messages = selectedItems.map(f => f.message.toLowerCase());
       const commonWords = ['good', 'great', 'excellent', 'poor', 'bad', 'issue', 'problem', 'love', 'like', 'improve'];
       const themes: string[] = [];
@@ -163,7 +157,6 @@ export default function EnhancedInsightsPage() {
         }
       });
 
-      // Generate insights
       const generatedInsights: Insights = {
         summary: `Analysis of ${selectedItems.length} feedback entries shows ${satisfactionRate}% satisfaction rate with an average rating of ${avgRating.toFixed(1)}/5. ${
           overallSentiment === 'positive' 
@@ -199,7 +192,6 @@ export default function EnhancedInsightsPage() {
         }
       };
 
-      // Simulate AI processing delay
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       setInsights(generatedInsights);
@@ -258,7 +250,6 @@ export default function EnhancedInsightsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950 transition-colors duration-300">
       <div className="container mx-auto p-6 space-y-8">
-        {/* Header Section */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -297,12 +288,11 @@ export default function EnhancedInsightsPage() {
               No Feedback Yet
             </h2>
             <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-              Share your feedback forms with customers to start collecting insights. Once you receive feedback, you'll be able to generate AI-powered analysis here.
+              Share your feedback forms with customers to start collecting insights.
             </p>
           </motion.div>
         ) : (
           <>
-            {/* Feedback Selection Card */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -310,205 +300,11 @@ export default function EnhancedInsightsPage() {
             >
               <div className="rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm transition-colors">
                 <div className="p-6 space-y-6">
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* AI Insights Results */}
-            <AnimatePresence>
-              {insights && showInsights && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  <div className="rounded-xl border border-blue-200 dark:border-blue-800 shadow-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 backdrop-blur-sm">
-                    <div className="p-6 space-y-6">
-                      <div className="flex items-center space-x-2 border-b border-blue-200 dark:border-blue-800 pb-4">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
-                          <Sparkles className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">AI Insights</h2>
-                      </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        AI-powered analysis of your selected feedback
-                      </p>
-
-                      <div className="space-y-6">
-                        {/* Summary */}
-                        <div className="rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm p-6 border border-gray-200 dark:border-gray-700">
-                          <div className="flex items-center space-x-2 mb-4">
-                            <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Summary</h3>
-                          </div>
-                          <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                            {insights.summary}
-                          </p>
-                        </div>
-
-                        {/* Key Themes */}
-                        <div className="rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm p-6 border border-gray-200 dark:border-gray-700">
-                          <div className="flex items-center space-x-2 mb-4">
-                            <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
-                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Key Themes</h3>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {insights.key_themes.map((theme, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600"
-                              >
-                                <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
-                                <span className="text-gray-700 dark:text-gray-300 text-sm">{theme}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Suggested Actions */}
-                        <div className="rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm p-6 border border-gray-200 dark:border-gray-700">
-                          <div className="flex items-center space-x-2 mb-4">
-                            <Target className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Suggested Actions</h3>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {insights.suggested_actions.map((action, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600"
-                              >
-                                <div className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0"></div>
-                                <span className="text-gray-700 dark:text-gray-300 text-sm">{action}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Performance Score & Sentiment */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {/* Performance Score */}
-                          <div className="rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm p-6 border border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center space-x-2 mb-4">
-                              <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Performance Score</h3>
-                            </div>
-                            <div className="space-y-4">
-                              <div className="flex items-center justify-between">
-                                <span className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-                                  {insights.performance.score}/100
-                                </span>
-                                <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                  insights.performance.score >= 80 
-                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' 
-                                    : insights.performance.score >= 60 
-                                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300' 
-                                    : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                                }`}>
-                                  {insights.performance.score >= 80 ? "Excellent" : insights.performance.score >= 60 ? "Good" : "Needs Improvement"}
-                                </div>
-                              </div>
-                              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                                <div 
-                                  className="bg-gradient-to-r from-purple-600 to-purple-400 h-3 rounded-full transition-all duration-500"
-                                  style={{ width: `${insights.performance.score}%` }}
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                {insights.performance.metrics.map((metric, index) => (
-                                  <p key={index} className="text-xs text-gray-600 dark:text-gray-400">
-                                    • {metric}
-                                  </p>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Sentiment Analysis */}
-                          <div className="rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm p-6 border border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center space-x-2 mb-4">
-                              <Lightbulb className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Sentiment Analysis</h3>
-                            </div>
-                            <div className="space-y-4">
-                              <div className="flex items-center justify-between">
-                                <span className="text-gray-600 dark:text-gray-400 text-sm">Overall Sentiment</span>
-                                <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                  insights.sentiment.overall === 'positive' 
-                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                                    : insights.sentiment.overall === 'negative' 
-                                    ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' 
-                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
-                                }`}>
-                                  {insights.sentiment.overall.charAt(0).toUpperCase() + insights.sentiment.overall.slice(1)}
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-3 gap-3">
-                                <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                    {insights.sentiment.positive}%
-                                  </div>
-                                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Positive</div>
-                                </div>
-                                <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
-                                  <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
-                                    {insights.sentiment.neutral}%
-                                  </div>
-                                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Neutral</div>
-                                </div>
-                                <div className="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                                  <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                                    {insights.sentiment.negative}%
-                                  </div>
-                                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Negative</div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Trends */}
-                        {insights.trends.length > 0 && (
-                          <div className="rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm p-6 border border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center space-x-2 mb-4">
-                              <TrendingUp className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Feedback Breakdown</h3>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {insights.trends.map((trend, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600"
-                                >
-                                  <div className="w-2 h-2 bg-indigo-500 rounded-full flex-shrink-0"></div>
-                                  <span className="text-gray-700 dark:text-gray-300 text-sm">{trend}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-<div className="flex items-center space-x-2 border-b border-gray-200 dark:border-gray-700 pb-4">
+                  <div className="flex items-center space-x-2 border-b border-gray-200 dark:border-gray-700 pb-4">
                     <Filter className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Select Feedback for Analysis</h2>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Choose the feedback entries you want to analyze. You can select individual items or use "Select All".
-                  </p>
-
-                  {/* Selection Controls */}
+                  
                   <div className="flex items-center justify-between flex-wrap gap-4">
                     <div className="flex items-center space-x-4">
                       <button
@@ -550,9 +346,6 @@ export default function EnhancedInsightsPage() {
                     </button>
                   </div>
 
-                  <div className="h-px bg-gray-200 dark:bg-gray-700" />
-
-                  {/* Feedbacks List */}
                   <div className="space-y-3 max-h-96 overflow-y-auto">
                     {feedbacks.map((feedback, index) => (
                       <motion.div
@@ -593,3 +386,96 @@ export default function EnhancedInsightsPage() {
                         </div>
                       </motion.div>
                     ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            <AnimatePresence>
+              {insights && showInsights && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <div className="rounded-xl border border-blue-200 dark:border-blue-800 shadow-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 backdrop-blur-sm">
+                    <div className="p-6 space-y-6">
+                      <div className="flex items-center space-x-2 border-b border-blue-200 dark:border-blue-800 pb-4">
+                        <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
+                          <Sparkles className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">AI Insights</h2>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div className="rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm p-6 border border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center space-x-2 mb-4">
+                            <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Summary</h3>
+                          </div>
+                          <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                            {insights.summary}
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm p-6 border border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center space-x-2 mb-4">
+                              <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Performance Score</h3>
+                            </div>
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <span className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                                  {insights.performance.score}/100
+                                </span>
+                              </div>
+                              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                                <div 
+                                  className="bg-gradient-to-r from-purple-600 to-purple-400 h-3 rounded-full transition-all duration-500"
+                                  style={{ width: `${insights.performance.score}%` }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm p-6 border border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center space-x-2 mb-4">
+                              <Lightbulb className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Sentiment Analysis</h3>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                  {insights.sentiment.positive}%
+                                </div>
+                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Positive</div>
+                              </div>
+                              <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                                  {insights.sentiment.neutral}%
+                                </div>
+                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Neutral</div>
+                              </div>
+                              <div className="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                                  {insights.sentiment.negative}%
+                                </div>
+                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Negative</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
