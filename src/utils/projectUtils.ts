@@ -1,0 +1,277 @@
+import { supabase } from '@/integrations/supabase/client';
+
+export interface Project {
+  id: string;
+  name: string;
+  user_id: string;
+  logo_url?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface ProjectWithSettings extends Project {
+  // Project settings can be added here if needed in the future
+}
+
+/**
+ * Create a new project
+ */
+export async function createProject(userId: string, name: string, logoUrl?: string): Promise<Project> {
+  if (!userId) {
+    throw new Error('User ID is required');
+  }
+
+  if (!name || name.trim() === '') {
+    throw new Error('Project name is required');
+  }
+
+  try {
+    // Use the database function to create project with settings
+    const { data, error } = await supabase.rpc('create_project_with_settings', {
+      p_user_id: userId,
+      p_name: name.trim(),
+      p_logo_url: logoUrl || null
+    });
+
+    if (error) {
+      console.error('Error creating project:', error);
+      throw new Error(`Failed to create project: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+      throw new Error('No data returned from project creation');
+    }
+
+    const { project_id, settings_id } = data[0];
+
+    // Fetch the created project
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', project_id)
+      .single();
+
+    if (projectError) {
+      console.error('Error fetching created project:', projectError);
+      throw new Error(`Failed to fetch created project: ${projectError.message}`);
+    }
+
+    return project;
+  } catch (error) {
+    console.error('Error in createProject:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all projects for a user with their feedback settings
+ * Includes retry logic for JWT token refresh
+ */
+export async function getUserProjects(userId: string): Promise<ProjectWithSettings[]> {
+  if (!userId) {
+    throw new Error('User ID is required');
+  }
+
+  const attemptFetch = async (isRetry = false): Promise<ProjectWithSettings[]> => {
+    try {
+      const { data, error } = await supabase.rpc('get_user_projects_with_settings', {
+        p_user_id: userId
+      });
+
+      if (error) {
+        console.error('Error fetching user projects:', error);
+        
+        // Check if it's a JWT expired error and we haven't retried yet
+        if (error.message.includes('JWT expired') && !isRetry) {
+          console.log('JWT expired, attempting to refresh token...');
+          
+          // Try to refresh the session
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError) {
+            console.error('Failed to refresh session:', refreshError);
+            throw new Error('Session expired. Please log in again.');
+          }
+          
+          console.log('Token refreshed successfully, retrying...');
+          // Retry the original request
+          return attemptFetch(true);
+        }
+        
+        // Check if server returned HTML instead of JSON (common with 404/500 errors)
+        if (error.message.includes('Unexpected token') || error.message.includes('<')) {
+          throw new Error('Server returned an error page. Please check your connection and try again.');
+        }
+        
+        throw new Error(`Failed to fetch projects: ${error.message}`);
+      }
+
+      // Transform the data to match our interface
+      return (data || []).map((row: any) => ({
+        id: row.project_id,
+        name: row.project_name,
+        user_id: userId,
+        logo_url: row.project_logo_url,
+        created_at: row.project_created_at,
+        updated_at: row.project_created_at, // Use created_at as fallback
+        settings: row.settings_id ? {
+          id: row.settings_id,
+          user_id: userId,
+          project_id: row.project_id,
+          widget_title: row.widget_title,
+          widget_color: row.widget_color,
+          greeting_text: row.greeting_text,
+          created_at: row.project_created_at,
+          updated_at: row.settings_updated_at
+        } : undefined
+      }));
+    } catch (error) {
+      console.error('Error in getUserProjects:', error);
+      throw error;
+    }
+  };
+
+  return attemptFetch();
+}
+
+
+/**
+ * Delete a project and all its associated data
+ */
+export async function deleteProject(projectId: string, userId: string): Promise<void> {
+  if (!projectId || !userId) {
+    throw new Error('Project ID and User ID are required');
+  }
+
+  try {
+    // Delete the project (cascade will handle feedback_settings and feedback)
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', projectId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error deleting project:', error);
+      throw new Error(`Failed to delete project: ${error.message}`);
+    }
+  } catch (error) {
+    console.error('Error in deleteProject:', error);
+    throw error;
+  }
+}
+
+/**
+ * Automatically create a default project for a user if they don't have one
+ * This function ensures every user has exactly one project
+ * Uses the new get_or_create_user_project function for better error handling
+ */
+export async function ensureUserHasProject(userId: string): Promise<Project> {
+  if (!userId) {
+    throw new Error('User ID is required');
+  }
+
+  const attemptCreate = async (isRetry = false): Promise<Project> => {
+    try {
+      console.log('🔍 Ensuring user has a project:', userId);
+      
+      // Use the new helper function that handles both cases
+      const { data, error } = await supabase.rpc('get_or_create_user_project', {
+        p_user_id: userId
+      });
+
+      if (error) {
+        console.error('Error in get_or_create_user_project:', error);
+        
+        // Check if it's a JWT expired error and we haven't retried yet
+        if (error.message.includes('JWT expired') && !isRetry) {
+          console.log('JWT expired, attempting to refresh token...');
+          
+          // Try to refresh the session
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError) {
+            console.error('Failed to refresh session:', refreshError);
+            throw new Error('Session expired. Please log in again.');
+          }
+          
+          console.log('Token refreshed successfully, retrying...');
+          // Retry the original request
+          return attemptCreate(true);
+        }
+        
+        // Check if server returned HTML instead of JSON (common with 404/500 errors)
+        if (error.message.includes('Unexpected token') || error.message.includes('<')) {
+          throw new Error('Server returned an error page. Please check your connection and try again.');
+        }
+        
+        // Check for network errors
+        if (error.message.includes('ERR_INTERNET_DISCONNECTED') || error.message.includes('network')) {
+          throw new Error('Network error. Please check your internet connection and try again.');
+        }
+        
+        throw new Error(`Failed to ensure user project: ${error.message}`);
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error('No data returned from project creation');
+      }
+
+      const { project_id, project_name } = data[0];
+      
+      // Return the project data in the expected format
+      const project: Project = {
+        id: project_id,
+        name: project_name,
+        user_id: userId,
+        created_at: new Date().toISOString()
+      };
+
+      console.log('✅ User project ensured successfully:', project.id);
+      return project;
+    } catch (error) {
+      console.error('Error in ensureUserHasProject:', error);
+      
+      // If it's a network error, provide a more helpful message
+      if (error instanceof Error && error.message.includes('network')) {
+        throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
+      }
+      
+      throw error;
+    }
+  };
+
+  return attemptCreate();
+}
+
+/**
+ * Upload project logo to storage
+ */
+export async function uploadProjectLogo(userId: string, file: File): Promise<string> {
+  if (!userId || !file) {
+    throw new Error('User ID and file are required');
+  }
+
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${userId}/${Date.now()}.${fileExt}`;
+
+    const { data, error } = await supabase.storage
+      .from('project-logos')
+      .upload(fileName, file);
+
+    if (error) {
+      console.error('Error uploading logo:', error);
+      throw new Error(`Failed to upload logo: ${error.message}`);
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('project-logos')
+      .getPublicUrl(fileName);
+
+    return publicUrl;
+  } catch (error) {
+    console.error('Error in uploadProjectLogo:', error);
+    throw error;
+  }
+}

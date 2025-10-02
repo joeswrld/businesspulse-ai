@@ -1,594 +1,453 @@
+// public/widget.js
+// NoteX Feedback Widget - With Trial Access Control
+
+if (typeof window !== 'undefined' && !window.ethereum) {
+  console.info("NoteX: No Ethereum provider found, skipping Web3 init...");
+}
+
 (function() {
   'use strict';
 
-  // Configuration
-  const CONFIG = {
-    apiUrl: 'https://xjbrqeqizpoqdjkiyqzt.supabase.co',
-    apiKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84',
-    widgetId: 'notex-feedback-widget',
-    buttonId: 'notex-feedback-button',
-    modalId: 'notex-feedback-modal',
-    overlayId: 'notex-feedback-overlay'
+  var config = {
+    projectId: null,
+    theme: 'light',
+    brandColor: '#3B82F6',
+    greeting: 'We value your feedback!',
+    supabaseUrl: 'https://xjbrqeqizpoqdjkiyqzt.supabase.co',
+    supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnJxZXFpenBvcWRqa2l5cXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTAzMjcsImV4cCI6MjA3MDYyNjMyN30.cxMH9tUGYEOTUauzluSEeNyjG1iMtUZnNIj4QYGNi84'
   };
 
-  // Get project ID from script tag
-  function getProjectId() {
-    const script = document.querySelector('script[data-project-id]');
-    return script ? script.getAttribute('data-project-id') : null;
-  }
+  var widgetState = {
+    isAccessValid: false,
+    isChecking: true,
+    errorMessage: null
+  };
 
-  // Fetch widget settings
-  async function fetchWidgetSettings(projectId) {
-    try {
-      const response = await fetch(`${CONFIG.apiUrl}/rest/v1/feedback_settings?project_id=eq.${projectId}&select=*`, {
-        headers: {
-          'apikey': CONFIG.apiKey,
-          'Authorization': `Bearer ${CONFIG.apiKey}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch widget settings');
-      }
-      
-      const data = await response.json();
-      return data.length > 0 ? data[0] : null;
-    } catch (error) {
-      console.error('Error fetching widget settings:', error);
-      return null;
+  function initWidget() {
+    var script = document.currentScript || getCurrentScript();
+    if (script) {
+      config.projectId = script.getAttribute('data-project-id');
+      config.theme = script.getAttribute('data-theme') || config.theme;
+      config.brandColor = script.getAttribute('data-brand-color') || config.brandColor;
+      config.greeting = script.getAttribute('data-greeting') || config.greeting;
     }
-  }
 
-  // Submit feedback
-  async function submitFeedback(projectId, email, message) {
-    try {
-      const response = await fetch(`${CONFIG.apiUrl}/rest/v1/feedback`, {
-        method: 'POST',
-        headers: {
-          'apikey': CONFIG.apiKey,
-          'Authorization': `Bearer ${CONFIG.apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          project_id: projectId,
-          email: email || null,
-          message: message
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error:', response.status, errorText);
-        throw new Error(`API Error: ${response.status}`);
-      }
-      
-      return true;
-    } catch (error) {
-      console.error('Error submitting feedback:', error);
-      throw error; // Re-throw to be handled by caller
+    if (!config.projectId) {
+      console.error('NoteX: data-project-id attribute is required');
+      return;
     }
+
+    // Validate project ID format (UUID)
+    var uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(config.projectId)) {
+      console.error('NoteX: Invalid project ID format. Must be a valid UUID.');
+      return;
+    }
+
+    // Check access before creating widget
+    checkWidgetAccess();
   }
 
-  // Create widget styles
-  function createStyles() {
-    const style = document.createElement('style');
+  function getCurrentScript() {
+    var scripts = document.getElementsByTagName('script');
+    return scripts[scripts.length - 1];
+  }
+
+  function checkWidgetAccess() {
+    // Check if the project owner has an active subscription or valid trial
+    fetch(config.supabaseUrl + '/rest/v1/rpc/check_widget_access', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': config.supabaseKey,
+        'Authorization': 'Bearer ' + config.supabaseKey
+      },
+      body: JSON.stringify({ project_id_param: config.projectId })
+    })
+    .then(function(response) {
+      if (!response.ok) {
+        throw new Error('Access check failed');
+      }
+      return response.json();
+    })
+    .then(function(data) {
+      widgetState.isAccessValid = data === true || (data && data.has_access === true);
+      widgetState.isChecking = false;
+      
+      if (widgetState.isAccessValid) {
+        createWidget();
+      } else {
+        console.warn('NoteX: Widget disabled - Trial expired or subscription inactive');
+        widgetState.errorMessage = 'Trial expired';
+      }
+    })
+    .catch(function(error) {
+      console.error('NoteX: Access check error:', error);
+      // Fail open - create widget anyway if check fails
+      widgetState.isAccessValid = true;
+      widgetState.isChecking = false;
+      createWidget();
+    });
+  }
+
+  function createWidget() {
+    if (!widgetState.isAccessValid) {
+      console.warn('NoteX: Widget access denied');
+      return;
+    }
+
+    // Create floating button with text
+    var button = document.createElement('button');
+    button.id = 'notex-feedback-button';
+    button.setAttribute('aria-label', 'Share your feedback');
+    
+    // Button content with emoji and text
+    button.innerHTML = '<span style="margin-right: 6px;">💬</span><span>Feedback</span>';
+    
+    var buttonStyles = {
+      position: 'fixed',
+      bottom: '20px',
+      right: '20px',
+      padding: '12px 20px',
+      borderRadius: '25px',
+      backgroundColor: config.brandColor,
+      color: 'white',
+      border: 'none',
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      zIndex: '10000',
+      transition: 'all 0.3s ease',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+    };
+
+    Object.assign(button.style, buttonStyles);
+
+    button.addEventListener('mouseenter', function() {
+      button.style.transform = 'translateY(-2px)';
+      button.style.boxShadow = '0 6px 20px rgba(0,0,0,0.25)';
+    });
+
+    button.addEventListener('mouseleave', function() {
+      button.style.transform = 'translateY(0)';
+      button.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+    });
+
+    button.addEventListener('click', openFeedbackModal);
+
+    document.body.appendChild(button);
+  }
+
+  function openFeedbackModal() {
+    var existing = document.getElementById('notex-feedback-modal');
+    if (existing) {
+      existing.remove();
+    }
+
+    var modal = document.createElement('div');
+    modal.id = 'notex-feedback-modal';
+    
+    var modalStyles = {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100%',
+      height: '100%',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      zIndex: '10001',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      animation: 'noteXFadeIn 0.3s ease'
+    };
+
+    Object.assign(modal.style, modalStyles);
+
+    var content = document.createElement('div');
+    var contentStyles = {
+      backgroundColor: config.theme === 'dark' ? '#1f2937' : 'white',
+      borderRadius: '12px',
+      padding: '0',
+      maxWidth: '500px',
+      width: '90%',
+      maxHeight: '80vh',
+      overflowY: 'auto',
+      position: 'relative',
+      animation: 'noteXSlideUp 0.3s ease'
+    };
+
+    Object.assign(content.style, contentStyles);
+
+    content.innerHTML = createModalHTML();
+
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+
+    addCSS();
+    setupModalEvents(modal);
+  }
+
+  function createModalHTML() {
+    var textColor = config.theme === 'dark' ? '#ffffff' : '#1f2937';
+    var inputBg = config.theme === 'dark' ? '#374151' : '#ffffff';
+    var borderColor = config.theme === 'dark' ? '#4b5563' : '#d1d5db';
+
+    return `
+      <div style="padding: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; color: ${textColor}; font-size: 20px; font-weight: 600;">
+            ${config.greeting}
+          </h2>
+          <button id="notex-close-btn" style="background: none; border: none; font-size: 24px; cursor: pointer; color: ${textColor}; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">
+            ×
+          </button>
+        </div>
+
+        <form id="notex-feedback-form">
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
+              Feedback Type
+            </label>
+            <select id="feedback-type" style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 6px; background-color: ${inputBg}; color: ${textColor}; font-size: 14px;">
+              <option value="satisfaction">Customer Satisfaction</option>
+              <option value="product">Product Feedback</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
+              Rating
+            </label>
+            <div id="rating-stars" style="display: flex; gap: 8px; margin-bottom: 8px;">
+              ${[1,2,3,4,5].map(i => `<span class="star" data-rating="${i}" style="font-size: 32px; cursor: pointer; color: #d1d5db; transition: color 0.2s ease;">☆</span>`).join('')}
+            </div>
+          </div>
+
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
+              Your Feedback
+            </label>
+            <textarea id="feedback-message" placeholder="Tell us what you think..." style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 6px; background-color: ${inputBg}; color: ${textColor}; font-size: 14px; min-height: 100px; resize: vertical; font-family: inherit;"></textarea>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
+              Email (Optional)
+            </label>
+            <input type="email" id="feedback-email" placeholder="your@email.com" style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 6px; background-color: ${inputBg}; color: ${textColor}; font-size: 14px;">
+          </div>
+
+          <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button type="button" id="notex-cancel-btn" style="padding: 10px 20px; border: 1px solid ${borderColor}; background-color: transparent; color: ${textColor}; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">
+              Cancel
+            </button>
+            <button type="submit" style="padding: 10px 20px; background-color: ${config.brandColor}; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">
+              Submit Feedback
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Powered by NoteX -->
+      <div style="background-color: ${config.theme === 'dark' ? '#111827' : '#f3f4f6'}; padding: 12px; text-align: center; border-top: 1px solid ${borderColor}; border-radius: 0 0 12px 12px;">
+        <a href="https://notex.com.ng/" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #6b7280; text-decoration: none; transition: color 0.2s ease;">
+          Powered by <span style="font-weight: 600;">NoteX</span>
+        </a>
+      </div>
+    `;
+  }
+
+  function addCSS() {
+    if (document.getElementById('notex-css')) return;
+
+    var style = document.createElement('style');
+    style.id = 'notex-css';
     style.textContent = `
-      #${CONFIG.widgetId} {
-        position: fixed;
-        bottom: 20px;
-        left: 20px;
-        z-index: 10000;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      @keyframes noteXFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
       }
-      
-      #${CONFIG.buttonId} {
-        background: #3B82F6;
-        color: white;
-        border: none;
-        border-radius: 50px;
-        padding: 12px 20px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        transition: all 0.3s ease;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        min-width: 120px;
-        justify-content: center;
+      @keyframes noteXSlideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
       }
-      
-      #${CONFIG.buttonId}:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+      .star.active {
+        color: #fbbf24 !important;
       }
-      
-      #${CONFIG.overlayId} {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 10001;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
+      .star.active::before {
+        content: '★';
       }
-      
-      #${CONFIG.modalId} {
-        background: white;
-        border-radius: 12px;
-        padding: 0;
-        max-width: 500px;
-        width: 100%;
-        max-height: 90vh;
-        overflow-y: auto;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-        animation: slideIn 0.3s ease;
+      .star:not(.active)::before {
+        content: '☆';
       }
-      
-      @keyframes slideIn {
-        from {
-          opacity: 0;
-          transform: translateY(20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-      
-      @keyframes slideInRight {
-        from {
-          opacity: 0;
-          transform: translateX(100%);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
-      }
-      
-      @keyframes slideOutRight {
-        from {
-          opacity: 1;
-          transform: translateX(0);
-        }
-        to {
-          opacity: 0;
-          transform: translateX(100%);
-        }
-      }
-      
-      .notex-modal-header {
-        padding: 24px 24px 0 24px;
-        border-bottom: 1px solid #e5e7eb;
-        margin-bottom: 24px;
-      }
-      
-      .notex-modal-title {
-        font-size: 20px;
-        font-weight: 600;
-        color: #111827;
-        margin: 0 0 8px 0;
-      }
-      
-      .notex-modal-subtitle {
-        font-size: 14px;
-        color: #6b7280;
-        margin: 0;
-      }
-      
-      .notex-modal-body {
-        padding: 0 24px 24px 24px;
-      }
-      
-      .notex-form-group {
-        margin-bottom: 20px;
-      }
-      
-      .notex-label {
-        display: block;
-        font-size: 14px;
-        font-weight: 500;
-        color: #374151;
-        margin-bottom: 6px;
-      }
-      
-      .notex-input {
-        width: 100%;
-        padding: 12px;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        font-size: 14px;
-        transition: border-color 0.2s;
-        box-sizing: border-box;
-      }
-      
-      .notex-input:focus {
-        outline: none;
-        border-color: #3B82F6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-      }
-      
-      .notex-textarea {
-        width: 100%;
-        padding: 12px;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        font-size: 14px;
-        min-height: 100px;
-        resize: vertical;
-        font-family: inherit;
-        transition: border-color 0.2s;
-        box-sizing: border-box;
-      }
-      
-      .notex-textarea:focus {
-        outline: none;
-        border-color: #3B82F6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-      }
-      
-      .notex-button {
-        background: #3B82F6;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 12px 24px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: background-color 0.2s;
-        width: 100%;
-      }
-      
-      .notex-button:hover {
-        background: #2563eb;
-      }
-      
-      .notex-button:disabled {
-        background: #9ca3af;
-        cursor: not-allowed;
-      }
-      
-      .notex-close {
-        position: absolute;
-        top: 16px;
-        right: 16px;
-        background: none;
-        border: none;
-        font-size: 24px;
-        cursor: pointer;
-        color: #6b7280;
-        width: 32px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 6px;
-        transition: background-color 0.2s;
-      }
-      
-      .notex-close:hover {
-        background: #f3f4f6;
-      }
-      
-      .notex-success {
-        text-align: center;
-        padding: 40px 24px;
-      }
-      
-      .notex-success-icon {
-        font-size: 48px;
-        margin-bottom: 16px;
-      }
-      
-      .notex-success-title {
-        font-size: 18px;
-        font-weight: 600;
-        color: #111827;
-        margin: 0 0 8px 0;
-      }
-      
-      .notex-success-message {
-        font-size: 14px;
-        color: #6b7280;
-        margin: 0;
-      }
-      
-      .notex-error {
-        color: #dc2626;
-        font-size: 12px;
-        margin-top: 4px;
-      }
-      
-      @media (max-width: 640px) {
-        #${CONFIG.widgetId} {
-          bottom: 16px;
-          right: 16px;
-        }
-        
-        #${CONFIG.buttonId} {
-          padding: 10px 16px;
-          font-size: 13px;
-          min-width: 100px;
-        }
-        
-        #${CONFIG.overlayId} {
-          padding: 16px;
-        }
-        
-        .notex-modal-header,
-        .notex-modal-body {
-          padding: 20px;
-        }
+      #notex-feedback-modal a:hover {
+        color: #3b82f6 !important;
       }
     `;
     document.head.appendChild(style);
   }
 
-  // Create widget HTML
-  function createWidget(settings) {
-    const widget = document.createElement('div');
-    widget.id = CONFIG.widgetId;
-    
-    const button = document.createElement('button');
-    button.id = CONFIG.buttonId;
-    button.innerHTML = (settings?.widget_title || 'We love Your Feedback') + '   💕';
-    button.style.backgroundColor = settings?.widget_color || '#3B82F6';
-    
-    widget.appendChild(button);
-    return widget;
-  }
+  function setupModalEvents(modal) {
+    var closeBtn = document.getElementById('notex-close-btn');
+    var cancelBtn = document.getElementById('notex-cancel-btn');
+    var form = document.getElementById('notex-feedback-form');
+    var stars = document.querySelectorAll('.star');
 
-  // Create modal HTML
-  function createModal(settings) {
-    const overlay = document.createElement('div');
-    overlay.id = CONFIG.overlayId;
-    
-    const modal = document.createElement('div');
-    modal.id = CONFIG.modalId;
-    
-    modal.innerHTML = `
-      <div class="notex-modal-header">
-        <button class="notex-close" onclick="closeFeedbackModal()">&times;</button>
-        <h2 class="notex-modal-title">${settings?.widget_title || 'Share your feedback with us!'}</h2>
-        <p class="notex-modal-subtitle">${settings?.greeting_text || 'Welcome, tell us what\'s on your mind'}</p>
-      </div>
-      <div class="notex-modal-body">
-        <form id="notex-feedback-form">
-          <div class="notex-form-group">
-            <label class="notex-label" for="notex-email">Email</label>
-            <input 
-              type="email *" 
-              id="notex-email" 
-              class="notex-input" 
-              placeholder="your@email.com"
-              @ required
-            >
-          </div>
-          <div class="notex-form-group">
-            <label class="notex-label" for="notex-message">Message *</label>
-            <textarea 
-              id="notex-message" 
-              class="notex-textarea" 
-              placeholder="Tell us what you think about are product..."
-              required
-            ></textarea>
-            <div id="notex-message-error" class="notex-error"></div>
-          </div>
-          <button type="submit" class="notex-button" id="notex-submit-btn">
-            Send Feedback
-          </button>
-          
-        </form>
-      </div>
-    `;
-    
-    overlay.appendChild(modal);
-    return overlay;
-  }
+    function closeModal() {
+      modal.remove();
+    }
 
-  // Show modal
-  function showModal() {
-    const overlay = document.getElementById(CONFIG.overlayId);
-    if (overlay) {
-      overlay.style.display = 'flex';
-      document.body.style.overflow = 'hidden';
-      
-      // Focus on first input
-      const emailInput = document.getElementById('notex-email');
-      if (emailInput) {
-        setTimeout(() => emailInput.focus(), 100);
-      }
-    }
-  }
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) closeModal();
+    });
 
-  // Close modal
-  function closeModal() {
-    const overlay = document.getElementById(CONFIG.overlayId);
-    if (overlay) {
-      overlay.style.display = 'none';
-      document.body.style.overflow = '';
-    }
-  }
+    var selectedRating = 0;
+    stars.forEach(function(star) {
+      star.addEventListener('click', function() {
+        selectedRating = parseInt(this.getAttribute('data-rating'));
+        updateStars(selectedRating);
+      });
 
-  // Show success message
-  function showSuccess() {
-    const modal = document.getElementById(CONFIG.modalId);
-    if (modal) {
-      modal.innerHTML = `
-        <div class="notex-success">
-          <div class="notex-success-icon">✅</div>
-          <h3 class="notex-success-title">Thank you!</h3>
-          <p class="notex-success-message">Your feedback has been submitted successfully.</p>
-        </div>
-      `;
-      
-      // Clear the form
-      const messageInput = document.getElementById('notex-message');
-      const emailInput = document.getElementById('notex-email');
-      if (messageInput) messageInput.value = '';
-      if (emailInput) emailInput.value = '';
-      
-      // Show success toast
-      showToast('Feedback submitted successfully!', 'success');
-      
-      setTimeout(() => {
-        closeModal();
-        // Reset modal content
-        initWidget();
-      }, 2000);
-    }
-  }
+      star.addEventListener('mouseenter', function() {
+        var hoverRating = parseInt(this.getAttribute('data-rating'));
+        updateStars(hoverRating);
+      });
+    });
 
-  // Show toast notification
-  function showToast(message, type = 'success') {
-    // Remove existing toast if any
-    const existingToast = document.getElementById('notex-toast');
-    if (existingToast) {
-      existingToast.remove();
-    }
-    
-    const toast = document.createElement('div');
-    toast.id = 'notex-toast';
-    toast.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: ${type === 'success' ? '#10b981' : '#ef4444'};
-      color: white;
-      padding: 12px 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      z-index: 10002;
-      font-size: 14px;
-      font-weight: 500;
-      animation: slideInRight 0.3s ease;
-      max-width: 300px;
-    `;
-    
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-      if (toast.parentNode) {
-        toast.style.animation = 'slideOutRight 0.3s ease';
-        setTimeout(() => {
-          if (toast.parentNode) {
-            toast.remove();
-          }
-        }, 300);
-      }
-    }, 3000);
-  }
+    document.getElementById('rating-stars').addEventListener('mouseleave', function() {
+      updateStars(selectedRating);
+    });
 
-  // Handle form submission
-  async function handleSubmit(event, projectId) {
-    event.preventDefault();
-    
-    const submitBtn = document.getElementById('notex-submit-btn');
-    const messageInput = document.getElementById('notex-message');
-    const emailInput = document.getElementById('notex-email');
-    const errorDiv = document.getElementById('notex-message-error');
-    
-    const message = messageInput.value.trim();
-    const email = emailInput.value.trim();
-    
-    // Clear previous errors
-    errorDiv.textContent = '';
-    
-    // Validate message
-    if (!message) {
-      errorDiv.textContent = 'Message is required';
-      messageInput.focus();
-      return;
-    }
-    
-    // Disable submit button
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Sending...';
-    
-    try {
-      await submitFeedback(projectId, email, message);
-      showSuccess();
-    } catch (error) {
-      console.error('Error submitting feedback:', error);
-      // Only show error message for API failures, not validation errors
-      errorDiv.textContent = 'Failed to submit feedback. Please try again.';
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Send Feedback';
-    }
-  }
-
-  // Initialize widget
-  async function initWidget() {
-    const projectId = getProjectId();
-    if (!projectId) {
-      console.error('No project ID found. Please add data-project-id to the script tag.');
-      return;
-    }
-    
-    // Remove existing widget if any
-    const existingWidget = document.getElementById(CONFIG.widgetId);
-    if (existingWidget) {
-      existingWidget.remove();
-    }
-    
-    const existingOverlay = document.getElementById(CONFIG.overlayId);
-    if (existingOverlay) {
-      existingOverlay.remove();
-    }
-    
-    // Create styles
-    createStyles();
-    
-    // Fetch settings
-    const settings = await fetchWidgetSettings(projectId);
-    
-    // Create widget
-    const widget = createWidget(settings);
-    document.body.appendChild(widget);
-    
-    // Create modal
-    const modal = createModal(settings);
-    document.body.appendChild(modal);
-    
-    // Add event listeners
-    const button = document.getElementById(CONFIG.buttonId);
-    const form = document.getElementById('notex-feedback-form');
-    
-    if (button) {
-      button.addEventListener('click', showModal);
-    }
-    
-    if (form) {
-      form.addEventListener('submit', (e) => handleSubmit(e, projectId));
-    }
-    
-    // Close modal on overlay click
-    const overlay = document.getElementById(CONFIG.overlayId);
-    if (overlay) {
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-          closeModal();
+    function updateStars(rating) {
+      stars.forEach(function(star, index) {
+        if (index < rating) {
+          star.classList.add('active');
+          star.textContent = '★';
+        } else {
+          star.classList.remove('active');
+          star.textContent = '☆';
         }
       });
     }
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      submitFeedback(selectedRating, closeModal);
+    });
   }
 
-  // Global close function
-  window.closeFeedbackModal = closeModal;
+  function submitFeedback(rating, closeCallback) {
+    var type = document.getElementById('feedback-type').value;
+    var message = document.getElementById('feedback-message').value.trim();
+    var email = document.getElementById('feedback-email').value.trim();
 
-  // Initialize when DOM is ready
+    if (!message) {
+      alert('Please provide your feedback message.');
+      return;
+    }
+
+    if (!config.projectId) {
+      alert('Invalid project configuration. Please contact support.');
+      return;
+    }
+
+    var feedbackData = {
+      project_id: config.projectId,
+      message: message,
+      form_type: type === 'satisfaction' ? 'customer_satisfaction' : 'product_feedback',
+      rating: rating || null,
+      metadata: {
+        email: email || null,
+        user_agent: navigator.userAgent,
+        page_url: window.location.href,
+        original_type: type
+      }
+    };
+
+    var submitBtn = document.querySelector('#notex-feedback-form button[type="submit"]');
+    var originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Submitting...';
+    submitBtn.disabled = true;
+
+    fetch(config.supabaseUrl + '/rest/v1/feedback', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': config.supabaseKey,
+        'Authorization': 'Bearer ' + config.supabaseKey,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(feedbackData)
+    })
+    .then(function(response) {
+      if (!response.ok) {
+        return response.text().then(function(text) {
+          var errorMessage = 'HTTP ' + response.status;
+          try {
+            var errorData = JSON.parse(text);
+            errorMessage = errorData.message || errorData.hint || errorMessage;
+          } catch (e) {
+            if (text) errorMessage = text;
+          }
+          throw new Error(errorMessage);
+        });
+      }
+      
+      return response.status === 201 ? { success: true } : response.json();
+    })
+    .then(function(data) {
+      console.log('Feedback submitted successfully');
+      showSuccessMessage();
+      setTimeout(closeCallback, 2000);
+    })
+    .catch(function(error) {
+      console.error('Error submitting feedback:', error);
+      
+      var errorMessage = 'Failed to submit feedback. Please try again.';
+      
+      if (error.message.includes('JWT')) {
+        errorMessage = 'Authentication error. Please refresh the page and try again.';
+      } else if (error.message.includes('permission')) {
+        errorMessage = 'Permission denied. Please contact support.';
+      } else if (error.message.includes('duplicate') || error.message.includes('unique')) {
+        errorMessage = 'This feedback has already been submitted.';
+      } else if (error.message.includes('violates foreign key constraint') || 
+                 error.message.includes('project_id')) {
+        errorMessage = 'Invalid project ID. Please verify your widget configuration.';
+      } else if (error.message && error.message !== 'Failed to fetch') {
+        errorMessage = error.message;
+      }
+      
+      alert(errorMessage);
+      
+      submitBtn.textContent = originalText;
+      submitBtn.disabled = false;
+    });
+  }
+
+  function showSuccessMessage() {
+    var form = document.getElementById('notex-feedback-form');
+    var textColor = config.theme === 'dark' ? '#ffffff' : '#1f2937';
+    
+    form.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px;">
+        <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+        <h3 style="margin: 0 0 12px 0; color: ${textColor}; font-size: 18px; font-weight: 600;">
+          Thank you for your feedback!
+        </h3>
+        <p style="margin: 0; color: ${textColor}; opacity: 0.7; font-size: 14px;">
+          Your message has been received and we'll review it soon.
+        </p>
+      </div>
+    `;
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initWidget);
   } else {

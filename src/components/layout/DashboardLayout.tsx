@@ -21,17 +21,14 @@ import {
   Zap,
   ChevronDown,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Cog
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import TopNav from "@/components/layout/TopNav";
 
-// Mock hook for feedback notifications - replace with actual implementation
-const useFeedbackNotifications = () => {
-  return { newCount: 0 };
-};
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -42,7 +39,6 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
-  const { newCount: feedbackNewCount } = useFeedbackNotifications();
 
 
   // Load user data
@@ -134,10 +130,10 @@ const navigation = [
   { name: "Feedback", href: "/feedback", icon: MessageSquare },
   { name: "AI Insights", href: "/insights-simple", icon: Brain },
   { name: "Reports & Analytics", href: "/reports", icon: FileText },
-  { name: "Roadmap", href: "/roadmap", icon: BarChart3 }, // <-- NEW ENTRY
+  { name: "Feedback Settings", href: "/feedback-settings", icon: Cog },
   { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
+  { name: "Roadmap", href: "/roadmap", icon: BarChart3 },
   { name: "Team Collaboration", href: "/teams", icon: Users },
-  { name: "Feedback Settings", href: "/feedback-settings", icon: Settings },
 ];
 
 
@@ -346,16 +342,7 @@ const navigation = [
             <div className="space-y-1">
              
               
-              <button
-                onClick={handleSignOut}
-                className={cn(
-                  "flex items-center space-x-3 rounded-lg text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 group",
-                  sidebarCollapsed ? "px-2 py-2 justify-center w-full" : "px-3 py-2.5 w-full"
-                )}
-                title={sidebarCollapsed ? "Sign Out" : undefined}
-              >
-                
-              </button>
+              
             </div>
           </div>
         </div>

@@ -1,103 +1,50 @@
--- Create feedback_settings table
-CREATE TABLE IF NOT EXISTS feedback_settings (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  project_id text UNIQUE NOT NULL,
-  widget_title text DEFAULT 'Share your feedback with us!',
-  widget_color text DEFAULT '#3B82F6',
-  greeting_text text DEFAULT 'Welcome, tell us what''s on your mind',
-  created_at timestamptz DEFAULT now()
-);
-
 -- Create feedback table
 CREATE TABLE IF NOT EXISTS feedback (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id text NOT NULL REFERENCES feedback_settings(project_id) ON DELETE CASCADE,
-  email text,
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id uuid REFERENCES projects(id) ON DELETE CASCADE,
+  user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  form_type text NOT NULL CHECK (form_type IN ('customer_satisfaction', 'product_feedback')),
   message text NOT NULL,
+  rating integer CHECK (rating >= 1 AND rating <= 5),
+  metadata jsonb DEFAULT '{}',
   created_at timestamptz DEFAULT now()
 );
 
--- Enable Row Level Security
-ALTER TABLE feedback_settings ENABLE ROW LEVEL SECURITY;
+-- Create feedback_settings table for widget configuration
+CREATE TABLE IF NOT EXISTS feedback_settings (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id uuid REFERENCES projects(id) ON DELETE CASCADE UNIQUE,
+  customer_satisfaction_enabled boolean DEFAULT true,
+  product_feedback_enabled boolean DEFAULT true,
+  widget_title text DEFAULT 'We love your feedback!',
+  widget_color text DEFAULT '#3B82F6',
+  greeting_text text DEFAULT 'Help us improve by sharing your thoughts',
+  widget_position text DEFAULT 'bottom-right',
+  show_branding boolean DEFAULT true,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Enable RLS and create policies
 ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feedback_settings ENABLE ROW LEVEL SECURITY;
 
--- RLS Policy for feedback_settings - users can only access their own settings
-CREATE POLICY "Users can view their own feedback settings" ON feedback_settings
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert their own feedback settings" ON feedback_settings
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update their own feedback settings" ON feedback_settings
-  FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete their own feedback settings" ON feedback_settings
-  FOR DELETE USING (auth.uid() = user_id);
-
--- RLS Policy for feedback - users can only access feedback for their project_id
-CREATE POLICY "Users can view feedback for their project" ON feedback
+-- RLS policies for feedback
+CREATE POLICY "Users can view their project feedback" ON feedback
   FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM feedback_settings 
-      WHERE feedback_settings.project_id = feedback.project_id 
-      AND feedback_settings.user_id = auth.uid()
-    )
+    project_id IN (SELECT id FROM projects WHERE user_id = auth.uid())
   );
 
 CREATE POLICY "Anyone can insert feedback" ON feedback
   FOR INSERT WITH CHECK (true);
 
--- Create index for better performance
-CREATE INDEX IF NOT EXISTS idx_feedback_settings_user_id ON feedback_settings(user_id);
-CREATE INDEX IF NOT EXISTS idx_feedback_settings_project_id ON feedback_settings(project_id);
+-- RLS policies for feedback_settings  
+CREATE POLICY "Users can manage their feedback settings" ON feedback_settings
+  FOR ALL USING (
+    project_id IN (SELECT id FROM projects WHERE user_id = auth.uid())
+  );
+
+-- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_feedback_project_id ON feedback(project_id);
-CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at);
-
--- Function to generate unique project_id
-CREATE OR REPLACE FUNCTION generate_project_id()
-RETURNS text AS $$
-DECLARE
-  new_id text;
-  exists boolean;
-BEGIN
-  LOOP
-    -- Generate a random 8-character alphanumeric string
-    new_id := substring(md5(random()::text) from 1 for 8);
-    
-    -- Check if it already exists
-    SELECT EXISTS(SELECT 1 FROM feedback_settings WHERE project_id = new_id) INTO exists;
-    
-    -- If it doesn't exist, return it
-    IF NOT exists THEN
-      RETURN new_id;
-    END IF;
-  END LOOP;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to get or create feedback settings for a user
-CREATE OR REPLACE FUNCTION get_or_create_feedback_settings(p_user_id uuid)
-RETURNS feedback_settings AS $$
-DECLARE
-  settings feedback_settings;
-  new_project_id text;
-BEGIN
-  -- Try to get existing settings
-  SELECT * INTO settings 
-  FROM feedback_settings 
-  WHERE user_id = p_user_id 
-  LIMIT 1;
-  
-  -- If no settings exist, create them
-  IF NOT FOUND THEN
-    new_project_id := generate_project_id();
-    
-    INSERT INTO feedback_settings (user_id, project_id)
-    VALUES (p_user_id, new_project_id)
-    RETURNING * INTO settings;
-  END IF;
-  
-  RETURN settings;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+CREATE INDEX IF NOT EXISTS idx_feedback_form_type ON feedback(form_type);
+CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at DESC);

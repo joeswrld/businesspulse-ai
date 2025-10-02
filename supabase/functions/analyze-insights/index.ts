@@ -1,352 +1,476 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// --- Configuration Constants ---
+const ANALYSIS_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    summary: {
+      type: "STRING",
+      description: "A concise 2-paragraph summary of key findings and insights from the user feedback. Focus on patterns, pain points, satisfaction levels, and opportunities for improvement."
+    },
+    key_themes: {
+      type: "ARRAY",
+      description: "Three to four recurring feedback topics, user pain points, and positive experiences (max 15 words each).",
+      items: {
+        type: "STRING"
+      }
+    },
+    suggested_actions: {
+      type: "ARRAY",
+      description: "Three to four practical improvements that address user feedback (max 15 words each).",
+      items: {
+        type: "STRING"
+      }
+    },
+    trends: {
+      type: "ARRAY",
+      description: "Two to three patterns in user sentiment and feedback (max 15 words each).",
+      items: {
+        type: "STRING"
+      }
+    },
+    performance: {
+      type: "OBJECT",
+      properties: {
+        metrics: {
+          type: "ARRAY",
+          description: "Two to three key metrics derived from the data (max 15 words each).",
+          items: {
+            type: "STRING"
+          }
+        },
+        score: {
+          type: "NUMBER",
+          description: "Overall performance score (0-100) based on feedback sentiment."
+        }
+      },
+      required: [
+        "metrics",
+        "score"
+      ]
+    },
+    sentiment: {
+      type: "OBJECT",
+      properties: {
+        positive: {
+          type: "NUMBER",
+          description: "Percentage of positive sentiment (0-100). Sum of all sentiments should be 100."
+        },
+        negative: {
+          type: "NUMBER",
+          description: "Percentage of negative sentiment (0-100). Sum of all sentiments should be 100."
+        },
+        neutral: {
+          type: "NUMBER",
+          description: "Percentage of neutral sentiment (0-100). Sum of all sentiments should be 100."
+        },
+        overall: {
+          type: "STRING",
+          description: "Overall sentiment: 'positive', 'negative', or 'neutral'."
+        }
+      },
+      required: [
+        "positive",
+        "negative",
+        "neutral",
+        "overall"
+      ]
+    }
+  },
+  required: [
+    "summary",
+    "key_themes",
+    "suggested_actions",
+    "trends",
+    "performance",
+    "sentiment"
+  ]
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+};
+
+// --- Enhanced AI Prompt ---
+const ANALYSIS_PROMPT_TEMPLATE = (dataString: string, fileType: string) => `Analyze the following raw user feedback data. Each entry may include rating, sentiment, text, and metadata.
+
+Data:
+${dataString}
+
+Your task: Generate insights **only from this dataset**. Do not invent or assume information not present.
+
+Return a JSON object following the exact schema provided. Ensure each field is derived directly from the data:
+
+1. **summary**: Two concise paragraphs describing recurring themes, satisfaction levels, pain points, and opportunities. Base this on actual feedback content, not assumptions.
+
+2. **key_themes**: 3–4 recurring feedback topics (≤ 15 words each). Identify patterns from the actual messages, not generic themes.
+
+3. **suggested_actions**: 3–4 practical improvements clearly addressing user pain points mentioned in the feedback (≤ 15 words each).
+
+4. **trends**: 2–3 patterns in sentiment or behavior based on ratings and message content (≤ 15 words each).
+
+5. **performance**:
+   - **metrics**: 2–3 quantifiable metrics calculated from the data (e.g., "Average rating 3.8/5", "45% mentioned bugs", "Response time complaints 25%").
+   - **score**: Overall performance score (0–100) based strictly on aggregated sentiment and ratings.
+
+6. **sentiment**:
+   - Calculate exact percentages of positive, negative, and neutral feedback based on ratings and message tone (sum = 100).
+   - Positive: ratings 4-5 or clearly positive messages
+   - Negative: ratings 1-2 or clearly negative messages
+   - Neutral: rating 3 or neutral-toned messages
+   - Label overall sentiment as "positive", "negative", or "neutral" based on the majority.
+
+Rules:
+- Base all insights on the provided data only.
+- If data is insufficient, reflect that in the output instead of fabricating information.
+- Use actual numbers and percentages from the dataset.
+- Keep the tone professional and actionable.
+- Ensure valid JSON output strictly matching the schema.
+- If no ratings are present, base sentiment purely on message tone analysis.`;
+
+// --- Utility Function for Resilient Fetching ---
+async function fetchWithExponentialBackoff(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    attempt++;
+    const delay = Math.pow(2, attempt) * 100 + Math.random() * 100;
+    
+    try {
+      const response = await fetch(url, options);
+      
+      if (response.ok || (response.status >= 400 && response.status !== 429)) {
+        return response;
+      }
+      
+      console.warn(`[Attempt ${attempt}/${maxRetries}] API call failed with status ${response.status}. Retrying in ${delay.toFixed(0)}ms...`);
+    } catch (error) {
+      console.warn(`[Attempt ${attempt}/${maxRetries}] API call failed with network error: ${error.message}. Retrying in ${delay.toFixed(0)}ms...`);
+    }
+    
+    if (attempt < maxRetries) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  
+  console.error(`[Attempt ${attempt}/${maxRetries}] Max retries reached. Final API call failed.`);
+  return fetch(url, options);
 }
 
-interface AnalyzeRequest {
-  data: any;
-  userId: string;
-  fileType: string;
-}
-
-interface AnalyzeResponse {
-  success: boolean;
-  analysis?: {
-    summary: string;
-    key_themes: string[];
-    suggested_actions: string[];
-    trends: string[];
-    performance: {
-      metrics: string[];
-      score: number;
-    };
-    sentiment: {
-      positive: number;
-      negative: number;
-      neutral: number;
-      overall: 'positive' | 'negative' | 'neutral';
-    };
-  };
-  error?: string;
-}
-
+// --- Main Handler ---
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    // Only allow POST requests
+    console.log('🚀 Analyze Insights function called');
+
     if (req.method !== 'POST') {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Method not allowed' }),
-        { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Method not allowed'
+      }), {
+        status: 405,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    // Get the authorization header
-    const authHeader = req.headers.get('authorization')
+    const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.error('❌ Missing or invalid authorization header');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Unauthorized'
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    const token = authHeader.substring(7)
+    const token = authHeader.substring(7);
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase environment variables (URL/KEY) are not set.');
+    }
 
-    // Verify the JWT token and get user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data: { user }, error: authError } = await serviceSupabase.auth.getUser(token);
     
     if (authError || !user) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.error('❌ Invalid token:', authError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid token'
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    // Parse request body
-    const { data, userId, fileType }: AnalyzeRequest = await req.json()
+    console.log('✅ User authenticated:', user.id);
 
-    // Validate request body
+    const { data, userId, fileType } = await req.json();
+
     if (!data || !userId) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Missing required fields' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.error('❌ Missing required fields');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Missing required fields'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    // Ensure the user can only analyze their own data
     if (user.id !== userId) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Forbidden' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.error('❌ User ID mismatch');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Forbidden'
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
+
+    console.log('📊 Analysis request:', {
+      userId,
+      fileType,
+      dataLength: Array.isArray(data) ? data.length : typeof data === 'string' ? data.length : JSON.stringify(data).length
+    });
 
     // Check usage limits
-    const { data: usageData, error: usageError } = await supabase
+    const { data: usageData, error: usageError } = await serviceSupabase
       .from('usage_tracking')
       .select('insights_count')
       .eq('user_id', userId)
-      .single()
+      .single();
 
     if (usageError && usageError.code !== 'PGRST116') {
-      console.error('Error checking usage:', usageError)
-      return new Response(
-        JSON.stringify({ success: false, error: 'Failed to check usage limits' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.error('⚠️ Error checking usage:', usageError);
     }
 
-    // Get user subscription to check limits
-    const { data: subscriptionData } = await supabase
+    const { data: subscriptionData } = await serviceSupabase
       .from('user_subscriptions')
       .select('*')
       .eq('user_id', userId)
-      .single()
+      .single();
 
-    // Determine user's plan
-    let userPlan = 'free'
+    let userPlan = 'free';
     if (subscriptionData) {
       if (subscriptionData.status === 'active') {
-        userPlan = subscriptionData.plan_name || subscriptionData.plan_type || 'pro'
+        userPlan = subscriptionData.plan_name || subscriptionData.plan_type || 'pro';
       } else if (subscriptionData.status === 'trialing') {
-        userPlan = 'free'
+        userPlan = 'free';
       }
     }
 
-    // Define plan limits
-    const planLimits = {
+    console.log('👤 User plan:', userPlan);
+
+    const planLimits: Record<string, number> = {
       free: 5,
       pro: 50,
-      business: -1, // unlimited
-      enterprise: -1 // unlimited
-    }
+      business: -1,
+      enterprise: -1
+    };
 
-    const currentUsage = usageData?.insights_count || 0
-    const limit = planLimits[userPlan as keyof typeof planLimits]
+    const validPlan = planLimits[userPlan] !== undefined ? userPlan : 'free';
+    const currentUsage = usageData?.insights_count || 0;
+    const limit = planLimits[validPlan];
 
     if (limit !== -1 && currentUsage >= limit) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: `Usage limit reached. Current: ${currentUsage}, Limit: ${limit}. Please upgrade your plan.` 
-        }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.warn('⚠️ Usage limit reached');
+      return new Response(JSON.stringify({
+        success: false,
+        error: `Usage limit reached. Current: ${currentUsage}, Limit: ${limit}. Please upgrade your plan.`
+      }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // Prepare data for Gemini AI
-    let dataString = ''
+    let dataString = '';
     if (typeof data === 'object') {
-      dataString = JSON.stringify(data, null, 2)
+      dataString = JSON.stringify(data, null, 2);
     } else {
-      dataString = String(data)
-    }
-    
-    // Log analysis type and data length for debugging
-    console.log(`🔍 Analysis type: ${fileType}`)
-    console.log(`📊 Data length: ${dataString.length} characters`)
-    if (fileType === 'feedback-analysis') {
-      console.log(`👥 Feedback analysis mode enabled`)
-      // Count feedback entries if data is a string
-      if (typeof dataString === 'string') {
-        const feedbackCount = (dataString.match(/\[.*?\]/g) || []).length
-        console.log(`📝 Detected ${feedbackCount} feedback entries`)
-      }
+      dataString = String(data);
     }
 
-    // Create the prompt for Gemini AI
-    const prompt = `
-You are an expert business analyst specializing in customer feedback analysis and user experience insights. Analyze the following user feedback data and provide comprehensive, actionable insights.
+    const prompt = ANALYSIS_PROMPT_TEMPLATE(dataString, fileType || 'feedback');
 
-Data to analyze:
-${dataString}
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    if (!GEMINI_API_KEY) {
+      console.error('❌ GEMINI_API_KEY not found in environment');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Gemini API key is not configured. Please set GEMINI_API_KEY in your Supabase environment variables.'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
-Analysis type: ${fileType === 'feedback-analysis' ? 'User Feedback Analysis' : 'General Data Analysis'}
+    console.log('🤖 Calling Gemini API with enhanced prompt...');
+    const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent";
 
-Please provide a detailed analysis in the following JSON format:
-
-{
-  "summary": "A comprehensive 2-10 paragraph summary of the key findings and insights from the user feedback. Focus on patterns, pain points, satisfaction levels, and opportunities for improvement.",
-  "key_themes": ["Theme 1", "Theme 2", "Theme 3", "Theme 4", "Theme 5"],
-  "suggested_actions": ["Action 1", "Action 2", "Action 3", "Action 4", "Action 5"],
-  "trends": ["Trend 1", "Trend 2", "Trend 3", "Trend 4"],
-  "performance": {
-    "metrics": ["Metric 1", "Metric 2", "Metric 3", "Metric 4"],
-    "score": 85
-  },
-  "sentiment": {
-    "positive": 65,
-    "negative": 15,
-    "neutral": 20,
-    "overall": "positive"
-  }
-}
-
-Guidelines for feedback analysis:
-- Summary should focus on user experience insights, common issues, and satisfaction patterns
-- Key themes should identify recurring feedback topics, user pain points, and positive experiences
-- Suggested actions should be practical improvements that address user feedback
-- Trends should highlight patterns in user sentiment and feedback over time
-- Performance metrics should focus on user satisfaction, feedback quality, and response rates
-- Performance score should be 0-100 based on overall feedback sentiment and actionable insights
-- Sentiment should be calculated based on the tone and content of the feedback messages
-- Ensure all percentages in sentiment add up to 100
-- Overall sentiment should be "positive", "negative", or "neutral"
-
-For feedback analysis, pay special attention to:
-- User pain points and frustrations
-- Feature requests and improvement suggestions
-- Positive experiences and what users love
-- Common patterns across multiple feedback entries
-- Urgency and priority of issues mentioned
-- User satisfaction levels and sentiment trends
-
-Return only valid JSON without any additional text or formatting.
-`
-
-    // Initialize Gemini AI with current API
-    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')!
-    
-    // Use the current Gemini API endpoint with gemini-1.5-flash model
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": GEMINI_API_KEY
-        },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            topK: 50,
-            topP: 0.9,
-            maxOutputTokens: 1000
+    const response = await fetchWithExponentialBackoff(geminiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }]
           }
-        })
-      }
-    );
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 4096,
+          responseMimeType: "application/json",
+          responseSchema: ANALYSIS_RESPONSE_SCHEMA
+        }
+      })
+    });
+
+    console.log('📡 Gemini API response status:', response.status);
 
     if (!response.ok) {
-      throw new Error(`Gemini API request failed: ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage = 'Gemini API request failed';
+      
+      if (response.status === 400) {
+        errorMessage = 'Bad request to Gemini API. Please check your request format.';
+      } else if (response.status === 403) {
+        errorMessage = 'Gemini API key is invalid or restricted. Please check your API key permissions.';
+      } else if (response.status === 429) {
+        errorMessage = 'Gemini API rate limit exceeded. Please try again later.';
+      }
+
+      return new Response(JSON.stringify({
+        success: false,
+        error: `${errorMessage} (Status: ${response.status})`,
+        details: errorText.substring(0, 500)
+      }), {
+        status: response.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     const geminiData = await response.json();
-    const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+    console.log('✅ Gemini API response received');
 
-    // Parse the JSON response
-    let analysis
+    const candidate = geminiData.candidates?.[0];
+    const text = candidate?.content?.parts?.[0]?.text;
+    const finishReason = candidate?.finishReason;
+
+    if (!text) {
+      console.error('❌ No text generated by Gemini');
+      let errorMessage = 'No analysis generated by AI.';
+      let status = 500;
+      
+      if (finishReason) {
+        errorMessage = `AI generation failed: Reason - ${finishReason}.`;
+        status = 400;
+        
+        if (finishReason === 'SAFETY') {
+          errorMessage += ' The prompt or input data violated policy filters. Please adjust your input.';
+        } else if (finishReason === 'RECITATION') {
+          errorMessage += ' The model declined to answer to prevent reciting copyrighted material.';
+        } else if (finishReason === 'MAX_TOKENS') {
+          errorMessage += ' The analysis was too long. Please try with fewer feedback entries.';
+        }
+      }
+
+      return new Response(JSON.stringify({
+        success: false,
+        error: errorMessage,
+        details: finishReason
+      }), {
+        status: status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    let analysis;
     try {
-      // Extract JSON from the response (in case there's extra text)
-      const jsonMatch = text.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) {
-        throw new Error('No valid JSON found in response')
-      }
+      const analysisText = text.trim();
+      analysis = JSON.parse(analysisText);
       
-      analysis = JSON.parse(jsonMatch[0])
-      
-      // Validate the response structure
       if (!analysis.summary || !analysis.key_themes || !analysis.suggested_actions || 
-          !analysis.trends || !analysis.performance || !analysis.sentiment) {
-        throw new Error('Invalid response structure from AI')
+          !analysis.performance || !analysis.sentiment) {
+        throw new Error('Invalid response structure from AI: Missing required top-level fields.');
       }
-      
-      // Ensure sentiment percentages add up to 100
-      const totalSentiment = analysis.sentiment.positive + analysis.sentiment.negative + analysis.sentiment.neutral
+
+      console.log('✅ Successfully parsed AI analysis');
+
+      // Normalize sentiment percentages
+      const totalSentiment = analysis.sentiment.positive + analysis.sentiment.negative + analysis.sentiment.neutral;
       if (Math.abs(totalSentiment - 100) > 1) {
-        // Normalize to 100%
-        const factor = 100 / totalSentiment
-        analysis.sentiment.positive = Math.round(analysis.sentiment.positive * factor)
-        analysis.sentiment.negative = Math.round(analysis.sentiment.negative * factor)
-        analysis.sentiment.neutral = 100 - analysis.sentiment.positive - analysis.sentiment.negative
+        const factor = 100 / totalSentiment;
+        analysis.sentiment.positive = Math.round(analysis.sentiment.positive * factor);
+        analysis.sentiment.negative = Math.round(analysis.sentiment.negative * factor);
+        analysis.sentiment.neutral = 100 - analysis.sentiment.positive - analysis.sentiment.negative;
+        console.log('📊 Normalized sentiment percentages');
       }
-      
-      // Ensure performance score is within bounds
-      analysis.performance.score = Math.max(0, Math.min(100, analysis.performance.score))
-      
-      // For feedback analysis, enhance the analysis with additional insights
-      if (fileType === 'feedback-analysis') {
-        // Ensure themes are feedback-focused
-        if (analysis.key_themes && analysis.key_themes.length > 0) {
-          analysis.key_themes = analysis.key_themes.map(theme => 
-            theme.includes('feedback') || theme.includes('user') || theme.includes('customer') 
-              ? theme 
-              : `User ${theme.toLowerCase()}`
-          );
-        }
-        
-        // Ensure actions are user-focused
-        if (analysis.suggested_actions && analysis.suggested_actions.length > 0) {
-          analysis.suggested_actions = analysis.suggested_actions.map(action => 
-            action.includes('user') || action.includes('customer') || action.includes('feedback')
-              ? action
-              : `Improve user ${action.toLowerCase()}`
-          );
-        }
-        
-        // Ensure trends are feedback-relevant
-        if (analysis.trends && analysis.trends.length > 0) {
-          analysis.trends = analysis.trends.map(trend => 
-            trend.includes('feedback') || trend.includes('user') || trend.includes('satisfaction')
-              ? trend
-              : `User ${trend.toLowerCase()} trends`
-          );
-        }
-      }
-      
+
+      analysis.performance.score = Math.max(0, Math.min(100, Math.round(analysis.performance.score)));
     } catch (parseError) {
-      console.error('Error parsing AI response:', parseError)
-      console.error('Raw response:', text)
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Failed to parse AI analysis response' 
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.error('❌ Error parsing AI response:', parseError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: `Failed to parse AI analysis response. ${parseError instanceof Error ? parseError.message : 'The AI did not return a parsable JSON structure.'}`
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // Increment usage count
-    const { error: incrementError } = await supabase
-      .rpc('increment_usage', {
+    try {
+      const { error: incrementError } = await serviceSupabase.rpc('increment_usage', {
         p_user_id: userId,
         p_action: 'insights'
-      })
-
-    if (incrementError) {
-      console.error('Error incrementing usage:', incrementError)
-      // Don't fail the request if usage tracking fails
+      });
+      
+      if (incrementError) {
+        console.error('⚠️ Error incrementing usage:', incrementError);
+      } else {
+        console.log('📈 Usage incremented successfully');
+      }
+    } catch (usageErr) {
+      console.error('⚠️ Usage tracking error:', usageErr);
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        analysis
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.log('🎉 Analysis completed successfully');
 
+    return new Response(JSON.stringify({
+      success: true,
+      analysis
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   } catch (error) {
-    console.error('Analysis error:', error)
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Internal server error' 
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.error('💥 Unexpected error:', error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: error instanceof Error ? error.message : 'Internal server error',
+      stack: error instanceof Error ? error.stack : undefined
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
-})
+});

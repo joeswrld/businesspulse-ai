@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { Loader2 } from "lucide-react";
+import { ensureUserHasProject } from "@/utils/projectUtils";
 
 interface AuthContextType {
   user: User | null;
@@ -54,6 +55,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           if (event === 'SIGNED_IN') {
             console.log("✅ User signed in successfully:", session?.user?.email);
+            
+            // Automatically ensure user has a project with retry logic
+            if (session?.user?.id) {
+              ensureUserHasProject(session.user.id)
+                .then((project) => {
+                  console.log("🎯 User project ensured:", project.id);
+                })
+                .catch((error) => {
+                  console.error("❌ Failed to ensure user project:", error);
+                  
+                  // Log specific error types for debugging
+                  if (error.message.includes('network')) {
+                    console.warn("⚠️ Network error during project creation - will retry on next interaction");
+                  } else if (error.message.includes('JWT expired')) {
+                    console.warn("⚠️ Session expired during project creation - user may need to refresh");
+                  } else {
+                    console.error("❌ Unexpected error during project creation:", error.message);
+                  }
+                  
+                  // Don't throw here as it would break the auth flow
+                  // The project will be created when needed
+                });
+            }
           } else if (event === 'SIGNED_OUT') {
             console.log("🚪 User signed out");
           } else if (event === 'TOKEN_REFRESHED') {
@@ -90,6 +114,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setSession(session);
           setUser(session?.user ?? null);
           setLoading(false);
+          
+          // If user is already signed in, ensure they have a project
+          if (session?.user?.id) {
+            ensureUserHasProject(session.user.id)
+              .then((project) => {
+                console.log("🎯 User project ensured on initial load:", project.id);
+              })
+              .catch((error) => {
+                console.error("❌ Failed to ensure user project on initial load:", error);
+                
+                // Log specific error types for debugging
+                if (error.message.includes('network')) {
+                  console.warn("⚠️ Network error during initial project check - will retry on next interaction");
+                } else if (error.message.includes('JWT expired')) {
+                  console.warn("⚠️ Session expired during initial project check - user may need to refresh");
+                } else {
+                  console.error("❌ Unexpected error during initial project check:", error.message);
+                }
+              });
+          }
         }
       } catch (error) {
         console.error("❌ Error in getInitialSession:", error);

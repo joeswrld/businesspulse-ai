@@ -2,9 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useUsageEnforcement } from '@/hooks/useUsageEnforcement';
-import { useUsageTracking } from '@/hooks/useUsageTracking';
-import { useRealtimeFeedback } from '@/hooks/useRealtimeFeedback';
 import { toast } from 'sonner';
 import { 
   Brain, 
@@ -36,7 +33,6 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { FeedbackBadgeGroup } from '@/components/ui/FeedbackBadge';
 
 // Types
 interface Feedback {
@@ -77,17 +73,14 @@ interface GeminiAnalysis {
 const Insights: React.FC = () => {
   const { user } = useAuth();
   const location = useLocation();
-  const { checkUsage, enforceUsage } = useUsageEnforcement();
-  const { trackUsage } = useUsageTracking();
   
   // Use real-time feedback hook
-  const { 
-    feedbacks, 
-    counts, 
-    loading: feedbackLoading, 
-    error: feedbackError, 
-    realtimeStatus 
-  } = useRealtimeFeedback();
+  // Mock feedback data since feedback system is removed
+  const feedbacks: Feedback[] = [];
+  const counts = { total: 0, new: 0, reviewed: 0, resolved: 0 };
+  const feedbackLoading = false;
+  const feedbackError = null;
+  const realtimeStatus = 'disconnected';
   
   // State
   const [selectedFeedbacks, setSelectedFeedbacks] = useState<Set<string>>(new Set());
@@ -182,21 +175,6 @@ const Insights: React.FC = () => {
       return;
     }
 
-    // Check usage limits
-    try {
-      const canProceed = await checkUsage('insights');
-      if (!canProceed) {
-        const shouldUpgrade = await enforceUsage('insights');
-        if (!shouldUpgrade) {
-          return;
-        }
-      }
-    } catch (error) {
-      console.error('Usage check failed:', error);
-      toast.error('Failed to check usage limits');
-      return;
-    }
-
     try {
       setIsAnalyzing(true);
       setError(null);
@@ -271,9 +249,6 @@ const Insights: React.FC = () => {
           console.error('❌ Missing analysis in response:', result);
           throw new Error('Invalid response from analysis service');
         }
-
-        // Track usage after successful analysis
-        await trackUsage('insights');
 
         // Save to insights history
         try {

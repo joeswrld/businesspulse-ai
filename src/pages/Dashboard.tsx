@@ -30,10 +30,6 @@ import {
     Minus
 } from 'lucide-react';
 
-import OnboardingChecklist from '@/components/OnboardingChecklist';
-import GuidedTour from '@/components/GuidedTour';
-import { useOnboarding } from '@/hooks/useOnboarding';
-
 import {
     BarChart as RechartsBarChart,
     Bar,
@@ -56,36 +52,23 @@ import {
 interface Feedback {
     id: string;
     project_id: string;
-    email: string | null;
+    user_id: string | null;
+    form_type: string;
     message: string;
-    page_url: string | null;
-    browser: string | null;
-    sentiment: 'positive' | 'negative' | 'neutral' | null;
-    timestamp: string;
+    rating: number | null;
+    metadata: any;
+    created_at: string;
 }
 
-interface Insight {
+interface FeedbackSettings {
     id: string;
     user_id: string;
-    file_id: string;
-    file_name: string;
-    summary: string;
-    key_themes: string[];
-    suggested_actions: string[];
-    sentiment: any;
-    performance: any;
-    trends: string[];
+    project_id: string;
+    customer_survey_url: string;
+    product_feedback_url: string;
+    widget_code: string;
     created_at: string;
-}
-
-interface Profile {
-    id: string;
-    user_id: string | null;
-    email: string | null;
-    full_name: string | null;
-    plan: string | null;
-    trial_end: string | null;
-    created_at: string;
+    updated_at: string;
 }
 
 interface DashboardMetrics {
@@ -93,17 +76,12 @@ interface DashboardMetrics {
     positiveFeedback: number;
     negativeFeedback: number;
     neutralFeedback: number;
-    activeUsers: number;
-    currentPlan: string;
+    averageRating: number;
+    responseRate: number;
 }
 
 interface ChartData {
     date: string;
-    count: number;
-}
-
-interface ThemeData {
-    theme: string;
     count: number;
 }
 
@@ -113,13 +91,17 @@ interface SentimentData {
     color: string;
 }
 
+interface RatingData {
+    rating: string;
+    count: number;
+}
+
 export default function Dashboard() {
     const { user } = useAuth();
 
     // State management
     const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
-    const [insights, setInsights] = useState<Insight[]>([]);
-    const [profile, setProfile] = useState<Profile | null>(null);
+    const [feedbackSettings, setFeedbackSettings] = useState<FeedbackSettings | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
@@ -128,8 +110,27 @@ export default function Dashboard() {
         from: undefined,
         to: undefined
     });
-    const [showTour, setShowTour] = useState(false);
-    const { isNewUser } = useOnboarding();
+
+    // Sentiment analysis helper
+    const analyzeSentiment = (message: string, rating: number | null): 'positive' | 'neutral' | 'negative' => {
+        // If rating exists, use it as primary indicator
+        if (rating !== null) {
+            if (rating >= 4) return 'positive';
+            if (rating <= 2) return 'negative';
+        }
+
+        // Fallback to text analysis
+        const lowerMessage = message.toLowerCase();
+        const positiveWords = ['great', 'excellent', 'amazing', 'love', 'awesome', 'fantastic', 'good', 'best', 'wonderful'];
+        const negativeWords = ['bad', 'terrible', 'awful', 'hate', 'worst', 'poor', 'disappointed', 'horrible', 'useless'];
+        
+        const positiveCount = positiveWords.filter(word => lowerMessage.includes(word)).length;
+        const negativeCount = negativeWords.filter(word => lowerMessage.includes(word)).length;
+        
+        if (positiveCount > negativeCount) return 'positive';
+        if (negativeCount > positiveCount) return 'negative';
+        return 'neutral';
+    };
 
     // Load dashboard data
     const loadDashboardData = useCallback(async () => {
@@ -139,67 +140,83 @@ export default function Dashboard() {
             setLoading(true);
             setError(null);
 
-            // Get user's project IDs from feedback_settings
-            const { data: settingsData, error: settingsError } = await supabase
+            console.log('Loading dashboard data for user:', user.id);
+
+            // Step 1: Get or create feedback settings
+            const { data: existingSettings, error: settingsError } = await supabase
                 .from('feedback_settings')
-                .select('project_id')
-                .eq('user_id', user.id);
+                .select('*')
+                .eq('user_id', user.id)
+                .maybeSingle();
 
             if (settingsError) {
-                console.error('Error loading feedback settings:', settingsError);
-                throw settingsError;
+                console.error('Error fetching feedback settings:', settingsError);
+                throw new Error('Failed to load feedback settings');
             }
 
-            const projectIds = settingsData?.map(s => s.project_id) || [];
+            let settings: FeedbackSettings | null = null;
 
-            // Load all data in parallel
-            const [feedbacksResult, insightsResult, profileResult] = await Promise.all([
-                // Load feedbacks
-                projectIds.length > 0
-                    ? supabase
-                        .from('feedback')
-                        .select('*')
-                        .in('project_id', projectIds)
-                        .order('created_at', { ascending: false })
-                    : Promise.resolve({ data: [], error: null }),
+            if (!existingSettings) {
+                // Create new settings if they don't exist
+                console.log('No feedback settings found, creating new ones...');
+                
+                const newProjectId = crypto.randomUUID();
+                const baseUrl = window.location.origin;
+                
+                const newSettings = {
+                    user_id: user.id,
+                    project_id: newProjectId,
+                    customer_survey_url: `${baseUrl}/survey/${newProjectId}?type=satisfaction`,
+                    product_feedback_url: `${baseUrl}/survey/${newProjectId}?type=product`,
+                    widget_code: `<script src="${baseUrl}/widget.js" data-project-id="${newProjectId}"></script>`
+                };
 
-                // Load insights
-                supabase
-                    .from('insights_results')
+                const { data: createdSettings, error: createError } = await supabase
+                    .from('feedback_settings')
+                    .insert(newSettings)
+                    .select()
+                    .single();
+
+                if (createError) {
+                    console.error('Error creating feedback settings:', createError);
+                    throw new Error('Failed to create feedback settings');
+                }
+
+                settings = createdSettings;
+                console.log('Created new feedback settings:', settings);
+            } else {
+                settings = existingSettings;
+                console.log('Found existing feedback settings:', settings);
+            }
+
+            setFeedbackSettings(settings);
+
+            // Step 2: Load feedback for this project
+            if (settings && settings.project_id) {
+                console.log('Loading feedback for project:', settings.project_id);
+                
+                const { data: feedbacksData, error: feedbacksError } = await supabase
+                    .from('feedback')
                     .select('*')
-                    .eq('user_id', user.id)
-                    .order('created_at', { ascending: false }),
+                    .eq('project_id', settings.project_id)
+                    .order('created_at', { ascending: false });
 
-                // Load profile
-                supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', user.id)
-                    .single()
-            ]);
+                if (feedbacksError) {
+                    console.error('Error loading feedbacks:', feedbacksError);
+                    throw new Error('Failed to load feedback data');
+                }
 
-            if (feedbacksResult.error) {
-                console.error('Error loading feedbacks:', feedbacksResult.error);
-                throw feedbacksResult.error;
+                console.log(`Loaded ${feedbacksData?.length || 0} feedback entries`);
+                setFeedbacks(feedbacksData || []);
             }
-
-            if (insightsResult.error) {
-                console.error('Error loading insights:', insightsResult.error);
-                throw insightsResult.error;
-            }
-
-            if (profileResult.error && profileResult.error.code !== 'PGRST116') {
-                console.error('Error loading profile:', profileResult.error);
-                throw profileResult.error;
-            }
-
-            setFeedbacks(feedbacksResult.data || []);
-            setInsights(insightsResult.data || []);
-            setProfile(profileResult.data || null);
 
         } catch (error) {
             console.error('Error loading dashboard data:', error);
-            setError(error instanceof Error ? error.message : 'An error occurred while loading data');
+            const errorMessage = error instanceof Error ? error.message : 'An error occurred while loading data';
+            setError(errorMessage);
+            toast.error('Dashboard Error', {
+                description: errorMessage
+            });
         } finally {
             setLoading(false);
         }
@@ -214,9 +231,10 @@ export default function Dashboard() {
 
     // Set up real-time subscriptions
     useEffect(() => {
-        if (!user) return;
+        if (!user || !feedbackSettings) return;
 
-        // Subscribe to feedback changes
+        console.log('Setting up real-time subscription for project:', feedbackSettings.project_id);
+
         const feedbackChannel = supabase
             .channel('dashboard-feedback-changes')
             .on(
@@ -224,73 +242,23 @@ export default function Dashboard() {
                 {
                     event: '*',
                     schema: 'public',
-                    table: 'feedbacks'
+                    table: 'feedback',
+                    filter: `project_id=eq.${feedbackSettings.project_id}`
                 },
                 (payload) => {
                     console.log('Feedback change received in dashboard:', payload);
-                    loadDashboardData(); // Reload all data when feedback changes
-                }
-            )
-            .subscribe();
-
-        // Subscribe to insights changes
-        const insightsChannel = supabase
-            .channel('dashboard-insights-changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'insights_results',
-                    filter: `user_id=eq.${user.id}`
-                },
-                (payload) => {
-                    console.log('Insights change received in dashboard:', payload);
-                    loadDashboardData(); // Reload all data when insights change
+                    toast.success('New feedback received!', {
+                        description: 'Dashboard data updated'
+                    });
+                    loadDashboardData();
                 }
             )
             .subscribe();
 
         return () => {
             supabase.removeChannel(feedbackChannel);
-            supabase.removeChannel(insightsChannel);
         };
-    }, [user, loadDashboardData]);
-
-    // Refresh data when date range changes
-    useEffect(() => {
-        if (user) {
-            loadDashboardData();
-        }
-    }, [dateRange, customDateRange, loadDashboardData, user]);
-
-    // Get sentiment from database or fallback to analysis
-    const getSentiment = (feedback: Feedback): 'positive' | 'negative' | 'neutral' => {
-        if (feedback.sentiment) {
-            return feedback.sentiment;
-        }
-
-        // Fallback to client-side analysis if no sentiment in database
-        const positiveWords = [
-            'great', 'good', 'excellent', 'amazing', 'wonderful', 'fantastic', 'love', 'like', 'happy', 'satisfied',
-            'perfect', 'awesome', 'outstanding', 'brilliant', 'superb', 'terrific', 'pleased', 'impressed', 'smooth',
-            'fast', 'easy', 'intuitive', 'beautiful', 'clean', 'modern', 'helpful', 'supportive', 'responsive'
-        ];
-
-        const negativeWords = [
-            'bad', 'terrible', 'awful', 'horrible', 'hate', 'dislike', 'angry', 'frustrated', 'annoyed', 'disappointed',
-            'broken', 'slow', 'difficult', 'confusing', 'ugly', 'cluttered', 'buggy', 'crash', 'error', 'fail',
-            'useless', 'waste', 'problem', 'issue', 'complaint', 'unhappy', 'dissatisfied', 'poor', 'weak'
-        ];
-
-        const messageLower = feedback.message.toLowerCase();
-        const positiveCount = positiveWords.filter(word => messageLower.includes(word)).length;
-        const negativeCount = negativeWords.filter(word => messageLower.includes(word)).length;
-
-        if (positiveCount > negativeCount) return 'positive';
-        if (negativeCount > positiveCount) return 'negative';
-        return 'neutral';
-    };
+    }, [user, feedbackSettings, loadDashboardData]);
 
     // Get date range for filtering
     const getDateRange = (): { start: Date; end: Date } => {
@@ -301,7 +269,7 @@ export default function Dashboard() {
                 case '7d': return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
                 case '30d': return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
                 case '90d': return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-                default: return new Date(0); // All time
+                default: return new Date(0);
             }
         })();
 
@@ -312,34 +280,32 @@ export default function Dashboard() {
     const dashboardMetrics = useMemo((): DashboardMetrics => {
         const { start, end } = getDateRange();
 
-        // Filter feedbacks by date range
         const filteredFeedbacks = feedbacks.filter(feedback => {
             const feedbackDate = new Date(feedback.created_at);
             return feedbackDate >= start && feedbackDate <= end;
         });
 
         // Calculate sentiment counts
-        const sentiments = filteredFeedbacks.map(feedback => getSentiment(feedback));
+        const sentiments = filteredFeedbacks.map(fb => analyzeSentiment(fb.message, fb.rating));
         const positiveCount = sentiments.filter(s => s === 'positive').length;
         const negativeCount = sentiments.filter(s => s === 'negative').length;
         const neutralCount = sentiments.filter(s => s === 'neutral').length;
 
-        // Calculate active users (unique emails)
-        const uniqueUsers = new Set(
-            filteredFeedbacks
-                .map(f => f.email)
-                .filter(email => email && email.trim() !== '')
-        );
+        // Calculate average rating
+        const ratings = filteredFeedbacks.filter(fb => fb.rating !== null).map(fb => fb.rating!);
+        const averageRating = ratings.length > 0 
+            ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length 
+            : 0;
 
         return {
             totalFeedback: filteredFeedbacks.length,
             positiveFeedback: positiveCount,
             negativeFeedback: negativeCount,
             neutralFeedback: neutralCount,
-            activeUsers: uniqueUsers.size,
-            currentPlan: profile?.plan || 'Free Trial'
+            averageRating,
+            responseRate: 0 // TODO: Implement response tracking
         };
-    }, [feedbacks, profile, dateRange, customDateRange]);
+    }, [feedbacks, dateRange, customDateRange]);
 
     // Calculate chart data
     const chartData = useMemo((): ChartData[] => {
@@ -350,7 +316,6 @@ export default function Dashboard() {
             return feedbackDate >= start && feedbackDate <= end;
         });
 
-        // Group by date
         const volumeData: Record<string, number> = {};
         filteredFeedbacks.forEach(feedback => {
             const date = new Date(feedback.created_at).toISOString().split('T')[0];
@@ -364,50 +329,37 @@ export default function Dashboard() {
 
     // Calculate sentiment data for pie chart
     const sentimentData = useMemo((): SentimentData[] => {
+        return [
+            { name: 'Positive', value: dashboardMetrics.positiveFeedback, color: '#10b981' },
+            { name: 'Neutral', value: dashboardMetrics.neutralFeedback, color: '#f59e0b' },
+            { name: 'Negative', value: dashboardMetrics.negativeFeedback, color: '#ef4444' }
+        ].filter(item => item.value > 0);
+    }, [dashboardMetrics]);
+
+    // Calculate rating distribution
+    const ratingData = useMemo((): RatingData[] => {
         const { start, end } = getDateRange();
 
         const filteredFeedbacks = feedbacks.filter(feedback => {
             const feedbackDate = new Date(feedback.created_at);
-            return feedbackDate >= start && feedbackDate <= end;
+            return feedbackDate >= start && feedbackDate <= end && feedback.rating !== null;
         });
 
-        const sentiments = filteredFeedbacks.map(feedback => getSentiment(feedback));
-        const positiveCount = sentiments.filter(s => s === 'positive').length;
-        const negativeCount = sentiments.filter(s => s === 'negative').length;
-        const neutralCount = sentiments.filter(s => s === 'neutral').length;
+        const ratingCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        filteredFeedbacks.forEach(fb => {
+            if (fb.rating) ratingCounts[fb.rating]++;
+        });
 
         return [
-            { name: 'Positive', value: positiveCount, color: '#10b981' },
-            { name: 'Neutral', value: neutralCount, color: '#f59e0b' },
-            { name: 'Negative', value: negativeCount, color: '#ef4444' }
+            { rating: '5★', count: ratingCounts[5] },
+            { rating: '4★', count: ratingCounts[4] },
+            { rating: '3★', count: ratingCounts[3] },
+            { rating: '2★', count: ratingCounts[2] },
+            { rating: '1★', count: ratingCounts[1] }
         ];
     }, [feedbacks, dateRange, customDateRange]);
 
-    // Calculate top themes from insights
-    const topThemes = useMemo((): ThemeData[] => {
-        const { start, end } = getDateRange();
-
-        const filteredInsights = insights.filter(insight => {
-            const insightDate = new Date(insight.created_at);
-            return insightDate >= start && insightDate <= end;
-        });
-
-        // Flatten all themes from insights
-        const allThemes = filteredInsights.flatMap(insight => insight.key_themes || []);
-
-        // Count theme occurrences
-        const themeCounts: Record<string, number> = {};
-        allThemes.forEach(theme => {
-            themeCounts[theme] = (themeCounts[theme] || 0) + 1;
-        });
-
-        return Object.entries(themeCounts)
-            .sort(([,a], [,b]) => b - a)
-            .slice(0, 5)
-            .map(([theme, count]) => ({ theme, count }));
-    }, [insights, dateRange, customDateRange]);
-
-    // Get recent feedback for the feed
+    // Get recent feedback
     const recentFeedbacks = useMemo(() => {
         const { start, end } = getDateRange();
 
@@ -416,23 +368,27 @@ export default function Dashboard() {
                 const feedbackDate = new Date(feedback.created_at);
                 return feedbackDate >= start && feedbackDate <= end;
             })
-            .slice(0, 10); // Show latest 10
+            .slice(0, 10);
     }, [feedbacks, dateRange, customDateRange]);
 
     // Format date
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleString();
+        try {
+            return format(new Date(dateString), 'MMM dd, yyyy HH:mm');
+        } catch {
+            return dateString;
+        }
     };
 
     // Get sentiment badge variant
-    const getSentimentBadgeVariant = (sentiment: string) => {
+    const getSentimentBadgeClass = (sentiment: string) => {
         switch (sentiment) {
             case 'positive':
-                return 'default';
+                return 'bg-green-100 text-green-800';
             case 'negative':
-                return 'destructive';
+                return 'bg-red-100 text-red-800';
             default:
-                return 'secondary';
+                return 'bg-yellow-100 text-yellow-800';
         }
     };
 
@@ -459,7 +415,7 @@ export default function Dashboard() {
                     <div className="text-center">
                         <RefreshCw className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-4" />
                         <h2 className="text-xl font-semibold mb-2">Loading Dashboard...</h2>
-                        <p className="text-gray-600 mb-2">Please wait while we fetch your data.</p>
+                        <p className="text-gray-600">Fetching your analytics...</p>
                     </div>
                 </div>
             </div>
@@ -470,22 +426,19 @@ export default function Dashboard() {
         return (
             <div className="container mx-auto p-6">
                 <div className="flex items-center justify-center min-h-[400px]">
-                    <div className="text-center">
-                        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                        <h2 className="text-xl font-semibold mb-2">Dashboard Error</h2>
-                        <p className="text-gray-600 mb-4">
-                            There was an issue loading your dashboard data.
-                        </p>
-                        <Button onClick={() => {
-                            setError(null);
-                            setLoading(true);
-                            loadDashboardData();
-                        }}>
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Try Again
-                        </Button>
-                        <p className="text-xs text-gray-500 mt-2">Error: {error}</p>
-                    </div>
+                    <Card className="w-full max-w-md">
+                        <CardContent className="p-6">
+                            <div className="text-center">
+                                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                                <h2 className="text-xl font-semibold mb-2">Dashboard Error</h2>
+                                <p className="text-gray-600 mb-4">{error}</p>
+                                <Button onClick={loadDashboardData}>
+                                    <RefreshCw className="h-4 w-4 mr-2" />
+                                    Try Again
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         );
@@ -493,48 +446,22 @@ export default function Dashboard() {
 
     return (
         <div className="container mx-auto p-6 space-y-6">
-            {/* Guided Tour */}
-            <GuidedTour run={showTour} onComplete={() => setShowTour(false)} />
-
             {/* Header */}
-            <div className="flex items-center justify-between" data-tour="dashboard-welcome">
+            <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-primary-foreground ">Analytics Dashboard</h1>
-                    <p className="text-gray-600 dark:text-primary-foreground mt-2">
-                        Real-time insights into your feedback data
+                    <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
+                    <p className="text-gray-600 mt-2">
+                        Real-time insights • {dashboardMetrics.totalFeedback} total feedback
                     </p>
                 </div>
-                <div className="flex items-center space-x-2">
-                    {isNewUser && (
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowTour(true)}
-                            className="border-blue-200 text-blue-600 hover:bg-blue-50"
-                        >
-                            <BarChart3 className="h-4 w-4 mr-2" />
-                            Take Tour
-                        </Button>
-                    )}
-                    <Button
-                        variant="outline"
-                        onClick={loadDashboardData}
-                        disabled={loading}
-                    >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                        Refresh
-                    </Button>
-                </div>
+                <Button variant="outline" onClick={loadDashboardData} disabled={loading}>
+                    <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                    Refresh
+                </Button>
             </div>
 
-            {/* Onboarding Checklist */}
-            {isNewUser && (
-                <div data-tour="onboarding-checklist">
-                    <OnboardingChecklist />
-                </div>
-            )}
-
             {/* Date Range Filter */}
-            <Card className="rounded-xl shadow-lg">
+            <Card>
                 <CardContent className="p-4">
                     <div className="flex flex-col sm:flex-row gap-4 items-center">
                         <div className="flex items-center space-x-2">
@@ -544,7 +471,7 @@ export default function Dashboard() {
 
                         <Select value={dateRange} onValueChange={(value: any) => setDateRange(value)}>
                             <SelectTrigger className="w-40">
-                                <SelectValue placeholder="Date Range" />
+                                <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="7d">Last 7 Days</SelectItem>
@@ -597,9 +524,8 @@ export default function Dashboard() {
             </Card>
 
             {/* Key Metrics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6" data-tour="feedback-metrics">
-                {/* Total Feedback */}
-                <Card className="rounded-xl shadow-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Feedback</CardTitle>
                         <MessageSquare className="h-4 w-4 text-muted-foreground" />
@@ -612,10 +538,9 @@ export default function Dashboard() {
                     </CardContent>
                 </Card>
 
-                {/* Positive Feedback */}
-                <Card className="rounded-xl shadow-lg">
+                <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Positive Feedback</CardTitle>
+                        <CardTitle className="text-sm font-medium">Positive</CardTitle>
                         <CheckCircle className="h-4 w-4 text-green-600" />
                     </CardHeader>
                     <CardContent>
@@ -630,10 +555,9 @@ export default function Dashboard() {
                     </CardContent>
                 </Card>
 
-                {/* Negative Feedback */}
-                <Card className="rounded-xl shadow-lg">
+                <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Negative Feedback</CardTitle>
+                        <CardTitle className="text-sm font-medium">Negative</CardTitle>
                         <AlertCircle className="h-4 w-4 text-red-600" />
                     </CardHeader>
                     <CardContent>
@@ -648,10 +572,9 @@ export default function Dashboard() {
                     </CardContent>
                 </Card>
 
-                {/* Neutral Feedback */}
-                <Card className="rounded-xl shadow-lg">
+                <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Neutral Feedback</CardTitle>
+                        <CardTitle className="text-sm font-medium">Neutral</CardTitle>
                         <Minus className="h-4 w-4 text-gray-600" />
                     </CardHeader>
                     <CardContent>
@@ -666,64 +589,33 @@ export default function Dashboard() {
                     </CardContent>
                 </Card>
 
-                {/* Active Users */}
-                <Card className="rounded-xl shadow-lg">
+                <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Active Users</CardTitle>
-                        <Users className="h-4 w-4 text-blue-600" />
+                        <CardTitle className="text-sm font-medium">Avg Rating</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-blue-600" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-blue-600">
-                            {dashboardMetrics.activeUsers}
+                            {dashboardMetrics.averageRating > 0 
+                                ? dashboardMetrics.averageRating.toFixed(1) 
+                                : '--'}★
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            Unique feedback providers
+                            Customer satisfaction
                         </p>
-                    </CardContent>
-                </Card>
-
-                {/* Current Plan */}
-                <Card className="rounded-xl shadow-lg border-2   ">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Current Plan</CardTitle>
-                        <Crown className="h-4 w-4 text-blue-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-lg font-bold text-blue-900 mb-2">
-                            {dashboardMetrics.currentPlan}
-                        </div>
-                        <div className="text-sm text-blue-700 mb-3">
-                            {profile?.trial_end ? (
-                                `Trial ends ${format(new Date(profile.trial_end), 'MMM dd, yyyy')}`
-                            ) : (
-                                'Active subscription'
-                            )}
-                        </div>
-                        <Button
-                            size="sm"
-                            className="w-full text-xs"
-                            asChild
-                        >
-                            <a href="/billing">
-                                {dashboardMetrics.currentPlan === 'Free Trial' ? 'Upgrade Now' : 'Manage Plan'}
-                            </a>
-                        </Button>
                     </CardContent>
                 </Card>
             </div>
 
             {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" data-tour="feedback-charts">
-                {/* Feedback Volume Over Time */}
-                <Card className="rounded-xl shadow-lg lg:col-span-2">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Feedback Volume */}
+                <Card className="lg:col-span-2">
                     <CardHeader>
                         <CardTitle className="flex items-center space-x-2">
                             <LineChart className="h-5 w-5" />
                             <span>Feedback Volume Over Time</span>
                         </CardTitle>
-                        <CardDescription>
-                            Daily feedback count for the selected period
-                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                         {chartData.length > 0 ? (
@@ -732,13 +624,13 @@ export default function Dashboard() {
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis
                                         dataKey="date"
-                                        tickFormatter={(value) => formatDate(value)}
+                                        tickFormatter={(value) => format(new Date(value), "MMM dd")}
                                         fontSize={12}
                                     />
                                     <YAxis fontSize={12} />
                                     <Tooltip
-                                        labelFormatter={(value) => formatDate(value)}
-                                        formatter={(value: any) => [value, 'Feedback Count']}
+                                        labelFormatter={(value) => format(new Date(value), "MMM dd, yyyy")}
+                                        formatter={(value: any) => [value, 'Feedback']}
                                     />
                                     <Area
                                         type="monotone"
@@ -750,11 +642,10 @@ export default function Dashboard() {
                                 </AreaChart>
                             </ResponsiveContainer>
                         ) : (
-                            <div className="flex items-center justify-center h-64 text-gray-500">
+                            <div className="flex items-center justify-center h-64 text-gray-400">
                                 <div className="text-center">
-                                    <BarChart3 className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                                    <p>No volume data available</p>
-                                    <p className="text-sm text-gray-400">Start collecting feedback to see trends</p>
+                                    <BarChart3 className="h-12 w-12 mx-auto mb-2" />
+                                    <p>No data available</p>
                                 </div>
                             </div>
                         )}
@@ -762,18 +653,15 @@ export default function Dashboard() {
                 </Card>
 
                 {/* Sentiment Breakdown */}
-                <Card className="rounded-xl shadow-lg">
+                <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center space-x-2">
                             <PieChart className="h-5 w-5" />
-                            <span>Sentiment Breakdown</span>
+                            <span>Sentiment</span>
                         </CardTitle>
-                        <CardDescription>
-                            Distribution of feedback sentiment
-                        </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {dashboardMetrics.totalFeedback > 0 ? (
+                        {sentimentData.length > 0 ? (
                             <ResponsiveContainer width="100%" height={300}>
                                 <RechartsPieChart>
                                     <Pie
@@ -792,88 +680,86 @@ export default function Dashboard() {
                                 </RechartsPieChart>
                             </ResponsiveContainer>
                         ) : (
-                            <div className="flex items-center justify-center h-64 text-gray-500">
-                                No sentiment data available
+                            <div className="flex items-center justify-center h-64 text-gray-400">
+                                No data
                             </div>
                         )}
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Bottom Row - Charts */}
+            {/* Bottom Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Top 5 Themes */}
-                <Card className="rounded-xl shadow-lg">
+                {/* Rating Distribution */}
+                <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center space-x-2">
                             <BarChartIcon className="h-5 w-5" />
-                            <span>Top 5 Themes</span>
+                            <span>Rating Distribution</span>
                         </CardTitle>
-                        <CardDescription>
-                            Most frequently mentioned themes from insights
-                        </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {topThemes.length > 0 ? (
+                        {ratingData.some(r => r.count > 0) ? (
                             <ResponsiveContainer width="100%" height={300}>
-                                <RechartsBarChart data={topThemes}>
+                                <RechartsBarChart data={ratingData}>
                                     <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="theme" fontSize={12} />
+                                    <XAxis dataKey="rating" fontSize={12} />
                                     <YAxis fontSize={12} />
-                                    <Tooltip formatter={(value: any) => [value, 'Mentions']} />
+                                    <Tooltip />
                                     <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                                 </RechartsBarChart>
                             </ResponsiveContainer>
                         ) : (
-                            <div className="flex items-center justify-center h-64 text-gray-500">
+                            <div className="flex items-center justify-center h-64 text-gray-400">
                                 <div className="text-center">
-                                    <Activity className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                                    <p>No theme data available</p>
-                                    <p className="text-sm text-gray-400">Generate insights to see themes</p>
+                                    <Activity className="h-12 w-12 mx-auto mb-2" />
+                                    <p>No rating data</p>
                                 </div>
                             </div>
                         )}
                     </CardContent>
                 </Card>
 
-                {/* Recent Feedback Feed */}
-                <Card className="rounded-xl shadow-lg" data-tour="recent-feedback">
+                {/* Recent Feedback */}
+                <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center space-x-2">
                             <MessageSquare className="h-5 w-5" />
-                            <span>Recent Feedback Feed</span>
+                            <span>Recent Feedback</span>
                         </CardTitle>
-                        <CardDescription>
-                            Latest feedback entries with sentiment analysis
-                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                         {recentFeedbacks.length > 0 ? (
                             <div className="space-y-4 max-h-80 overflow-y-auto">
-                                {recentFeedbacks.map((feedback) => (
-                                    <div key={feedback.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                                        <div className="flex items-start justify-between mb-2">
-                                            <div className="flex items-center space-x-2">
-                        <span className="font-medium text-gray-900">
-                          {feedback.email || 'Anonymous'}
-                        </span>
-                                                <Badge variant={getSentimentBadgeVariant(getSentiment(feedback)) as any}>
-                                                    {getSentiment(feedback)}
-                                                </Badge>
+                                {recentFeedbacks.map((feedback) => {
+                                    const sentiment = analyzeSentiment(feedback.message, feedback.rating);
+                                    return (
+                                        <div key={feedback.id} className="border rounded-lg p-3 hover:bg-gray-50">
+                                            <div className="flex items-start justify-between mb-2">
+                                                <div className="flex items-center space-x-2">
+                                                    <Badge className={getSentimentBadgeClass(sentiment)}>
+                                                        {sentiment}
+                                                    </Badge>
+                                                    {feedback.rating && (
+                                                        <Badge variant="secondary">
+                                                            {feedback.rating}⭐
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center space-x-2 text-sm text-gray-500">
+                                                    <Clock className="h-3 w-3" />
+                                                    <span className="text-xs">{formatDate(feedback.created_at)}</span>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center space-x-2 text-sm text-gray-500">
-                                                <Clock className="h-4 w-4" />
-                                                <span>{formatDate(feedback.created_at)}</span>
-                                            </div>
+                                            <p className="text-gray-700 text-sm line-clamp-2">{feedback.message}</p>
+                                            {feedback.metadata?.email && (
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    From: {feedback.metadata.email}
+                                                </p>
+                                            )}
                                         </div>
-                                        <p className="text-gray-700 text-sm line-clamp-2">{feedback.message}</p>
-                                        {feedback.page_url && (
-                                            <p className="text-xs text-gray-500 mt-1 truncate">
-                                                From: {feedback.page_url}
-                                            </p>
-                                        )}
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         ) : (
                             <div className="text-center py-12">
@@ -882,10 +768,10 @@ export default function Dashboard() {
                                     No feedback yet
                                 </h3>
                                 <p className="text-gray-600 mb-4">
-                                    Start collecting feedback through your widget to see insights and analytics.
+                                    Start collecting feedback to see insights.
                                 </p>
                                 <Button variant="outline" asChild>
-                                    <a href="/feedback-settings">Configure Widget</a>
+                                    <a href="/feedback-settings">Setup Widget</a>
                                 </Button>
                             </div>
                         )}

@@ -70,7 +70,7 @@ const OnboardingChecklist: React.FC = () => {
           <Button 
             variant="outline" 
             className="border-green-300 text-green-700 hover:bg-green-100"
-            onClick={() => window.location.href = '/feedback-settings'}
+            onClick={() => window.location.href = '/feedback'}
           >
             <ArrowRight className="h-4 w-4 mr-2" />
             Continue to Settings
@@ -171,7 +171,7 @@ const OnboardingChecklist: React.FC = () => {
                       <Button
                         size="sm"
                         className="bg-blue-600 hover:bg-blue-700"
-                        onClick={() => window.location.href = '/feedback-settings'}
+                        onClick={() => window.location.href = '/feedback'}
                       >
                         <ArrowRight className="h-4 w-4 mr-2" />
                         Configure Widget
@@ -207,7 +207,7 @@ const OnboardingChecklist: React.FC = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => window.location.href = '/feedback-settings'}
+                        onClick={() => window.location.href = '/feedback'}
                       >
                         <Palette className="h-4 w-4 mr-2" />
                         Customize Branding

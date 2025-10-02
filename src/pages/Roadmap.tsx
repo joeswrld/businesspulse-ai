@@ -359,12 +359,12 @@ const Roadmap: React.FC = () => {
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md bg-white dark:bg-slate-900">
           <CardContent className="p-6">
             <div className="text-center">
               <Target className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
-              <p className="text-gray-600">Please log in to access your roadmap.</p>
+              <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">Authentication Required</h2>
+              <p className="text-gray-600 dark:text-gray-400">Please log in to access your roadmap.</p>
             </div>
           </CardContent>
         </Card>
@@ -388,12 +388,12 @@ const Roadmap: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <Target className="h-6 w-6 text-blue-600" />
+          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+            <Target className="h-6 w-6 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Product Roadmap</h1>
-            <p className="text-gray-600 mt-1">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Product Roadmap</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
               Manage feature requests and track development progress
             </p>
           </div>
@@ -414,7 +414,7 @@ const Roadmap: React.FC = () => {
                 Add Feature
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl bg-white dark:bg-slate-900">
               <DialogHeader>
                 <DialogTitle>Create New Feature Request</DialogTitle>
                 <DialogDescription>
@@ -456,7 +456,7 @@ const Roadmap: React.FC = () => {
                 </div>
                 <div>
                   <Label>Link Feedback</Label>
-                  <div className="max-h-40 overflow-y-auto border rounded-md p-2 space-y-2">
+                  <div className="max-h-40 overflow-y-auto border rounded-md p-2 space-y-2 border-gray-200 dark:border-gray-700">
                     {feedbacks.map((feedback) => (
                       <div key={feedback.id} className="flex items-center space-x-2">
                         <input
@@ -477,7 +477,7 @@ const Roadmap: React.FC = () => {
                             }
                           }}
                         />
-                        <label htmlFor={`feedback-${feedback.id}`} className="text-sm text-gray-700 cursor-pointer">
+                        <label htmlFor={`feedback-${feedback.id}`} className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                           {feedback.message.substring(0, 100)}...
                         </label>
                       </div>
@@ -499,7 +499,7 @@ const Roadmap: React.FC = () => {
       </div>
 
       {/* Search and Filters */}
-      <Card>
+      <Card className="bg-white dark:bg-slate-900">
         <CardContent className="p-4">
           <div className="flex items-center space-x-4">
             <div className="relative flex-1">
@@ -511,7 +511,7 @@ const Roadmap: React.FC = () => {
                 className="pl-10"
               />
             </div>
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-gray-500 dark:text-gray-400">
               {filteredFeatures.length} of {featureRequests.length} features
             </div>
           </div>
@@ -534,7 +534,7 @@ const Roadmap: React.FC = () => {
             
             <div className="space-y-3 min-h-[400px]">
               {features.map((feature) => (
-                <Card key={feature.id} className="hover:shadow-md transition-shadow">
+                <Card key={feature.id} className="hover:shadow-md transition-shadow bg-white dark:bg-slate-900">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -573,14 +573,14 @@ const Roadmap: React.FC = () => {
                         <Badge className={getStatusColor(feature.status)}>
                           {feature.status}
                         </Badge>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
                           {formatDate(feature.created_at)}
                         </div>
                       </div>
 
                       {/* Linked Feedback */}
                       {feature.feedback_ids.length > 0 && (
-                        <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
                           <MessageSquare className="h-4 w-4" />
                           <span>{getLinkedFeedbackCount(feature.feedback_ids)} linked feedback</span>
                         </div>
@@ -637,7 +637,7 @@ const Roadmap: React.FC = () => {
 
       {/* Edit Modal */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl bg-white dark:bg-slate-900">
           <DialogHeader>
             <DialogTitle>Edit Feature Request</DialogTitle>
             <DialogDescription>
@@ -679,7 +679,7 @@ const Roadmap: React.FC = () => {
             </div>
             <div>
               <Label>Link Feedback</Label>
-              <div className="max-h-40 overflow-y-auto border rounded-md p-2 space-y-2">
+              <div className="max-h-40 overflow-y-auto border rounded-md p-2 space-y-2 border-gray-200 dark:border-gray-700">
                 {feedbacks.map((feedback) => (
                   <div key={feedback.id} className="flex items-center space-x-2">
                     <input
@@ -700,7 +700,7 @@ const Roadmap: React.FC = () => {
                         }
                       }}
                     />
-                    <label htmlFor={`edit-feedback-${feedback.id}`} className="text-sm text-gray-700 cursor-pointer">
+                    <label htmlFor={`edit-feedback-${feedback.id}`} className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                       {feedback.message.substring(0, 100)}...
                     </label>
                   </div>

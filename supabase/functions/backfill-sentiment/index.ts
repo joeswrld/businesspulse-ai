@@ -63,7 +63,7 @@ serve(async (req) => {
 
     // Get feedback entries that need sentiment analysis
     const { data: feedbacks, error: feedbacksError } = await supabase
-      .from('feedbacks')
+      .from('feedback')
       .select('id, message, sentiment')
       .in('project_id', projectIds)
       .or('sentiment.is.null,sentiment.eq.unknown')
@@ -101,7 +101,7 @@ serve(async (req) => {
 
         // Update the feedback entry
         const { error: updateError } = await supabase
-          .from('feedbacks')
+          .from('feedback')
           .update({ sentiment: finalSentiment })
           .eq('id', feedback.id);
 

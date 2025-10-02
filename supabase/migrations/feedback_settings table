@@ -1,0 +1,21 @@
+create table public.feedback_settings (
+  id uuid not null default gen_random_uuid (),
+  user_id uuid not null,
+  project_id uuid null default gen_random_uuid (),
+  customer_survey_url text null,
+  product_feedback_url text null,
+  widget_code text null,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  constraint feedback_settings_pkey primary key (id),
+  constraint feedback_settings_user_id_key unique (user_id),
+  constraint feedback_settings_user_id_fkey foreign KEY (user_id) references auth.users (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create index IF not exists idx_feedback_settings_user_id on public.feedback_settings using btree (user_id) TABLESPACE pg_default;
+
+create index IF not exists idx_feedback_settings_project_id on public.feedback_settings using btree (project_id) TABLESPACE pg_default;
+
+create trigger feedback_settings_updated_at BEFORE
+update on feedback_settings for EACH row
+execute FUNCTION handle_updated_at ();

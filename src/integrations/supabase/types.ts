@@ -1318,28 +1318,31 @@ export type Database = {
           id: string
           user_id: string
           project_id: string
-          widget_title: string | null
-          widget_color: string | null
-          greeting_text: string | null
+          customer_survey_url: string | null
+          product_feedback_url: string | null
+          widget_code: string | null
           created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
           user_id: string
-          project_id: string
-          widget_title?: string | null
-          widget_color?: string | null
-          greeting_text?: string | null
+          project_id?: string
+          customer_survey_url?: string | null
+          product_feedback_url?: string | null
+          widget_code?: string | null
           created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
           user_id?: string
           project_id?: string
-          widget_title?: string | null
-          widget_color?: string | null
-          greeting_text?: string | null
+          customer_survey_url?: string | null
+          product_feedback_url?: string | null
+          widget_code?: string | null
           created_at?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -1698,10 +1701,29 @@ export type Database = {
           id: string
           user_id: string
           project_id: string
-          widget_title: string | null
-          widget_color: string | null
-          greeting_text: string | null
+          customer_survey_url: string | null
+          product_feedback_url: string | null
+          widget_code: string | null
           created_at: string
+          updated_at: string
+        }[]
+      }
+      update_feedback_settings: {
+        Args: { 
+          p_user_id: string
+          p_customer_survey_url?: string | null
+          p_product_feedback_url?: string | null
+          p_widget_code?: string | null
+        }
+        Returns: {
+          id: string
+          user_id: string
+          project_id: string
+          customer_survey_url: string | null
+          product_feedback_url: string | null
+          widget_code: string | null
+          created_at: string
+          updated_at: string
         }[]
       }
     }

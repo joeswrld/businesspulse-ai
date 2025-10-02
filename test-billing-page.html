@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing Page Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .code {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Billing Page Fix Test</h1>
+            <p>Testing the simplified billing page implementation</p>
+        </div>
+
+        <div class="status success">
+            <strong>✅ Fix Applied:</strong> Simplified the billing page by removing complex dependencies and hooks that were causing the blank page issue.
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 What Was Fixed</h3>
+            <ul>
+                <li><strong>Removed complex hooks:</strong> Eliminated useSubscription, usePaystack, and useBillingSystem hooks that were causing dependency issues</li>
+                <li><strong>Simplified state management:</strong> Replaced complex state with simple local state management</li>
+                <li><strong>Removed external dependencies:</strong> Eliminated imports from hooks that might not be properly configured</li>
+                <li><strong>Added error boundaries:</strong> Wrapped the component in ErrorBoundary for better error handling</li>
+                <li><strong>Simplified UI:</strong> Removed dark mode classes and complex styling that might cause rendering issues</li>
+                <li><strong>Direct Supabase calls:</strong> Made direct calls to Supabase instead of going through complex hook abstractions</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>🚀 How to Test</h3>
+            <ol>
+                <li>Start the development server: <code class="code">npm run dev</code></li>
+                <li>Navigate to the billing page: <code class="code">http://localhost:5173/billing</code></li>
+                <li>Check that the page loads without being blank</li>
+                <li>Verify that subscription information is displayed</li>
+                <li>Test the refresh functionality</li>
+                <li>Check that transaction history loads (if any transactions exist)</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Expected Behavior</h3>
+            <ul>
+                <li><strong>Page loads:</strong> The billing page should display content instead of being blank</li>
+                <li><strong>User info:</strong> Shows user email and account ID</li>
+                <li><strong>Plan status:</strong> Displays current plan (Trial or Business) with status</li>
+                <li><strong>Trial info:</strong> Shows trial days remaining for trial users</li>
+                <li><strong>Action buttons:</strong> Upgrade button for trial users, Cancel button for business users</li>
+                <li><strong>Transaction history:</strong> Shows transaction list or "No transactions yet" message</li>
+                <li><strong>Error handling:</strong> Shows error messages if there are connection issues</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Technical Changes Made</h3>
+            <div class="code">
+// Before: Complex hook dependencies
+import { useSubscription } from '@/hooks/useSubscription';
+import { usePaystack } from '@/hooks/usePaystack';
+import { useBillingSystem } from '@/hooks/useBillingSystem';
+
+// After: Simplified direct implementation
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+            </div>
+            <p>The billing page now uses direct Supabase calls and simple state management instead of complex hooks that were causing the blank page issue.</p>
+        </div>
+
+        <div class="status info">
+            <strong>ℹ️ Note:</strong> The billing page should now load properly. If you still see a blank page, check the browser console for any remaining JavaScript errors.
+        </div>
+    </div>
+</body>
+</html>

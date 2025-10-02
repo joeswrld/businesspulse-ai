@@ -59,14 +59,6 @@ const navigationItems: NavItem[] = [
     requiresAccess: true
   },
   {
-    id: 'feedback-settings',
-    label: 'Feedback Settings',
-    icon: <Settings className="h-5 w-5" />,
-    path: '/feedback-settings',
-    requiresAccess: false,
-    allowedWhenExpired: true
-  },
-  {
     id: 'feedback',
     label: 'Feedback',
     icon: <MessageCircle className="h-5 w-5" />,
@@ -75,10 +67,10 @@ const navigationItems: NavItem[] = [
     allowedWhenExpired: true
   },
   {
-    id: 'widget',
-    label: 'Widget',
+    id: 'feedback-settings',
+    label: 'Feedback Settings',
     icon: <Widget className="h-5 w-5" />,
-    path: '/widget',
+    path: '/feedback-settings',
     requiresAccess: false,
     allowedWhenExpired: true
   },
