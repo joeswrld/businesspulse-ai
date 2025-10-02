@@ -5,9 +5,6 @@ import { useTrialAccess } from '@/contexts/TrialContext';
 import { Lock, Crown, Clock, AlertTriangle, CheckCircle, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// ==========================================
-// FEATURE GUARD COMPONENT
-// ==========================================
 interface FeatureGuardProps {
   feature: string;
   children: ReactNode;
@@ -47,16 +44,12 @@ export const FeatureGuard: React.FC<FeatureGuardProps> = ({
   );
 };
 
-// ==========================================
-// TRIAL EXPIRED BLOCK
-// ==========================================
 export const TrialExpiredBlock: React.FC = () => {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 dark:from-gray-900 dark:via-red-950 dark:to-orange-950 p-4">
       <div className="max-w-2xl w-full bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
-        {/* Header */}
         <div className="bg-gradient-to-r from-red-500 to-orange-500 p-8 text-center">
           <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4">
             <Lock className="h-10 w-10 text-white" />
@@ -65,7 +58,6 @@ export const TrialExpiredBlock: React.FC = () => {
           <p className="text-white/90 text-lg">Your 8-day free trial has ended</p>
         </div>
 
-        {/* Content */}
         <div className="p-8 space-y-6">
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4 rounded">
             <div className="flex items-start space-x-3">
@@ -81,7 +73,6 @@ export const TrialExpiredBlock: React.FC = () => {
             </div>
           </div>
 
-          {/* Features List */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {[
               'Real-time Feedback Collection',
@@ -98,7 +89,6 @@ export const TrialExpiredBlock: React.FC = () => {
             ))}
           </div>
 
-          {/* Upgrade CTA */}
           <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
             <Button 
               onClick={() => navigate('/billing')}
@@ -117,9 +107,6 @@ export const TrialExpiredBlock: React.FC = () => {
   );
 };
 
-// ==========================================
-// TRIAL COUNTDOWN BANNER
-// ==========================================
 export const TrialCountdownBanner: React.FC = () => {
   const { trialStatus } = useTrialAccess();
   const navigate = useNavigate();
@@ -168,9 +155,6 @@ export const TrialCountdownBanner: React.FC = () => {
   );
 };
 
-// ==========================================
-// INLINE TRIAL STATUS BADGE
-// ==========================================
 export const TrialStatusBadge: React.FC = () => {
   const { trialStatus } = useTrialAccess();
 
@@ -197,40 +181,4 @@ export const TrialStatusBadge: React.FC = () => {
   }
 
   return null;
-};
-
-// ==========================================
-// FEATURE LOCK OVERLAY (for inline use)
-// ==========================================
-interface FeatureLockOverlayProps {
-  featureName?: string;
-}
-
-export const FeatureLockOverlay: React.FC<FeatureLockOverlayProps> = ({ 
-  featureName = 'this feature' 
-}) => {
-  const navigate = useNavigate();
-
-  return (
-    <div className="relative">
-      <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm z-10 rounded-lg flex items-center justify-center">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md mx-4 shadow-2xl text-center">
-          <Lock className="h-12 w-12 text-orange-500 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-            Trial Expired
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Upgrade to Business Plan to access {featureName}
-          </p>
-          <Button 
-            onClick={() => navigate('/billing')}
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
-          >
-            <Crown className="h-4 w-4 mr-2" />
-            Upgrade Now
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
 };
