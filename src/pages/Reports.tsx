@@ -1,102 +1,44 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
-import { 
-  FileText, 
-  Clock, 
-  TrendingUp, 
-  Lightbulb, 
-  Target,
-  Download,
-  Search,
-  Filter,
-  Calendar,
-  RefreshCw,
-  Eye,
-  BarChart3,
-  MessageSquare,
-  CalendarDays,
-  SortAsc,
-  SortDesc,
-  FileDown,
-  FileText as FileTextIcon,
-  Users,
-  Hash,
-  Loader2,
-  Rocket,
-  CheckCircle,
-  AlertCircle,
-  Minus
-} from 'lucide-react';
-import {
-  BarChart as RechartsBarChart,
-  Bar,
-  PieChart as RechartsPieChart,
-  Cell,
-  Pie,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  LineChart as RechartsLineChart,
-  Line,
-  AreaChart,
-  Area
-} from 'recharts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+// src/pages/InsightsSimple.tsx
+// Enhanced with auto-save to Reports
 
-// Types
-interface Report {
-  id: string;
-  user_id: string;
-  title: string;
-  feedback_ids: string[];
-  insights_text: string;
-  created_at: string;
-}
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  Brain, 
+  Loader2, 
+  CheckSquare, 
+  Square, 
+  MessageSquare, 
+  Calendar,
+  User,
+  Sparkles,
+  Star,
+  TrendingUp,
+  Target,
+  BarChart3,
+  Lightbulb,
+  Filter,
+  CheckCircle2,
+  Hash,
+  Activity,
+  PieChart,
+  Save,
+  FileText
+} from 'lucide-react';
 
 interface Feedback {
   id: string;
   message: string;
-  email: string | null;
+  rating: number | null;
+  form_type: string;
   created_at: string;
-  sentiment: 'positive' | 'negative' | 'neutral' | null;
+  metadata?: any;
 }
 
-interface FeatureRequest {
-  id: string;
-  title: string;
-  description: string | null;
-  status: 'Planned' | 'In Progress' | 'Released';
-  feedback_ids: string[];
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface AnalyticsData {
-  topFeatures: Array<{ title: string; count: number }>;
-  sentimentData: Array<{ name: string; value: number; color: string }>;
-  feedbackVolume: Array<{ date: string; count: number }>;
-  featureStatus: Array<{ status: string; count: number }>;
-  totalFeedback: number;
-  totalFeatures: number;
-  releasedFeatures: number;
-  averageFeedbackPerFeature: number;
-}
-
-interface AIInsights {
+interface Insights {
   summary: string;
   key_themes: string[];
   suggested_actions: string[];
@@ -113,1176 +55,635 @@ interface AIInsights {
   };
 }
 
-export default function Reports() {
+export default function EnhancedInsightsPage() {
   const { user } = useAuth();
-  
-  // State management
-  const [reports, setReports] = useState<Report[]>([]);
+  const { toast } = useToast();
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
-  const [featureRequests, setFeatureRequests] = useState<FeatureRequest[]>([]);
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [dateRange, setDateRange] = useState<'all' | '7d' | '30d' | '90d'>('all');
-  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
-  const [exportingPDF, setExportingPDF] = useState(false);
-  const [exportingCSV, setExportingCSV] = useState(false);
-  const [feedbackData, setFeedbackData] = useState<Feedback[]>([]);
-  const [loadingFeedback, setLoadingFeedback] = useState(false);
+  const [selectedFeedbacks, setSelectedFeedbacks] = useState<Set<string>>(new Set());
+  const [generating, setGenerating] = useState(false);
+  const [insights, setInsights] = useState<Insights | null>(null);
+  const [showInsights, setShowInsights] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [currentReportId, setCurrentReportId] = useState<string | null>(null);
 
-  // Load all data for comprehensive analytics
-  const loadAllData = useCallback(async () => {
+  useEffect(() => {
+    if (user) {
+      fetchFeedbacks();
+    }
+  }, [user]);
+
+  const fetchFeedbacks = async () => {
     if (!user) return;
 
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      // Get user's project IDs from feedback_settings
       const { data: settingsData, error: settingsError } = await supabase
         .from('feedback_settings')
         .select('project_id')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .single();
 
-      if (settingsError) {
-        console.error('Error loading feedback settings:', settingsError);
-        return;
-      }
+      if (settingsError) throw settingsError;
 
-      const projectIds = settingsData?.map(s => s.project_id) || [];
+      const { data: feedbackData, error: feedbackError } = await supabase
+        .from('feedback')
+        .select('*')
+        .eq('project_id', settingsData.project_id)
+        .order('created_at', { ascending: false });
 
-      // Load all data in parallel
-      const [reportsResult, feedbacksResult, featureRequestsResult] = await Promise.all([
-        // Load reports
-        supabase
-          .from('reports')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: sortOrder === 'oldest' }),
-        
-        // Load feedbacks
-        projectIds.length > 0 
-          ? supabase
-              .from('feedback')
-              .select('*')
-              .in('project_id', projectIds)
-              .order('created_at', { ascending: false })
-          : Promise.resolve({ data: [], error: null }),
-        
-        // Load feature requests
-        supabase
-          .from('feature_requests')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-      ]);
+      if (feedbackError) throw feedbackError;
 
-      if (reportsResult.error) {
-        console.error('Error loading reports:', reportsResult.error);
-        toast.error('Failed to load reports');
-        return;
-      }
-
-      if (feedbacksResult.error) {
-        console.error('Error loading feedbacks:', feedbacksResult.error);
-        toast.error('Failed to load feedbacks');
-        return;
-      }
-
-      if (featureRequestsResult.error) {
-        console.error('Error loading feature requests:', featureRequestsResult.error);
-        toast.error('Failed to load feature requests');
-        return;
-      }
-
-      setReports(reportsResult.data || []);
-      setFeedbacks(feedbacksResult.data || []);
-      setFeatureRequests(featureRequestsResult.data || []);
-
+      setFeedbacks(feedbackData || []);
     } catch (error) {
-      console.error('Error in loadAllData:', error);
-      toast.error('Failed to load data');
+      console.error('Error fetching feedbacks:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load feedback data',
+        variant: 'destructive'
+      });
     } finally {
       setLoading(false);
     }
-  }, [user, sortOrder]);
+  };
 
-  // Legacy function for backward compatibility
-  const loadReports = loadAllData;
+  const handleFeedbackSelection = (feedbackId: string, checked: boolean) => {
+    const newSelection = new Set(selectedFeedbacks);
+    if (checked) {
+      newSelection.add(feedbackId);
+    } else {
+      newSelection.delete(feedbackId);
+    }
+    setSelectedFeedbacks(newSelection);
+  };
 
-  // Calculate analytics data
-  const calculateAnalytics = useMemo((): AnalyticsData => {
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    
-    // Filter data by date range
-    const filteredFeedbacks = feedbacks.filter(feedback => {
-      const feedbackDate = new Date(feedback.created_at);
-      return feedbackDate >= thirtyDaysAgo;
-    });
+  const handleSelectAll = () => {
+    if (selectedFeedbacks.size === feedbacks.length) {
+      setSelectedFeedbacks(new Set());
+    } else {
+      setSelectedFeedbacks(new Set(feedbacks.map(f => f.id)));
+    }
+  };
 
-    // Top requested features (by number of linked feedback)
-    const featureFeedbackCounts: Record<string, number> = {};
-    featureRequests.forEach(feature => {
-      featureFeedbackCounts[feature.title] = feature.feedback_ids.length;
-    });
-    
-    const topFeatures = Object.entries(featureFeedbackCounts)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5)
-      .map(([title, count]) => ({ title, count }));
+  // Save insights to reports table
+  const saveInsightsToReports = async (insightsData: Insights, feedbackIds: string[]) => {
+    if (!user) return null;
 
-    // Sentiment analysis
-    const sentimentCounts = {
-      positive: filteredFeedbacks.filter(f => f.sentiment === 'positive').length,
-      negative: filteredFeedbacks.filter(f => f.sentiment === 'negative').length,
-      neutral: filteredFeedbacks.filter(f => f.sentiment === 'neutral').length
-    };
-
-    const totalSentiment = sentimentCounts.positive + sentimentCounts.negative + sentimentCounts.neutral;
-    const sentimentData = [
-      { 
-        name: 'Positive', 
-        value: totalSentiment > 0 ? Math.round((sentimentCounts.positive / totalSentiment) * 100) : 0,
-        color: '#10b981'
-      },
-      { 
-        name: 'Neutral', 
-        value: totalSentiment > 0 ? Math.round((sentimentCounts.neutral / totalSentiment) * 100) : 0,
-        color: '#f59e0b'
-      },
-      { 
-        name: 'Negative', 
-        value: totalSentiment > 0 ? Math.round((sentimentCounts.negative / totalSentiment) * 100) : 0,
-        color: '#ef4444'
-      }
-    ];
-
-    // Feedback volume over time (last 30 days)
-    const volumeData: Record<string, number> = {};
-    filteredFeedbacks.forEach(feedback => {
-      const date = new Date(feedback.created_at).toISOString().split('T')[0];
-      volumeData[date] = (volumeData[date] || 0) + 1;
-    });
-
-    const feedbackVolume = Object.entries(volumeData)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, count]) => ({ date, count }));
-
-    // Feature status distribution
-    const featureStatus = [
-      { status: 'Planned', count: featureRequests.filter(f => f.status === 'Planned').length },
-      { status: 'In Progress', count: featureRequests.filter(f => f.status === 'In Progress').length },
-      { status: 'Released', count: featureRequests.filter(f => f.status === 'Released').length }
-    ];
-
-    // Summary metrics
-    const totalFeedback = feedbacks.length;
-    const totalFeatures = featureRequests.length;
-    const releasedFeatures = featureRequests.filter(f => f.status === 'Released').length;
-    const averageFeedbackPerFeature = totalFeatures > 0 ? Math.round(totalFeedback / totalFeatures) : 0;
-
-    return {
-      topFeatures,
-      sentimentData,
-      feedbackVolume,
-      featureStatus,
-      totalFeedback,
-      totalFeatures,
-      releasedFeatures,
-      averageFeedbackPerFeature
-    };
-  }, [feedbacks, featureRequests]);
-
-  // Update analytics data when data changes
-  useEffect(() => {
-    setAnalyticsData(calculateAnalytics);
-  }, [calculateAnalytics]);
-
-  // Load reports on component mount and when sort order changes
-  useEffect(() => {
-    loadReports();
-  }, [loadReports]);
-
-  // Set up real-time subscription for reports
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const channel = supabase
-      .channel('reports-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'reports',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          // Refetch reports when changes occur
-          loadReports();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id, loadReports]);
-
-  // Load feedback data for a specific report
-  const loadFeedbackData = async (feedbackIds: string[]) => {
-    if (feedbackIds.length === 0) return [];
-
+    setSaving(true);
     try {
-      setLoadingFeedback(true);
-      const { data: feedbackData, error: feedbackError } = await supabase
-        .from('feedback')
-        .select('id, message, email, created_at')
-        .in('id', feedbackIds);
+      // Generate report title based on date and feedback count
+      const reportTitle = `AI Insights Report - ${new Date().toLocaleDateString()} (${feedbackIds.length} feedbacks)`;
 
-      if (feedbackError) {
-        console.error('Error loading feedback:', feedbackError);
-        return [];
+      // Save to reports table
+      const { data: reportData, error: reportError } = await supabase
+        .from('reports')
+        .insert({
+          user_id: user.id,
+          title: reportTitle,
+          feedback_ids: feedbackIds,
+          insights_text: JSON.stringify(insightsData)
+        })
+        .select()
+        .single();
+
+      if (reportError) {
+        console.error('Error saving report:', reportError);
+        throw reportError;
       }
 
-      return feedbackData || [];
-    } catch (error) {
-      console.error('Error loading feedback:', error);
-      return [];
-    } finally {
-      setLoadingFeedback(false);
-    }
-  };
+      console.log('✅ Report saved successfully:', reportData.id);
+      
+      toast({
+        title: '💾 Report Saved!',
+        description: `Your insights have been saved to Reports. View it anytime.`,
+        duration: 5000
+      });
 
-  // Filter reports based on search term and date range
-  const filteredReports = reports.filter(report => {
-    const matchesSearch = searchTerm === '' || 
-      report.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      report.insights_text.toLowerCase().includes(searchTerm.toLowerCase());
-
-    if (!matchesSearch) return false;
-
-    if (dateRange === 'all') return true;
-
-    const reportDate = new Date(report.created_at);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - reportDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    switch (dateRange) {
-      case '7d':
-        return diffDays <= 7;
-      case '30d':
-        return diffDays <= 30;
-      case '90d':
-        return diffDays <= 90;
-      default:
-        return true;
-    }
-  });
-
-  // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Get insights preview (first 150 chars)
-  const getInsightsPreview = (insightsText: string) => {
-    try {
-      const insights = JSON.parse(insightsText);
-      return insights.summary ? insights.summary.substring(0, 150) + '...' : 'No summary available';
-    } catch {
-      return insightsText.substring(0, 150) + '...';
-    }
-  };
-
-  // Parse insights text
-  const parseInsights = (insightsText: string): AIInsights | null => {
-    try {
-      return JSON.parse(insightsText);
-    } catch {
+      return reportData.id;
+    } catch (error: any) {
+      console.error('Error saving insights to reports:', error);
+      toast({
+        title: 'Warning',
+        description: 'Insights generated but failed to save to Reports.',
+        variant: 'destructive'
+      });
       return null;
-    }
-  };
-
-  // Calculate word count
-  const getWordCount = (text: string) => {
-    return text.split(/\s+/).filter(word => word.length > 0).length;
-  };
-
-  // Calculate sentiment breakdown
-  const getSentimentBreakdown = (insights: AIInsights) => {
-    return {
-      positive: insights.sentiment.positive,
-      neutral: insights.sentiment.neutral,
-      negative: insights.sentiment.negative,
-      overall: insights.sentiment.overall
-    };
-  };
-
-  // Export to PDF
-  const exportToPDF = async (report: Report) => {
-    setExportingPDF(true);
-    try {
-      toast.info('Generating PDF...', {
-        description: 'Please wait while we create your report.'
-      });
-
-      const insights = parseInsights(report.insights_text);
-      if (!insights) {
-        toast.error('Invalid report data');
-        return;
-      }
-
-      // Create a temporary div for PDF generation
-      const pdfContainer = document.createElement('div');
-      pdfContainer.style.position = 'absolute';
-      pdfContainer.style.left = '-9999px';
-      pdfContainer.style.top = '0';
-      pdfContainer.style.width = '800px';
-      pdfContainer.style.backgroundColor = 'white';
-      pdfContainer.style.padding = '40px';
-      pdfContainer.style.fontFamily = 'Arial, sans-serif';
-      pdfContainer.style.color = '#333';
-      document.body.appendChild(pdfContainer);
-
-      // Generate PDF content
-      pdfContainer.innerHTML = `
-        <div style="margin-bottom: 30px;">
-          <h1 style="color: #1f2937; font-size: 28px; margin-bottom: 10px; border-bottom: 3px solid #3b82f6; padding-bottom: 10px;">
-            ${report.title}
-          </h1>
-          <p style="color: #6b7280; font-size: 14px; margin-bottom: 20px;">
-            Generated on ${formatDate(report.created_at)} • 
-            Based on ${report.feedback_ids.length} feedback entries
-          </p>
-        </div>
-
-        <div style="margin-bottom: 30px;">
-          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 15px;">
-            Summary
-          </h2>
-          <p style="font-size: 16px; line-height: 1.6; color: #374151;">
-            ${insights.summary}
-          </p>
-        </div>
-
-        <div style="margin-bottom: 30px;">
-          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #10b981; padding-left: 15px;">
-            Key Themes
-          </h2>
-          <ul style="font-size: 14px; line-height: 1.6; color: #374151; padding-left: 20px;">
-            ${insights.key_themes.map(theme => 
-              `<li style="margin-bottom: 8px;">${theme}</li>`
-            ).join('')}
-          </ul>
-        </div>
-
-        <div style="margin-bottom: 30px;">
-          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #f59e0b; padding-left: 15px;">
-            Suggested Actions
-          </h2>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            ${insights.suggested_actions.map((action, index) => `
-              <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; background-color: #f9fafb;">
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                  <div style="width: 24px; height: 24px; background-color: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 12px;">
-                    ${index + 1}
-                  </div>
-                  <span style="font-weight: 600; color: #1f2937;">Action ${index + 1}</span>
-                </div>
-                <p style="color: #374151; line-height: 1.5;">${action}</p>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        <div style="margin-bottom: 30px;">
-          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #8b5cf6; padding-left: 15px;">
-            Performance Metrics
-          </h2>
-          <div style="margin-bottom: 20px;">
-            <div style="display: flex; align-items: center; margin-bottom: 10px;">
-              <span style="font-weight: 600; color: #1f2937; margin-right: 15px;">Overall Score:</span>
-              <div style="width: 100px; height: 20px; background-color: #e5e7eb; border-radius: 10px; overflow: hidden;">
-                <div style="width: ${insights.performance.score}%; height: 100%; background-color: #10b981;"></div>
-              </div>
-              <span style="margin-left: 10px; font-weight: 600; color: #1f2937;">${insights.performance.score}/100</span>
-            </div>
-          </div>
-          <ul style="font-size: 14px; line-height: 1.6; color: #374151; padding-left: 20px;">
-            ${insights.performance.metrics.map(metric => 
-              `<li style="margin-bottom: 8px;">${metric}</li>`
-            ).join('')}
-          </ul>
-        </div>
-
-        <div style="margin-bottom: 30px;">
-          <h2 style="color: #1f2937; font-size: 20px; margin-bottom: 15px; border-left: 4px solid #ec4899; padding-left: 15px;">
-            Sentiment Analysis
-          </h2>
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
-            <div style="text-align: center; padding: 20px; background-color: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
-              <div style="font-size: 24px; font-weight: bold; color: #16a34a; margin-bottom: 5px;">${insights.sentiment.positive}%</div>
-              <div style="color: #16a34a; font-weight: 500;">Positive</div>
-            </div>
-            <div style="text-align: center; padding: 20px; background-color: #fefce8; border-radius: 8px; border: 1px solid #fde68a;">
-              <div style="font-size: 24px; font-weight: bold; color: #ca8a04; margin-bottom: 5px;">${insights.sentiment.neutral}%</div>
-              <div style="color: #ca8a04; font-weight: 500;">Neutral</div>
-            </div>
-            <div style="text-align: center; padding: 20px; background-color: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
-              <div style="font-size: 24px; font-weight: bold; color: #dc2626; margin-bottom: 5px;">${insights.sentiment.negative}%</div>
-              <div style="color: #dc2626; font-weight: 500;">Negative</div>
-            </div>
-          </div>
-          <div style="text-align: center; margin-top: 20px;">
-            <span style="background-color: #3b82f6; color: white; padding: 8px 16px; border-radius: 16px; font-size: 14px;">
-              Overall: ${insights.sentiment.overall}
-            </span>
-          </div>
-        </div>
-      `;
-
-      // Generate PDF
-      const canvas = await html2canvas(pdfContainer, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210;
-      const pageHeight = 295;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      // Download PDF
-      pdf.save(`insights-report-${report.id}-${new Date(report.created_at).toISOString().split('T')[0]}.pdf`);
-
-      // Cleanup
-      document.body.removeChild(pdfContainer);
-      toast.success('PDF exported successfully!');
-    } catch (error) {
-      console.error('Error exporting PDF:', error);
-      toast.error('Failed to export PDF');
     } finally {
-      setExportingPDF(false);
+      setSaving(false);
     }
   };
 
-  // View full report
-  const viewFullReport = async (report: Report) => {
-    setSelectedReport(report);
-    setShowViewModal(true);
+  const generateInsights = async () => {
+    if (selectedFeedbacks.size === 0) return;
+
+    setGenerating(true);
+
+    try {
+      const selectedItems = feedbacks.filter(f => selectedFeedbacks.has(f.id));
+      
+      // Prepare structured data for AI analysis
+      const feedbackData = selectedItems.map(item => ({
+        message: item.message,
+        rating: item.rating,
+        form_type: item.form_type,
+        created_at: item.created_at,
+        email: item.metadata?.email || null
+      }));
+
+      // Get the current session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      console.log('🤖 Calling AI analysis function...');
+
+      // Call the Supabase Edge Function for AI analysis
+      const { data, error } = await supabase.functions.invoke('analyze-insights', {
+        body: {
+          data: feedbackData,
+          userId: user!.id,
+          fileType: 'feedback'
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
+
+      if (error) {
+        console.error('AI Analysis Error:', error);
+        throw error;
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to generate insights');
+      }
+
+      const analysis = data.analysis;
+
+      // Validate the response structure
+      if (!analysis || !analysis.summary || !analysis.sentiment) {
+        throw new Error('Invalid AI response structure');
+      }
+
+      console.log('✅ AI Analysis received:', analysis);
+
+      setInsights(analysis);
+      setShowInsights(true);
+
+      // Auto-save to reports
+      const reportId = await saveInsightsToReports(
+        analysis, 
+        Array.from(selectedFeedbacks)
+      );
+      
+      setCurrentReportId(reportId);
+      
+      toast({
+        title: '✨ AI Insights Generated!',
+        description: `Real-time analysis complete for ${selectedItems.length} feedback entries.`,
+        duration: 5000
+      });
+    } catch (error: any) {
+      console.error('Error generating insights:', error);
+      
+      let errorMessage = 'Failed to generate insights. Please try again.';
+      
+      if (error.message?.includes('Usage limit')) {
+        errorMessage = error.message;
+      } else if (error.message?.includes('API key')) {
+        errorMessage = 'AI service is not configured. Please contact support.';
+      } else if (error.message?.includes('rate limit')) {
+        errorMessage = 'AI service rate limit reached. Please try again in a few moments.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+        duration: 7000
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const renderStars = (rating: number | null) => {
+    if (!rating) return <span className="text-xs text-gray-400">No rating</span>;
     
-    // Load feedback data for this report
-    const feedback = await loadFeedbackData(report.feedback_ids);
-    setFeedbackData(feedback);
-  };
-
-  // Get sentiment badge variant
-  const getSentimentBadgeVariant = (sentiment: string) => {
-    switch (sentiment) {
-      case 'positive':
-        return 'default';
-      case 'negative':
-        return 'destructive';
-      default:
-        return 'secondary';
-    }
-  };
-
-  if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-6">
-            <div className="text-center">
-              <FileText className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
-              <p className="text-gray-600">Please log in to access your reports.</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex items-center space-x-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Star
+            key={star}
+            className={`h-3 w-3 ${
+              star <= rating
+                ? 'fill-yellow-400 text-yellow-400 dark:fill-yellow-500 dark:text-yellow-500'
+                : 'text-gray-300 dark:text-gray-600'
+            }`}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    return new Date(timestamp).toLocaleString();
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600 dark:text-gray-400">Loading feedback data...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Reports</h1>
-          <p className="text-gray-600 mt-2">
-            View and export your AI-generated insights reports
-          </p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            onClick={loadReports}
-            disabled={loading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* Filters Bar */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
-            {/* Search */}
-            <div className="flex-1 min-w-0">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search reports by title or content..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950 transition-colors duration-300">
+      <div className="container mx-auto p-6 space-y-8">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center space-y-4"
+        >
+          <div className="flex items-center justify-center space-x-3">
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/40 rounded-full transition-colors">
+              <Brain className="h-8 w-8 text-blue-600 dark:text-blue-400" />
             </div>
-
-            {/* Date Range Filter */}
-            <Select value={dateRange} onValueChange={(value: any) => setDateRange(value)}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Date Range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="7d">Last 7 Days</SelectItem>
-                <SelectItem value="30d">Last 30 Days</SelectItem>
-                <SelectItem value="90d">Last 90 Days</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Sort Order */}
-            <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Sort Order" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">
-                  <div className="flex items-center space-x-2">
-                    <SortDesc className="h-4 w-4" />
-                    <span>Newest First</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="oldest">
-                  <div className="flex items-center space-x-2">
-                    <SortAsc className="h-4 w-4" />
-                    <span>Oldest First</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
+              AI-Powered Insights
+            </h1>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Analytics Overview */}
-      {analyticsData && (
-        <div className="space-y-6">
-          {/* Key Metrics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="rounded-xl shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Feedback</CardTitle>
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{analyticsData.totalFeedback}</div>
-                <p className="text-xs text-muted-foreground">
-                  All time feedback entries
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-xl shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Feature Requests</CardTitle>
-                <Target className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{analyticsData.totalFeatures}</div>
-                <p className="text-xs text-muted-foreground">
-                  {analyticsData.releasedFeatures} released
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-xl shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Released Features</CardTitle>
-                <Rocket className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{analyticsData.releasedFeatures}</div>
-                <p className="text-xs text-muted-foreground">
-                  {analyticsData.totalFeatures > 0 ? Math.round((analyticsData.releasedFeatures / analyticsData.totalFeatures) * 100) : 0}% completion rate
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-xl shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Avg Feedback/Feature</CardTitle>
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{analyticsData.averageFeedbackPerFeature}</div>
-                <p className="text-xs text-muted-foreground">
-                  Feedback per feature request
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Analytics Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Top Requested Features */}
-            <Card className="rounded-xl shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Target className="h-5 w-5" />
-                  <span>Top Requested Features</span>
-                </CardTitle>
-                <CardDescription>
-                  Features with the most linked feedback
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {analyticsData.topFeatures.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <RechartsBarChart data={analyticsData.topFeatures}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="title" 
-                        fontSize={12}
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                      />
-                      <YAxis fontSize={12} />
-                      <Tooltip formatter={(value: any) => [value, 'Linked Feedback']} />
-                      <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    </RechartsBarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-64 text-gray-500">
-                    <div className="text-center">
-                      <Target className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                      <p>No feature data available</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Sentiment Analysis */}
-            <Card className="rounded-xl shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <MessageSquare className="h-5 w-5" />
-                  <span>Feedback Sentiment (30 days)</span>
-                </CardTitle>
-                <CardDescription>
-                  Distribution of feedback sentiment
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {analyticsData.sentimentData.some(s => s.value > 0) ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <RechartsPieChart>
-                      <Pie
-                        data={analyticsData.sentimentData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {analyticsData.sentimentData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </RechartsPieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-64 text-gray-500">
-                    <div className="text-center">
-                      <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                      <p>No sentiment data available</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Bottom Row Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Feedback Volume Over Time */}
-            <Card className="rounded-xl shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <TrendingUp className="h-5 w-5" />
-                  <span>Feedback Volume (30 days)</span>
-                </CardTitle>
-                <CardDescription>
-                  Daily feedback count over the last 30 days
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {analyticsData.feedbackVolume.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={analyticsData.feedbackVolume}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="date" 
-                        fontSize={12}
-                        tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      />
-                      <YAxis fontSize={12} />
-                      <Tooltip 
-                        labelFormatter={(value) => new Date(value).toLocaleDateString('en-US', { 
-                          year: 'numeric', 
-                          month: 'long', 
-                          day: 'numeric' 
-                        })}
-                        formatter={(value: any) => [value, 'Feedback Count']}
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="count" 
-                        stroke="#3b82f6" 
-                        fill="#3b82f6" 
-                        fillOpacity={0.3}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-64 text-gray-500">
-                    <div className="text-center">
-                      <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                      <p>No volume data available</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Feature Status Distribution */}
-            <Card className="rounded-xl shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <CheckCircle className="h-5 w-5" />
-                  <span>Feature Status Distribution</span>
-                </CardTitle>
-                <CardDescription>
-                  Current status of all feature requests
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {analyticsData.featureStatus.some(f => f.count > 0) ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <RechartsBarChart data={analyticsData.featureStatus}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="status" fontSize={12} />
-                      <YAxis fontSize={12} />
-                      <Tooltip formatter={(value: any) => [value, 'Features']} />
-                      <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} />
-                    </RechartsBarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-64 text-gray-500">
-                    <div className="text-center">
-                      <CheckCircle className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                      <p>No feature status data available</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {/* Reports Grid */}
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin mr-3" />
-          <span className="text-lg">Loading reports...</span>
-        </div>
-      ) : filteredReports.length === 0 ? (
-        <Card className="text-center py-12">
-          <CardContent>
-            <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-xl font-medium text-gray-900 mb-2">
-              {searchTerm || dateRange !== 'all' ? 'No reports found' : 'No reports yet'}
-            </h3>
-            <p className="text-gray-600 mb-4">
-              {searchTerm || dateRange !== 'all' 
-                ? 'Try adjusting your search or filters.'
-                : 'Generate your first insights report from the Insights page.'
-              }
-            </p>
-            {!searchTerm && dateRange === 'all' && (
-              <Button asChild>
-                <a href="/insights-simple">Go to Insights</a>
-              </Button>
+          <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+            Transform your feedback into actionable insights with Gemini AI
+          </p>
+          <div className="flex items-center justify-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+            <div className="flex items-center space-x-1 px-3 py-1 bg-white/50 dark:bg-gray-800/50 rounded-full border border-gray-200 dark:border-gray-700">
+              <MessageSquare className="h-3 w-3" />
+              <span>{feedbacks.length} Feedbacks</span>
+            </div>
+            <div className="flex items-center space-x-1 px-3 py-1 bg-purple-50 dark:bg-purple-900/30 rounded-full border border-purple-200 dark:border-purple-800">
+              <Sparkles className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+              <span className="text-purple-700 dark:text-purple-300">Powered by Gemini AI</span>
+            </div>
+            {currentReportId && (
+              <div className="flex items-center space-x-1 px-3 py-1 bg-green-50 dark:bg-green-900/30 rounded-full border border-green-200 dark:border-green-800">
+                <Save className="h-3 w-3 text-green-600 dark:text-green-400" />
+                <span className="text-green-700 dark:text-green-300">Auto-saved to Reports</span>
+              </div>
             )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredReports.map((report) => {
-            const insights = parseInsights(report.insights_text);
-            return (
-              <Card key={report.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm text-gray-600">
-                        {formatDate(report.created_at)}
-                      </span>
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {report.feedback_ids.length} feedbacks
-                    </Badge>
+          </div>
+        </motion.div>
+
+        {feedbacks.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center py-16"
+          >
+            <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
+              <MessageSquare className="h-10 w-10 text-gray-400" />
+            </div>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              No Feedback Yet
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+              Share your feedback forms with customers to start collecting insights.
+            </p>
+          </motion.div>
+        ) : (
+          <>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm transition-colors">
+                <div className="p-6 space-y-6">
+                  <div className="flex items-center space-x-2 border-b border-gray-200 dark:border-gray-700 pb-4">
+                    <Filter className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Select Feedback for AI Analysis</h2>
                   </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  {/* Title */}
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-2">{report.title}</h3>
-                    <p className="text-sm text-gray-600 line-clamp-3">
-                      {getInsightsPreview(report.insights_text)}
-                    </p>
+                  
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex items-center space-x-4">
+                      <button
+                        onClick={handleSelectAll}
+                        className="flex items-center space-x-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300"
+                      >
+                        {selectedFeedbacks.size === feedbacks.length ? (
+                          <>
+                            <Square className="h-4 w-4" />
+                            <span>Deselect All</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckSquare className="h-4 w-4" />
+                            <span>Select All</span>
+                          </>
+                        )}
+                      </button>
+                      <div className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-full text-sm text-blue-700 dark:text-blue-300">
+                        {selectedFeedbacks.size} of {feedbacks.length} selected
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={generateInsights}
+                        disabled={selectedFeedbacks.size === 0 || generating || saving}
+                        className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg shadow-lg transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {generating || saving ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>{saving ? 'Saving...' : 'Analyzing with AI...'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4" />
+                            <span>Generate AI Insights</span>
+                          </>
+                        )}
+                      </button>
+                      {currentReportId && (
+                        <a 
+                          href="/reports"
+                          className="flex items-center space-x-2 px-4 py-3 border-2 border-green-600 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-all"
+                        >
+                          <FileText className="h-4 w-4" />
+                          <span>View in Reports</span>
+                        </a>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Performance Score */}
-                  {insights && (
-                    <div>
-                      <h3 className="font-medium text-gray-900 mb-2">Performance Score</h3>
-                      <div className="flex items-center space-x-2">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {feedbacks.map((feedback, index) => (
+                      <motion.div
+                        key={feedback.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <div className="group rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800/50">
+                          <div className="p-4">
+                            <div className="flex items-start space-x-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedFeedbacks.has(feedback.id)}
+                                onChange={(e) => handleFeedbackSelection(feedback.id, e.target.checked)}
+                                className="mt-1 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:bg-gray-700"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                                  <div className="flex items-center space-x-2">
+                                    <div className="flex items-center space-x-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded text-xs text-blue-700 dark:text-blue-300">
+                                      <User className="h-3 w-3" />
+                                      <span className="capitalize">{feedback.form_type.replace('_', ' ')}</span>
+                                    </div>
+                                    {renderStars(feedback.rating)}
+                                  </div>
+                                  <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>{formatTimestamp(feedback.created_at)}</span>
+                                  </div>
+                                </div>
+                                <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed line-clamp-3">
+                                  {feedback.message}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            <AnimatePresence>
+              {insights && showInsights && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.5 }}
+                  className="space-y-6"
+                >
+                  {/* Summary Section */}
+                  <div className="rounded-xl border border-blue-200 dark:border-blue-800 shadow-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 backdrop-blur-sm">
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-2">
+                          <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
+                            <BarChart3 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Executive Summary</h2>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-1 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 rounded-full text-xs text-purple-700 dark:text-purple-300">
+                            <Sparkles className="h-3 w-3" />
+                            <span>AI Generated</span>
+                          </div>
+                          {currentReportId && (
+                            <div className="flex items-center space-x-1 px-3 py-1 bg-green-100 dark:bg-green-900/30 rounded-full text-xs text-green-700 dark:text-green-300">
+                              <Save className="h-3 w-3" />
+                              <span>Saved</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-gray-700 dark:text-gray-300 leading-relaxed text-lg whitespace-pre-wrap">
+                        {insights.summary}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Performance & Sentiment Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
+                      <div className="flex items-center space-x-2 mb-6">
+                        <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                        <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Performance Score</h3>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-4xl font-bold text-purple-600 dark:text-purple-400">
+                            {insights.performance.score}/100
+                          </span>
+                          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            insights.performance.score >= 80 
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              : insights.performance.score >= 60
+                              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                              : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                          }`}>
+                            {insights.performance.score >= 80 ? 'Excellent' : insights.performance.score >= 60 ? 'Good' : 'Needs Work'}
+                          </div>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
                           <div 
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            className="bg-gradient-to-r from-purple-600 to-purple-400 h-4 rounded-full transition-all duration-1000"
                             style={{ width: `${insights.performance.score}%` }}
                           />
                         </div>
-                        <span className="text-sm font-medium text-gray-900">
-                          {insights.performance.score}/100
-                        </span>
+                        <div className="space-y-2 mt-4">
+                          {insights.performance.metrics.map((metric, idx) => (
+                            <div key={idx} className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                              <CheckCircle2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                              <span>{metric}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  )}
 
-                  {/* Sentiment */}
-                  {insights && (
-                    <div>
-                      <h3 className="font-medium text-gray-900 mb-2">Overall Sentiment</h3>
-                      <Badge variant={getSentimentBadgeVariant(insights.sentiment.overall)}>
-                        {insights.sentiment.overall}
-                      </Badge>
+                    <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
+                      <div className="flex items-center space-x-2 mb-6">
+                        <PieChart className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                        <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Sentiment Analysis</h3>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3 mb-4">
+                        <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-200 dark:border-green-800">
+                          <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+                            {insights.sentiment.positive}%
+                          </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Positive</div>
+                        </div>
+                        <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border-2 border-gray-200 dark:border-gray-600">
+                          <div className="text-3xl font-bold text-gray-600 dark:text-gray-400">
+                            {insights.sentiment.neutral}%
+                          </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Neutral</div>
+                        </div>
+                        <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border-2 border-red-200 dark:border-red-800">
+                          <div className="text-3xl font-bold text-red-600 dark:text-red-400">
+                            {insights.sentiment.negative}%
+                          </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Negative</div>
+                        </div>
+                      </div>
+                      <div className={`p-4 rounded-lg ${
+                        insights.sentiment.overall === 'positive'
+                          ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800'
+                          : insights.sentiment.overall === 'negative'
+                          ? 'bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800'
+                          : 'bg-gray-50 dark:bg-gray-700/50 border-2 border-gray-200 dark:border-gray-600'
+                      }`}>
+                        <div className="text-center">
+                          <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Overall Sentiment</div>
+                          <div className={`text-xl font-bold capitalize ${
+                            insights.sentiment.overall === 'positive'
+                              ? 'text-green-600 dark:text-green-400'
+                              : insights.sentiment.overall === 'negative'
+                              ? 'text-red-600 dark:text-red-400'
+                              : 'text-gray-600 dark:text-gray-400'
+                          }`}>
+                            {insights.sentiment.overall}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  )}
+                  </div>
+
+                  {/* Key Themes */}
+                  <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
+                    <div className="flex items-center space-x-2 mb-6">
+                      <Lightbulb className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Key Themes</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {insights.key_themes.map((theme, idx) => (
+                        <div 
+                          key={idx} 
+                          className="flex items-start space-x-3 p-4 bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-lg border border-orange-200 dark:border-orange-800"
+                        >
+                          <div className="flex-shrink-0 w-6 h-6 bg-orange-100 dark:bg-orange-900/40 rounded-full flex items-center justify-center text-orange-600 dark:text-orange-400 font-bold text-sm">
+                            {idx + 1}
+                          </div>
+                          <span className="text-gray-700 dark:text-gray-300 text-sm">{theme}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Suggested Actions */}
+                  <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
+                    <div className="flex items-center space-x-2 mb-6">
+                      <Target className="h-5 w-5 text-red-600 dark:text-red-400" />
+                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Suggested Actions</h3>
+                    </div>
+                    <div className="space-y-3">
+                      {insights.suggested_actions.map((action, idx) => (
+                        <div 
+                          key={idx} 
+                          className="flex items-start space-x-3 p-4 bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 rounded-lg border border-red-200 dark:border-red-800 hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex-shrink-0">
+                            <div className="w-8 h-8 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center">
+                              <CheckCircle2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                            </div>
+                          </div>
+                          <span className="text-gray-700 dark:text-gray-300 flex-1">{action}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Trends */}
+                  <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
+                    <div className="flex items-center space-x-2 mb-6">
+                      <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Trends & Patterns</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {insights.trends.map((trend, idx) => (
+                        <div 
+                          key={idx} 
+                          className="flex items-center space-x-3 p-4 bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 rounded-lg border border-green-200 dark:border-green-800"
+                        >
+                          <div className="flex-shrink-0">
+                            <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
+                          </div>
+                          <span className="text-gray-700 dark:text-gray-300 text-sm font-medium">{trend}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
                   {/* Action Buttons */}
-                  <div className="flex flex-col space-y-2 pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => viewFullReport(report)}
-                      className="w-full"
+                  <div className="flex justify-center space-x-4 pt-4">
+                    <button
+                      onClick={() => setShowInsights(false)}
+                      className="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white rounded-lg shadow-lg transition-all"
                     >
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Full
-                    </Button>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => exportToPDF(report)}
-                        disabled={exportingPDF}
-                        className="w-full"
+                      Hide Insights
+                    </button>
+                    {currentReportId && (
+                      <a
+                        href="/reports"
+                        className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg shadow-lg transition-all flex items-center space-x-2"
                       >
-                        {exportingPDF ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <FileTextIcon className="h-4 w-4" />
-                        )}
-                        PDF
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => exportToPDF(report)}
-                        disabled={exportingPDF}
-                        className="w-full"
-                      >
-                        {exportingPDF ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <FileDown className="h-4 w-4" />
-                        )}
-                        CSV
-                      </Button>
-                    </div>
+                        <FileText className="h-4 w-4" />
+                        <span>View Full Report</span>
+                      </a>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {/* View Full Report Modal */}
-      <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <FileText className="h-5 w-5" />
-              <span>Full Report - {selectedReport && formatDate(selectedReport.created_at)}</span>
-            </DialogTitle>
-            <DialogDescription>
-              Complete analysis based on {selectedReport?.feedback_ids.length} feedback entries
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedReport && (() => {
-            const insights = parseInsights(selectedReport.insights_text);
-            if (!insights) return <div>Invalid report data</div>;
-
-            return (
-              <div className="space-y-6">
-                {/* Summary */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                    <Lightbulb className="h-5 w-5 text-yellow-600" />
-                    <span>Summary</span>
-                  </h3>
-                  <p className="text-gray-700 leading-relaxed">
-                    {insights.summary}
-                  </p>
-                </div>
-
-                {/* Key Themes */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                    <Target className="h-5 w-5 text-blue-600" />
-                    <span>Key Themes</span>
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {insights.key_themes.map((theme, index) => (
-                      <div key={index} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                        <Target className="h-4 w-4 text-blue-600" />
-                        <span className="text-gray-700">{theme}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Suggested Actions */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                    <TrendingUp className="h-5 w-5 text-green-600" />
-                    <span>Suggested Actions</span>
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {insights.suggested_actions.map((action, index) => (
-                      <div key={index} className="flex items-center space-x-2 p-3 bg-green-50 rounded-lg">
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                        <span className="text-gray-700">{action}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Performance */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                    <BarChart3 className="h-5 w-5 text-indigo-600" />
-                    <span>Performance Metrics</span>
-                  </h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Overall Score</span>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-24 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${insights.performance.score}%` }}
-                          />
-                        </div>
-                        <span className="font-semibold">{insights.performance.score}/100</span>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {insights.performance.metrics.map((metric, index) => (
-                        <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                          <span className="text-sm text-gray-700">{metric}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Sentiment */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                    <MessageSquare className="h-5 w-5 text-pink-600" />
-                    <span>Sentiment Analysis</span>
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Overall Sentiment</span>
-                      <Badge 
-                        variant={getSentimentBadgeVariant(insights.sentiment.overall)}
-                        className="text-sm"
-                      >
-                        {insights.sentiment.overall}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">
-                          {insights.sentiment.positive}%
-                        </div>
-                        <div className="text-sm text-gray-600">Positive</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-gray-600">
-                          {insights.sentiment.neutral}%
-                        </div>
-                        <div className="text-sm text-gray-600">Neutral</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-red-600">
-                          {insights.sentiment.negative}%
-                        </div>
-                        <div className="text-sm text-gray-600">Negative</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Analytics */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                    <BarChart3 className="h-5 w-5 text-purple-600" />
-                    <span>Analytics</span>
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 bg-gray-50 rounded-lg text-center">
-                      <div className="text-2xl font-bold text-gray-900">
-                        {getWordCount(insights.summary)}
-                      </div>
-                      <div className="text-sm text-gray-600">Word Count</div>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg text-center">
-                      <div className="text-2xl font-bold text-gray-900">
-                        {selectedReport.feedback_ids.length}
-                      </div>
-                      <div className="text-sm text-gray-600">Feedback Items</div>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg text-center">
-                      <div className="text-2xl font-bold text-gray-900">
-                        {insights.key_themes.length}
-                      </div>
-                      <div className="text-sm text-gray-600">Key Themes</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Feedback Messages */}
-                {feedbackData.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                      <MessageSquare className="h-5 w-5 text-blue-600" />
-                      <span>Feedback Messages Used</span>
-                    </h3>
-                    <div className="space-y-3 max-h-60 overflow-y-auto">
-                      {feedbackData.map((feedback) => (
-                        <div key={feedback.id} className="p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center space-x-2">
-                              {feedback.email ? (
-                                <Badge variant="secondary" className="flex items-center space-x-1">
-                                  <MessageSquare className="h-3 w-3" />
-                                  <span>{feedback.email}</span>
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline">Anonymous</Badge>
-                              )}
-                            </div>
-                            <span className="text-xs text-gray-500">
-                              {formatDate(feedback.created_at)}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-700">{feedback.message}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Export Actions */}
-                <div className="flex items-center justify-between pt-4 border-t">
-                  <div className="text-sm text-gray-500">
-                    Report ID: {selectedReport.id}
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => exportToPDF(selectedReport)}
-                      disabled={exportingPDF}
-                    >
-                      {exportingPDF ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <FileTextIcon className="h-4 w-4 mr-2" />
-                      )}
-                      Export PDF
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        )}
+      </div>
     </div>
   );
 }
