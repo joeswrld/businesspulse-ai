@@ -1,5 +1,5 @@
 // src/pages/InsightsSimple.tsx
-// Fixed version with correct JSX structure
+// Enhanced version with comprehensive insights display
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,14 +15,17 @@ import {
   Calendar,
   User,
   Sparkles,
-  AlertCircle,
   Star,
   TrendingUp,
   Target,
   BarChart3,
   Lightbulb,
-  Eye,
-  Filter
+  Filter,
+  AlertCircle,
+  CheckCircle2,
+  Hash,
+  Activity,
+  PieChart
 } from 'lucide-react';
 
 interface Feedback {
@@ -47,6 +50,12 @@ interface Insights {
     negative: number;
     neutral: number;
     overall: 'positive' | 'negative' | 'neutral';
+  };
+  analytics: {
+    total_feedback: number;
+    avg_rating: number;
+    response_rate: number;
+    top_rating: number;
   };
 }
 
@@ -146,41 +155,88 @@ export default function EnhancedInsightsPage() {
 
       const overallSentiment = positivePercent > 50 ? 'positive' : negativePercent > 50 ? 'negative' : 'neutral';
 
+      // Enhanced keyword analysis
       const messages = selectedItems.map(f => f.message.toLowerCase());
-      const commonWords = ['good', 'great', 'excellent', 'poor', 'bad', 'issue', 'problem', 'love', 'like', 'improve'];
-      const themes: string[] = [];
+      const keywords = ['good', 'great', 'excellent', 'amazing', 'love', 'like', 'best', 
+                       'poor', 'bad', 'terrible', 'worst', 'hate', 'issue', 'problem', 
+                       'improve', 'better', 'feature', 'bug', 'slow', 'fast', 'easy', 'difficult'];
       
-      commonWords.forEach(word => {
+      const themes: string[] = [];
+      const wordCounts: { [key: string]: number } = {};
+      
+      keywords.forEach(word => {
         const count = messages.filter(m => m.includes(word)).length;
         if (count > 0) {
-          themes.push(`"${word}" mentioned ${count} time${count > 1 ? 's' : ''}`);
+          wordCounts[word] = count;
         }
       });
 
+      // Sort by frequency and get top themes
+      const sortedWords = Object.entries(wordCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+
+      sortedWords.forEach(([word, count]) => {
+        const sentiment = ['good', 'great', 'excellent', 'amazing', 'love', 'like', 'best', 'fast', 'easy'].includes(word) 
+          ? '✓' : ['poor', 'bad', 'terrible', 'worst', 'hate', 'issue', 'problem', 'slow', 'difficult'].includes(word)
+          ? '⚠' : '•';
+        themes.push(`${sentiment} "${word}" mentioned ${count} time${count > 1 ? 's' : ''}`);
+      });
+
+      // Calculate top rating
+      const ratingCounts = [1, 2, 3, 4, 5].map(rating => 
+        selectedItems.filter(f => f.rating === rating).length
+      );
+      const topRating = ratingCounts.indexOf(Math.max(...ratingCounts)) + 1;
+
+      // Generate suggested actions based on data
+      const actions: string[] = [];
+      
+      if (avgRating < 3) {
+        actions.push('🚨 URGENT: Address critical customer satisfaction issues immediately');
+        actions.push('📞 Schedule follow-up calls with dissatisfied customers');
+      } else if (avgRating < 4) {
+        actions.push('📊 Investigate areas of improvement identified in feedback');
+        actions.push('💡 Implement quick wins to boost satisfaction scores');
+      } else {
+        actions.push('✅ Maintain current service quality standards');
+        actions.push('🎯 Focus on scaling successful practices');
+      }
+
+      if (negativePercent > 30) {
+        actions.push('⚠️ Create action plan for recurring pain points');
+      }
+
+      if (selectedItems.some(f => f.message.toLowerCase().includes('bug') || f.message.toLowerCase().includes('issue'))) {
+        actions.push('🔧 Prioritize technical issues in next sprint');
+      }
+
+      actions.push('📧 Send personalized thank-you notes to feedback providers');
+      actions.push('📈 Share insights with product and support teams');
+
       const generatedInsights: Insights = {
-        summary: `Analysis of ${selectedItems.length} feedback entries shows ${satisfactionRate}% satisfaction rate with an average rating of ${avgRating.toFixed(1)}/5. ${
+        summary: `Comprehensive analysis of ${selectedItems.length} feedback entries reveals ${satisfactionRate}% satisfaction rate with an average rating of ${avgRating.toFixed(1)}/5. ${
           overallSentiment === 'positive' 
-            ? 'Overall sentiment is positive.' 
+            ? 'Customer sentiment is predominantly positive, indicating strong product-market fit and customer satisfaction.' 
             : overallSentiment === 'negative'
-            ? 'Overall sentiment indicates areas needing improvement.'
-            : 'Sentiment is mixed with room for enhancement.'
-        }`,
-        key_themes: themes.slice(0, 4).length > 0 ? themes.slice(0, 4) : ['No common themes detected'],
-        suggested_actions: [
-          avgRating < 3 ? 'Urgent: Address critical feedback issues' : 'Continue current service quality',
-          negative > positive ? 'Focus on resolving customer pain points' : 'Maintain positive customer experience',
-          'Follow up with customers who provided email addresses',
-          'Analyze feedback patterns for product improvements'
-        ],
+            ? 'Customer sentiment indicates significant areas requiring immediate attention and improvement.'
+            : 'Mixed customer sentiment suggests opportunities for targeted enhancements to elevate overall experience.'
+        } The most frequent rating is ${topRating}/5, providing a clear signal of typical customer experience.`,
+        key_themes: themes.length > 0 ? themes : ['No significant themes detected - consider collecting more feedback'],
+        suggested_actions: actions,
         trends: [
-          `${selectedItems.filter(f => f.form_type === 'customer_satisfaction').length} CSAT responses`,
-          `${selectedItems.filter(f => f.form_type === 'product_feedback').length} Product feedback entries`
+          `📊 ${selectedItems.filter(f => f.form_type === 'customer_satisfaction').length} Customer Satisfaction responses`,
+          `💬 ${selectedItems.filter(f => f.form_type === 'product_feedback').length} Product Feedback entries`,
+          `⭐ ${totalRatings} rated responses out of ${selectedItems.length} total`,
+          `📈 ${positivePercent}% positive sentiment trend`,
+          avgRating >= 4 ? '🎉 High satisfaction momentum' : avgRating >= 3 ? '📊 Stable satisfaction levels' : '⚠️ Satisfaction needs attention'
         ],
         performance: {
           metrics: [
-            `${satisfactionRate}% satisfaction rate`,
-            `${avgRating.toFixed(1)}/5 average rating`,
-            `${selectedItems.length} total responses`
+            `${satisfactionRate}% overall satisfaction rate`,
+            `${avgRating.toFixed(1)}/5 average customer rating`,
+            `${selectedItems.length} total feedback responses analyzed`,
+            `${Math.round((totalRatings / selectedItems.length) * 100)}% response completion rate`
           ],
           score: satisfactionRate
         },
@@ -189,6 +245,12 @@ export default function EnhancedInsightsPage() {
           negative: negativePercent,
           neutral: neutralPercent,
           overall: overallSentiment as 'positive' | 'negative' | 'neutral'
+        },
+        analytics: {
+          total_feedback: selectedItems.length,
+          avg_rating: parseFloat(avgRating.toFixed(1)),
+          response_rate: Math.round((totalRatings / selectedItems.length) * 100),
+          top_rating: topRating
         }
       };
 
@@ -198,8 +260,8 @@ export default function EnhancedInsightsPage() {
       setShowInsights(true);
       
       toast({
-        title: 'Insights Generated!',
-        description: `Analysis complete for ${selectedItems.length} feedback entries.`
+        title: '✨ Insights Generated!',
+        description: `AI analysis complete for ${selectedItems.length} feedback entries.`
       });
     } catch (error) {
       console.error('Error generating insights:', error);
@@ -398,77 +460,226 @@ export default function EnhancedInsightsPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.5 }}
+                  className="space-y-6"
                 >
+                  {/* Summary Section */}
                   <div className="rounded-xl border border-blue-200 dark:border-blue-800 shadow-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 backdrop-blur-sm">
-                    <div className="p-6 space-y-6">
-                      <div className="flex items-center space-x-2 border-b border-blue-200 dark:border-blue-800 pb-4">
+                    <div className="p-6">
+                      <div className="flex items-center space-x-2 mb-4">
                         <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
-                          <Sparkles className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                          <BarChart3 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                         </div>
-                        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">AI Insights</h2>
+                        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Executive Summary</h2>
                       </div>
+                      <p className="text-gray-700 dark:text-gray-300 leading-relaxed text-lg">
+                        {insights.summary}
+                      </p>
+                    </div>
+                  </div>
 
-                      <div className="space-y-6">
-                        <div className="rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm p-6 border border-gray-200 dark:border-gray-700">
-                          <div className="flex items-center space-x-2 mb-4">
-                            <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Summary</h3>
+                  {/* Analytics Overview */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="rounded-lg bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <Hash className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                        {insights.analytics.total_feedback}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Total Responses</div>
+                    </div>
+
+                    <div className="rounded-lg bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <Star className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                      </div>
+                      <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                        {insights.analytics.avg_rating}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Average Rating</div>
+                    </div>
+
+                    <div className="rounded-lg bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                        {insights.analytics.response_rate}%
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Response Rate</div>
+                    </div>
+
+                    <div className="rounded-lg bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                        {insights.analytics.top_rating}⭐
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Most Frequent</div>
+                    </div>
+                  </div>
+
+                  {/* Performance & Sentiment Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
+                      <div className="flex items-center space-x-2 mb-6">
+                        <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                        <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Performance Score</h3>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-4xl font-bold text-purple-600 dark:text-purple-400">
+                            {insights.performance.score}/100
+                          </span>
+                          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            insights.performance.score >= 80 
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              : insights.performance.score >= 60
+                              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                              : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                          }`}>
+                            {insights.performance.score >= 80 ? 'Excellent' : insights.performance.score >= 60 ? 'Good' : 'Needs Work'}
                           </div>
-                          <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                            {insights.summary}
-                          </p>
                         </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
+                          <div 
+                            className="bg-gradient-to-r from-purple-600 to-purple-400 h-4 rounded-full transition-all duration-1000"
+                            style={{ width: `${insights.performance.score}%` }}
+                          />
+                        </div>
+                        <div className="space-y-2 mt-4">
+                          {insights.performance.metrics.map((metric, idx) => (
+                            <div key={idx} className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                              <CheckCircle2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                              <span>{metric}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm p-6 border border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center space-x-2 mb-4">
-                              <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Performance Score</h3>
-                            </div>
-                            <div className="space-y-4">
-                              <div className="flex items-center justify-between">
-                                <span className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-                                  {insights.performance.score}/100
-                                </span>
-                              </div>
-                              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                                <div 
-                                  className="bg-gradient-to-r from-purple-600 to-purple-400 h-3 rounded-full transition-all duration-500"
-                                  style={{ width: `${insights.performance.score}%` }}
-                                />
-                              </div>
-                            </div>
+                    <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
+                      <div className="flex items-center space-x-2 mb-6">
+                        <PieChart className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                        <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Sentiment Analysis</h3>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3 mb-4">
+                        <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-200 dark:border-green-800">
+                          <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+                            {insights.sentiment.positive}%
                           </div>
-
-                          <div className="rounded-lg bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm p-6 border border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center space-x-2 mb-4">
-                              <Lightbulb className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Sentiment Analysis</h3>
-                            </div>
-                            <div className="grid grid-cols-3 gap-3">
-                              <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                  {insights.sentiment.positive}%
-                                </div>
-                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Positive</div>
-                              </div>
-                              <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                                <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
-                                  {insights.sentiment.neutral}%
-                                </div>
-                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Neutral</div>
-                              </div>
-                              <div className="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                                  {insights.sentiment.negative}%
-                                </div>
-                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Negative</div>
-                              </div>
-                            </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Positive</div>
+                        </div>
+                        <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border-2 border-gray-200 dark:border-gray-600">
+                          <div className="text-3xl font-bold text-gray-600 dark:text-gray-400">
+                            {insights.sentiment.neutral}%
+                          </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Neutral</div>
+                        </div>
+                        <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border-2 border-red-200 dark:border-red-800">
+                          <div className="text-3xl font-bold text-red-600 dark:text-red-400">
+                            {insights.sentiment.negative}%
+                          </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Negative</div>
+                        </div>
+                      </div>
+                      <div className={`p-4 rounded-lg ${
+                        insights.sentiment.overall === 'positive'
+                          ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800'
+                          : insights.sentiment.overall === 'negative'
+                          ? 'bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800'
+                          : 'bg-gray-50 dark:bg-gray-700/50 border-2 border-gray-200 dark:border-gray-600'
+                      }`}>
+                        <div className="text-center">
+                          <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Overall Sentiment</div>
+                          <div className={`text-xl font-bold capitalize ${
+                            insights.sentiment.overall === 'positive'
+                              ? 'text-green-600 dark:text-green-400'
+                              : insights.sentiment.overall === 'negative'
+                              ? 'text-red-600 dark:text-red-400'
+                              : 'text-gray-600 dark:text-gray-400'
+                          }`}>
+                            {insights.sentiment.overall}
                           </div>
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Key Themes */}
+                  <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
+                    <div className="flex items-center space-x-2 mb-6">
+                      <Lightbulb className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Key Themes</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {insights.key_themes.map((theme, idx) => (
+                        <div 
+                          key={idx} 
+                          className="flex items-start space-x-3 p-4 bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-lg border border-orange-200 dark:border-orange-800"
+                        >
+                          <div className="flex-shrink-0 w-6 h-6 bg-orange-100 dark:bg-orange-900/40 rounded-full flex items-center justify-center text-orange-600 dark:text-orange-400 font-bold text-sm">
+                            {idx + 1}
+                          </div>
+                          <span className="text-gray-700 dark:text-gray-300 text-sm">{theme}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Suggested Actions */}
+                  <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
+                    <div className="flex items-center space-x-2 mb-6">
+                      <Target className="h-5 w-5 text-red-600 dark:text-red-400" />
+                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Suggested Actions</h3>
+                    </div>
+                    <div className="space-y-3">
+                      {insights.suggested_actions.map((action, idx) => (
+                        <div 
+                          key={idx} 
+                          className="flex items-start space-x-3 p-4 bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 rounded-lg border border-red-200 dark:border-red-800 hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex-shrink-0">
+                            <div className="w-8 h-8 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center">
+                              <CheckCircle2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                            </div>
+                          </div>
+                          <span className="text-gray-700 dark:text-gray-300 flex-1">{action}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Trends */}
+                  <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
+                    <div className="flex items-center space-x-2 mb-6">
+                      <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Trends & Patterns</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {insights.trends.map((trend, idx) => (
+                        <div 
+                          key={idx} 
+                          className="flex items-center space-x-3 p-4 bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 rounded-lg border border-green-200 dark:border-green-800"
+                        >
+                          <div className="flex-shrink-0">
+                            <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
+                          </div>
+                          <span className="text-gray-700 dark:text-gray-300 text-sm font-medium">{trend}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Action Button */}
+                  <div className="flex justify-center pt-4">
+                    <button
+                      onClick={() => setShowInsights(false)}
+                      className="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white rounded-lg shadow-lg transition-all"
+                    >
+                      Hide Insights
+                    </button>
                   </div>
                 </motion.div>
               )}
