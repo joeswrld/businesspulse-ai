@@ -330,140 +330,6 @@ const FeedbackSettings: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-3">
-                <Label htmlFor="widget-code" className="text-sm font-medium">
-                  Embed Code
-                </Label>
-                <Textarea
-                  id="widget-code"
-                  value={settings.widget_code}
-                  rows={5}
-                  className="font-mono text-xs sm:text-sm bg-muted/50"
-                  readOnly
-                />
-                <div className="flex justify-end">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => copyToClipboard(settings.widget_code, 'Widget Code')}
-                  >
-                    {copiedField === 'Widget Code' ? (
-                      <>
-                        <Check className="h-4 w-4 mr-2 text-white" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy Code
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg space-y-3">
-                <h4 className="font-semibold text-sm flex items-center gap-2 text-blue-900 dark:text-blue-100">
-                  <Sparkles className="h-4 w-4" />
-                  Installation Instructions
-                </h4>
-                <ol className="space-y-2 text-sm text-blue-800 dark:text-blue-200 ml-1">
-                  <li className="flex gap-2">
-                    <span className="font-semibold min-w-[1.5rem]">1.</span>
-                    <span>Copy the embed code above</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-semibold min-w-[1.5rem]">2.</span>
-                    <span>Open your website HTML file</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-semibold min-w-[1.5rem]">3.</span>
-                    <span>Paste the code before the closing body tag</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-semibold min-w-[1.5rem]">4.</span>
-                    <span>Save and refresh your website to see the widget</span>
-                  </li>
-                </ol>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Project ID Tab */}
-        <TabsContent value="project" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-                  <Settings className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                </div>
-                Project Configuration
-              </CardTitle>
-              <CardDescription>
-                Your unique project identifier for all feedback collection
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-3">
-                <Label htmlFor="project-id" className="text-sm font-medium">
-                  Project ID
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="project-id"
-                    value={settings.project_id}
-                    readOnly
-                    className="flex-1 font-mono text-xs sm:text-sm bg-muted/50"
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => copyToClipboard(settings.project_id, 'Project ID')}
-                    className="flex-shrink-0"
-                  >
-                    {copiedField === 'Project ID' ? (
-                      <Check className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <RefreshCw className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
-                  <div className="space-y-2 flex-1">
-                    <h4 className="font-semibold text-sm text-amber-900 dark:text-amber-100">
-                      Regenerate URLs
-                    </h4>
-                    <p className="text-xs text-amber-800 dark:text-amber-200">
-                      This will generate new URLs and invalidate all existing links. Use this if your current links have been compromised or shared publicly by mistake.
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleRegenerateUrls}
-                      className="border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-900/30"
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Regenerate All URLs
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-};
-
-export default FeedbackSettings;-y-6">
               {/* Business Name */}
               <div className="space-y-3">
                 <Label htmlFor="business-name" className="text-sm font-medium">
@@ -606,7 +472,106 @@ export default FeedbackSettings;-y-6">
               </div>
 
               {/* Tips */}
-              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg space-y-3">
+                <h4 className="font-semibold text-sm flex items-center gap-2 text-blue-900 dark:text-blue-100">
+                  <Sparkles className="h-4 w-4" />
+                  Installation Instructions
+                </h4>
+                <ol className="space-y-2 text-sm text-blue-800 dark:text-blue-200 ml-1">
+                  <li className="flex gap-2">
+                    <span className="font-semibold min-w-[1.5rem]">1.</span>
+                    <span>Copy the embed code above</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-semibold min-w-[1.5rem]">2.</span>
+                    <span>Open your website HTML file</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-semibold min-w-[1.5rem]">3.</span>
+                    <span>Paste the code before the closing body tag</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-semibold min-w-[1.5rem]">4.</span>
+                    <span>Save and refresh your website to see the widget</span>
+                  </li>
+                </ol>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Project ID Tab */}
+        <TabsContent value="project" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                  <Settings className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                Project Configuration
+              </CardTitle>
+              <CardDescription>
+                Your unique project identifier for all feedback collection
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <Label htmlFor="project-id" className="text-sm font-medium">
+                  Project ID
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="project-id"
+                    value={settings.project_id}
+                    readOnly
+                    className="flex-1 font-mono text-xs sm:text-sm bg-muted/50"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => copyToClipboard(settings.project_id, 'Project ID')}
+                    className="flex-shrink-0"
+                  >
+                    {copiedField === 'Project ID' ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <RefreshCw className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                  <div className="space-y-2 flex-1">
+                    <h4 className="font-semibold text-sm text-amber-900 dark:text-amber-100">
+                      Regenerate URLs
+                    </h4>
+                    <p className="text-xs text-amber-800 dark:text-amber-200">
+                      This will generate new URLs and invalidate all existing links. Use this if your current links have been compromised or shared publicly by mistake.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRegenerateUrls}
+                      className="border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Regenerate All URLs
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default FeedbackSettings;:border-blue-800 p-4 rounded-lg">
                 <div className="flex items-start gap-3">
                   <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
                   <div className="space-y-2">
@@ -740,18 +705,6 @@ export default FeedbackSettings;-y-6">
                   </div>
                 )}
               </div>
-
-              <div className="bg-muted/50 p-4 rounded-lg border">
-                <div className="flex items-start gap-3">
-                  <Eye className="h-5 w-5 text-primary mt-0.5" />
-                  <div className="space-y-1">
-                    <h4 className="font-medium text-sm">Preview</h4>
-                    <p className="text-xs text-muted-foreground">
-                      Customers will rate their satisfaction on a 1-5 scale and optionally provide comments
-                    </p>
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
 
@@ -868,18 +821,6 @@ export default FeedbackSettings;-y-6">
                   </div>
                 )}
               </div>
-
-              <div className="bg-muted/50 p-4 rounded-lg border">
-                <div className="flex items-start gap-3">
-                  <Eye className="h-5 w-5 text-primary mt-0.5" />
-                  <div className="space-y-1">
-                    <h4 className="font-medium text-sm">Preview</h4>
-                    <p className="text-xs text-muted-foreground">
-                      Customers can submit detailed feedback with type categorization and priority levels
-                    </p>
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -898,4 +839,39 @@ export default FeedbackSettings;-y-6">
                 Add this code to your website to display an interactive feedback widget
               </CardDescription>
             </CardHeader>
-            <CardContent className="space
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <Label htmlFor="widget-code" className="text-sm font-medium">
+                  Embed Code
+                </Label>
+                <Textarea
+                  id="widget-code"
+                  value={settings.widget_code}
+                  rows={5}
+                  className="font-mono text-xs sm:text-sm bg-muted/50"
+                  readOnly
+                />
+                <div className="flex justify-end">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => copyToClipboard(settings.widget_code, 'Widget Code')}
+                  >
+                    {copiedField === 'Widget Code' ? (
+                      <>
+                        <Check className="h-4 w-4 mr-2 text-white" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Code
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark
