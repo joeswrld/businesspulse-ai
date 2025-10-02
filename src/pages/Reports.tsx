@@ -653,7 +653,7 @@ export default function Reports() {
             </div>
 
             {/* Date Range Filter */}
-            <Select value={dateRange} onValueChange={(value: any) => setDateRange(value)}>
+            <Select value={dateRange} onValueChange={(value: 'all' | '7d' | '30d' | '90d') => setDateRange(value)}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Date Range" />
               </SelectTrigger>
@@ -666,7 +666,7 @@ export default function Reports() {
             </Select>
 
             {/* Sort Order */}
-            <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+            <Select value={sortOrder} onValueChange={(value: 'newest' | 'oldest') => setSortOrder(value)}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Sort Order" />
               </SelectTrigger>
@@ -773,7 +773,7 @@ export default function Reports() {
                         height={80}
                       />
                       <YAxis fontSize={12} />
-                      <Tooltip formatter={(value: any) => [value, 'Occurrences']} />
+                      <Tooltip formatter={(value: number) => [value, 'Occurrences']} />
                       <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                     </RechartsBarChart>
                   </ResponsiveContainer>
@@ -868,7 +868,7 @@ export default function Reports() {
                           month: 'long', 
                           day: 'numeric' 
                         })}
-                        formatter={(value: any) => [value, 'Insights Count']}
+                        formatter={(value: number) => [value, 'Insights Count']}
                       />
                       <Area 
                         type="monotone" 
