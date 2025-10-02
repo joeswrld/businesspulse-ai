@@ -1,5 +1,5 @@
 // src/pages/InsightsSimple.tsx
-// Enhanced version with comprehensive insights display
+// Real AI-Powered Insights with 
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,7 +21,6 @@ import {
   BarChart3,
   Lightbulb,
   Filter,
-  AlertCircle,
   CheckCircle2,
   Hash,
   Activity,
@@ -34,6 +33,7 @@ interface Feedback {
   rating: number | null;
   form_type: string;
   created_at: string;
+  metadata?: any;
 }
 
 interface Insights {
@@ -50,12 +50,6 @@ interface Insights {
     negative: number;
     neutral: number;
     overall: 'positive' | 'negative' | 'neutral';
-  };
-  analytics: {
-    total_feedback: number;
-    avg_rating: number;
-    response_rate: number;
-    top_rating: number;
   };
 }
 
@@ -135,140 +129,82 @@ export default function EnhancedInsightsPage() {
     try {
       const selectedItems = feedbacks.filter(f => selectedFeedbacks.has(f.id));
       
-      const totalRatings = selectedItems.filter(f => f.rating !== null).length;
-      const avgRating = totalRatings > 0
-        ? selectedItems.reduce((sum, f) => sum + (f.rating || 0), 0) / totalRatings
-        : 0;
+      // Prepare structured data for AI analysis
+      const feedbackData = selectedItems.map(item => ({
+        message: item.message,
+        rating: item.rating,
+        form_type: item.form_type,
+        created_at: item.created_at,
+        email: item.metadata?.email || null
+      }));
+
+      // Get the current session
+      const { data: { session } } = await supabase.auth.getSession();
       
-      const satisfactionRate = totalRatings > 0
-        ? Math.round((selectedItems.filter(f => f.rating && f.rating >= 4).length / totalRatings) * 100)
-        : 0;
+      if (!session) {
+        throw new Error('No active session');
+      }
 
-      const positive = selectedItems.filter(f => f.rating && f.rating >= 4).length;
-      const negative = selectedItems.filter(f => f.rating && f.rating <= 2).length;
-      const neutral = selectedItems.filter(f => !f.rating || f.rating === 3).length;
-      const total = selectedItems.length;
+      console.log('🤖 Calling AI analysis function...');
 
-      const positivePercent = Math.round((positive / total) * 100);
-      const negativePercent = Math.round((negative / total) * 100);
-      const neutralPercent = Math.round((neutral / total) * 100);
-
-      const overallSentiment = positivePercent > 50 ? 'positive' : negativePercent > 50 ? 'negative' : 'neutral';
-
-      // Enhanced keyword analysis
-      const messages = selectedItems.map(f => f.message.toLowerCase());
-      const keywords = ['good', 'great', 'excellent', 'amazing', 'love', 'like', 'best', 
-                       'poor', 'bad', 'terrible', 'worst', 'hate', 'issue', 'problem', 
-                       'improve', 'better', 'feature', 'bug', 'slow', 'fast', 'easy', 'difficult'];
-      
-      const themes: string[] = [];
-      const wordCounts: { [key: string]: number } = {};
-      
-      keywords.forEach(word => {
-        const count = messages.filter(m => m.includes(word)).length;
-        if (count > 0) {
-          wordCounts[word] = count;
+      // Call the Supabase Edge Function for AI analysis
+      const { data, error } = await supabase.functions.invoke('analyze-insights', {
+        body: {
+          data: feedbackData,
+          userId: user!.id,
+          fileType: 'feedback'
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
         }
       });
 
-      // Sort by frequency and get top themes
-      const sortedWords = Object.entries(wordCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5);
-
-      sortedWords.forEach(([word, count]) => {
-        const sentiment = ['good', 'great', 'excellent', 'amazing', 'love', 'like', 'best', 'fast', 'easy'].includes(word) 
-          ? '✓' : ['poor', 'bad', 'terrible', 'worst', 'hate', 'issue', 'problem', 'slow', 'difficult'].includes(word)
-          ? '⚠' : '•';
-        themes.push(`${sentiment} "${word}" mentioned ${count} time${count > 1 ? 's' : ''}`);
-      });
-
-      // Calculate top rating
-      const ratingCounts = [1, 2, 3, 4, 5].map(rating => 
-        selectedItems.filter(f => f.rating === rating).length
-      );
-      const topRating = ratingCounts.indexOf(Math.max(...ratingCounts)) + 1;
-
-      // Generate suggested actions based on data
-      const actions: string[] = [];
-      
-      if (avgRating < 3) {
-        actions.push('🚨 URGENT: Address critical customer satisfaction issues immediately');
-        actions.push('📞 Schedule follow-up calls with dissatisfied customers');
-      } else if (avgRating < 4) {
-        actions.push('📊 Investigate areas of improvement identified in feedback');
-        actions.push('💡 Implement quick wins to boost satisfaction scores');
-      } else {
-        actions.push('✅ Maintain current service quality standards');
-        actions.push('🎯 Focus on scaling successful practices');
+      if (error) {
+        console.error('AI Analysis Error:', error);
+        throw error;
       }
 
-      if (negativePercent > 30) {
-        actions.push('⚠️ Create action plan for recurring pain points');
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to generate insights');
       }
 
-      if (selectedItems.some(f => f.message.toLowerCase().includes('bug') || f.message.toLowerCase().includes('issue'))) {
-        actions.push('🔧 Prioritize technical issues in next sprint');
+      const analysis = data.analysis;
+
+      // Validate the response structure
+      if (!analysis || !analysis.summary || !analysis.sentiment) {
+        throw new Error('Invalid AI response structure');
       }
 
-      actions.push('📧 Send personalized thank-you notes to feedback providers');
-      actions.push('📈 Share insights with product and support teams');
+      console.log('✅ AI Analysis received:', analysis);
 
-      const generatedInsights: Insights = {
-        summary: `Comprehensive analysis of ${selectedItems.length} feedback entries reveals ${satisfactionRate}% satisfaction rate with an average rating of ${avgRating.toFixed(1)}/5. ${
-          overallSentiment === 'positive' 
-            ? 'Customer sentiment is predominantly positive, indicating strong product-market fit and customer satisfaction.' 
-            : overallSentiment === 'negative'
-            ? 'Customer sentiment indicates significant areas requiring immediate attention and improvement.'
-            : 'Mixed customer sentiment suggests opportunities for targeted enhancements to elevate overall experience.'
-        } The most frequent rating is ${topRating}/5, providing a clear signal of typical customer experience.`,
-        key_themes: themes.length > 0 ? themes : ['No significant themes detected - consider collecting more feedback'],
-        suggested_actions: actions,
-        trends: [
-          `📊 ${selectedItems.filter(f => f.form_type === 'customer_satisfaction').length} Customer Satisfaction responses`,
-          `💬 ${selectedItems.filter(f => f.form_type === 'product_feedback').length} Product Feedback entries`,
-          `⭐ ${totalRatings} rated responses out of ${selectedItems.length} total`,
-          `📈 ${positivePercent}% positive sentiment trend`,
-          avgRating >= 4 ? '🎉 High satisfaction momentum' : avgRating >= 3 ? '📊 Stable satisfaction levels' : '⚠️ Satisfaction needs attention'
-        ],
-        performance: {
-          metrics: [
-            `${satisfactionRate}% overall satisfaction rate`,
-            `${avgRating.toFixed(1)}/5 average customer rating`,
-            `${selectedItems.length} total feedback responses analyzed`,
-            `${Math.round((totalRatings / selectedItems.length) * 100)}% response completion rate`
-          ],
-          score: satisfactionRate
-        },
-        sentiment: {
-          positive: positivePercent,
-          negative: negativePercent,
-          neutral: neutralPercent,
-          overall: overallSentiment as 'positive' | 'negative' | 'neutral'
-        },
-        analytics: {
-          total_feedback: selectedItems.length,
-          avg_rating: parseFloat(avgRating.toFixed(1)),
-          response_rate: Math.round((totalRatings / selectedItems.length) * 100),
-          top_rating: topRating
-        }
-      };
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      setInsights(generatedInsights);
+      setInsights(analysis);
       setShowInsights(true);
       
       toast({
-        title: '✨ Insights Generated!',
-        description: `AI analysis complete for ${selectedItems.length} feedback entries.`
+        title: '✨ AI Insights Generated!',
+        description: `Real-time analysis complete for ${selectedItems.length} feedback entries.`,
+        duration: 5000
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating insights:', error);
+      
+      let errorMessage = 'Failed to generate insights. Please try again.';
+      
+      if (error.message?.includes('Usage limit')) {
+        errorMessage = error.message;
+      } else if (error.message?.includes('API key')) {
+        errorMessage = 'AI service is not configured. Please contact support.';
+      } else if (error.message?.includes('rate limit')) {
+        errorMessage = 'AI service rate limit reached. Please try again in a few moments.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: 'Error',
-        description: 'Failed to generate insights. Please try again.',
-        variant: 'destructive'
+        description: errorMessage,
+        variant: 'destructive',
+        duration: 7000
       });
     } finally {
       setGenerating(false);
@@ -327,12 +263,15 @@ export default function EnhancedInsightsPage() {
             </h1>
           </div>
           <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Transform your feedback into actionable insights with advanced AI analysis
+            Transform your feedback into actionable insights 
           </p>
           <div className="flex items-center justify-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
             <div className="flex items-center space-x-1 px-3 py-1 bg-white/50 dark:bg-gray-800/50 rounded-full border border-gray-200 dark:border-gray-700">
               <MessageSquare className="h-3 w-3" />
               <span>{feedbacks.length} Feedbacks</span>
+            </div>
+            <div className="flex items-center space-x-1 px-3 py-1 bg-purple-50 dark:bg-purple-900/30 rounded-full border border-purple-200 dark:border-purple-800">
+              <Sparkles className="h-3 w-3 text-purple-600 dark:text-purple-400" />
             </div>
           </div>
         </motion.div>
@@ -364,7 +303,7 @@ export default function EnhancedInsightsPage() {
                 <div className="p-6 space-y-6">
                   <div className="flex items-center space-x-2 border-b border-gray-200 dark:border-gray-700 pb-4">
                     <Filter className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Select Feedback for Analysis</h2>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Select Feedback for AI Analysis</h2>
                   </div>
                   
                   <div className="flex items-center justify-between flex-wrap gap-4">
@@ -397,12 +336,12 @@ export default function EnhancedInsightsPage() {
                       {generating ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>Generating...</span>
+                          <span>Analyzing with AI...</span>
                         </>
                       ) : (
                         <>
                           <Sparkles className="h-4 w-4" />
-                          <span>Generate Insights</span>
+                          <span>Generate AI Insights</span>
                         </>
                       )}
                     </button>
@@ -470,53 +409,14 @@ export default function EnhancedInsightsPage() {
                           <BarChart3 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                         </div>
                         <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Executive Summary</h2>
+                        <div className="ml-auto flex items-center space-x-1 px-2 py-1 bg-purple-100 dark:bg-purple-900/30 rounded-full text-xs text-purple-700 dark:text-purple-300">
+                          <Sparkles className="h-3 w-3" />
+                          <span>AI Generated</span>
+                        </div>
                       </div>
-                      <p className="text-gray-700 dark:text-gray-300 leading-relaxed text-lg">
+                      <p className="text-gray-700 dark:text-gray-300 leading-relaxed text-lg whitespace-pre-wrap">
                         {insights.summary}
                       </p>
-                    </div>
-                  </div>
-
-                  {/* Analytics Overview */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="rounded-lg bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <Hash className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                        {insights.analytics.total_feedback}
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Total Responses</div>
-                    </div>
-
-                    <div className="rounded-lg bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <Star className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                      </div>
-                      <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                        {insights.analytics.avg_rating}
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Average Rating</div>
-                    </div>
-
-                    <div className="rounded-lg bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
-                      </div>
-                      <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                        {insights.analytics.response_rate}%
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Response Rate</div>
-                    </div>
-
-                    <div className="rounded-lg bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <TrendingUp className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                      </div>
-                      <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                        {insights.analytics.top_rating}⭐
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Most Frequent</div>
                     </div>
                   </div>
 
