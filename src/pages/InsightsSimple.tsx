@@ -703,16 +703,294 @@ export default function InsightsPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
                           <div className="flex items-center space-x-2 mb-6">
-                            <BarChart3 className="h-5 w-5 text-purple-600" />
+                            <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                             <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Performance Score</h3>
                           </div>
                           <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                              <span className="text-4xl font-bold text-purple-600">
+                              <span className="text-4xl font-bold text-purple-600 dark:text-purple-400">
                                 {currentInsight.performance.score}/100
                               </span>
                               <div className={`px-3 py-1 rounded-full text-sm font-medium ${
                                 currentInsight.performance.score >= 80 
-                                  ? 'bg-green-100 text-green-700'
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                                   : currentInsight.performance.score >= 60
-                                  ? 'bg-yellow-100 text-yellow-700'
+                                  ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                              }`}>
+                                {currentInsight.performance.score >= 80 ? 'Excellent' : currentInsight.performance.score >= 60 ? 'Good' : 'Needs Work'}
+                              </div>
+                            </div>
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
+                              <div 
+                                className="bg-gradient-to-r from-purple-600 to-purple-400 h-4 rounded-full transition-all duration-1000"
+                                style={{ width: `${currentInsight.performance.score}%` }}
+                              />
+                            </div>
+                            <div className="space-y-2 mt-4">
+                              {currentInsight.performance.metrics.map((metric, idx) => (
+                                <div key={idx} className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                                  <CheckCircle2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                  <span>{metric}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
+                          <div className="flex items-center space-x-2 mb-6">
+                            <PieChart className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                            <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Sentiment Analysis</h3>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3 mb-4">
+                            <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-200 dark:border-green-800">
+                              <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+                                {currentInsight.sentiment.positive}%
+                              </div>
+                              <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Positive</div>
+                            </div>
+                            <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border-2 border-gray-200 dark:border-gray-600">
+                              <div className="text-3xl font-bold text-gray-600 dark:text-gray-400">
+                                {currentInsight.sentiment.neutral}%
+                              </div>
+                              <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Neutral</div>
+                            </div>
+                            <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border-2 border-red-200 dark:border-red-800">
+                              <div className="text-3xl font-bold text-red-600 dark:text-red-400">
+                                {currentInsight.sentiment.negative}%
+                              </div>
+                              <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Negative</div>
+                            </div>
+                          </div>
+                          <div className={`p-4 rounded-lg ${
+                            currentInsight.sentiment.overall === 'positive'
+                              ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800'
+                              : currentInsight.sentiment.overall === 'negative'
+                              ? 'bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800'
+                              : 'bg-gray-50 dark:bg-gray-700/50 border-2 border-gray-200 dark:border-gray-600'
+                          }`}>
+                            <div className="text-center">
+                              <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Overall Sentiment</div>
+                              <div className={`text-xl font-bold capitalize ${
+                                currentInsight.sentiment.overall === 'positive'
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : currentInsight.sentiment.overall === 'negative'
+                                  ? 'text-red-600 dark:text-red-400'
+                                  : 'text-gray-600 dark:text-gray-400'
+                              }`}>
+                                {currentInsight.sentiment.overall}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Key Themes */}
+                      <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
+                        <div className="flex items-center space-x-2 mb-6">
+                          <Lightbulb className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                          <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Key Themes</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {currentInsight.key_themes.map((theme, idx) => (
+                            <div 
+                              key={idx} 
+                              className="flex items-start space-x-3 p-4 bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-lg border border-orange-200 dark:border-orange-800"
+                            >
+                              <div className="flex-shrink-0 w-6 h-6 bg-orange-600 dark:bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                {idx + 1}
+                              </div>
+                              <span className="text-gray-700 dark:text-gray-300 text-sm">{theme}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Suggested Actions */}
+                      <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
+                        <div className="flex items-center space-x-2 mb-6">
+                          <Target className="h-5 w-5 text-red-600 dark:text-red-400" />
+                          <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Suggested Actions</h3>
+                        </div>
+                        <div className="space-y-3">
+                          {currentInsight.suggested_actions.map((action, idx) => (
+                            <div 
+                              key={idx} 
+                              className="flex items-start space-x-3 p-4 bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 rounded-lg border border-red-200 dark:border-red-800 hover:shadow-md transition-shadow"
+                            >
+                              <div className="flex-shrink-0">
+                                <div className="w-8 h-8 bg-red-600 dark:bg-red-500 rounded-full flex items-center justify-center">
+                                  <CheckCircle2 className="h-4 w-4 text-white" />
+                                </div>
+                              </div>
+                              <span className="text-gray-700 dark:text-gray-300 flex-1">{action}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Trends */}
+                      <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
+                        <div className="flex items-center space-x-2 mb-6">
+                          <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                          <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Trends & Patterns</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {currentInsight.trends.map((trend, idx) => (
+                            <div 
+                              key={idx} 
+                              className="flex items-center space-x-3 p-4 bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 rounded-lg border border-green-200 dark:border-green-800"
+                            >
+                              <div className="flex-shrink-0">
+                                <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
+                              </div>
+                              <span className="text-gray-700 dark:text-gray-300 text-sm font-medium">{trend}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            )}
+          </motion.div>
+        )}
+
+        {/* History Tab */}
+        {activeTab === 'history' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6"
+          >
+            {savedInsights.length > 0 && (
+              <div className="flex items-center justify-end space-x-3">
+                <button
+                  onClick={exportAllAsCSV}
+                  className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-700 dark:text-gray-300 text-sm"
+                >
+                  <FileText className="h-4 w-4" />
+                  <span>Export All (CSV)</span>
+                </button>
+                <button
+                  onClick={exportAllAsPDF}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Export All (PDF)</span>
+                </button>
+              </div>
+            )}
+
+            {loadingHistory ? (
+              <div className="text-center py-12">
+                <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-600" />
+                <p className="text-gray-600 dark:text-gray-400">Loading history...</p>
+              </div>
+            ) : savedInsights.length === 0 ? (
+              <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+                <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <History className="h-10 w-10 text-gray-400" />
+                </div>
+                <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                  No Insights Yet
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-6">
+                  Generate and save your first AI-powered insight from your feedback data.
+                </p>
+                <button
+                  onClick={() => setActiveTab('generate')}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  Generate First Insight
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {savedInsights.map((insight, index) => (
+                  <motion.div
+                    key={insight.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+                  >
+                    <div className="p-6">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                            {insight.title}
+                          </h3>
+                          <div className="flex items-center space-x-4 text-sm text-gray-500">
+                            <div className="flex items-center space-x-1">
+                              <Clock className="h-4 w-4" />
+                              <span>{new Date(insight.created_at).toLocaleString()}</span>
+                            </div>
+                            {insight.feedback_count && (
+                              <div className="flex items-center space-x-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded text-blue-700 dark:text-blue-300 text-xs">
+                                <MessageSquare className="h-3 w-3" />
+                                <span>{insight.feedback_count} feedbacks analyzed</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setExpandedInsightId(
+                            expandedInsightId === insight.id ? null : insight.id
+                          )}
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        >
+                          {expandedInsightId === insight.id ? (
+                            <ChevronUp className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                          ) : (
+                            <ChevronDown className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                          )}
+                        </button>
+                      </div>
+
+                      <AnimatePresence>
+                        {expandedInsightId === insight.id && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-4 mt-4">
+                              <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 text-sm leading-relaxed font-sans">
+                                {insight.details}
+                              </pre>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        <button
+                          onClick={() => downloadPDF(insight.title, insight.details)}
+                          className="flex items-center space-x-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+                        >
+                          <Download className="h-3 w-3" />
+                          <span>PDF</span>
+                        </button>
+                        <button
+                          onClick={() => deleteInsight(insight.id)}
+                          className="flex items-center space-x-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}
