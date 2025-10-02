@@ -107,6 +107,95 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
       setValidationError('');
 
     } catch (err) {
+      console.error('❌ Error validating project:', err);
+      setIsValid(false);
+      setValidationError('Unable to load feedback form. Please try again later.');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleRatingClick = (selectedRating: number) => {
+    setRating(selectedRating);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (previewMode) {
+      toast({
+        title: 'Preview Mode',
+        description: 'This is a preview. Feedback will not be submitted.',
+        variant: 'default'
+      });
+      return;
+    }
+
+    if (!message.trim()) {
+      toast({
+        title: 'Message Required',
+        description: 'Please provide your feedback message',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (!settings?.project_id) {
+      toast({
+        title: 'Invalid Project',
+        description: 'Cannot submit feedback for this project.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const feedbackData = {
+        project_id: settings.project_id,
+        form_type: 'product_feedback',
+        message: message.trim(),
+        rating: rating || null,
+        metadata: {
+          email: email.trim() || null,
+          page_url: window.location.href,
+          user_agent: navigator.userAgent,
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      const { error } = await supabase
+        .from('feedback')
+        .insert([feedbackData]);
+
+      if (error) {
+        let errorMessage = 'Failed to submit feedback.';
+        if (error.code === '23503') {
+          errorMessage = 'Invalid project reference. Please contact support.';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      setIsSubmitted(true);
+      
+      if (onSubmitted) {
+        onSubmitted(feedbackData);
+      }
+      
+      toast({
+        title: 'Thank you!',
+        description: 'Your feedback has been submitted successfully.'
+      });
+    } catch (err) {
       console.error('❌ Submit failed:', err);
       toast({
         title: 'Error',
@@ -357,93 +446,4 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
   );
 };
 
-export default ProductFeedbackForm; Error validating project:', err);
-      setIsValid(false);
-      setValidationError('Unable to load feedback form. Please try again later.');
-    } finally {
-      setIsValidating(false);
-    }
-  };
-
-  const handleRatingClick = (selectedRating: number) => {
-    setRating(selectedRating);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (previewMode) {
-      toast({
-        title: 'Preview Mode',
-        description: 'This is a preview. Feedback will not be submitted.',
-        variant: 'default'
-      });
-      return;
-    }
-
-    if (!message.trim()) {
-      toast({
-        title: 'Message Required',
-        description: 'Please provide your feedback message',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    if (!settings?.project_id) {
-      toast({
-        title: 'Invalid Project',
-        description: 'Cannot submit feedback for this project.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const feedbackData = {
-        project_id: settings.project_id,
-        form_type: 'product_feedback',
-        message: message.trim(),
-        rating: rating || null,
-        metadata: {
-          email: email.trim() || null,
-          page_url: window.location.href,
-          user_agent: navigator.userAgent,
-          timestamp: new Date().toISOString()
-        }
-      };
-
-      const { error } = await supabase
-        .from('feedback')
-        .insert([feedbackData]);
-
-      if (error) {
-        let errorMessage = 'Failed to submit feedback.';
-        if (error.code === '23503') {
-          errorMessage = 'Invalid project reference. Please contact support.';
-        } else if (error.message) {
-          errorMessage = error.message;
-        }
-        
-        toast({
-          title: 'Error',
-          description: errorMessage,
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      setIsSubmitted(true);
-      
-      if (onSubmitted) {
-        onSubmitted(feedbackData);
-      }
-      
-      toast({
-        title: 'Thank you!',
-        description: 'Your feedback has been submitted successfully.'
-      });
-    } catch (err) {
-      console.error('❌
+export default ProductFeedbackForm;
