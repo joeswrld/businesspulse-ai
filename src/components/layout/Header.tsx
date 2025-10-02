@@ -106,7 +106,7 @@ const Header = () => {
             {loading ? (
               // Show loading state
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className="w-8 h-8  rounded-full animate-pulse"></div>
               </div>
             ) : user ? (
               // Show user profile and dashboard button when logged in
@@ -127,7 +127,7 @@ const Header = () => {
                           className="w-6 h-6 rounded-full object-cover"
                         />
                       ) : (
-                        <User className="h-3 w-3 text-white" />
+                        <User className="h-3 w-3 text-white dark:text-primary-foreground" />
                       )}
                     </div>
                     <span className="text-sm font-medium">

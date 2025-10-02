@@ -578,8 +578,8 @@ const loadFeedbackData = useCallback(async () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Feedback Dashboard</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-3xl font-bold ">Feedback Dashboard</h1>
+          <p className=" mt-2">
             AI-powered real-time insights • {filteredFeedbacks.length} total entries
           </p>
         </div>
