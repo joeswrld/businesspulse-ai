@@ -376,11 +376,11 @@ const FeedbackSettings: React.FC = () => {
                   </li>
                   <li className="flex gap-2">
                     <span className="font-semibold min-w-[1.5rem]">2.</span>
-                    <span>Open your website's HTML file</span>
+                    <span>Open your website HTML file</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="font-semibold min-w-[1.5rem]">3.</span>
-                    <span>Paste the code before the closing &lt;/body&gt; tag</span>
+                    <span>Paste the code before the closing body tag</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="font-semibold min-w-[1.5rem]">4.</span>
