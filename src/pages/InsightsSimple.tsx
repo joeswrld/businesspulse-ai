@@ -22,14 +22,11 @@ import {
   Star,
   Calendar,
   User,
-  Filter,
   TrendingUp,
   Target,
-  BarChart3,
   Lightbulb,
   CheckCircle2,
-  Activity,
-  PieChart
+  Activity
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 
@@ -52,7 +49,6 @@ interface SavedInsight {
 
 interface GeneratedInsight {
   title: string;
-  details: string;
   summary: string;
   key_themes: string[];
   suggested_actions: string[];
@@ -139,13 +135,17 @@ export default function InsightsPage() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Fetch history error:', error);
+        throw error;
+      }
+      
       setSavedInsights(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching history:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load insights history',
+        description: error.message || 'Failed to load insights history',
         variant: 'destructive'
       });
     } finally {
@@ -264,23 +264,29 @@ export default function InsightsPage() {
 
     setSaving(true);
     try {
-      const detailsText = `Summary:\n${currentInsight.summary}\n\nKey Themes:\n• ${currentInsight.key_themes.join('\n• ')}\n\nSuggested Actions:\n• ${currentInsight.suggested_actions.join('\n• ')}\n\nTrends:\n• ${currentInsight.trends.join('\n• ')}\n\nPerformance Score: ${currentInsight.performance.score}/100\nSentiment: ${currentInsight.sentiment.overall} (${currentInsight.sentiment.positive}% positive, ${currentInsight.sentiment.neutral}% neutral, ${currentInsight.sentiment.negative}% negative)`;
+      const detailsText = `Summary:\n${currentInsight.summary}\n\nKey Themes:\n${currentInsight.key_themes.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\nSuggested Actions:\n${currentInsight.suggested_actions.map((a, i) => `${i + 1}. ${a}`).join('\n')}\n\nTrends:\n${currentInsight.trends.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\nPerformance Score: ${currentInsight.performance.score}/100\nSentiment: ${currentInsight.sentiment.overall} (${currentInsight.sentiment.positive}% positive, ${currentInsight.sentiment.neutral}% neutral, ${currentInsight.sentiment.negative}% negative)`;
+
+      const insertData = {
+        user_id: user.id,
+        title: currentInsight.title || 'AI Insight Analysis',
+        details: detailsText,
+        feedback_count: selectedFeedbacks.size
+      };
+
+      console.log('Attempting to insert:', insertData);
 
       const { data, error } = await supabase
         .from('insights')
-        .insert({
-          user_id: user.id,
-          title: currentInsight.title,
-          details: detailsText,
-          feedback_count: selectedFeedbacks.size
-        })
+        .insert(insertData)
         .select()
         .single();
 
       if (error) {
-        console.error('Supabase error:', error);
+        console.error('Supabase insert error:', error);
         throw error;
       }
+
+      console.log('Insert successful:', data);
 
       toast({
         title: '💾 Saved!',
@@ -289,18 +295,18 @@ export default function InsightsPage() {
       });
 
       if (activeTab === 'history') {
-        fetchHistory();
+        await fetchHistory();
       }
     } catch (error: any) {
       console.error('Error saving insight:', error);
       
       let errorMessage = 'Failed to save insight';
       
-      if (error.message?.includes('permission') || error.code === 'PGRST301') {
-        errorMessage = 'Permission denied. Please check your account settings or contact support.';
+      if (error.message?.includes('permission') || error.code === 'PGRST301' || error.code === '42501') {
+        errorMessage = 'Permission denied. Please check your database RLS policies.';
       } else if (error.code === '23505') {
         errorMessage = 'This insight already exists.';
-      } else if (error.message?.includes('JWT')) {
+      } else if (error.message?.includes('JWT') || error.message?.includes('token')) {
         errorMessage = 'Session expired. Please refresh the page and try again.';
       } else if (error.message) {
         errorMessage = error.message;
@@ -319,6 +325,10 @@ export default function InsightsPage() {
 
   const downloadPDF = (title: string, content: string) => {
     try {
+      if (!title || !content) {
+        throw new Error('Missing title or content for PDF generation');
+      }
+
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
@@ -326,19 +336,21 @@ export default function InsightsPage() {
       const maxWidth = pageWidth - (margin * 2);
       let yPosition = 20;
       
-      doc.setFontSize(18);
+      doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
-      const titleLines = doc.splitTextToSize(title, maxWidth);
+      const safeTitle = String(title).substring(0, 100);
+      const titleLines = doc.splitTextToSize(safeTitle, maxWidth);
       doc.text(titleLines, margin, yPosition);
-      yPosition += titleLines.length * 7 + 3;
+      yPosition += titleLines.length * 7 + 5;
       
-      doc.setFontSize(10);
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.text(`Generated: ${new Date().toLocaleString()}`, margin, yPosition);
-      yPosition += 15;
+      yPosition += 12;
       
-      doc.setFontSize(11);
-      const contentLines = doc.splitTextToSize(content, maxWidth);
+      doc.setFontSize(10);
+      const safeContent = String(content);
+      const contentLines = doc.splitTextToSize(safeContent, maxWidth);
       
       contentLines.forEach((line: string) => {
         if (yPosition > pageHeight - 30) {
@@ -346,7 +358,7 @@ export default function InsightsPage() {
           yPosition = 20;
         }
         doc.text(line, margin, yPosition);
-        yPosition += 7;
+        yPosition += 6;
       });
       
       const totalPages = doc.internal.pages.length - 1;
@@ -361,7 +373,7 @@ export default function InsightsPage() {
         );
       }
       
-      const filename = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+      const filename = `${safeTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
       doc.save(filename);
       
       toast({
@@ -406,137 +418,6 @@ export default function InsightsPage() {
     }
   };
 
-  const exportAllAsCSV = () => {
-    if (savedInsights.length === 0) return;
-
-    try {
-      const headers = ['Title', 'Details', 'Feedback Count', 'Created At'];
-      const rows = savedInsights.map(insight => [
-        insight.title,
-        insight.details.replace(/\n/g, ' ').replace(/"/g, '""'),
-        insight.feedback_count || 0,
-        new Date(insight.created_at).toLocaleString()
-      ]);
-
-      const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `notex_insights_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      toast({
-        title: '📥 Exported!',
-        description: `${savedInsights.length} insights exported to CSV`,
-        duration: 2000
-      });
-    } catch (error) {
-      console.error('Error exporting CSV:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to export CSV',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const exportAllAsPDF = () => {
-    if (savedInsights.length === 0) return;
-
-    try {
-      const doc = new jsPDF();
-      const margin = 20;
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const maxWidth = pageWidth - (margin * 2);
-      let yPosition = 20;
-
-      doc.setFontSize(22);
-      doc.setFont('helvetica', 'bold');
-      doc.text('NoteX Insights Report', margin, yPosition);
-      
-      yPosition += 10;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Generated: ${new Date().toLocaleString()}`, margin, yPosition);
-      yPosition += 5;
-      doc.text(`Total Insights: ${savedInsights.length}`, margin, yPosition);
-      yPosition += 10;
-
-      savedInsights.forEach((insight, index) => {
-        if (yPosition > pageHeight - 40) {
-          doc.addPage();
-          yPosition = 20;
-        }
-
-        yPosition += 10;
-        
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        const titleLines = doc.splitTextToSize(`${index + 1}. ${insight.title}`, maxWidth);
-        doc.text(titleLines, margin, yPosition);
-        yPosition += titleLines.length * 7 + 3;
-
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'italic');
-        doc.setTextColor(100, 100, 100);
-        doc.text(new Date(insight.created_at).toLocaleString(), margin, yPosition);
-        yPosition += 7;
-
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(0, 0, 0);
-        const contentLines = doc.splitTextToSize(insight.details, maxWidth);
-        
-        contentLines.forEach((line: string) => {
-          if (yPosition > pageHeight - 30) {
-            doc.addPage();
-            yPosition = 20;
-          }
-          doc.text(line, margin, yPosition);
-          yPosition += 5;
-        });
-        
-        yPosition += 5;
-      });
-
-      const totalPages = doc.internal.pages.length - 1;
-      for (let i = 1; i <= totalPages; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(128, 128, 128);
-        doc.text(
-          `NoteX Insights Report | Page ${i} of ${totalPages}`,
-          margin,
-          pageHeight - 10
-        );
-      }
-
-      doc.save(`notex_all_insights_${new Date().toISOString().split('T')[0]}.pdf`);
-      
-      toast({
-        title: '📥 Exported!',
-        description: `${savedInsights.length} insights exported to PDF`,
-        duration: 2000
-      });
-    } catch (error) {
-      console.error('Error exporting PDF:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to export PDF',
-        variant: 'destructive'
-      });
-    }
-  };
-
   const renderStars = (rating: number | null) => {
     if (!rating) return <span className="text-xs text-gray-400">No rating</span>;
     
@@ -557,368 +438,275 @@ export default function InsightsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950">
-      <div className="container mx-auto p-6 max-w-6xl">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
-        >
-          <div className="flex items-center justify-center space-x-3 mb-4">
-            <div className="p-3 bg-blue-600 rounded-full">
-              <Brain className="h-8 w-8 text-white" />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="container mx-auto p-4 md:p-6 max-w-7xl">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center space-x-3 mb-2">
+            <div className="p-2 bg-blue-600 rounded-lg">
+              <Brain className="h-6 w-6 text-white" />
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              AI Insights Generator
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              AI Insights
             </h1>
           </div>
-          <p className="text-gray-600 dark:text-gray-300 text-lg">
-            Convert your feedback into actionable AI-powered insights
+          <p className="text-gray-600 dark:text-gray-400">
+            Generate actionable insights from your feedback
           </p>
-          <div className="flex items-center justify-center space-x-4 text-sm text-gray-500 mt-3">
-            <div className="flex items-center space-x-1 px-3 py-1 bg-white/50 dark:bg-gray-800/50 rounded-full border border-gray-200 dark:border-gray-700">
-              <MessageSquare className="h-3 w-3" />
-              <span>{feedbacks.length} Feedbacks Available</span>
-            </div>
-            <div className="flex items-center space-x-1 px-3 py-1 bg-purple-50 dark:bg-purple-900/30 rounded-full border border-purple-200 dark:border-purple-800">
-              <Sparkles className="h-3 w-3 text-purple-600" />
-              <span>AI-Powered</span>
-            </div>
-          </div>
-        </motion.div>
+        </div>
 
-        <div className="flex items-center justify-center space-x-2 mb-8">
+        {/* Tabs */}
+        <div className="flex space-x-2 mb-6 border-b border-gray-200 dark:border-gray-700">
           <button
             onClick={() => setActiveTab('generate')}
-            className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all ${
+            className={`px-4 py-2 font-medium transition-colors border-b-2 ${
               activeTab === 'generate'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
             }`}
           >
-            <Zap className="h-4 w-4" />
-            <span>Generate from Feedback</span>
+            <div className="flex items-center space-x-2">
+              <Zap className="h-4 w-4" />
+              <span>Generate</span>
+            </div>
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all ${
+            className={`px-4 py-2 font-medium transition-colors border-b-2 ${
               activeTab === 'history'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
             }`}
           >
-            <History className="h-4 w-4" />
-            <span>History</span>
-            {savedInsights.length > 0 && (
-              <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">
-                {savedInsights.length}
-              </span>
-            )}
+            <div className="flex items-center space-x-2">
+              <History className="h-4 w-4" />
+              <span>History</span>
+              {savedInsights.length > 0 && (
+                <span className="px-1.5 py-0.5 bg-blue-600 text-white text-xs rounded-full">
+                  {savedInsights.length}
+                </span>
+              )}
+            </div>
           </button>
         </div>
 
+        {/* Generate Tab */}
         {activeTab === 'generate' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
-          >
+          <div className="space-y-6">
             {loadingFeedbacks ? (
               <div className="text-center py-12">
                 <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-600" />
                 <p className="text-gray-600 dark:text-gray-400">Loading feedbacks...</p>
               </div>
             ) : feedbacks.length === 0 ? (
-              <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-                <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <MessageSquare className="h-10 w-10 text-gray-400" />
-                </div>
-                <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
                   No Feedback Available
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-                  Collect feedback from your customers first to generate AI insights.
+                <p className="text-gray-600 dark:text-gray-400">
+                  Collect feedback to generate AI insights
                 </p>
               </div>
             ) : (
               <>
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center space-x-2 mb-4 border-b border-gray-200 dark:border-gray-700 pb-4">
-                    <Filter className="h-5 w-5 text-blue-600" />
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Select Feedback to Analyze</h2>
-                  </div>
-                  
-                  <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
-                    <div className="flex items-center space-x-4">
+                {/* Feedback Selection */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-3">
                       <button
                         onClick={handleSelectAll}
-                        className="flex items-center space-x-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-700 dark:text-gray-300"
+                        className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       >
-                        {selectedFeedbacks.size === feedbacks.length ? (
-                          <>
-                            <Square className="h-4 w-4" />
-                            <span>Deselect All</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckSquare className="h-4 w-4" />
-                            <span>Select All</span>
-                          </>
-                        )}
+                        {selectedFeedbacks.size === feedbacks.length ? 'Deselect All' : 'Select All'}
                       </button>
-                      <div className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-full text-sm text-blue-700 dark:text-blue-300">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
                         {selectedFeedbacks.size} of {feedbacks.length} selected
-                      </div>
+                      </span>
                     </div>
                     <button
                       onClick={generateInsight}
                       disabled={selectedFeedbacks.size === 0 || generating}
-                      className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg shadow-lg transition-all disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors disabled:cursor-not-allowed flex items-center space-x-2"
                     >
                       {generating ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>Generating Insights...</span>
+                          <span>Generating...</span>
                         </>
                       ) : (
                         <>
                           <Sparkles className="h-4 w-4" />
-                          <span>Generate AI Insights</span>
+                          <span>Generate Insights</span>
                         </>
                       )}
                     </button>
                   </div>
 
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {feedbacks.map((feedback, index) => (
-                      <motion.div
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {feedbacks.map((feedback) => (
+                      <div
                         key={feedback.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.03 }}
-                        className="group rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md transition-all bg-white dark:bg-gray-800/50"
+                        className="flex items-start space-x-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
                       >
-                        <div className="p-4">
-                          <div className="flex items-start space-x-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedFeedbacks.has(feedback.id)}
-                              onChange={(e) => handleFeedbackSelection(feedback.id, e.target.checked)}
-                              className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                                <div className="flex items-center space-x-2">
-                                  <div className="flex items-center space-x-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded text-xs text-blue-700 dark:text-blue-300">
-                                    <User className="h-3 w-3" />
-                                    <span className="capitalize">{feedback.form_type.replace('_', ' ')}</span>
-                                  </div>
-                                  {renderStars(feedback.rating)}
-                                </div>
-                                <div className="flex items-center space-x-1 text-xs text-gray-500">
-                                  <Calendar className="h-3 w-3" />
-                                  <span>{new Date(feedback.created_at).toLocaleString()}</span>
-                                </div>
-                              </div>
-                              <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed line-clamp-2">
-                                {feedback.message}
-                              </p>
+                        <input
+                          type="checkbox"
+                          checked={selectedFeedbacks.has(feedback.id)}
+                          onChange={(e) => handleFeedbackSelection(feedback.id, e.target.checked)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">
+                                {feedback.form_type.replace('_', ' ')}
+                              </span>
+                              {renderStars(feedback.rating)}
                             </div>
+                            <span className="text-xs text-gray-500">
+                              {new Date(feedback.created_at).toLocaleDateString()}
+                            </span>
                           </div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
+                            {feedback.message}
+                          </p>
                         </div>
-                      </motion.div>
+                      </div>
                     ))}
                   </div>
                 </div>
 
+                {/* Generated Insights */}
                 <AnimatePresence>
                   {currentInsight && (
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
-                      className="space-y-6"
+                      className="space-y-4"
                     >
-                      <div className="flex justify-end gap-3">
+                      {/* Action Buttons */}
+                      <div className="flex justify-end gap-2">
                         <button
                           onClick={saveInsight}
                           disabled={saving}
-                          className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg transition-colors disabled:cursor-not-allowed"
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center space-x-2"
                         >
-                          {saving ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Save className="h-4 w-4" />
-                          )}
-                          <span>Save to History</span>
+                          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          <span>Save</span>
                         </button>
                         <button
                           onClick={() => {
-                            const content = `Summary:\n${currentInsight.summary}\n\nKey Themes:\n• ${currentInsight.key_themes.join('\n• ')}\n\nSuggested Actions:\n• ${currentInsight.suggested_actions.join('\n• ')}\n\nTrends:\n• ${currentInsight.trends.join('\n• ')}\n\nPerformance: ${currentInsight.performance.score}/100\nSentiment: ${currentInsight.sentiment.overall}`;
-                            downloadPDF(currentInsight.title, content);
+                            const content = `Summary:\n${currentInsight.summary}\n\nKey Themes:\n${currentInsight.key_themes.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\nSuggested Actions:\n${currentInsight.suggested_actions.map((a, i) => `${i + 1}. ${a}`).join('\n')}\n\nTrends:\n${currentInsight.trends.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\nPerformance: ${currentInsight.performance.score}/100`;
+                            downloadPDF(currentInsight.title || 'AI Insight', content);
                           }}
-                          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center space-x-2"
                         >
                           <Download className="h-4 w-4" />
                           <span>Download PDF</span>
                         </button>
                       </div>
 
-                      <div className="rounded-xl border border-blue-200 dark:border-blue-800 shadow-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
-                        <div className="flex items-center space-x-2 mb-4">
-                          <div className="p-2 bg-blue-600 rounded-lg">
-                            <BarChart3 className="h-6 w-6 text-white" />
-                          </div>
-                          <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Executive Summary</h2>
-                        </div>
-                        <p className="text-gray-700 dark:text-gray-300 leading-relaxed text-lg whitespace-pre-wrap">
-                          {currentInsight.summary}
-                        </p>
+                      {/* Summary Card */}
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                        <h3 className="font-semibold text-lg mb-2 text-gray-900 dark:text-white">Summary</h3>
+                        <p className="text-gray-700 dark:text-gray-300">{currentInsight.summary}</p>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
-                          <div className="flex items-center space-x-2 mb-6">
-                            <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                            <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Performance Score</h3>
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Performance */}
+                        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                          <h3 className="font-semibold mb-3 text-gray-900 dark:text-white">Performance</h3>
+                          <div className="text-3xl font-bold text-blue-600 mb-2">
+                            {currentInsight.performance.score}/100
                           </div>
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                              <span className="text-4xl font-bold text-purple-600 dark:text-purple-400">
-                                {currentInsight.performance.score}/100
-                              </span>
-                              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                currentInsight.performance.score >= 80 
-                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                  : currentInsight.performance.score >= 60
-                                  ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                              }`}>
-                                {currentInsight.performance.score >= 80 ? 'Excellent' : currentInsight.performance.score >= 60 ? 'Good' : 'Needs Work'}
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-3">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full transition-all"
+                              style={{ width: `${currentInsight.performance.score}%` }}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            {currentInsight.performance.metrics.map((metric, idx) => (
+                              <div key={idx} className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                                <CheckCircle2 className="h-3 w-3 text-blue-600" />
+                                <span>{metric}</span>
                               </div>
-                            </div>
-                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
-                              <div 
-                                className="bg-gradient-to-r from-purple-600 to-purple-400 h-4 rounded-full transition-all duration-1000"
-                                style={{ width: `${currentInsight.performance.score}%` }}
-                              />
-                            </div>
-                            <div className="space-y-2 mt-4">
-                              {currentInsight.performance.metrics.map((metric, idx) => (
-                                <div key={idx} className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-                                  <CheckCircle2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                                  <span>{metric}</span>
-                                </div>
-                              ))}
-                            </div>
+                            ))}
                           </div>
                         </div>
 
-                        <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
-                          <div className="flex items-center space-x-2 mb-6">
-                            <PieChart className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                            <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Sentiment Analysis</h3>
-                          </div>
-                          <div className="grid grid-cols-3 gap-3 mb-4">
-                            <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-200 dark:border-green-800">
-                              <div className="text-3xl font-bold text-green-600 dark:text-green-400">
-                                {currentInsight.sentiment.positive}%
-                              </div>
-                              <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Positive</div>
+                        {/* Sentiment */}
+                        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                          <h3 className="font-semibold mb-3 text-gray-900 dark:text-white">Sentiment</h3>
+                          <div className="grid grid-cols-3 gap-2 mb-3">
+                            <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded">
+                              <div className="text-2xl font-bold text-green-600">{currentInsight.sentiment.positive}%</div>
+                              <div className="text-xs text-gray-600 dark:text-gray-400">Positive</div>
                             </div>
-                            <div className="text-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border-2 border-gray-200 dark:border-gray-600">
-                              <div className="text-3xl font-bold text-gray-600 dark:text-gray-400">
-                                {currentInsight.sentiment.neutral}%
-                              </div>
-                              <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Neutral</div>
+                            <div className="text-center p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                              <div className="text-2xl font-bold text-gray-600">{currentInsight.sentiment.neutral}%</div>
+                              <div className="text-xs text-gray-600 dark:text-gray-400">Neutral</div>
                             </div>
-                            <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border-2 border-red-200 dark:border-red-800">
-                              <div className="text-3xl font-bold text-red-600 dark:text-red-400">
-                                {currentInsight.sentiment.negative}%
-                              </div>
-                              <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-medium">Negative</div>
+                            <div className="text-center p-2 bg-red-50 dark:bg-red-900/20 rounded">
+                              <div className="text-2xl font-bold text-red-600">{currentInsight.sentiment.negative}%</div>
+                              <div className="text-xs text-gray-600 dark:text-gray-400">Negative</div>
                             </div>
                           </div>
-                          <div className={`p-4 rounded-lg ${
-                            currentInsight.sentiment.overall === 'positive'
-                              ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800'
-                              : currentInsight.sentiment.overall === 'negative'
-                              ? 'bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800'
-                              : 'bg-gray-50 dark:bg-gray-700/50 border-2 border-gray-200 dark:border-gray-600'
-                          }`}>
-                            <div className="text-center">
-                              <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Overall Sentiment</div>
-                              <div className={`text-xl font-bold capitalize ${
-                                currentInsight.sentiment.overall === 'positive'
-                                  ? 'text-green-600 dark:text-green-400'
-                                  : currentInsight.sentiment.overall === 'negative'
-                                  ? 'text-red-600 dark:text-red-400'
-                                  : 'text-gray-600 dark:text-gray-400'
-                              }`}>
-                                {currentInsight.sentiment.overall}
-                              </div>
-                            </div>
+                          <div className="text-center">
+                            <span className="text-lg font-semibold capitalize text-gray-700 dark:text-gray-300">
+                              Overall: {currentInsight.sentiment.overall}
+                            </span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
-                        <div className="flex items-center space-x-2 mb-6">
-                          <Lightbulb className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                          <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Key Themes</h3>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* Themes */}
+                      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <h3 className="font-semibold mb-3 flex items-center space-x-2 text-gray-900 dark:text-white">
+                          <Lightbulb className="h-5 w-5 text-orange-500" />
+                          <span>Key Themes</span>
+                        </h3>
+                        <div className="space-y-2">
                           {currentInsight.key_themes.map((theme, idx) => (
-                            <div 
-                              key={idx} 
-                              className="flex items-start space-x-3 p-4 bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-lg border border-orange-200 dark:border-orange-800"
-                            >
-                              <div className="flex-shrink-0 w-6 h-6 bg-orange-600 dark:bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                            <div key={idx} className="flex items-start space-x-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded">
+                              <span className="flex-shrink-0 w-5 h-5 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
                                 {idx + 1}
-                              </div>
-                              <span className="text-gray-700 dark:text-gray-300 text-sm">{theme}</span>
+                              </span>
+                              <span className="text-sm text-gray-700 dark:text-gray-300">{theme}</span>
                             </div>
                           ))}
                         </div>
                       </div>
 
-                      <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
-                        <div className="flex items-center space-x-2 mb-6">
-                          <Target className="h-5 w-5 text-red-600 dark:text-red-400" />
-                          <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Suggested Actions</h3>
-                        </div>
-                        <div className="space-y-3">
+                      {/* Actions */}
+                      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <h3 className="font-semibold mb-3 flex items-center space-x-2 text-gray-900 dark:text-white">
+                          <Target className="h-5 w-5 text-red-500" />
+                          <span>Suggested Actions</span>
+                        </h3>
+                        <div className="space-y-2">
                           {currentInsight.suggested_actions.map((action, idx) => (
-                            <div 
-                              key={idx} 
-                              className="flex items-start space-x-3 p-4 bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 rounded-lg border border-red-200 dark:border-red-800 hover:shadow-md transition-shadow"
-                            >
-                              <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-red-600 dark:bg-red-500 rounded-full flex items-center justify-center">
-                                  <CheckCircle2 className="h-4 w-4 text-white" />
-                                </div>
-                              </div>
-                              <span className="text-gray-700 dark:text-gray-300 flex-1">{action}</span>
+                            <div key={idx} className="flex items-start space-x-2 p-2 bg-red-50 dark:bg-red-900/20 rounded">
+                              <CheckCircle2 className="flex-shrink-0 h-5 w-5 text-red-500 mt-0.5" />
+                              <span className="text-sm text-gray-700 dark:text-gray-300">{action}</span>
                             </div>
                           ))}
                         </div>
                       </div>
 
-                      <div className="rounded-xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl">
-                        <div className="flex items-center space-x-2 mb-6">
-                          <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
-                          <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Trends & Patterns</h3>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {/* Trends */}
+                      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <h3 className="font-semibold mb-3 flex items-center space-x-2 text-gray-900 dark:text-white">
+                          <TrendingUp className="h-5 w-5 text-green-500" />
+                          <span>Trends</span>
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                           {currentInsight.trends.map((trend, idx) => (
-                            <div 
-                              key={idx} 
-                              className="flex items-center space-x-3 p-4 bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 rounded-lg border border-green-200 dark:border-green-800"
-                            >
-                              <div className="flex-shrink-0">
-                                <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
-                              </div>
-                              <span className="text-gray-700 dark:text-gray-300 text-sm font-medium">{trend}</span>
+                            <div key={idx} className="flex items-center space-x-2 p-2 bg-green-50 dark:bg-green-900/20 rounded">
+                              <Activity className="flex-shrink-0 h-4 w-4 text-green-500" />
+                              <span className="text-sm text-gray-700 dark:text-gray-300">{trend}</span>
                             </div>
                           ))}
                         </div>
@@ -928,82 +716,55 @@ export default function InsightsPage() {
                 </AnimatePresence>
               </>
             )}
-          </motion.div>
+          </div>
         )}
 
+        {/* History Tab */}
         {activeTab === 'history' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
-          >
-            {savedInsights.length > 0 && (
-              <div className="flex items-center justify-end space-x-3">
-                <button
-                  onClick={exportAllAsCSV}
-                  className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-700 dark:text-gray-300 text-sm"
-                >
-                  <FileText className="h-4 w-4" />
-                  <span>Export All (CSV)</span>
-                </button>
-                <button
-                  onClick={exportAllAsPDF}
-                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Export All (PDF)</span>
-                </button>
-              </div>
-            )}
-
+          <div className="space-y-4">
             {loadingHistory ? (
               <div className="text-center py-12">
                 <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-600" />
                 <p className="text-gray-600 dark:text-gray-400">Loading history...</p>
               </div>
             ) : savedInsights.length === 0 ? (
-              <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-                <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <History className="h-10 w-10 text-gray-400" />
-                </div>
-                <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                <History className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
                   No Insights Yet
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-6">
-                  Generate and save your first AI-powered insight from your feedback data.
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  Generate and save your first insight
                 </p>
                 <button
                   onClick={() => setActiveTab('generate')}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                 >
                   Generate First Insight
                 </button>
               </div>
             ) : (
-              <div className="space-y-4">
-                {savedInsights.map((insight, index) => (
-                  <motion.div
+              <div className="space-y-3">
+                {savedInsights.map((insight) => (
+                  <div
                     key={insight.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+                    className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
                   >
-                    <div className="p-6">
-                      <div className="flex items-start justify-between mb-3">
+                    <div className="p-4">
+                      <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                          <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
                             {insight.title}
                           </h3>
-                          <div className="flex items-center space-x-4 text-sm text-gray-500">
+                          <div className="flex items-center space-x-3 text-sm text-gray-500">
                             <div className="flex items-center space-x-1">
-                              <Clock className="h-4 w-4" />
+                              <Clock className="h-3 w-3" />
                               <span>{new Date(insight.created_at).toLocaleString()}</span>
                             </div>
                             {insight.feedback_count && (
-                              <div className="flex items-center space-x-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded text-blue-700 dark:text-blue-300 text-xs">
+                              <div className="flex items-center space-x-1">
                                 <MessageSquare className="h-3 w-3" />
-                                <span>{insight.feedback_count} feedbacks analyzed</span>
+                                <span>{insight.feedback_count} feedbacks</span>
                               </div>
                             )}
                           </div>
@@ -1012,7 +773,7 @@ export default function InsightsPage() {
                           onClick={() => setExpandedInsightId(
                             expandedInsightId === insight.id ? null : insight.id
                           )}
-                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                         >
                           {expandedInsightId === insight.id ? (
                             <ChevronUp className="h-5 w-5 text-gray-600 dark:text-gray-400" />
@@ -1030,8 +791,8 @@ export default function InsightsPage() {
                             exit={{ opacity: 0, height: 0 }}
                             className="overflow-hidden"
                           >
-                            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-4 mt-4">
-                              <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 text-sm leading-relaxed font-sans">
+                            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded text-sm">
+                              <pre className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 font-sans">
                                 {insight.details}
                               </pre>
                             </div>
@@ -1039,28 +800,28 @@ export default function InsightsPage() {
                         )}
                       </AnimatePresence>
 
-                      <div className="flex flex-wrap gap-2 mt-4">
+                      <div className="flex gap-2 mt-3">
                         <button
                           onClick={() => downloadPDF(insight.title, insight.details)}
-                          className="flex items-center space-x-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors flex items-center space-x-1"
                         >
                           <Download className="h-3 w-3" />
                           <span>PDF</span>
                         </button>
                         <button
                           onClick={() => deleteInsight(insight.id)}
-                          className="flex items-center space-x-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors flex items-center space-x-1"
                         >
                           <Trash2 className="h-3 w-3" />
                           <span>Delete</span>
                         </button>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             )}
-          </motion.div>
+          </div>
         )}
       </div>
     </div>
