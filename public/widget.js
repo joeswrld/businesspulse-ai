@@ -107,7 +107,7 @@ if (typeof window !== 'undefined' && !window.ethereum) {
     var buttonStyles = {
       position: 'fixed',
       bottom: '20px',
-      right: '20px',
+      left: '20px',
       padding: '12px 20px',
       borderRadius: '25px',
       backgroundColor: config.brandColor,
@@ -236,9 +236,9 @@ if (typeof window !== 'undefined' && !window.ethereum) {
 
           <div style="margin-bottom: 20px;">
             <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
-              Email (Optional)
+              Email 
             </label>
-            <input type="email" id="feedback-email" placeholder="your@email.com" style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 6px; background-color: ${inputBg}; color: ${textColor}; font-size: 14px;">
+            <input type="email" id="feedback-email" placeholder="your@email.com" style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 6px; background-color: ${inputBg}; color: ${textColor}; font-size: 14px; ">
           </div>
 
           <div style="display: flex; gap: 12px; justify-content: flex-end;">
