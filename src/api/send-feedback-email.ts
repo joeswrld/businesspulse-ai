@@ -139,7 +139,7 @@ class ResendProvider implements EmailProvider {
                       <table width="100%" cellpadding="0" cellspacing="0">
                         <tr>
                           <td align="center" style="padding: 20px 0;">
-                            <a href="https://notex.com.ng/dashboard" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);">
+                            <a href="${payload.dashboardUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);">
                               View in Dashboard →
                             </a>
                           </td>
@@ -358,7 +358,7 @@ export default async function handler(req: any, res: any) {
     }
 
     // Prepare email payload
-    const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/feedback`;
+    const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://notex.com.ng'}/feedback`;
     
     const emailPayload: FeedbackEmailPayload = {
       recipientEmail,
