@@ -7,18 +7,22 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Eye, EyeOff, Loader2, Mail, Lock, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
+
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
+  const [formData, setFormData] = useState({ email: "", password: "" });
 
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
+
+  const { subscription, loading: subLoading } = useSubscriptionStatus();
+
+  
+
 
   // Check if user is returning from password reset
   useEffect(() => {
@@ -184,11 +188,11 @@ const Login = () => {
               </div>
 
               <Button 
-                type="submit" 
-                className="w-full" 
-                variant="hero" 
-                size="lg"
-                disabled={loading}
+                  type="submit" 
+                  className="w-full" 
+                  variant="hero" 
+                  size="lg"
+                 disabled={loading || subLoading}
               >
                 {loading ? (
                   <>
