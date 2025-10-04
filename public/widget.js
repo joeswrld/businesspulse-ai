@@ -1,5 +1,5 @@
 // public/widget.js
-// NoteX Feedback Widget - With Trial Access Control
+// NoteX Feedback Widget - With Enhanced Trial & Subscription Access Control
 
 if (typeof window !== 'undefined' && !window.ethereum) {
   console.info("NoteX: No Ethereum provider found, skipping Web3 init...");
@@ -20,7 +20,8 @@ if (typeof window !== 'undefined' && !window.ethereum) {
   var widgetState = {
     isAccessValid: false,
     isChecking: true,
-    errorMessage: null
+    errorMessage: null,
+    accessStatus: 'unknown'
   };
 
   function initWidget() {
@@ -75,18 +76,129 @@ if (typeof window !== 'undefined' && !window.ethereum) {
       widgetState.isChecking = false;
       
       if (widgetState.isAccessValid) {
+        widgetState.accessStatus = 'active';
         createWidget();
       } else {
         console.warn('NoteX: Widget disabled - Trial expired or subscription inactive');
-        widgetState.errorMessage = 'Trial expired';
+        widgetState.errorMessage = 'The owner of this feedback form has an expired trial or subscription.';
+        widgetState.accessStatus = 'expired';
+        // Still create widget button but it will show error message
+        createDisabledWidget();
       }
     })
     .catch(function(error) {
       console.error('NoteX: Access check error:', error);
-      // Fail open - create widget anyway if check fails
+      // Fail open - create widget anyway if check fails (network issues etc)
       widgetState.isAccessValid = true;
       widgetState.isChecking = false;
+      widgetState.accessStatus = 'unknown';
       createWidget();
+    });
+  }
+
+  function createDisabledWidget() {
+    // Create a button that shows the user the widget is disabled
+    var button = document.createElement('button');
+    button.id = 'notex-feedback-button';
+    button.setAttribute('aria-label', 'Feedback unavailable');
+    
+    button.innerHTML = '<span style="margin-right: 6px;">💬</span><span>Feedback</span>';
+    
+    var buttonStyles = {
+      position: 'fixed',
+      bottom: '20px',
+      right: '20px',
+      padding: '12px 20px',
+      borderRadius: '25px',
+      backgroundColor: '#9CA3AF',
+      color: 'white',
+      border: 'none',
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: 'not-allowed',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      zIndex: '10000',
+      opacity: '0.7',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+    };
+
+    Object.assign(button.style, buttonStyles);
+
+    button.addEventListener('click', showDisabledMessage);
+
+    document.body.appendChild(button);
+  }
+
+  function showDisabledMessage() {
+    var existing = document.getElementById('notex-feedback-modal');
+    if (existing) {
+      existing.remove();
+    }
+
+    var modal = document.createElement('div');
+    modal.id = 'notex-feedback-modal';
+    
+    var modalStyles = {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100%',
+      height: '100%',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      zIndex: '10001',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      animation: 'noteXFadeIn 0.3s ease'
+    };
+
+    Object.assign(modal.style, modalStyles);
+
+    var content = document.createElement('div');
+    var contentStyles = {
+      backgroundColor: config.theme === 'dark' ? '#1f2937' : 'white',
+      borderRadius: '12px',
+      padding: '32px',
+      maxWidth: '500px',
+      width: '90%',
+      textAlign: 'center',
+      position: 'relative',
+      animation: 'noteXSlideUp 0.3s ease'
+    };
+
+    Object.assign(content.style, contentStyles);
+
+    var textColor = config.theme === 'dark' ? '#ffffff' : '#1f2937';
+
+    content.innerHTML = `
+      <div style="margin-bottom: 24px;">
+        <div style="font-size: 64px; margin-bottom: 16px;">⚠️</div>
+        <h2 style="margin: 0 0 12px 0; color: ${textColor}; font-size: 24px; font-weight: 600;">
+          Feedback Temporarily Unavailable
+        </h2>
+        <p style="margin: 0; color: ${textColor}; opacity: 0.7; font-size: 16px; line-height: 1.5;">
+          ${widgetState.errorMessage || 'The feedback system is currently unavailable. Please try again later.'}
+        </p>
+      </div>
+      <button id="notex-close-disabled-btn" style="padding: 12px 24px; background-color: #3B82F6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">
+        Close
+      </button>
+    `;
+
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+
+    addCSS();
+
+    document.getElementById('notex-close-disabled-btn').addEventListener('click', function() {
+      modal.remove();
+    });
+
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) modal.remove();
     });
   }
 
@@ -101,13 +213,12 @@ if (typeof window !== 'undefined' && !window.ethereum) {
     button.id = 'notex-feedback-button';
     button.setAttribute('aria-label', 'Share your feedback');
     
-    // Button content with emoji and text
     button.innerHTML = '<span style="margin-right: 6px;">💬</span><span>Feedback</span>';
     
     var buttonStyles = {
       position: 'fixed',
       bottom: '20px',
-      left: '20px',
+      right: '20px',
       padding: '12px 20px',
       borderRadius: '25px',
       backgroundColor: config.brandColor,
@@ -143,6 +254,12 @@ if (typeof window !== 'undefined' && !window.ethereum) {
   }
 
   function openFeedbackModal() {
+    // Re-check access status before opening modal
+    if (widgetState.accessStatus === 'expired') {
+      showDisabledMessage();
+      return;
+    }
+
     var existing = document.getElementById('notex-feedback-modal');
     if (existing) {
       existing.remove();
@@ -236,9 +353,9 @@ if (typeof window !== 'undefined' && !window.ethereum) {
 
           <div style="margin-bottom: 20px;">
             <label style="display: block; margin-bottom: 8px; font-weight: 500; color: ${textColor};">
-              Email 
+              Email (Optional)
             </label>
-            <input type="email" id="feedback-email" placeholder="your@email.com" style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 6px; background-color: ${inputBg}; color: ${textColor}; font-size: 14px; ">
+            <input type="email" id="feedback-email" placeholder="your@email.com" style="width: 100%; padding: 12px; border: 1px solid ${borderColor}; border-radius: 6px; background-color: ${inputBg}; color: ${textColor}; font-size: 14px;">
           </div>
 
           <div style="display: flex; gap: 12px; justify-content: flex-end;">
@@ -343,6 +460,13 @@ if (typeof window !== 'undefined' && !window.ethereum) {
   }
 
   function submitFeedback(rating, closeCallback) {
+    // Double-check access before submission
+    if (widgetState.accessStatus === 'expired') {
+      alert('Your trial or subscription has ended. Please upgrade to continue collecting feedback.');
+      closeCallback();
+      return;
+    }
+
     var type = document.getElementById('feedback-type').value;
     var message = document.getElementById('feedback-message').value.trim();
     var email = document.getElementById('feedback-email').value.trim();

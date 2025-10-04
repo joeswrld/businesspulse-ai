@@ -122,7 +122,7 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+  
     if (previewMode) {
       toast({
         title: 'Preview Mode',
@@ -131,7 +131,7 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
       });
       return;
     }
-
+  
     if (!rating) {
       toast({
         title: 'Rating Required',
@@ -140,7 +140,7 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
       });
       return;
     }
-
+  
     if (!settings?.project_id) {
       toast({
         title: 'Invalid Project',
@@ -149,9 +149,40 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
       });
       return;
     }
-
+  
+    // ===== CHECK ACCESS BEFORE SUBMISSION =====
+    try {
+      const { data: accessCheck, error: accessError } = await supabase
+        .rpc('check_widget_access', { project_id_param: settings.project_id });
+  
+      if (accessError) {
+        console.error('Access check error:', accessError);
+        toast({
+          title: 'Error',
+          description: 'Could not verify access. Please try again.',
+          variant: 'destructive'
+        });
+        return;
+      }
+  
+      const hasAccess = accessCheck === true || (accessCheck && accessCheck.has_access === true);
+  
+      if (!hasAccess) {
+        toast({
+          title: 'Feedback Unavailable',
+          description: 'This feedback form is currently unavailable. The owner\'s trial or subscription has ended.',
+          variant: 'destructive'
+        });
+        return;
+      }
+    } catch (err) {
+      console.error('Access verification failed:', err);
+      // Optional: continue submission even if check fails due to network issues
+    }
+  
     setIsSubmitting(true);
-
+  
+    // ===== EXISTING SUBMISSION LOGIC =====
     try {
       const feedbackData = {
         project_id: settings.project_id,
@@ -165,11 +196,9 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
           timestamp: new Date().toISOString()
         }
       };
-
-      const { error } = await supabase
-        .from('feedback')
-        .insert([feedbackData]);
-
+  
+      const { error } = await supabase.from('feedback').insert([feedbackData]);
+  
       if (error) {
         let errorMessage = 'Failed to submit feedback.';
         if (error.code === '23503') {
@@ -177,7 +206,7 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
         } else if (error.message) {
           errorMessage = error.message;
         }
-        
+  
         toast({
           title: 'Error',
           description: errorMessage,
@@ -185,13 +214,13 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
         });
         return;
       }
-
+  
       setIsSubmitted(true);
-      
+  
       if (onSubmitted) {
         onSubmitted(feedbackData);
       }
-      
+  
       toast({
         title: 'Thank you!',
         description: 'Your feedback has been submitted successfully.'
@@ -207,7 +236,7 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
       setIsSubmitting(false);
     }
   };
-
+  
   if (isValidating) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-950 dark:to-indigo-950">

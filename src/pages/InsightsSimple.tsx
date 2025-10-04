@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
+import { useNavigate } from 'react-router-dom';
+import { Lock, Crown } from 'lucide-react';
 import { 
   Brain, 
   Loader2, 
@@ -29,6 +32,8 @@ import {
   Activity
 } from 'lucide-react';
 import jsPDF from 'jspdf';
+
+import { Button, Card, CardHeader, CardTitle, CardContent } from '@/components/ui'; // Adjust path if needed
 
 interface Feedback {
   id: string;
@@ -68,6 +73,19 @@ interface GeneratedInsight {
 export default function InsightsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const {
+    hasAccess,
+    isLoading: loadingSubscription,
+    isTrialExpired,
+    isSubscriptionExpired,
+    daysLeft,
+    status
+  } = useSubscriptionStatus({
+    redirectOnExpiry: true,
+    allowBillingPage: false
+  });
   
   const [activeTab, setActiveTab] = useState<'generate' | 'history'>('generate');
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
@@ -79,6 +97,57 @@ export default function InsightsPage() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [expandedInsightId, setExpandedInsightId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+   
+  if (loadingSubscription) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-red-950 p-4">
+        <Card className="w-full max-w-md shadow-2xl border-2 border-red-200 dark:border-red-800">
+          <CardHeader className="text-center space-y-4">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
+              <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+            <CardTitle className="text-2xl">AI Insights Access Locked</CardTitle>
+            <p className="text-muted-foreground">
+              {isTrialExpired 
+                ? 'Your trial has expired. Upgrade to access AI insights.'
+                : isSubscriptionExpired
+                ? 'Your subscription has expired. Renew to continue.'
+                : 'Active subscription required to access AI insights.'}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button 
+              onClick={() => navigate('/billing')}
+              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+              size="lg"
+            >
+              <Crown className="h-5 w-5 mr-2" />
+              {isSubscriptionExpired ? 'Renew Subscription' : 'Upgrade Now'}
+            </Button>
+            <Button 
+              onClick={() => navigate('/dashboard')}
+              variant="outline"
+              className="w-full"
+            >
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // --- Existing useEffect / fetch functions remain unchanged ---
 
   useEffect(() => {
     if (user) {
@@ -172,7 +241,7 @@ export default function InsightsPage() {
   };
 
   const generateInsight = async () => {
-    if (selectedFeedbacks.size === 0) {
+    if (!hasAccess) {
       toast({
         title: 'No Feedback Selected',
         description: 'Please select at least one feedback to generate insights',
@@ -458,7 +527,8 @@ export default function InsightsPage() {
         {/* Tabs */}
         <div className="flex space-x-2 mb-6 border-b border-gray-200 dark:border-gray-700">
           <button
-            onClick={() => setActiveTab('generate')}
+            onClick={generateInsight}
+            disabled={selectedFeedbacks.size === 0 || generating || !hasAccess}
             className={`px-4 py-2 font-medium transition-colors border-b-2 ${
               activeTab === 'generate'
                 ? 'border-blue-600 text-blue-600'
@@ -526,7 +596,7 @@ export default function InsightsPage() {
                     </div>
                     <button
                       onClick={generateInsight}
-                      disabled={selectedFeedbacks.size === 0 || generating}
+                      disabled={selectedFeedbacks.size === 0 || generating || !hasAccess}
                       className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors disabled:cursor-not-allowed flex items-center space-x-2"
                     >
                       {generating ? (

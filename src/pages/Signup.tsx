@@ -24,86 +24,82 @@ const Signup = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
+  
     try {
-      console.log("🔐 Creating account for email:", formData.email);
-      
-      // Validate required fields
-      if (!formData.fullName.trim()) {
-        throw new Error("Full name is required");
-      }
-      if (!formData.companyName.trim()) {
-        throw new Error("Company name is required");
-      }
-      if (formData.password.length < 8) {
-        throw new Error("Password must be at least 8 characters long");
-      }
-
+      // Trim inputs
+      const fullName = formData.fullName.trim();
+      const email = formData.email.trim();
+      const password = formData.password;
+      const companyName = formData.companyName.trim() || "Individual User";
+  
+      // Frontend validations
+      if (!fullName) throw new Error("Full name is required");
+      if (!companyName) throw new Error("Company name is required");
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        throw new Error("Please enter a valid email address");
+      if (password.length < 8) throw new Error("Password must be at least 8 characters long");
+  
+      // Trial calculation
+      const trialStart = new Date();
+      const trialEnd = new Date(trialStart.getTime() + 8 * 24 * 60 * 60 * 1000); // 8-day trial
       const redirectUrl = `${window.location.origin}/verify-email`;
-      
+  
+      // Sign up user with Supabase and add trial metadata
       const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
+        email,
+        password,
         options: {
           emailRedirectTo: redirectUrl,
           data: {
-            full_name: formData.fullName.trim(),
-            company_name: formData.companyName.trim() || 'Individual User',
-          }
-        }
+            full_name: fullName,
+            company_name: companyName,
+            trial_start: trialStart.toISOString(),
+            trial_end: trialEnd.toISOString(),
+            subscription_status: "trial",
+          },
+        },
       });
-
-      console.log("🔐 Sign up result:", { data, error });
-
-      if (error) {
-        console.error("❌ Sign up error:", error);
-        
-        // Provide more specific error messages
-        let errorMessage = error.message || "An error occurred during account creation.";
-        
-        if (error.message.includes("Database error updating user") || error.message.includes("Database error saving new user")) {
-          errorMessage = "There was a database error creating your account. This has been fixed - please try again. If the issue persists, please contact support.";
-        } else if (error.message.includes("User already registered")) {
-          errorMessage = "An account with this email already exists. Please sign in instead.";
-        } else if (error.message.includes("Invalid email")) {
-          errorMessage = "Please enter a valid email address.";
-        } else if (error.message.includes("Password should be at least")) {
-          errorMessage = "Password must be at least 8 characters long.";
-        } else if (error.message.includes("signup is disabled")) {
-          errorMessage = "Account creation is temporarily disabled. Please contact support.";
-        } else if (error.message.includes("Email rate limit exceeded")) {
-          errorMessage = "Too many signup attempts. Please wait a few minutes before trying again.";
+  
+      if (error) throw error;
+  
+      // Initialize billing profile
+      if (data.user) {
+        try {
+          await supabase.from("billing_profiles").insert({
+            id: data.user.id,
+            plan: "trial",
+            trial_ends_at: trialEnd.toISOString(),
+            subscription_status: "trial",
+            paystack_customer_id: null,
+            paystack_subscription_id: null,
+            next_billing_date: null,
+          });
+        } catch (billingError) {
+          console.error("Error creating billing profile:", billingError);
+          // Continue anyway - Supabase trigger or later billing setup can handle it
         }
-        
-        throw new Error(errorMessage);
       }
-
-      console.log("✅ Sign up successful:", data.user?.email);
-
+  
+      // Show success toast
       toast({
         title: "Account created successfully!",
-        description: "Please check your email to verify your account. Your 8-day free trial will begin after verification.",
+        description: "Check your email to verify your account. Your 8-day trial begins after verification.",
       });
-
+  
       // Navigate to email verification page
-      navigate("/verify-email", { 
-        state: { 
-          email: formData.email,
-          companyName: formData.companyName 
-        } 
-      });
-
-    } catch (error: any) {
-      console.error("❌ Sign up error:", error);
+      navigate("/verify-email", { state: { email, companyName } });
+  
+    } catch (err: any) {
       toast({
         title: "Error",
-        description: error.message || "An error occurred during account creation.",
+        description: err.message || "An unexpected error occurred.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
+  
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({

@@ -26,14 +26,24 @@ const TrialExpired = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          navigate("/login");
-          return;
-        }
+    if (!userProfile?.trial_end) return;
+  
+    const interval = setInterval(() => {
+      const now = new Date();
+      const trialEnd = new Date(userProfile.trial_end);
+      const diffTime = trialEnd.getTime() - now.getTime();
+      if (diffTime <= 0) {
+        clearInterval(interval);
+        navigate("/billing"); // redirect when time is up
+      } else {
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        setTrialDaysRemaining(diffDays);
+      }
+    }, 1000 * 60); // update every minute
+  
+    return () => clearInterval(interval);
+  }, [userProfile, navigate]);
+  
 
         // Get user profile with access status
         const { data: profileData, error } = await supabase

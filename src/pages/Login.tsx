@@ -36,70 +36,67 @@ const Login = () => {
     setLoading(true);
 
     try {
-      console.log("🔐 Signing in with email:", formData.email);
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
+        // Sign in with Supabase
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: formData.email,
+            password: formData.password,
+        });
 
-      console.log("🔐 Sign in result:", { data, error });
+        if (error) throw error;
 
-      if (error) {
-        console.error("❌ Sign in error:", error);
-        throw error;
-      }
+        // ✅ Access check after successful login
+        const { data: accessData, error: accessError } = await supabase
+            .rpc('check_user_access', { user_uuid: data.user?.id });
 
-      console.log("✅ Sign in successful:", data.user?.email);
-      
-      // Check if user has access (trial or subscription)
-      const { data: accessData, error: accessError } = await supabase
-        .rpc('check_user_access', { user_uuid: data.user?.id });
-
-      if (accessError) {
-        console.error("❌ Access check error:", accessError);
-        // Continue anyway, let the protected route handle it
-      } else if (accessData && accessData.length > 0) {
-        const access = accessData[0];
-        if (!access.has_access) {
-          // User's trial has expired and no active subscription
-          navigate("/trial-expired");
-          return;
+        if (accessError) {
+            console.error('Access check error:', accessError);
+            // Continue anyway if the RPC fails (network/db issues)
+        } else if (accessData && accessData.length > 0) {
+            const access = accessData[0];
+            if (!access.has_access) {
+                toast({
+                    title: "Trial Expired",
+                    description: "Your trial has ended. Upgrade to continue using NoteX.",
+                    variant: "destructive"
+                });
+                navigate("/trial-expired");
+                return;
+            }
         }
-      }
-      
-      toast({
-        title: "Welcome back!",
-        description: "You've been successfully signed in.",
-      });
-      
-      // Add a small delay to ensure the auth state is updated
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 100);
+
+        // Successful login feedback
+        toast({
+            title: "Welcome back!",
+            description: "You've been successfully signed in.",
+        });
+
+        // Small delay to ensure auth state updates before redirect
+        setTimeout(() => {
+            navigate("/dashboard");
+        }, 100);
 
     } catch (error: any) {
-      console.error("❌ Sign in error:", error);
-      
-      let errorMessage = "An error occurred during sign in.";
-      
-      if (error.message.includes("Invalid login credentials")) {
-        errorMessage = "Invalid email or password. Please check your credentials and try again.";
-      } else if (error.message.includes("Email not confirmed")) {
-        errorMessage = "Please check your email and click the confirmation link before signing in.";
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      toast({
-        title: "Sign in failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
+        console.error("❌ Sign in error:", error);
+
+        let errorMessage = "An error occurred during sign in.";
+
+        if (error.message.includes("Invalid login credentials")) {
+            errorMessage = "Invalid email or password. Please check your credentials and try again.";
+        } else if (error.message.includes("Email not confirmed")) {
+            errorMessage = "Please check your email and click the confirmation link before signing in.";
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+
+        toast({
+            title: "Sign in failed",
+            description: errorMessage,
+            variant: "destructive",
+        });
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+};
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({

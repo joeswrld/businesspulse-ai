@@ -1,6 +1,8 @@
-// src/pages/Feedback.tsx - Updated with email notification integration
+// src/pages/Feedback.tsx - Updated with subscription gating + email notifications
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,41 +17,44 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 import {
-  MessageSquare,
-  Star,
-  Filter,
-  Search,
-  Download,
-  RefreshCw,
-  Clock,
-  AlertCircle,
-  BarChart3,
-  LineChart,
-  TrendingUp,
-  TrendingDown,
-  Sparkles,
-  Mail,
-  ExternalLink,
-  CheckCircle2,
-  AlertTriangle,
-  Copy,
-  Bell,
-  BellOff
+MessageSquare,
+Star,
+Filter,
+Search,
+Download,
+RefreshCw,
+Clock,
+AlertCircle,
+BarChart3,
+LineChart,
+TrendingUp,
+TrendingDown,
+Sparkles,
+Mail,
+ExternalLink,
+CheckCircle2,
+AlertTriangle,
+Copy,
+Bell,
+BellOff,
+Crown,
+Lock,
+Loader2
 } from 'lucide-react';
 
 import {
-  AreaChart,
-  Area,
-  PieChart as RechartsPieChart,
-  Cell,
-  Pie,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar
+AreaChart,
+Area,
+PieChart as RechartsPieChart,
+Cell,
+Pie,
+XAxis,
+YAxis,
+CartesianGrid,
+Tooltip,
+ResponsiveContainer,
+BarChart,
+Bar
 } from 'recharts';
 
 // Types
@@ -114,19 +119,88 @@ interface EmailNotificationPreferences {
 
 export default function Feedback() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { hasAccess, isLoading: loadingSubscription, isTrialExpired,
+  isSubscriptionExpired, daysLeft, status } = useSubscriptionStatus({
+  redirectOnExpiry: true,
+  allowBillingPage: false
+  });
+  
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<FeedbackStats | null>(null);
   const [feedbackSettings, setFeedbackSettings] = useState<FeedbackSettings | null>(null);
-  const [filters, setFilters] = useState<FilterState>({
-    formType: 'all',
-    rating: 'all',
-    sentiment: 'all',
-    status: 'all',
-    dateRange: { from: undefined, to: undefined },
-    searchQuery: ''
+  const [filters, setFilters] = useState({
+  formType: 'all',
+  rating: 'all',
+  sentiment: 'all',
+  status: 'all',
+  dateRange: { from: undefined, to: undefined },
+  searchQuery: ''
   });
+
+  if (loadingSubscription) {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+            <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+                <p className="text-muted-foreground">Checking access...</p>
+            </div>
+        </div>
+    );
+}
+if (!hasAccess) {
+  return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-red-950 p-4">
+          <Card className="w-full max-w-md shadow-2xl border-2 border-red-200 dark:border-red-800">
+              <CardHeader className="text-center space-y-4">
+                  <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
+                      <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
+                  </div>
+                  <CardTitle className="text-2xl">Feedback Access Locked</CardTitle>
+                      <p className="text-muted-foreground">
+                          {isTrialExpired 
+                           ? 'Your trial has expired. Upgrade to access feedback.'
+                            : isSubscriptionExpired
+                            ? 'Your subscription has expired. Renew to continue.'
+                            : 'Active subscription required to access feedback.'}
+                      </p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                  <Button 
+                      onClick={() => navigate('/billing')}
+                      className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+                      size="lg"
+                  >
+                      <Crown className="h-5 w-5 mr-2" />
+                      {isSubscriptionExpired ? 'Renew Subscription' : 'Upgrade Now'}
+                  </Button>
+                  <Button 
+                      onClick={() => navigate('/dashboard')}
+                      variant="outline"
+                      className="w-full"
+                  >
+                      Back to Dashboard
+                  </Button>
+              </CardContent>
+          </Card>
+      </div>
+  );
+}
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (!hasAccess) {
+      alert('Your trial/subscription has ended. Please upgrade to continue.');
+      navigate('/billing');
+      return;
+  }
+  
+  // Your existing submission code...
+};
+  
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
@@ -371,7 +445,7 @@ export default function Feedback() {
     console.log('🔔 Setting up real-time feedback listener...');
 
     const channel = supabase
-      .channel('feedback-changes')
+      .channel(`feedback-changes-${feedbackSettings.project_id}`)
       .on(
         'postgres_changes',
         {
@@ -641,10 +715,10 @@ export default function Feedback() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={exportToCSV} disabled={filteredFeedbacks.length === 0}>
-            <Download className="h-4 w-4 mr-2" />
+        <Button onClick={exportToCSV} disabled={!hasAccess || filteredFeedbacks.length === 0}>
+           <Download className="h-4 w-4 mr-2" />
             Export
-          </Button>
+        </Button>
           <Button variant="outline" onClick={loadFeedbackData}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh

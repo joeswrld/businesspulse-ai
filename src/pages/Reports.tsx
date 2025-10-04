@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
 import { 
-  FileText, 
-  Clock, 
-  TrendingUp, 
-  Lightbulb, 
+  FileText,
+  Clock,
+  TrendingUp,
+  Lightbulb,
   Target,
   Download,
   Search,
@@ -22,8 +24,11 @@ import {
   FileDown,
   Loader2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Lock,
+  Crown
 } from 'lucide-react';
+
 import {
   BarChart as RechartsBarChart,
   Bar,
@@ -40,7 +45,6 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -63,15 +67,87 @@ interface AnalyticsData {
   scoreDistribution: Array<{ range: string; count: number }>;
 }
 
-export default function DynamicReports() {
+export default function Reports() {
+  const navigate = useNavigate();
+
+  // Subscription + paywall
+  const {
+    hasAccess,
+    isLoading: loadingSubscription,
+    isTrialExpired,
+    isSubscriptionExpired,
+  } = useSubscriptionStatus({
+    redirectOnExpiry: true,
+    allowBillingPage: false,
+  });
+
+  // Auth
   const { user } = useAuth();
-  
+
+  // Local state
   const [insights, setInsights] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [dateRange, setDateRange] = useState<'all' | '7d' | '30d'>('all');
-  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
-  const [expandedInsightId, setExpandedInsightId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateRange, setDateRange] = useState<"all" | "7d" | "30d">("all");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [expandedInsightId, setExpandedInsightId] = useState<string | null>(
+    null
+  );
+
+ 
+
+  // Show subscription loading state
+  if (loadingSubscription) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show paywall if user has no access
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-red-950 p-4">
+        <Card className="w-full max-w-md shadow-2xl border-2 border-red-200 dark:border-red-800">
+          <CardHeader className="text-center space-y-4">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
+              <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+            <CardTitle className="text-2xl">Reports Access Locked</CardTitle>
+            <p className="text-muted-foreground">
+              {isTrialExpired
+                ? 'Your trial has expired. Upgrade to access reports.'
+                : isSubscriptionExpired
+                ? 'Your subscription has expired. Renew to continue.'
+                : 'Active subscription required to access reports.'}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button
+              onClick={() => navigate('/billing')}
+              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+              size="lg"
+            >
+              <Crown className="h-5 w-5 mr-2" />
+              {isSubscriptionExpired ? 'Renew Subscription' : 'Upgrade Now'}
+            </Button>
+            <Button
+              onClick={() => navigate('/dashboard')}
+              variant="outline"
+              className="w-full"
+            >
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
 
   // Load insights from Supabase
   const loadInsights = useCallback(async () => {
@@ -238,6 +314,11 @@ export default function DynamicReports() {
 
   // Export to PDF
   const exportToPDF = () => {
+    if (!hasAccess) {
+      alert('Your trial/subscription has ended. Please upgrade to export reports.');
+      navigate('/billing');
+      return;
+  }
     try {
       toast.info('Generating PDF...', { description: 'Please wait' });
 
@@ -301,6 +382,11 @@ export default function DynamicReports() {
 
   // Export to CSV
   const exportToCSV = () => {
+    if (!hasAccess) {
+      alert('Your trial/subscription has ended. Please upgrade to export reports.');
+      navigate('/billing');
+      return;
+  }
     try {
       const headers = ['Title', 'Details', 'Feedback Count', 'Created Date'];
       const rows = insights.map(insight => [
@@ -393,7 +479,7 @@ export default function DynamicReports() {
               </div>
             </div>
 
-            <Select value={dateRange} onValueChange={(value: any) => setDateRange(value)}>
+            <Select value={dateRange} onValueChange={(value: "all" | "7d" | "30d") => setDateRange(value)}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Date Range" />
               </SelectTrigger>
@@ -404,7 +490,7 @@ export default function DynamicReports() {
               </SelectContent>
             </Select>
 
-            <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+            <Select value={sortOrder} onValueChange={(value: "newest" | "oldest") => setSortOrder(value)}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Sort Order" />
               </SelectTrigger>
@@ -657,14 +743,22 @@ export default function DynamicReports() {
 
           {/* Export Buttons */}
           <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={exportToPDF}>
-              <FileText className="h-4 w-4 mr-2" />
-              Download PDF
-            </Button>
-            <Button variant="outline" onClick={exportToCSV}>
-              <FileDown className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
+          <Button 
+             onClick={exportToPDF} 
+             disabled={!hasAccess || insights.length === 0}
+             className={!hasAccess ? "opacity-50 cursor-not-allowed" : ""}
+            >
+              <FileDown className="h-4 w-4 mr-2" /> Export PDF
+          </Button>
+
+          <Button 
+              onClick={exportToCSV} 
+              disabled={!hasAccess || insights.length === 0}
+              className={!hasAccess ? "opacity-50 cursor-not-allowed" : ""}
+            >
+            <Download className="h-4 w-4 mr-2" /> Export CSV
+          </Button>
+
           </div>
 
           {/* History Tab - Insights List */}

@@ -121,7 +121,7 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+  
     if (previewMode) {
       toast({
         title: 'Preview Mode',
@@ -130,16 +130,16 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
       });
       return;
     }
-
-    if (!message.trim()) {
+  
+    if (!rating) {
       toast({
-        title: 'Message Required',
-        description: 'Please provide your feedback message',
+        title: 'Rating Required',
+        description: 'Please select a satisfaction rating',
         variant: 'destructive'
       });
       return;
     }
-
+  
     if (!settings?.project_id) {
       toast({
         title: 'Invalid Project',
@@ -148,15 +148,46 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
       });
       return;
     }
-
+  
+    // ===== CHECK ACCESS BEFORE SUBMISSION =====
+    try {
+      const { data: accessCheck, error: accessError } = await supabase
+        .rpc('check_widget_access', { project_id_param: settings.project_id });
+  
+      if (accessError) {
+        console.error('Access check error:', accessError);
+        toast({
+          title: 'Error',
+          description: 'Could not verify access. Please try again.',
+          variant: 'destructive'
+        });
+        return;
+      }
+  
+      const hasAccess = accessCheck === true || (accessCheck && accessCheck.has_access === true);
+  
+      if (!hasAccess) {
+        toast({
+          title: 'Feedback Unavailable',
+          description: 'This feedback form is currently unavailable. The owner\'s trial or subscription has ended.',
+          variant: 'destructive'
+        });
+        return;
+      }
+    } catch (err) {
+      console.error('Access verification failed:', err);
+      // Optional: continue submission even if check fails due to network issues
+    }
+  
     setIsSubmitting(true);
-
+  
+    // ===== EXISTING SUBMISSION LOGIC =====
     try {
       const feedbackData = {
         project_id: settings.project_id,
-        form_type: 'product_feedback',
-        message: message.trim(),
-        rating: rating || null,
+        form_type: 'customer_satisfaction',
+        message: comments.trim() || `Customer satisfaction rating: ${rating}/5`,
+        rating: rating,
         metadata: {
           email: email.trim() || null,
           page_url: window.location.href,
@@ -164,11 +195,9 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
           timestamp: new Date().toISOString()
         }
       };
-
-      const { error } = await supabase
-        .from('feedback')
-        .insert([feedbackData]);
-
+  
+      const { error } = await supabase.from('feedback').insert([feedbackData]);
+  
       if (error) {
         let errorMessage = 'Failed to submit feedback.';
         if (error.code === '23503') {
@@ -176,7 +205,7 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
         } else if (error.message) {
           errorMessage = error.message;
         }
-        
+  
         toast({
           title: 'Error',
           description: errorMessage,
@@ -184,13 +213,13 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
         });
         return;
       }
-
+  
       setIsSubmitted(true);
-      
+  
       if (onSubmitted) {
         onSubmitted(feedbackData);
       }
-      
+  
       toast({
         title: 'Thank you!',
         description: 'Your feedback has been submitted successfully.'
@@ -206,6 +235,7 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
       setIsSubmitting(false);
     }
   };
+  
 
   if (isValidating) {
     return (

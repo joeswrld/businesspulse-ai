@@ -2,40 +2,36 @@
 // Fixed version with on-demand QR code generation
 
 import React, { useState, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { QRCodeSVG } from 'qrcode.react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  Copy, 
-  Check, 
-  RefreshCw, 
-  ExternalLink, 
-  Code, 
-  QrCode, 
-  Download,
-  Settings,
-  Link as LinkIcon,
-  Sparkles,
-  Eye,
-  Palette,
-  Upload,
-  X,
-  Building2
-} from 'lucide-react';
 import { useFeedbackSettings } from '@/hooks/useFeedbackSettings';
 import { useToast } from '@/hooks/use-toast';
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
+import { 
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
+  Button, Input, Label, Textarea, Tabs, TabsContent, TabsList, TabsTrigger,
+  Badge, Separator, Alert, AlertDescription
+} from '@/components/ui';
+
+import { 
+  Copy, Check, RefreshCw, ExternalLink, Code, QrCode, Download,
+  Settings, Link as LinkIcon, Sparkles, Eye, Palette, Upload, X,
+  Building2, Lock, Crown, Loader2
+} from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 const FeedbackSettings: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { settings, loading, saving, saveSettings, regenerateUrls, setSettings } = useFeedbackSettings();
+
+  // Subscription hook
+  const { hasAccess, isLoading: loadingSubscription, isTrialExpired, 
+          isSubscriptionExpired, daysLeft, status } = useSubscriptionStatus({
+    redirectOnExpiry: true,
+    allowBillingPage: false
+  });
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [showCsatQr, setShowCsatQr] = useState(false);
@@ -44,91 +40,121 @@ const FeedbackSettings: React.FC = () => {
   const csatQrRef = useRef<HTMLDivElement>(null);
   const productQrRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+   
+  // Loading Subscription Check
+  // -----------------------
+  if (loadingSubscription) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
 
+   // Paywall Check
+  // -----------------------
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-red-950 p-4">
+        <Card className="w-full max-w-md shadow-2xl border-2 border-red-200 dark:border-red-800">
+          <CardHeader className="text-center space-y-4">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
+              <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+            <CardTitle className="text-2xl">Feedback Settings Access Locked</CardTitle>
+            <p className="text-muted-foreground">
+              {isTrialExpired 
+                  ? 'Your trial has expired. Upgrade to access feedback settings.'
+                  : isSubscriptionExpired
+                  ? 'Your subscription has expired. Renew to continue.'
+                  : 'Active subscription required to access feedback settings.'}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button 
+              onClick={() => navigate('/billing')}
+              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+              size="lg"
+            >
+              <Crown className="h-5 w-5 mr-2" />
+              {isSubscriptionExpired ? 'Renew Subscription' : 'Upgrade Now'}
+            </Button>
+            <Button 
+              onClick={() => navigate('/dashboard')}
+              variant="outline"
+              className="w-full"
+            >
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  
+  
+
+  // -----------------------
+  // Copy helper
+  // -----------------------
   const copyToClipboard = async (text: string, fieldName: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedField(fieldName);
-      toast({
-        title: "Copied!",
-        description: `${fieldName} copied to clipboard.`,
-      });
+      toast({ title: "Copied!", description: `${fieldName} copied to clipboard.` });
       setTimeout(() => setCopiedField(null), 2000);
     } catch (error) {
-      console.error('Failed to copy:', error);
-      toast({
-        title: "Copy Failed",
-        description: "Failed to copy to clipboard. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Copy Failed", description: "Failed to copy to clipboard.", variant: "destructive" });
     }
   };
 
+  // -----------------------
+  // Logo Upload / Remove
+  // -----------------------
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user) return;
     const file = event.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      toast({
-        title: "Invalid File",
-        description: "Please upload an image file (PNG, JPG, SVG, etc.)",
-        variant: "destructive",
-      });
+      toast({ title: "Invalid File", description: "Please upload an image file.", variant: "destructive" });
       return;
     }
-
     if (file.size > 2 * 1024 * 1024) {
-      toast({
-        title: "File Too Large",
-        description: "Please upload an image smaller than 2MB",
-        variant: "destructive",
-      });
+      toast({ title: "File Too Large", description: "Image must be smaller than 2MB", variant: "destructive" });
       return;
     }
 
     setUploadingLogo(true);
 
     try {
+      // Remove old logo
       if (settings?.logo_url) {
-        try {
-          const urlParts = settings.logo_url.split('/');
-          const fileName = urlParts[urlParts.length - 1];
-          const oldPath = `${user.id}/${fileName}`;
-          await supabase.storage.from('feedback-logos').remove([oldPath]);
-        } catch (deleteError) {
-          console.warn('Could not delete old logo:', deleteError);
-        }
+        const urlParts = settings.logo_url.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        await supabase.storage.from('feedback-logos').remove([`${user.id}/${fileName}`]);
       }
 
       const fileExt = file.name.split('.').pop();
       const fileName = `logo-${Date.now()}.${fileExt}`;
       const filePath = `${user.id}/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('feedback-logos')
-        .upload(filePath, file, { cacheControl: '3600', upsert: true });
-
+      const { error: uploadError } = await supabase.storage.from('feedback-logos').upload(filePath, file, { cacheControl: '3600', upsert: true });
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('feedback-logos')
-        .getPublicUrl(filePath);
+      const { data: { publicUrl } } = supabase.storage.from('feedback-logos').getPublicUrl(filePath);
 
       const updatedSettings = { ...settings!, logo_url: publicUrl };
       setSettings(updatedSettings);
       await saveSettings(updatedSettings);
 
-      toast({
-        title: "Logo Uploaded!",
-        description: "Your logo has been uploaded and saved successfully.",
-      });
+      toast({ title: "Logo Uploaded!", description: "Your logo has been uploaded successfully." });
     } catch (error) {
-      console.error('Failed to upload logo:', error);
-      toast({
-        title: "Upload Failed",
-        description: "Failed to upload logo. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Upload Failed", description: "Failed to upload logo.", variant: "destructive" });
     } finally {
       setUploadingLogo(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -139,36 +165,42 @@ const FeedbackSettings: React.FC = () => {
     if (!settings?.logo_url || !user) return;
 
     try {
-      try {
-        const urlParts = settings.logo_url.split('/');
-        const fileName = urlParts[urlParts.length - 1];
-        const oldPath = `${user.id}/${fileName}`;
-        await supabase.storage.from('feedback-logos').remove([oldPath]);
-      } catch (deleteError) {
-        console.warn('Could not delete logo file:', deleteError);
-      }
+      const urlParts = settings.logo_url.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      await supabase.storage.from('feedback-logos').remove([`${user.id}/${fileName}`]);
 
       const updatedSettings = { ...settings, logo_url: null };
       setSettings(updatedSettings);
       await saveSettings(updatedSettings);
 
-      toast({
-        title: "Logo Removed",
-        description: "Your logo has been removed and saved.",
-      });
+      toast({ title: "Logo Removed", description: "Your logo has been removed." });
     } catch (error) {
-      console.error('Failed to remove logo:', error);
-      toast({
-        title: "Removal Failed",
-        description: "Failed to remove logo. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Removal Failed", description: "Failed to remove logo.", variant: "destructive" });
     }
   };
 
+  // -----------------------
+  // Save Settings with Access Block
+  // -----------------------
+  const handleSaveSettings = async () => {
+    if (!settings || !hasAccess) {
+      toast({ title: "Access Required", description: "Upgrade to modify settings", variant: "destructive" });
+      navigate('/billing');
+      return;
+    }
+    try {
+      await saveSettings(settings);
+      toast({ title: "Settings Saved!", description: "Your feedback settings have been updated." });
+    } catch {
+      toast({ title: "Save Failed", description: "Failed to save settings.", variant: "destructive" });
+    }
+  };
+
+  // -----------------------
+  // QR download helper
+  // -----------------------
   const downloadQRCode = (qrRef: React.RefObject<HTMLDivElement>, filename: string) => {
     if (!qrRef.current) return;
-
     const svg = qrRef.current.querySelector('svg');
     if (!svg) return;
 
@@ -181,71 +213,42 @@ const FeedbackSettings: React.FC = () => {
     canvas.height = 400;
 
     img.onload = () => {
-      if (ctx) {
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, 400, 400);
-        
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${filename}.png`;
-            a.click();
-            URL.revokeObjectURL(url);
-            
-            toast({
-              title: "QR Code Downloaded!",
-              description: `${filename} has been saved to your device.`,
-            });
-          }
-        });
-      }
+      if (!ctx) return;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, 400, 400);
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast({ title: "QR Code Downloaded!", description: `${filename} saved.` });
+      });
     };
 
     img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
   };
 
   const handleRegenerateUrls = async () => {
+    if (!settings) return;
     try {
       await regenerateUrls();
-      setShowCsatQr(false);
-      setShowProductQr(false);
-      toast({
-        title: "URLs Regenerated!",
-        description: "New project ID and URLs have been generated.",
-      });
-    } catch (error) {
-      toast({
-        title: "Regeneration Failed",
-        description: "Failed to regenerate URLs. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "URLs Regenerated", description: "All feedback links have been updated." });
+    } catch {
+      toast({ title: "Error", description: "Failed to regenerate URLs.", variant: "destructive" });
     }
   };
+  
 
-  const handleSaveSettings = async () => {
-    if (!settings) return;
-    
-    try {
-      await saveSettings(settings);
-      toast({
-        title: "Settings Saved!",
-        description: "Your feedback settings have been updated.",
-      });
-    } catch (error) {
-      toast({
-        title: "Save Failed",
-        description: "Failed to save settings. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
+  // -----------------------
+  // Loading Feedback Settings
+  // -----------------------
   if (loading || !settings) {
     return (
-      <div className="container mx-auto p-6">
+      <div className=" mx-auto p-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center space-y-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
@@ -256,8 +259,22 @@ const FeedbackSettings: React.FC = () => {
     );
   }
 
+  // -----------------------
+  // Main UI
+  // -----------------------
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-6 max-w-7xl">
+      {!hasAccess && (
+        <Alert className="border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20">
+          <Lock className="h-4 w-4 text-red-600 dark:text-red-400" />
+          <AlertDescription className="text-red-900 dark:text-red-100">
+            Your widgets are disabled. Upgrade to reactivate feedback collection.
+          </AlertDescription>
+        </Alert>
+      )}
+
+  return (
+    <div className=" mx-auto p-4 sm:p-6 space-y-6 max-w-7xl">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">

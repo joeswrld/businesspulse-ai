@@ -1,9 +1,15 @@
+// src/pages/Dashboard.tsx
+// Integrated with subscription access control
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -13,7 +19,6 @@ import { toast } from 'sonner';
 
 import {
     BarChart3,
-    Users,
     MessageSquare,
     CheckCircle,
     AlertCircle,
@@ -26,8 +31,9 @@ import {
     LineChart,
     BarChart as BarChartIcon,
     Activity,
-    Zap,
-    Minus
+    Minus,
+    Loader2,
+    Lock
 } from 'lucide-react';
 
 import {
@@ -98,6 +104,13 @@ interface RatingData {
 
 export default function Dashboard() {
     const { user } = useAuth();
+    const navigate = useNavigate();
+
+    // Subscription status check
+    const { hasAccess, isLoading: loadingSubscription, isTrialExpired, isSubscriptionExpired, daysLeft, status } = useSubscriptionStatus({
+        redirectOnExpiry: true,
+        allowBillingPage: false
+    });
 
     // State management
     const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
@@ -111,15 +124,65 @@ export default function Dashboard() {
         to: undefined
     });
 
+    // Show loading while checking subscription
+    if (loadingSubscription) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <div className="text-center">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+                    <p className="text-muted-foreground">Checking access...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Show paywall if no access (backup to redirect)
+    if (!hasAccess) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-red-950 p-4">
+                <Card className="w-full max-w-md shadow-2xl border-2 border-red-200 dark:border-red-800">
+                    <CardHeader className="text-center space-y-4">
+                        <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
+                            <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
+                        </div>
+                        <CardTitle className="text-2xl">Dashboard Access Locked</CardTitle>
+                        <p className="text-muted-foreground">
+                            {isTrialExpired 
+                                ? 'Your free trial has expired. Upgrade to continue using NoteX.'
+                                : isSubscriptionExpired
+                                ? 'Your subscription has expired. Renew to restore access.'
+                                : 'You need an active subscription to access the dashboard.'}
+                        </p>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <Button 
+                            onClick={() => navigate('/billing')}
+                            className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+                            size="lg"
+                        >
+                            <Crown className="h-5 w-5 mr-2" />
+                            {isSubscriptionExpired ? 'Renew Subscription' : 'Upgrade Now'}
+                        </Button>
+                        <Button 
+                            onClick={() => navigate('/')}
+                            variant="outline"
+                            className="w-full"
+                        >
+                            Go Home
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     // Sentiment analysis helper
     const analyzeSentiment = (message: string, rating: number | null): 'positive' | 'neutral' | 'negative' => {
-        // If rating exists, use it as primary indicator
         if (rating !== null) {
             if (rating >= 4) return 'positive';
             if (rating <= 2) return 'negative';
         }
 
-        // Fallback to text analysis
         const lowerMessage = message.toLowerCase();
         const positiveWords = ['great', 'excellent', 'amazing', 'love', 'awesome', 'fantastic', 'good', 'best', 'wonderful'];
         const negativeWords = ['bad', 'terrible', 'awful', 'hate', 'worst', 'poor', 'disappointed', 'horrible', 'useless'];
@@ -140,9 +203,6 @@ export default function Dashboard() {
             setLoading(true);
             setError(null);
 
-            console.log('Loading dashboard data for user:', user.id);
-
-            // Step 1: Get or create feedback settings
             const { data: existingSettings, error: settingsError } = await supabase
                 .from('feedback_settings')
                 .select('*')
@@ -157,17 +217,14 @@ export default function Dashboard() {
             let settings: FeedbackSettings | null = null;
 
             if (!existingSettings) {
-                // Create new settings if they don't exist
-                console.log('No feedback settings found, creating new ones...');
-                
                 const newProjectId = crypto.randomUUID();
                 const baseUrl = window.location.origin;
                 
                 const newSettings = {
                     user_id: user.id,
                     project_id: newProjectId,
-                    customer_survey_url: `${baseUrl}/survey/${newProjectId}?type=satisfaction`,
-                    product_feedback_url: `${baseUrl}/survey/${newProjectId}?type=product`,
+                    customer_survey_url: `${baseUrl}/csat/${newProjectId}`,
+                    product_feedback_url: `${baseUrl}/product-feedback/${newProjectId}`,
                     widget_code: `<script src="${baseUrl}/widget.js" data-project-id="${newProjectId}"></script>`
                 };
 
@@ -183,18 +240,13 @@ export default function Dashboard() {
                 }
 
                 settings = createdSettings;
-                console.log('Created new feedback settings:', settings);
             } else {
                 settings = existingSettings;
-                console.log('Found existing feedback settings:', settings);
             }
 
             setFeedbackSettings(settings);
 
-            // Step 2: Load feedback for this project
             if (settings && settings.project_id) {
-                console.log('Loading feedback for project:', settings.project_id);
-                
                 const { data: feedbacksData, error: feedbacksError } = await supabase
                     .from('feedback')
                     .select('*')
@@ -206,7 +258,6 @@ export default function Dashboard() {
                     throw new Error('Failed to load feedback data');
                 }
 
-                console.log(`Loaded ${feedbacksData?.length || 0} feedback entries`);
                 setFeedbacks(feedbacksData || []);
             }
 
@@ -224,16 +275,14 @@ export default function Dashboard() {
 
     // Load data on component mount
     useEffect(() => {
-        if (user) {
+        if (user && hasAccess) {
             loadDashboardData();
         }
-    }, [loadDashboardData, user]);
+    }, [loadDashboardData, user, hasAccess]);
 
-    // Set up real-time subscriptions
+    // Real-time subscriptions
     useEffect(() => {
-        if (!user || !feedbackSettings) return;
-
-        console.log('Setting up real-time subscription for project:', feedbackSettings.project_id);
+        if (!user || !feedbackSettings || !hasAccess) return;
 
         const feedbackChannel = supabase
             .channel('dashboard-feedback-changes')
@@ -246,7 +295,6 @@ export default function Dashboard() {
                     filter: `project_id=eq.${feedbackSettings.project_id}`
                 },
                 (payload) => {
-                    console.log('Feedback change received in dashboard:', payload);
                     toast.success('New feedback received!', {
                         description: 'Dashboard data updated'
                     });
@@ -258,7 +306,7 @@ export default function Dashboard() {
         return () => {
             supabase.removeChannel(feedbackChannel);
         };
-    }, [user, feedbackSettings, loadDashboardData]);
+    }, [user, feedbackSettings, loadDashboardData, hasAccess]);
 
     // Get date range for filtering
     const getDateRange = (): { start: Date; end: Date } => {
@@ -285,13 +333,11 @@ export default function Dashboard() {
             return feedbackDate >= start && feedbackDate <= end;
         });
 
-        // Calculate sentiment counts
         const sentiments = filteredFeedbacks.map(fb => analyzeSentiment(fb.message, fb.rating));
         const positiveCount = sentiments.filter(s => s === 'positive').length;
         const negativeCount = sentiments.filter(s => s === 'negative').length;
         const neutralCount = sentiments.filter(s => s === 'neutral').length;
 
-        // Calculate average rating
         const ratings = filteredFeedbacks.filter(fb => fb.rating !== null).map(fb => fb.rating!);
         const averageRating = ratings.length > 0 
             ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length 
@@ -303,7 +349,7 @@ export default function Dashboard() {
             negativeFeedback: negativeCount,
             neutralFeedback: neutralCount,
             averageRating,
-            responseRate: 0 // TODO: Implement response tracking
+            responseRate: 0
         };
     }, [feedbacks, dateRange, customDateRange]);
 
@@ -327,7 +373,7 @@ export default function Dashboard() {
             .map(([date, count]) => ({ date, count }));
     }, [feedbacks, dateRange, customDateRange]);
 
-    // Calculate sentiment data for pie chart
+    // Calculate sentiment data
     const sentimentData = useMemo((): SentimentData[] => {
         return [
             { name: 'Positive', value: dashboardMetrics.positiveFeedback, color: '#10b981' },
@@ -380,7 +426,7 @@ export default function Dashboard() {
         }
     };
 
-    // Get sentiment badge variant
+    // Get sentiment badge class
     const getSentimentBadgeClass = (sentiment: string) => {
         switch (sentiment) {
             case 'positive':
@@ -444,14 +490,48 @@ export default function Dashboard() {
         );
     }
 
+    // Show trial warning if trial is active but expiring soon
+    const showTrialWarning = status === 'trial' && daysLeft <= 3 && daysLeft > 0;
+
     return (
         <div className="container mx-auto p-6 space-y-6">
+            {/* Trial Warning Banner */}
+            {showTrialWarning && (
+                <Alert className="border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20">
+                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    <AlertDescription className="text-orange-900 dark:text-orange-100">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <strong>Trial ending soon!</strong> You have {daysLeft} day{daysLeft !== 1 ? 's' : ''} left. Upgrade to keep your data and features.
+                            </div>
+                            <Button
+                                onClick={() => navigate('/billing')}
+                                size="sm"
+                                className="bg-orange-600 hover:bg-orange-700 text-white"
+                            >
+                                Upgrade Now
+                            </Button>
+                        </div>
+                    </AlertDescription>
+                </Alert>
+            )}
+
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold ">Analytics Dashboard</h1>
-                    <p className=" mt-2">
+                    <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+                    <p className="mt-2 flex items-center gap-2">
                         Real-time insights • {dashboardMetrics.totalFeedback} total feedback
+                        {status === 'trial' && (
+                            <Badge className="bg-primary/10 text-primary">
+                                Trial: {daysLeft} days left
+                            </Badge>
+                        )}
+                        {status === 'active' && (
+                            <Badge className="bg-green-500/10 text-green-600 dark:text-green-400">
+                                Active Subscription
+                            </Badge>
+                        )}
                     </p>
                 </div>
                 <Button variant="outline" onClick={loadDashboardData} disabled={loading}>
