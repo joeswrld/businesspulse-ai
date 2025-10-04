@@ -1,12 +1,12 @@
 // src/pages/Dashboard.tsx
-// Integrated with subscription access control
+// Fixed version with proper React hooks order
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -18,43 +18,17 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 import {
-    BarChart3,
-    MessageSquare,
-    CheckCircle,
-    AlertCircle,
-    Clock,
-    RefreshCw,
-    Crown,
-    Calendar as CalendarIcon,
-    TrendingUp,
-    PieChart,
-    LineChart,
-    BarChart as BarChartIcon,
-    Activity,
-    Minus,
-    Loader2,
-    Lock
+    BarChart3, MessageSquare, CheckCircle, AlertCircle, Clock, RefreshCw,
+    Crown, Calendar as CalendarIcon, TrendingUp, LineChart,
+    BarChart as BarChartIcon, Activity, Minus, Loader2, Lock
 } from 'lucide-react';
 
 import {
-    BarChart as RechartsBarChart,
-    Bar,
-    PieChart as RechartsPieChart,
-    Cell,
-    Pie,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    Legend,
-    ResponsiveContainer,
-    LineChart as RechartsLineChart,
-    Line,
-    AreaChart,
-    Area
+    BarChart as RechartsBarChart, Bar, PieChart as RechartsPieChart, Cell, Pie,
+    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
 
-// Types
+// Types remain the same...
 interface Feedback {
     id: string;
     project_id: string;
@@ -86,33 +60,17 @@ interface DashboardMetrics {
     responseRate: number;
 }
 
-interface ChartData {
-    date: string;
-    count: number;
-}
-
-interface SentimentData {
-    name: string;
-    value: number;
-    color: string;
-}
-
-interface RatingData {
-    rating: string;
-    count: number;
-}
-
 export default function Dashboard() {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    // Subscription status check
-    const { hasAccess, isLoading: loadingSubscription, isTrialExpired, isSubscriptionExpired, daysLeft, status } = useSubscriptionStatus({
+    // ALL HOOKS MUST BE CALLED FIRST - BEFORE ANY CONDITIONAL RETURNS
+    const { hasAccess, isLoading: loadingSubscription, isTrialExpired, 
+            isSubscriptionExpired, daysLeft, status } = useSubscriptionStatus({
         redirectOnExpiry: true,
         allowBillingPage: false
     });
 
-    // State management
     const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
     const [feedbackSettings, setFeedbackSettings] = useState<FeedbackSettings | null>(null);
     const [loading, setLoading] = useState(true);
@@ -124,76 +82,21 @@ export default function Dashboard() {
         to: undefined
     });
 
-    // Show loading while checking subscription
-    if (loadingSubscription) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-background">
-                <div className="text-center">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-                    <p className="text-muted-foreground">Checking access...</p>
-                </div>
-            </div>
-        );
-    }
-
-    // Show paywall if no access (backup to redirect)
-    if (!hasAccess) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-red-950 p-4">
-                <Card className="w-full max-w-md shadow-2xl border-2 border-red-200 dark:border-red-800">
-                    <CardHeader className="text-center space-y-4">
-                        <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
-                            <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
-                        </div>
-                        <CardTitle className="text-2xl">Dashboard Access Locked</CardTitle>
-                        <p className="text-muted-foreground">
-                            {isTrialExpired 
-                                ? 'Your free trial has expired. Upgrade to continue using NoteX.'
-                                : isSubscriptionExpired
-                                ? 'Your subscription has expired. Renew to restore access.'
-                                : 'You need an active subscription to access the dashboard.'}
-                        </p>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <Button 
-                            onClick={() => navigate('/billing')}
-                            className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
-                            size="lg"
-                        >
-                            <Crown className="h-5 w-5 mr-2" />
-                            {isSubscriptionExpired ? 'Renew Subscription' : 'Upgrade Now'}
-                        </Button>
-                        <Button 
-                            onClick={() => navigate('/')}
-                            variant="outline"
-                            className="w-full"
-                        >
-                            Go Home
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
-
     // Sentiment analysis helper
-    const analyzeSentiment = (message: string, rating: number | null): 'positive' | 'neutral' | 'negative' => {
+    const analyzeSentiment = useCallback((message: string, rating: number | null): 'positive' | 'neutral' | 'negative' => {
         if (rating !== null) {
             if (rating >= 4) return 'positive';
             if (rating <= 2) return 'negative';
         }
-
         const lowerMessage = message.toLowerCase();
         const positiveWords = ['great', 'excellent', 'amazing', 'love', 'awesome', 'fantastic', 'good', 'best', 'wonderful'];
         const negativeWords = ['bad', 'terrible', 'awful', 'hate', 'worst', 'poor', 'disappointed', 'horrible', 'useless'];
-        
         const positiveCount = positiveWords.filter(word => lowerMessage.includes(word)).length;
         const negativeCount = negativeWords.filter(word => lowerMessage.includes(word)).length;
-        
         if (positiveCount > negativeCount) return 'positive';
         if (negativeCount > positiveCount) return 'negative';
         return 'neutral';
-    };
+    }, []);
 
     // Load dashboard data
     const loadDashboardData = useCallback(async () => {
@@ -238,7 +141,6 @@ export default function Dashboard() {
                     console.error('Error creating feedback settings:', createError);
                     throw new Error('Failed to create feedback settings');
                 }
-
                 settings = createdSettings;
             } else {
                 settings = existingSettings;
@@ -257,23 +159,19 @@ export default function Dashboard() {
                     console.error('Error loading feedbacks:', feedbacksError);
                     throw new Error('Failed to load feedback data');
                 }
-
                 setFeedbacks(feedbacksData || []);
             }
-
         } catch (error) {
             console.error('Error loading dashboard data:', error);
             const errorMessage = error instanceof Error ? error.message : 'An error occurred while loading data';
             setError(errorMessage);
-            toast.error('Dashboard Error', {
-                description: errorMessage
-            });
+            toast.error('Dashboard Error', { description: errorMessage });
         } finally {
             setLoading(false);
         }
     }, [user]);
 
-    // Load data on component mount
+    // Load data on mount
     useEffect(() => {
         if (user && hasAccess) {
             loadDashboardData();
@@ -286,21 +184,15 @@ export default function Dashboard() {
 
         const feedbackChannel = supabase
             .channel('dashboard-feedback-changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'feedback',
-                    filter: `project_id=eq.${feedbackSettings.project_id}`
-                },
-                (payload) => {
-                    toast.success('New feedback received!', {
-                        description: 'Dashboard data updated'
-                    });
-                    loadDashboardData();
-                }
-            )
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'feedback',
+                filter: `project_id=eq.${feedbackSettings.project_id}`
+            }, () => {
+                toast.success('New feedback received!', { description: 'Dashboard data updated' });
+                loadDashboardData();
+            })
             .subscribe();
 
         return () => {
@@ -309,7 +201,7 @@ export default function Dashboard() {
     }, [user, feedbackSettings, loadDashboardData, hasAccess]);
 
     // Get date range for filtering
-    const getDateRange = (): { start: Date; end: Date } => {
+    const getDateRange = useCallback((): { start: Date; end: Date } => {
         const now = new Date();
         const end = customDateRange.to || now;
         const start = customDateRange.from || (() => {
@@ -320,14 +212,12 @@ export default function Dashboard() {
                 default: return new Date(0);
             }
         })();
-
         return { start, end };
-    };
+    }, [dateRange, customDateRange]);
 
-    // Calculate dashboard metrics
+    // Calculate metrics
     const dashboardMetrics = useMemo((): DashboardMetrics => {
         const { start, end } = getDateRange();
-
         const filteredFeedbacks = feedbacks.filter(feedback => {
             const feedbackDate = new Date(feedback.created_at);
             return feedbackDate >= start && feedbackDate <= end;
@@ -339,9 +229,7 @@ export default function Dashboard() {
         const neutralCount = sentiments.filter(s => s === 'neutral').length;
 
         const ratings = filteredFeedbacks.filter(fb => fb.rating !== null).map(fb => fb.rating!);
-        const averageRating = ratings.length > 0 
-            ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length 
-            : 0;
+        const averageRating = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : 0;
 
         return {
             totalFeedback: filteredFeedbacks.length,
@@ -351,12 +239,10 @@ export default function Dashboard() {
             averageRating,
             responseRate: 0
         };
-    }, [feedbacks, dateRange, customDateRange]);
+    }, [feedbacks, getDateRange, analyzeSentiment]);
 
-    // Calculate chart data
-    const chartData = useMemo((): ChartData[] => {
+    const chartData = useMemo(() => {
         const { start, end } = getDateRange();
-
         const filteredFeedbacks = feedbacks.filter(feedback => {
             const feedbackDate = new Date(feedback.created_at);
             return feedbackDate >= start && feedbackDate <= end;
@@ -371,10 +257,9 @@ export default function Dashboard() {
         return Object.entries(volumeData)
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([date, count]) => ({ date, count }));
-    }, [feedbacks, dateRange, customDateRange]);
+    }, [feedbacks, getDateRange]);
 
-    // Calculate sentiment data
-    const sentimentData = useMemo((): SentimentData[] => {
+    const sentimentData = useMemo(() => {
         return [
             { name: 'Positive', value: dashboardMetrics.positiveFeedback, color: '#10b981' },
             { name: 'Neutral', value: dashboardMetrics.neutralFeedback, color: '#f59e0b' },
@@ -382,10 +267,8 @@ export default function Dashboard() {
         ].filter(item => item.value > 0);
     }, [dashboardMetrics]);
 
-    // Calculate rating distribution
-    const ratingData = useMemo((): RatingData[] => {
+    const ratingData = useMemo(() => {
         const { start, end } = getDateRange();
-
         const filteredFeedbacks = feedbacks.filter(feedback => {
             const feedbackDate = new Date(feedback.created_at);
             return feedbackDate >= start && feedbackDate <= end && feedback.rating !== null;
@@ -403,21 +286,18 @@ export default function Dashboard() {
             { rating: '2★', count: ratingCounts[2] },
             { rating: '1★', count: ratingCounts[1] }
         ];
-    }, [feedbacks, dateRange, customDateRange]);
+    }, [feedbacks, getDateRange]);
 
-    // Get recent feedback
     const recentFeedbacks = useMemo(() => {
         const { start, end } = getDateRange();
-
         return feedbacks
             .filter(feedback => {
                 const feedbackDate = new Date(feedback.created_at);
                 return feedbackDate >= start && feedbackDate <= end;
             })
             .slice(0, 10);
-    }, [feedbacks, dateRange, customDateRange]);
+    }, [feedbacks, getDateRange]);
 
-    // Format date
     const formatDate = (dateString: string) => {
         try {
             return format(new Date(dateString), 'MMM dd, yyyy HH:mm');
@@ -426,18 +306,15 @@ export default function Dashboard() {
         }
     };
 
-    // Get sentiment badge class
     const getSentimentBadgeClass = (sentiment: string) => {
         switch (sentiment) {
-            case 'positive':
-                return 'bg-green-100 text-green-800';
-            case 'negative':
-                return 'bg-red-100 text-red-800';
-            default:
-                return 'bg-yellow-100 text-yellow-800';
+            case 'positive': return 'bg-green-100 text-green-800';
+            case 'negative': return 'bg-red-100 text-red-800';
+            default: return 'bg-yellow-100 text-yellow-800';
         }
     };
 
+    // NOW WE CAN DO CONDITIONAL RETURNS AFTER ALL HOOKS
     if (!user) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -448,6 +325,56 @@ export default function Dashboard() {
                             <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
                             <p className="text-gray-600">Please log in to access your dashboard.</p>
                         </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    if (loadingSubscription) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <div className="text-center">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+                    <p className="text-muted-foreground">Checking access...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!hasAccess) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-red-950 p-4">
+                <Card className="w-full max-w-md shadow-2xl border-2 border-red-200 dark:border-red-800">
+                    <CardHeader className="text-center space-y-4">
+                        <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
+                            <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
+                        </div>
+                        <CardTitle className="text-2xl">Dashboard Access Locked</CardTitle>
+                        <p className="text-muted-foreground">
+                            {isTrialExpired 
+                                ? 'Your free trial has expired. Upgrade to continue using NoteX.'
+                                : isSubscriptionExpired
+                                ? 'Your subscription has expired. Renew to restore access.'
+                                : 'You need an active subscription to access the dashboard.'}
+                        </p>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <Button 
+                            onClick={() => navigate('/billing')}
+                            className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+                            size="lg"
+                        >
+                            <Crown className="h-5 w-5 mr-2" />
+                            {isSubscriptionExpired ? 'Renew Subscription' : 'Upgrade Now'}
+                        </Button>
+                        <Button 
+                            onClick={() => navigate('/')}
+                            variant="outline"
+                            className="w-full"
+                        >
+                            Go Home
+                        </Button>
                     </CardContent>
                 </Card>
             </div>
@@ -490,12 +417,10 @@ export default function Dashboard() {
         );
     }
 
-    // Show trial warning if trial is active but expiring soon
     const showTrialWarning = status === 'trial' && daysLeft <= 3 && daysLeft > 0;
 
     return (
         <div className="container mx-auto p-6 space-y-6">
-            {/* Trial Warning Banner */}
             {showTrialWarning && (
                 <Alert className="border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20">
                     <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
