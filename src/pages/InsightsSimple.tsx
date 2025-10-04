@@ -33,8 +33,6 @@ import {
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 
-import { Button, Card, CardHeader, CardTitle, CardContent } from '@/components/ui'; // Adjust path if needed
-
 interface Feedback {
   id: string;
   message: string;
