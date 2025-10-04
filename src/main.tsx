@@ -71,7 +71,5 @@ function MainWithBanner() {
 }
 
 createRoot(document.getElementById('root')!).render(
-  <BrowserRouter>
-    <MainWithBanner />
-  </BrowserRouter>
+  <MainWithBanner />
 );
