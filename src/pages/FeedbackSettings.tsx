@@ -264,6 +264,7 @@ const FeedbackSettings: React.FC = () => {
   // -----------------------
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-6 max-w-7xl">
+      {/* Show alert if user has no access */}
       {!hasAccess && (
         <Alert className="border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20">
           <Lock className="h-4 w-4 text-red-600 dark:text-red-400" />
@@ -272,9 +273,8 @@ const FeedbackSettings: React.FC = () => {
           </AlertDescription>
         </Alert>
       )}
-
-  return (
-    <div className=" mx-auto p-4 sm:p-6 space-y-6 max-w-7xl">
+  
+      {/* Main Feedback Settings UI */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -287,6 +287,11 @@ const FeedbackSettings: React.FC = () => {
             Configure your feedback collection and share links with customers
           </p>
         </div>
+        {/* ... your Save button goes here */}
+      </div>
+    </div>
+  );
+  
         <Button 
           onClick={handleSaveSettings} 
           disabled={saving}
