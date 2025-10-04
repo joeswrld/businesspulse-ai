@@ -24,31 +24,20 @@ const TrialExpired = () => {
 
   const navigate = useNavigate();
   const { toast } = useToast();
-
   useEffect(() => {
-    if (!userProfile?.trial_end) return;
+    const fetchUserProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
   
-    const interval = setInterval(() => {
-      const now = new Date();
-      const trialEnd = new Date(userProfile.trial_end);
-      const diffTime = trialEnd.getTime() - now.getTime();
-      if (diffTime <= 0) {
-        clearInterval(interval);
-        navigate("/billing"); // redirect when time is up
-      } else {
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        setTrialDaysRemaining(diffDays);
-      }
-    }, 1000 * 60); // update every minute
+        if (!user) {
+          navigate("/login");
+          return;
+        }
   
-    return () => clearInterval(interval);
-  }, [userProfile, navigate]);
-  
-
-        // Get user profile with access status
+        // ✅ Fetch user profile with access status
         const { data: profileData, error } = await supabase
           .rpc('get_user_profile_with_access', { user_uuid: user.id });
-
+  
         if (error) {
           console.error("Error fetching profile:", error);
           toast({
@@ -58,12 +47,12 @@ const TrialExpired = () => {
           });
           return;
         }
-
+  
         if (profileData && profileData.length > 0) {
           const profile = profileData[0];
           setUserProfile(profile);
-          
-          // Calculate days remaining
+  
+          // Initial trial days calculation
           if (profile.trial_end) {
             const now = new Date();
             const trialEnd = new Date(profile.trial_end);
@@ -83,13 +72,36 @@ const TrialExpired = () => {
         setLoading(false);
       }
     };
-
+  
     fetchUserProfile();
   }, [navigate, toast]);
-
+  
+  // --------------------
+  // Trial countdown effect
+  useEffect(() => {
+    if (!userProfile?.trial_end) return;
+  
+    const interval = setInterval(() => {
+      const now = new Date();
+      const trialEnd = new Date(userProfile.trial_end);
+      const diffTime = trialEnd.getTime() - now.getTime();
+  
+      if (diffTime <= 0) {
+        clearInterval(interval);
+        navigate("/billing"); // redirect when time is up
+      } else {
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        setTrialDaysRemaining(diffDays);
+      }
+    }, 1000 * 60); // update every minute
+  
+    return () => clearInterval(interval);
+  }, [userProfile, navigate]);
+  
   const handleUpgrade = () => {
     navigate("/billing");
   };
+  
 
   const handleSignOut = async () => {
     try {
