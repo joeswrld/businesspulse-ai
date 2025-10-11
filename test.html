@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .test-result {
+            margin-top: 20px;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Test Page</h1>
+        <p>This is a simple test page to verify that the server is working correctly.</p>
+        
+        <button class="test-button" onclick="testJavaScript()">Test JavaScript</button>
+        <button class="test-button" onclick="testFetch()">Test Fetch</button>
+        
+        <div id="test-result" class="test-result" style="display: none;">
+            <h3>Test Results:</h3>
+            <div id="test-output"></div>
+        </div>
+    </div>
+
+    <script>
+        function testJavaScript() {
+            const result = document.getElementById('test-result');
+            const output = document.getElementById('test-output');
+            
+            result.style.display = 'block';
+            output.innerHTML = '<p>✅ JavaScript is working correctly!</p>';
+        }
+        
+        async function testFetch() {
+            const result = document.getElementById('test-result');
+            const output = document.getElementById('test-output');
+            
+            result.style.display = 'block';
+            output.innerHTML = '<p>Testing fetch...</p>';
+            
+            try {
+                const response = await fetch('/');
+                if (response.ok) {
+                    output.innerHTML = '<p>✅ Fetch is working correctly! Server responded with status: ' + response.status + '</p>';
+                } else {
+                    output.innerHTML = '<p>❌ Fetch failed with status: ' + response.status + '</p>';
+                }
+            } catch (error) {
+                output.innerHTML = '<p>❌ Fetch failed with error: ' + error.message + '</p>';
+            }
+        }
+    </script>
+</body>
+</html>

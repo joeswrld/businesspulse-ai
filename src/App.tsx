@@ -3,13 +3,19 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { UnifiedTrialProvider } from "@/contexts/UnifiedTrialContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { TrialProvider } from '@/contexts/TrialContext';
+
+// UI components for banner
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { AlertCircle } from 'lucide-react';
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 // Direct imports
 import Index from "./pages/Index";
 import Signup from "./pages/Signup";
@@ -54,17 +60,46 @@ import ProductFeedbackForm from './pages/ProductFeedback';
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <TrialProvider>  {/* Add this */}
-          <ThemeProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <ErrorBoundary>
-                <Routes>
+// Trial banner component that can access router context
+function TrialBanner() {
+  const navigate = useNavigate();
+  const { status, daysLeft } = useSubscriptionStatus({ redirectOnExpiry: false });
+
+  if (status !== 'trial' || daysLeft > 3 || daysLeft <= 0) {
+    return null;
+  }
+
+  return (
+    <Alert className="border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20">
+      <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+      <AlertDescription className="text-orange-900 dark:text-orange-100 flex items-center">
+        Trial ending in {daysLeft} day{daysLeft !== 1 ? 's' : ''}. Upgrade to keep your features.
+        <Button
+          onClick={() => navigate('/billing')}
+          size="sm"
+          variant="link"
+          className="ml-2 text-orange-600 dark:text-orange-400 p-0 h-auto"
+        >
+          Upgrade →
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <TrialProvider>  {/* Add this */}
+            <ThemeProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <ErrorBoundary>
+                  <TrialBanner />
+                  <Routes>
                   {/* 🌍 PUBLIC ROUTES */}
                   <Route path="/" element={<Index />} />
                   <Route path="/signup" element={<Signup />} />
@@ -119,6 +154,7 @@ const App = () => (
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
