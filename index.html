@@ -1,63 +1,13 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NoteX - AI Feedback & Analytics Platform for Business Insights</title>
-<link rel="icon" href="/favicon.ico" type="image/x-icon" />
-<link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
-<link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png" />
-<link rel="icon" href="/favicon-16x16.png" sizes="16x16" type="image/png"/>
-<link rel="manifest" href="/site.webmanifest" />
-
-<meta name="description" content="Transform feedback into actionable insights with NoteX. AI-powered feedback analytics platform trusted by businesses worldwide. Start your free trial today." />
-<meta name="author" content="NoteX" />
-<meta name="keywords" content="AI feedback, customer feedback platform, AI survey tool, customer insights, real-time feedback, sentiment analysis, AI business dashboard, feedback analytics, client intelligence, AI-powered insights, business automation, customer experience analytics" />
-
-<meta property="og:title" content="NoteX - AI Feedback & Analytics Platform for Business Insights" />
-<meta property="og:description" content="Turn feedback into growth opportunities with advanced AI-powered insights. Trusted by businesses worldwide." />
-<meta property="og:type" content="website" />
-<meta property="og:image" content="https://notex.com.ng/favicon-32x32.png" />
-
-<meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:site" content="@notex_ai" />
-<meta name="twitter:title" content="NoteX - AI Feedback & Analytics Platform for Business Insights" />
-<meta name="twitter:description" content="Turn feedback into growth opportunities with AI-powered insights." />
-<meta name="twitter:image" content="https://notex.com.ng/favicon-32x32.png" />
-
-<link rel="canonical" href="https://notex.com.ng" />
-
-
-    <!-- Speed up Paystack popup by preconnecting to CDN and loading script early -->
-    <!-- Only use the inline JS -->
-<script src="https://js.paystack.co/v1/inline.js"></script>
-
-
-    <!-- Wallet conflict handler - temporarily disabled -->
-     <script src="/wallet-conflict-handler.js"></script> 
+    <title>NoteX - AI-Powered Feedback Management</title>
   </head>
-
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-
-    <script>
-      (function() {
-        try {
-          var stored = localStorage.getItem('theme');
-          var mql = window.matchMedia('(prefers-color-scheme: dark)');
-          var shouldDark = stored ? stored === 'dark' : mql.matches;
-          if (shouldDark) {
-            document.documentElement.classList.add('dark');
-          } else {
-            document.documentElement.classList.remove('dark');
-          }
-        } catch (e) {
-          // no-op
-        }
-      })();
-    </script>
-    <!-- NoteX Feedback Widget - Disabled to prevent console errors -->
-   <script src="https://notex.com.ng/widget.js" data-project-id="edd9ad53-02b0-467d-8114-1973593ed269"></script>
   </body>
 </html>
