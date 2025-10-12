@@ -1,9 +1,8 @@
 
 // src/pages/FeedbackSettings.tsx
 // Fixed version with proper JSX structure
+// At the top of FeedbackSettings.tsx, UPDATE the import section:
 
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

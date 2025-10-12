@@ -10,6 +10,8 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { TrialProvider } from '@/contexts/TrialContext';
+import { SubscriptionProvider } from './contexts/SubscriptionContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 // Direct imports
 import Index from "./pages/Index";
 import Signup from "./pages/Signup";
@@ -51,6 +53,7 @@ import CSATSurvey from "./pages/CSATSurvey";
 import ProductFeedback from "./pages/ProductFeedback";
 import CSATForm from './pages/CSATForm';
 import ProductFeedbackForm from './pages/ProductFeedback';
+import SubscriptionExpired from './pages/SubscriptionExpired';
 
 const queryClient = new QueryClient();
 
@@ -64,6 +67,7 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <ErrorBoundary>
+              <SubscriptionProvider>
                 <Routes>
                   {/* 🌍 PUBLIC ROUTES */}
                   <Route path="/" element={<Index />} />
@@ -94,6 +98,11 @@ const App = () => (
                   <Route path="/csat/:projectId" element={<CSATForm />} />
                   <Route path="/feedback/:projectId" element={<ProductFeedback />} />
                   <Route path="/product-feedback/:projectId" element={<ProductFeedbackForm />} />
+                   {/* Always Accessible (even without subscription) */}
+              <Route path="/billing" element={<Billing />} />
+              <Route path="/account" element={<Settings />} />
+              <Route path="/trial-expired" element={<TrialExpired />} />
+              <Route path="/subscription-expired" element={<SubscriptionExpired />} />
 
                   {/* 🔒 PROTECTED ROUTES */}
                   <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
@@ -112,6 +121,7 @@ const App = () => (
                   {/* ❌ CATCH-ALL */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
+                </SubscriptionProvider>
               </ErrorBoundary>
             </BrowserRouter>
           </ThemeProvider>
