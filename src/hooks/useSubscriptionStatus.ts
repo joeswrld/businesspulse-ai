@@ -1,65 +1,122 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from 'react'
+import { supabase, Profile } from '../lib/supabase'
+import { useAuth } from './useAuth'
 
-interface SubscriptionStatus {
-  status: "active" | "expired" | "none";
-  trialDaysRemaining: number;
-  plan?: string;
+export interface SubscriptionStatus {
+  hasAccess: boolean
+  status: string
+  daysRemaining: number
+  isTrialActive: boolean
+  isPaidActive: boolean
+  isLoading: boolean
+  error?: string
 }
 
-export const useSubscriptionStatus = () => {
-  const [subscription, setSubscription] = useState<SubscriptionStatus>({
-    status: "none",
-    trialDaysRemaining: 0,
-  });
-  const [loading, setLoading] = useState(true);
+export const useSubscriptionStatus = (): SubscriptionStatus => {
+  const { user } = useAuth()
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | undefined>()
 
   useEffect(() => {
-    const fetchStatus = async () => {
+    if (!user) {
+      setIsLoading(false)
+      return
+    }
+
+    // Fetch initial profile
+    const fetchProfile = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          setSubscription({ status: "none", trialDaysRemaining: 0 });
-          setLoading(false);
-          return;
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+
+        if (error) {
+          console.error('Error fetching profile:', error)
+          setError(error.message)
+          return
         }
 
-        // Fetch profile + subscription info from RPC
-        const { data: profileData, error } = await supabase
-          .rpc("get_user_profile_with_access", { user_uuid: user.id });
-
-        if (error || !profileData || profileData.length === 0) {
-          setSubscription({ status: "none", trialDaysRemaining: 0 });
-        } else {
-          const profile = profileData[0];
-          let trialDays = 0;
-          if (profile.trial_end) {
-            const now = new Date();
-            const trialEnd = new Date(profile.trial_end);
-            trialDays = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-          }
-
-          const status =
-            profile.subscription_status === "active" || trialDays > 0
-              ? "active"
-              : "expired";
-
-          setSubscription({
-            status,
-            trialDaysRemaining: trialDays,
-            plan: profile.plan || undefined,
-          });
-        }
+        setProfile(data)
       } catch (err) {
-        console.error("Error fetching subscription status:", err);
-        setSubscription({ status: "none", trialDaysRemaining: 0 });
+        console.error('Error fetching profile:', err)
+        setError('Failed to fetch subscription status')
       } finally {
-        setLoading(false);
+        setIsLoading(false)
       }
-    };
+    }
 
-    fetchStatus();
-  }, []);
+    fetchProfile()
 
-  return { subscription, loading };
-};
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('profile-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Profile updated:', payload.new)
+          setProfile(payload.new as Profile)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user])
+
+  if (!user || isLoading) {
+    return {
+      hasAccess: false,
+      status: 'loading',
+      daysRemaining: 0,
+      isTrialActive: false,
+      isPaidActive: false,
+      isLoading: true,
+      error
+    }
+  }
+
+  if (!profile) {
+    return {
+      hasAccess: false,
+      status: 'error',
+      daysRemaining: 0,
+      isTrialActive: false,
+      isPaidActive: false,
+      isLoading: false,
+      error: error || 'Profile not found'
+    }
+  }
+
+  const now = new Date()
+  const trialEndDate = new Date(profile.trial_end_date)
+  const isTrialActive = profile.subscription_status === 'trial' && now < trialEndDate
+  const isPaidActive = profile.subscription_status === 'active'
+  const hasAccess = isTrialActive || isPaidActive
+
+  // Calculate days remaining
+  let daysRemaining = 0
+  if (isTrialActive) {
+    const diffTime = trialEndDate.getTime() - now.getTime()
+    daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  }
+
+  return {
+    hasAccess,
+    status: profile.subscription_status,
+    daysRemaining,
+    isTrialActive,
+    isPaidActive,
+    isLoading: false,
+    error
+  }
+}
