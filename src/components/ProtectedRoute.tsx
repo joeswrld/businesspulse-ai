@@ -1,58 +1,102 @@
-import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useUnifiedTrial } from '@/contexts/UnifiedTrialContext';
-import PlatformLock from './PlatformLock';
+import { ReactNode } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
+import { AccessLocked } from '@/components/AccessLocked';
+import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
-  children: React.ReactNode;
-  requireActiveSubscription?: boolean;
-  fallbackPath?: string;
+  children: ReactNode;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  requireActiveSubscription = false,
-  fallbackPath = '/billing'
-}) => {
-  const { user, loading: authLoading } = useAuth();
-  const { trialStatus, checkAccess } = useUnifiedTrial();
-  const location = useLocation();
+export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+  const { isLoading, hasAccess, status, daysRemaining, isTrialActive } = useSubscriptionStatus();
 
-  // Show loading while auth is loading
-  if (authLoading) {
+  // Show loading spinner while checking subscription
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
   }
 
-  // Redirect to login if not authenticated
-  if (!user) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
-  }
-
-  // Special handling for billing page - always allow access
-  if (location.pathname === '/billing') {
+  // If user has access (trial or paid), show the protected content
+  if (hasAccess) {
     return <>{children}</>;
   }
 
-  // Show loading while trial status is loading
-  if (trialStatus.loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  // Use PlatformLock component to handle access control
-  return (
-    <PlatformLock>
-      {children}
-    </PlatformLock>
-  );
+  // If no access, show the access locked screen
+  return <AccessLocked status={status} />;
 };
 
-export default ProtectedRoute;
+// AccessLocked Component
+import { AlertCircle, Lock, CreditCard } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+interface AccessLockedProps {
+  status: 'trial' | 'active' | 'expired' | 'failed' | 'unknown';
+}
+
+export const AccessLocked = ({ status }: AccessLockedProps) => {
+  const getMessage = () => {
+    switch (status) {
+      case 'expired':
+        return {
+          title: 'Your Trial Has Expired',
+          description: 'Your 8-day free trial has ended. Upgrade to continue using NoteX.',
+          icon: AlertCircle,
+        };
+      case 'failed':
+        return {
+          title: 'Payment Failed',
+          description: 'We couldn\'t process your payment. Please update your payment method.',
+          icon: CreditCard,
+        };
+      default:
+        return {
+          title: 'Access Restricted',
+          description: 'You need an active subscription to access this feature.',
+          icon: Lock,
+        };
+    }
+  };
+
+  const { title, description, icon: Icon } = getMessage();
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+        <div className="mb-6 flex justify-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+            <Icon className="w-8 h-8 text-red-600" />
+          </div>
+        </div>
+        
+        <h1 className="text-2xl font-bold text-gray-900 mb-3">{title}</h1>
+        <p className="text-gray-600 mb-8">{description}</p>
+        
+        <div className="space-y-3">
+          <Link
+            to="/billing"
+            className="block w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+          >
+            {status === 'failed' ? 'Update Payment' : 'Upgrade Now'}
+          </Link>
+          
+          <Link
+            to="/account"
+            className="block w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+          >
+            View Account
+          </Link>
+        </div>
+        
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <p className="text-sm text-gray-500">
+            Need help? <a href="mailto:support@notex.com" className="text-blue-600 hover:underline">Contact Support</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};

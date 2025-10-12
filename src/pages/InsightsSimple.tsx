@@ -6,6 +6,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Crown } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { 
   Brain, 
   Loader2, 

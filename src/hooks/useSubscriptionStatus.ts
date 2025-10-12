@@ -1,65 +1,133 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
 
 interface SubscriptionStatus {
-  status: "active" | "expired" | "none";
-  trialDaysRemaining: number;
-  plan?: string;
+  isLoading: boolean;
+  hasAccess: boolean;
+  status: 'trial' | 'active' | 'expired' | 'failed' | 'unknown';
+  trialEndsAt: Date | null;
+  daysRemaining: number | null;
+  isTrialActive: boolean;
+  isPaidActive: boolean;
 }
 
 export const useSubscriptionStatus = () => {
-  const [subscription, setSubscription] = useState<SubscriptionStatus>({
-    status: "none",
-    trialDaysRemaining: 0,
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>({
+    isLoading: true,
+    hasAccess: false,
+    status: 'unknown',
+    trialEndsAt: null,
+    daysRemaining: null,
+    isTrialActive: false,
+    isPaidActive: false,
   });
-  const [loading, setLoading] = useState(true);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchStatus = async () => {
+    const checkSubscription = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
+        
         if (!user) {
-          setSubscription({ status: "none", trialDaysRemaining: 0 });
-          setLoading(false);
+          navigate('/login');
           return;
         }
 
-        // Fetch profile + subscription info from RPC
-        const { data: profileData, error } = await supabase
-          .rpc("get_user_profile_with_access", { user_uuid: user.id });
+        // Fetch user subscription data from Supabase
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('trial_start_date, trial_end_date, subscription_status, plan_type')
+          .eq('id', user.id)
+          .single();
 
-        if (error || !profileData || profileData.length === 0) {
-          setSubscription({ status: "none", trialDaysRemaining: 0 });
-        } else {
-          const profile = profileData[0];
-          let trialDays = 0;
-          if (profile.trial_end) {
-            const now = new Date();
-            const trialEnd = new Date(profile.trial_end);
-            trialDays = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-          }
+        if (error) throw error;
 
-          const status =
-            profile.subscription_status === "active" || trialDays > 0
-              ? "active"
-              : "expired";
-
-          setSubscription({
-            status,
-            trialDaysRemaining: trialDays,
-            plan: profile.plan || undefined,
-          });
+        const now = new Date();
+        const trialEnd = profile.trial_end_date ? new Date(profile.trial_end_date) : null;
+        
+        // Calculate days remaining
+        let daysRemaining = null;
+        if (trialEnd) {
+          const diff = trialEnd.getTime() - now.getTime();
+          daysRemaining = Math.ceil(diff / (1000 * 60 * 60 * 24));
         }
-      } catch (err) {
-        console.error("Error fetching subscription status:", err);
-        setSubscription({ status: "none", trialDaysRemaining: 0 });
-      } finally {
-        setLoading(false);
+
+        // Check trial status
+        const isTrialActive = trialEnd && now < trialEnd && 
+          (profile.subscription_status === 'trial' || !profile.subscription_status);
+
+        // Check paid subscription status
+        const isPaidActive = profile.subscription_status === 'active';
+
+        // Determine overall access
+        const hasAccess = isTrialActive || isPaidActive;
+
+        // Determine status
+        let status: SubscriptionStatus['status'] = 'unknown';
+        if (isPaidActive) {
+          status = 'active';
+        } else if (isTrialActive) {
+          status = 'trial';
+        } else if (profile.subscription_status === 'expired') {
+          status = 'expired';
+        } else if (profile.subscription_status === 'failed') {
+          status = 'failed';
+        }
+
+        setSubscriptionStatus({
+          isLoading: false,
+          hasAccess,
+          status,
+          trialEndsAt: trialEnd,
+          daysRemaining,
+          isTrialActive,
+          isPaidActive,
+        });
+
+      } catch (error) {
+        console.error('Error checking subscription:', error);
+        setSubscriptionStatus(prev => ({ ...prev, isLoading: false }));
       }
     };
 
-    fetchStatus();
-  }, []);
+    checkSubscription();
 
-  return { subscription, loading };
+    // Set up real-time subscription to profile changes
+    const channel = supabase
+      .channel('profile-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+        },
+        () => {
+          checkSubscription();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [navigate]);
+
+  return subscriptionStatus;
+};
+
+// Helper hook for protected routes
+export const useProtectedRoute = () => {
+  const subscriptionStatus = useSubscriptionStatus();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!subscriptionStatus.isLoading && !subscriptionStatus.hasAccess) {
+      navigate('/billing');
+    }
+  }, [subscriptionStatus.isLoading, subscriptionStatus.hasAccess, navigate]);
+
+  return subscriptionStatus;
 };
