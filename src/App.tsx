@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button';
 import { AlertCircle } from 'lucide-react';
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 import { SubscriptionProvider } from './contexts/SubscriptionContext';
-import { ThemeProvider } from './contexts/ThemeContext';
 // Direct imports
 import Index from "./pages/Index";
 import Signup from "./pages/Signup";
