@@ -1,7 +1,3 @@
-// PAYSTACK WEBHOOK HANDLER
-// File: supabase/functions/paystack-webhook/index.ts
-// ============================================================================
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { crypto } from 'https://deno.land/std@0.168.0/crypto/mod.ts';
@@ -11,38 +7,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-paystack-signature',
 };
 
-interface PaystackEvent {
-  event: string;
-  data: {
-    status: string;
-    reference: string;
-    amount: number;
-    currency: string;
-    customer: {
-      email: string;
-      customer_code: string;
-    };
-    metadata?: {
-      user_id?: string;
-      plan?: string;
-    };
-    subscription?: {
-      subscription_code: string;
-      email_token: string;
-    };
-  };
-}
-
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    // Verify Paystack signature
     const signature = req.headers.get('x-paystack-signature');
     const body = await req.text();
+    
+    // Verify signature
     const hash = await crypto.subtle.digest(
       'SHA-512',
       new TextEncoder().encode(Deno.env.get('PAYSTACK_SECRET_KEY')! + body)
@@ -52,146 +26,99 @@ serve(async (req) => {
       .join('');
 
     if (signature !== expectedSignature) {
-      console.error('Invalid webhook signature');
+      console.error('Invalid signature');
       return new Response(JSON.stringify({ error: 'Invalid signature' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const event: PaystackEvent = JSON.parse(body);
-    console.log('Paystack Event:', event.event, event.data);
+    const event = JSON.parse(body);
+    console.log('✅ Webhook received:', event.event);
 
-    // Initialize Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Handle different event types
-    switch (event.event) {
-      case 'charge.success':
-        await handleChargeSuccess(supabase, event);
-        break;
+    // Handle charge.success - This is the critical event
+    if (event.event === 'charge.success') {
+      const { data: eventData } = event;
       
-      case 'subscription.create':
-        await handleSubscriptionCreate(supabase, event);
-        break;
+      // Extract user_id from metadata
+      const userId = eventData.metadata?.user_id;
       
-      case 'subscription.disable':
-      case 'subscription.not_renew':
-        await handleSubscriptionDisable(supabase, event);
-        break;
-      
-      case 'invoice.payment_failed':
-        await handlePaymentFailed(supabase, event);
-        break;
-      
-      default:
-        console.log('Unhandled event type:', event.event);
+      if (!userId) {
+        console.error('❌ No user_id in payment metadata');
+        return new Response(JSON.stringify({ error: 'No user_id' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log('💳 Processing payment for user:', userId);
+
+      // CRITICAL: Update billing profile to grant access
+      const nextBillingDate = new Date();
+      nextBillingDate.setDate(nextBillingDate.getDate() + 30); // 30 days from now
+
+      const { data: updateData, error: updateError } = await supabase
+        .from('billing_profiles')
+        .update({
+          plan: 'business',
+          subscription_status: 'active',
+          next_billing_date: nextBillingDate.toISOString(),
+          paystack_customer_id: eventData.customer?.customer_code || null,
+          trial_ends_at: null, // Clear trial date - user is now paid
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId)
+        .select();
+
+      if (updateError) {
+        console.error('❌ Failed to update billing profile:', updateError);
+        throw updateError;
+      }
+
+      console.log('✅ Billing profile updated:', updateData);
+
+      // Record the transaction
+      await supabase.from('transactions').insert({
+        user_id: userId,
+        amount: eventData.amount,
+        currency: eventData.currency || 'NGN',
+        status: 'success',
+        paystack_reference: eventData.reference,
+        description: 'Business Plan Subscription',
+        created_at: new Date().toISOString(),
+      });
+
+      console.log('✅ Transaction recorded');
+      console.log('🎉 USER GRANTED INSTANT ACCESS:', userId);
+
+      return new Response(JSON.stringify({ 
+        success: true,
+        message: 'Payment processed successfully',
+        userId,
+        plan: 'business',
+        status: 'active'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
     }
 
+    // Handle other events...
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
   } catch (error) {
-    console.error('Webhook error:', error);
+    console.error('❌ Webhook error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
-
-// ============================================================================
-// WEBHOOK EVENT HANDLERS
-// ============================================================================
-
-async function handleChargeSuccess(supabase: any, event: PaystackEvent) {
-  const { data, status, reference, amount, currency, customer, metadata } = event.data;
-  
-  if (status !== 'success') return;
-
-  const userId = metadata?.user_id;
-  if (!userId) {
-    console.error('No user_id in metadata');
-    return;
-  }
-
-  // Record transaction
-  await supabase.from('transactions').insert({
-    user_id: userId,
-    amount,
-    currency,
-    status: 'success',
-    paystack_reference: reference,
-    description: 'Subscription Payment',
-    created_at: new Date().toISOString(),
-  });
-
-  // Update billing profile - INSTANT ACCESS
-  const nextBillingDate = new Date();
-  nextBillingDate.setDate(nextBillingDate.getDate() + 30);
-
-  await supabase.from('billing_profiles').update({
-    plan: 'business',
-    subscription_status: 'active',
-    next_billing_date: nextBillingDate.toISOString(),
-    paystack_customer_id: customer.customer_code,
-    trial_ends_at: null, // Clear trial date
-  }).eq('id', userId);
-
-  console.log('✅ Payment successful - User granted instant access:', userId);
-}
-
-async function handleSubscriptionCreate(supabase: any, event: PaystackEvent) {
-  const userId = event.data.metadata?.user_id;
-  if (!userId) return;
-
-  const subscriptionCode = event.data.subscription?.subscription_code;
-
-  await supabase.from('billing_profiles').update({
-    plan: 'business',
-    subscription_status: 'active',
-    paystack_subscription_id: subscriptionCode,
-    paystack_customer_id: event.data.customer.customer_code,
-  }).eq('id', userId);
-
-  console.log('✅ Subscription created:', userId);
-}
-
-async function handleSubscriptionDisable(supabase: any, event: PaystackEvent) {
-  const userId = event.data.metadata?.user_id;
-  if (!userId) return;
-
-  await supabase.from('billing_profiles').update({
-    subscription_status: 'cancelled',
-  }).eq('id', userId);
-
-  console.log('❌ Subscription cancelled:', userId);
-}
-
-async function handlePaymentFailed(supabase: any, event: PaystackEvent) {
-  const userId = event.data.metadata?.user_id;
-  if (!userId) return;
-
-  // Record failed transaction
-  await supabase.from('transactions').insert({
-    user_id: userId,
-    amount: event.data.amount,
-    currency: event.data.currency,
-    status: 'failed',
-    paystack_reference: event.data.reference,
-    description: 'Failed Payment Attempt',
-    created_at: new Date().toISOString(),
-  });
-
-  // Update billing profile
-  await supabase.from('billing_profiles').update({
-    subscription_status: 'failed',
-  }).eq('id', userId);
-
-  console.log('❌ Payment failed:', userId);
-}
