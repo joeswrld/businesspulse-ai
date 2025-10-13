@@ -1,6 +1,3 @@
-// src/pages/Dashboard.tsx
-// Fixed version with proper React hooks order
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -28,7 +25,6 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
 
-// Types remain the same...
 interface Feedback {
     id: string;
     project_id: string;
@@ -64,9 +60,8 @@ export default function Dashboard() {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    // ALL HOOKS MUST BE CALLED FIRST - BEFORE ANY CONDITIONAL RETURNS
-    const { hasAccess, isLoading: loadingSubscription, isTrialExpired, 
-            isSubscriptionExpired, daysLeft, status } = useSubscriptionStatus({
+    // ✅ ALL HOOKS MUST BE CALLED FIRST - UNCONDITIONALLY
+    const subscriptionStatus = useSubscriptionStatus({
         redirectOnExpiry: true,
         allowBillingPage: false
     });
@@ -82,7 +77,15 @@ export default function Dashboard() {
         to: undefined
     });
 
-    // Sentiment analysis helper
+    // ✅ Safely extract subscription values with defaults
+    const hasAccess = subscriptionStatus?.hasAccess ?? false;
+    const loadingSubscription = subscriptionStatus?.isLoading ?? true;
+    const isTrialExpired = subscriptionStatus?.isTrialExpired ?? false;
+    const isSubscriptionExpired = subscriptionStatus?.isSubscriptionExpired ?? false;
+    const daysLeft = subscriptionStatus?.daysLeft ?? 0;
+    const status = subscriptionStatus?.status ?? 'inactive';
+
+    // Sentiment analysis
     const analyzeSentiment = useCallback((message: string, rating: number | null): 'positive' | 'neutral' | 'negative' => {
         if (rating !== null) {
             if (rating >= 4) return 'positive';
@@ -112,8 +115,7 @@ export default function Dashboard() {
                 .eq('user_id', user.id)
                 .maybeSingle();
 
-            if (settingsError) {
-                console.error('Error fetching feedback settings:', settingsError);
+            if (settingsError && settingsError.code !== 'PGRST116') {
                 throw new Error('Failed to load feedback settings');
             }
 
@@ -123,24 +125,19 @@ export default function Dashboard() {
                 const newProjectId = crypto.randomUUID();
                 const baseUrl = window.location.origin;
                 
-                const newSettings = {
-                    user_id: user.id,
-                    project_id: newProjectId,
-                    customer_survey_url: `${baseUrl}/csat/${newProjectId}`,
-                    product_feedback_url: `${baseUrl}/product-feedback/${newProjectId}`,
-                    widget_code: `<script src="${baseUrl}/widget.js" data-project-id="${newProjectId}"></script>`
-                };
-
                 const { data: createdSettings, error: createError } = await supabase
                     .from('feedback_settings')
-                    .insert(newSettings)
+                    .insert({
+                        user_id: user.id,
+                        project_id: newProjectId,
+                        customer_survey_url: `${baseUrl}/csat/${newProjectId}`,
+                        product_feedback_url: `${baseUrl}/product-feedback/${newProjectId}`,
+                        widget_code: `<script src="${baseUrl}/widget.js" data-project-id="${newProjectId}"></script>`
+                    })
                     .select()
                     .single();
 
-                if (createError) {
-                    console.error('Error creating feedback settings:', createError);
-                    throw new Error('Failed to create feedback settings');
-                }
+                if (createError) throw new Error('Failed to create feedback settings');
                 settings = createdSettings;
             } else {
                 settings = existingSettings;
@@ -148,22 +145,18 @@ export default function Dashboard() {
 
             setFeedbackSettings(settings);
 
-            if (settings && settings.project_id) {
+            if (settings?.project_id) {
                 const { data: feedbacksData, error: feedbacksError } = await supabase
                     .from('feedback')
                     .select('*')
                     .eq('project_id', settings.project_id)
                     .order('created_at', { ascending: false });
 
-                if (feedbacksError) {
-                    console.error('Error loading feedbacks:', feedbacksError);
-                    throw new Error('Failed to load feedback data');
-                }
+                if (feedbacksError) throw new Error('Failed to load feedback data');
                 setFeedbacks(feedbacksData || []);
             }
-        } catch (error) {
-            console.error('Error loading dashboard data:', error);
-            const errorMessage = error instanceof Error ? error.message : 'An error occurred while loading data';
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
             setError(errorMessage);
             toast.error('Dashboard Error', { description: errorMessage });
         } finally {
@@ -190,7 +183,7 @@ export default function Dashboard() {
                 table: 'feedback',
                 filter: `project_id=eq.${feedbackSettings.project_id}`
             }, () => {
-                toast.success('New feedback received!', { description: 'Dashboard data updated' });
+                toast.success('New feedback received!');
                 loadDashboardData();
             })
             .subscribe();
@@ -200,7 +193,7 @@ export default function Dashboard() {
         };
     }, [user, feedbackSettings, loadDashboardData, hasAccess]);
 
-    // Get date range for filtering
+    // Get date range
     const getDateRange = useCallback((): { start: Date; end: Date } => {
         const now = new Date();
         const end = customDateRange.to || now;
@@ -241,63 +234,85 @@ export default function Dashboard() {
         };
     }, [feedbacks, getDateRange, analyzeSentiment]);
 
+    // Chart data with safety checks
     const chartData = useMemo(() => {
-        const { start, end } = getDateRange();
-        const filteredFeedbacks = feedbacks.filter(feedback => {
-            const feedbackDate = new Date(feedback.created_at);
-            return feedbackDate >= start && feedbackDate <= end;
-        });
+        try {
+            const { start, end } = getDateRange();
+            const filteredFeedbacks = feedbacks.filter(feedback => {
+                const feedbackDate = new Date(feedback.created_at);
+                return feedbackDate >= start && feedbackDate <= end;
+            });
 
-        const volumeData: Record<string, number> = {};
-        filteredFeedbacks.forEach(feedback => {
-            const date = new Date(feedback.created_at).toISOString().split('T')[0];
-            volumeData[date] = (volumeData[date] || 0) + 1;
-        });
+            const volumeData: Record<string, number> = {};
+            filteredFeedbacks.forEach(feedback => {
+                const date = new Date(feedback.created_at).toISOString().split('T')[0];
+                volumeData[date] = (volumeData[date] || 0) + 1;
+            });
 
-        return Object.entries(volumeData)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([date, count]) => ({ date, count }));
+            return Object.entries(volumeData)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([date, count]) => ({ date, count }));
+        } catch (err) {
+            console.error('Error generating chart data:', err);
+            return [];
+        }
     }, [feedbacks, getDateRange]);
 
     const sentimentData = useMemo(() => {
-        return [
-            { name: 'Positive', value: dashboardMetrics.positiveFeedback, color: '#10b981' },
-            { name: 'Neutral', value: dashboardMetrics.neutralFeedback, color: '#f59e0b' },
-            { name: 'Negative', value: dashboardMetrics.negativeFeedback, color: '#ef4444' }
-        ].filter(item => item.value > 0);
+        try {
+            return [
+                { name: 'Positive', value: dashboardMetrics.positiveFeedback, color: '#10b981' },
+                { name: 'Neutral', value: dashboardMetrics.neutralFeedback, color: '#f59e0b' },
+                { name: 'Negative', value: dashboardMetrics.negativeFeedback, color: '#ef4444' }
+            ].filter(item => item.value > 0);
+        } catch (err) {
+            console.error('Error generating sentiment data:', err);
+            return [];
+        }
     }, [dashboardMetrics]);
 
     const ratingData = useMemo(() => {
-        const { start, end } = getDateRange();
-        const filteredFeedbacks = feedbacks.filter(feedback => {
-            const feedbackDate = new Date(feedback.created_at);
-            return feedbackDate >= start && feedbackDate <= end && feedback.rating !== null;
-        });
+        try {
+            const { start, end } = getDateRange();
+            const filteredFeedbacks = feedbacks.filter(feedback => {
+                const feedbackDate = new Date(feedback.created_at);
+                return feedbackDate >= start && feedbackDate <= end && feedback.rating !== null;
+            });
 
-        const ratingCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-        filteredFeedbacks.forEach(fb => {
-            if (fb.rating) ratingCounts[fb.rating]++;
-        });
+            const ratingCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+            filteredFeedbacks.forEach(fb => {
+                if (fb.rating) ratingCounts[fb.rating]++;
+            });
 
-        return [
-            { rating: '5★', count: ratingCounts[5] },
-            { rating: '4★', count: ratingCounts[4] },
-            { rating: '3★', count: ratingCounts[3] },
-            { rating: '2★', count: ratingCounts[2] },
-            { rating: '1★', count: ratingCounts[1] }
-        ];
+            return [
+                { rating: '5★', count: ratingCounts[5] },
+                { rating: '4★', count: ratingCounts[4] },
+                { rating: '3★', count: ratingCounts[3] },
+                { rating: '2★', count: ratingCounts[2] },
+                { rating: '1★', count: ratingCounts[1] }
+            ];
+        } catch (err) {
+            console.error('Error generating rating data:', err);
+            return [];
+        }
     }, [feedbacks, getDateRange]);
 
     const recentFeedbacks = useMemo(() => {
-        const { start, end } = getDateRange();
-        return feedbacks
-            .filter(feedback => {
-                const feedbackDate = new Date(feedback.created_at);
-                return feedbackDate >= start && feedbackDate <= end;
-            })
-            .slice(0, 10);
+        try {
+            const { start, end } = getDateRange();
+            return feedbacks
+                .filter(feedback => {
+                    const feedbackDate = new Date(feedback.created_at);
+                    return feedbackDate >= start && feedbackDate <= end;
+                })
+                .slice(0, 10);
+        } catch (err) {
+            console.error('Error filtering recent feedbacks:', err);
+            return [];
+        }
     }, [feedbacks, getDateRange]);
 
+    // Helper functions
     const formatDate = (dateString: string) => {
         try {
             return format(new Date(dateString), 'MMM dd, yyyy HH:mm');
@@ -314,7 +329,7 @@ export default function Dashboard() {
         }
     };
 
-    // NOW WE CAN DO CONDITIONAL RETURNS AFTER ALL HOOKS
+    // NOW SAFE TO DO CONDITIONAL RENDERS
     if (!user) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -398,21 +413,19 @@ export default function Dashboard() {
     if (error) {
         return (
             <div className="container mx-auto p-6">
-                <div className="flex items-center justify-center min-h-[400px]">
-                    <Card className="w-full max-w-md">
-                        <CardContent className="p-6">
-                            <div className="text-center">
-                                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                                <h2 className="text-xl font-semibold mb-2">Dashboard Error</h2>
-                                <p className="text-gray-600 mb-4">{error}</p>
-                                <Button onClick={loadDashboardData}>
-                                    <RefreshCw className="h-4 w-4 mr-2" />
-                                    Try Again
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                <Card className="w-full max-w-md mx-auto">
+                    <CardContent className="p-6">
+                        <div className="text-center">
+                            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                            <h2 className="text-xl font-semibold mb-2">Dashboard Error</h2>
+                            <p className="text-gray-600 mb-4">{error}</p>
+                            <Button onClick={loadDashboardData}>
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Try Again
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         );
     }
@@ -422,17 +435,17 @@ export default function Dashboard() {
     return (
         <div className="container mx-auto p-6 space-y-6">
             {showTrialWarning && (
-                <Alert className="border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20">
-                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                    <AlertDescription className="text-orange-900 dark:text-orange-100">
+                <Alert className="border-orange-300 bg-orange-50">
+                    <AlertCircle className="h-4 w-4 text-orange-600" />
+                    <AlertDescription className="text-orange-900">
                         <div className="flex items-center justify-between">
                             <div>
-                                <strong>Trial ending soon!</strong> You have {daysLeft} day{daysLeft !== 1 ? 's' : ''} left. Upgrade to keep your data and features.
+                                <strong>Trial ending soon!</strong> You have {daysLeft} day{daysLeft !== 1 ? 's' : ''} left.
                             </div>
                             <Button
                                 onClick={() => navigate('/billing')}
                                 size="sm"
-                                className="bg-orange-600 hover:bg-orange-700 text-white"
+                                className="bg-orange-600 hover:bg-orange-700"
                             >
                                 Upgrade Now
                             </Button>
@@ -447,20 +460,10 @@ export default function Dashboard() {
                     <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
                     <p className="mt-2 flex items-center gap-2">
                         Real-time insights • {dashboardMetrics.totalFeedback} total feedback
-                        {status === 'trial' && (
-                            <Badge className="bg-primary/10 text-primary">
-                                Trial: {daysLeft} days left
-                            </Badge>
-                        )}
-                        {status === 'active' && (
-                            <Badge className="bg-green-500/10 text-green-600 dark:text-green-400">
-                                Active Subscription
-                            </Badge>
-                        )}
                     </p>
                 </div>
-                <Button variant="outline" onClick={loadDashboardData} disabled={loading}>
-                    <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                <Button variant="outline" onClick={loadDashboardData}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
                     Refresh
                 </Button>
             </div>
