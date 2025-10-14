@@ -19,14 +19,9 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  FileText,
   History,
   Zap,
-  CheckSquare,
-  Square,
   Star,
-  Calendar,
-  User,
   TrendingUp,
   Target,
   Lightbulb,
@@ -97,58 +92,8 @@ export default function InsightsPage() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [expandedInsightId, setExpandedInsightId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-   
-  if (loadingSubscription) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Checking access...</p>
-        </div>
-      </div>
-    );
-  }
-  if (!hasAccess) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-red-950 p-4">
-        <Card className="w-full max-w-md shadow-2xl border-2 border-red-200 dark:border-red-800">
-          <CardHeader className="text-center space-y-4">
-            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
-              <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
-            </div>
-            <CardTitle className="text-2xl">AI Insights Access Locked</CardTitle>
-            <p className="text-muted-foreground">
-              {isTrialExpired 
-                ? 'Your trial has expired. Upgrade to access AI insights.'
-                : isSubscriptionExpired
-                ? 'Your subscription has expired. Renew to continue.'
-                : 'Active subscription required to access AI insights.'}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button 
-              onClick={() => navigate('/billing')}
-              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
-              size="lg"
-            >
-              <Crown className="h-5 w-5 mr-2" />
-              {isSubscriptionExpired ? 'Renew Subscription' : 'Upgrade Now'}
-            </Button>
-            <Button 
-              onClick={() => navigate('/dashboard')}
-              variant="outline"
-              className="w-full"
-            >
-              Back to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
-  // --- Existing useEffect / fetch functions remain unchanged ---
-
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   useEffect(() => {
     if (user) {
       if (activeTab === 'generate') {
@@ -241,10 +186,19 @@ export default function InsightsPage() {
   };
 
   const generateInsight = async () => {
-    if (!hasAccess) {
+    if (selectedFeedbacks.size === 0) {
       toast({
         title: 'No Feedback Selected',
         description: 'Please select at least one feedback to generate insights',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (!hasAccess) {
+      toast({
+        title: 'Access Denied',
+        description: 'Active subscription required to generate insights',
         variant: 'destructive'
       });
       return;
@@ -342,8 +296,6 @@ export default function InsightsPage() {
         feedback_count: selectedFeedbacks.size
       };
 
-      console.log('Attempting to insert:', insertData);
-
       const { data, error } = await supabase
         .from('insights')
         .insert(insertData)
@@ -354,8 +306,6 @@ export default function InsightsPage() {
         console.error('Supabase insert error:', error);
         throw error;
       }
-
-      console.log('Insert successful:', data);
 
       toast({
         title: '💾 Saved!',
@@ -506,6 +456,57 @@ export default function InsightsPage() {
     );
   };
 
+  // CONDITIONAL RETURNS AFTER ALL HOOKS
+  if (loadingSubscription) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-red-950 p-4">
+        <Card className="w-full max-w-md shadow-2xl border-2 border-red-200 dark:border-red-800">
+          <CardHeader className="text-center space-y-4">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
+              <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+            <CardTitle className="text-2xl">AI Insights Access Locked</CardTitle>
+            <p className="text-muted-foreground">
+              {isTrialExpired 
+                ? 'Your trial has expired. Upgrade to access AI insights.'
+                : isSubscriptionExpired
+                ? 'Your subscription has expired. Renew to continue.'
+                : 'Active subscription required to access AI insights.'}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button 
+              onClick={() => navigate('/billing')}
+              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+              size="lg"
+            >
+              <Crown className="h-5 w-5 mr-2" />
+              {isSubscriptionExpired ? 'Renew Subscription' : 'Upgrade Now'}
+            </Button>
+            <Button 
+              onClick={() => navigate('/dashboard')}
+              variant="outline"
+              className="w-full"
+            >
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="container mx-auto p-4 md:p-6 max-w-7xl">
@@ -527,8 +528,7 @@ export default function InsightsPage() {
         {/* Tabs */}
         <div className="flex space-x-2 mb-6 border-b border-gray-200 dark:border-gray-700">
           <button
-            onClick={generateInsight}
-            disabled={selectedFeedbacks.size === 0 || generating || !hasAccess}
+            onClick={() => setActiveTab('generate')}
             className={`px-4 py-2 font-medium transition-colors border-b-2 ${
               activeTab === 'generate'
                 ? 'border-blue-600 text-blue-600'
