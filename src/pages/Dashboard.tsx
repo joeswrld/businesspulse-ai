@@ -1,3 +1,6 @@
+// src/pages/Dashboard.tsx
+// ✅ FIXED: PieChart icon import issue resolved
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -14,15 +17,27 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+// ✅ FIXED: Separate icon imports from chart imports
 import {
     BarChart3, MessageSquare, CheckCircle, AlertCircle, Clock, RefreshCw,
     Crown, Calendar as CalendarIcon, TrendingUp, LineChart,
-    BarChart as BarChartIcon, Activity, Minus, Loader2, Lock
+    BarChart as BarChartIcon, Activity, Minus, Loader2, Lock, 
+    PieChart as PieChartIcon  // ✅ Added: PieChart icon from lucide-react
 } from 'lucide-react';
 
 import {
-    BarChart as RechartsBarChart, Bar, PieChart as RechartsPieChart, Cell, Pie,
-    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area
+    BarChart as RechartsBarChart, 
+    Bar, 
+    PieChart as RechartsPieChart,  // ✅ Chart component from recharts
+    Cell, 
+    Pie,
+    XAxis, 
+    YAxis, 
+    CartesianGrid, 
+    Tooltip, 
+    ResponsiveContainer, 
+    AreaChart, 
+    Area
 } from 'recharts';
 
 interface Feedback {
@@ -60,7 +75,7 @@ export default function Dashboard() {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    // ✅ ALL HOOKS MUST BE CALLED FIRST - UNCONDITIONALLY
+    // ✅ ALL HOOKS CALLED FIRST
     const subscriptionStatus = useSubscriptionStatus({
         redirectOnExpiry: true,
         allowBillingPage: false
@@ -77,7 +92,7 @@ export default function Dashboard() {
         to: undefined
     });
 
-    // ✅ Safely extract subscription values with defaults
+    // ✅ Safe defaults
     const hasAccess = subscriptionStatus?.hasAccess ?? false;
     const loadingSubscription = subscriptionStatus?.isLoading ?? true;
     const isTrialExpired = subscriptionStatus?.isTrialExpired ?? false;
@@ -329,7 +344,7 @@ export default function Dashboard() {
         }
     };
 
-    // NOW SAFE TO DO CONDITIONAL RENDERS
+    // Conditional renders AFTER all hooks
     if (!user) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -660,11 +675,11 @@ export default function Dashboard() {
                     </CardContent>
                 </Card>
 
-                {/* Sentiment Breakdown */}
+                {/* Sentiment Breakdown - ✅ FIXED: Using PieChartIcon for the header icon */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center space-x-2">
-                            <PieChart className="h-5 w-5" />
+                            <PieChartIcon className="h-5 w-5" />
                             <span>Sentiment</span>
                         </CardTitle>
                     </CardHeader>
