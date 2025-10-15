@@ -1,3 +1,6 @@
+// src/hooks/useSubscriptionStatus.ts
+// FALLBACK VERSION - Works without RPC function
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,70 +44,96 @@ export function useSubscriptionStatus(options?: {
     try {
       console.log('🔍 Checking subscription for user:', user.id);
 
-      // Use RPC function for consistent access logic
-      const { data, error } = await supabase
-        .rpc('get_user_profile_with_access', { user_uuid: user.id });
+      // DIRECT QUERY - No RPC function needed
+      const { data: profile, error } = await supabase
+        .from('billing_profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
 
       if (error) {
-        console.error('❌ RPC error:', error);
+        console.error('❌ Query error:', error);
+        
+        // If profile doesn't exist, create trial
+        if (error.code === 'PGRST116') {
+          console.log('⚠️ No profile found, creating trial...');
+          const trialEndDate = new Date(Date.now() + 8 * 24 * 60 * 60 * 1000);
+          
+          const { error: createError } = await supabase
+            .from('billing_profiles')
+            .insert({
+              id: user.id,
+              plan: 'trial',
+              subscription_status: 'trial',
+              trial_ends_at: trialEndDate.toISOString(),
+              created_at: new Date().toISOString(),
+            });
+
+          if (!createError) {
+            setState({
+              hasAccess: true,
+              isLoading: false,
+              isTrialExpired: false,
+              isSubscriptionExpired: false,
+              daysLeft: 8,
+              status: 'trial',
+              plan: 'trial',
+            });
+            return;
+          }
+        }
+        
         throw error;
       }
 
-      console.log('📊 Subscription data:', data);
+      console.log('📊 Profile data:', profile);
 
-      if (!data || data.length === 0) {
-        console.warn('⚠️ No billing profile found - creating trial');
-        
-        // Create trial profile
-        const trialEndDate = new Date(Date.now() + 8 * 24 * 60 * 60 * 1000);
-        await supabase.from('billing_profiles').insert({
-          id: user.id,
-          plan: 'trial',
-          subscription_status: 'trial',
-          trial_ends_at: trialEndDate.toISOString(),
-          created_at: new Date().toISOString(),
-        });
-
-        setState({
-          hasAccess: true,
-          isLoading: false,
-          isTrialExpired: false,
-          isSubscriptionExpired: false,
-          daysLeft: 8,
-          status: 'trial',
-          plan: 'trial',
-        });
-        return;
-      }
-
-      const profile = data[0];
+      // Calculate access locally
+      const now = new Date();
+      const trialEnd = profile.trial_ends_at ? new Date(profile.trial_ends_at) : null;
       
-      // CRITICAL: Determine access based on backend calculation
-      const hasAccess = profile.has_access === true;
-      const daysLeft = profile.days_left || 0;
-      
-      // Determine plan and status
-      let plan: 'trial' | 'business' | 'expired' = 'expired';
-      let status: 'trial' | 'active' | 'expired' | 'cancelled' = 'expired';
+      // Determine if user has access
+      let hasAccess = false;
       let isTrialExpired = false;
       let isSubscriptionExpired = false;
-
+      let plan: 'trial' | 'business' | 'expired' = 'expired';
+      let status: 'trial' | 'active' | 'expired' | 'cancelled' = 'expired';
+      
+      // CRITICAL ACCESS LOGIC
       if (profile.plan === 'business' && profile.subscription_status === 'active') {
+        // Business plan with active subscription = ACCESS GRANTED
+        hasAccess = true;
         plan = 'business';
         status = 'active';
       } else if (profile.plan === 'trial') {
-        if (hasAccess) {
+        // Trial plan
+        if (trialEnd && now <= trialEnd) {
+          // Trial still valid = ACCESS GRANTED
+          hasAccess = true;
           plan = 'trial';
           status = 'trial';
         } else {
+          // Trial expired = NO ACCESS
+          hasAccess = false;
           plan = 'expired';
           status = 'expired';
           isTrialExpired = true;
         }
       } else if (profile.subscription_status === 'cancelled' || profile.subscription_status === 'expired') {
+        // Cancelled or expired subscription = NO ACCESS
+        hasAccess = false;
         plan = 'expired';
         status = profile.subscription_status;
         isSubscriptionExpired = true;
+      }
+
+      // Calculate days left
+      let daysLeft = 0;
+      if (profile.plan === 'trial' && trialEnd) {
+        daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+      } else if (profile.plan === 'business' && profile.next_billing_date) {
+        const nextBilling = new Date(profile.next_billing_date);
+        daysLeft = Math.max(0, Math.ceil((nextBilling.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
       }
 
       console.log('✅ Access decision:', {
@@ -112,7 +141,8 @@ export function useSubscriptionStatus(options?: {
         plan,
         status,
         daysLeft,
-        subscriptionStatus: profile.subscription_status
+        subscriptionStatus: profile.subscription_status,
+        trialEndsAt: profile.trial_ends_at
       });
 
       setState({
@@ -125,15 +155,18 @@ export function useSubscriptionStatus(options?: {
         plan,
       });
 
-      // Redirect if no access and redirect option is enabled
+      // Redirect if no access
       if (!hasAccess && options?.redirectOnExpiry && !options?.allowBillingPage) {
         const currentPath = window.location.pathname;
-        if (!currentPath.startsWith('/billing') && !currentPath.startsWith('/trial-expired')) {
-          console.log('🚫 No access - redirecting to trial-expired');
+        if (!currentPath.startsWith('/billing') && 
+            !currentPath.startsWith('/trial-expired') && 
+            !currentPath.startsWith('/subscription-expired')) {
+          console.log('🚫 No access - redirecting...');
+          
           if (isTrialExpired) {
-            navigate('/trial-expired');
+            navigate('/trial-expired', { replace: true });
           } else if (isSubscriptionExpired) {
-            navigate('/subscription-expired');
+            navigate('/subscription-expired', { replace: true });
           }
         }
       }
@@ -155,7 +188,7 @@ export function useSubscriptionStatus(options?: {
   useEffect(() => {
     checkSubscriptionStatus();
 
-    // Refresh every minute to catch payment updates
+    // Refresh every minute
     const interval = setInterval(checkSubscriptionStatus, 60 * 1000);
 
     // Subscribe to realtime changes
@@ -174,11 +207,10 @@ export function useSubscriptionStatus(options?: {
             console.log('🔔 Billing profile updated:', payload);
             checkSubscriptionStatus();
             
-            // Show success toast if user just upgraded
             const newData = payload.new as any;
             if (newData.subscription_status === 'active' && newData.plan === 'business') {
               toast.success('🎉 Subscription activated!', {
-                description: 'You now have full access to all features',
+                description: 'You now have full access',
                 duration: 5000,
               });
             }
@@ -200,3 +232,7 @@ export function useSubscriptionStatus(options?: {
     refresh: checkSubscriptionStatus,
   };
 }
+
+// USAGE: This hook works exactly the same as before
+// Just replace the import in all your pages:
+// import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
