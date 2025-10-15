@@ -17,12 +17,13 @@ import { toast } from 'sonner';
 import {
   MessageSquare, Star, Filter, Search, Download, RefreshCw, Clock, AlertCircle,
   BarChart3, LineChart, TrendingUp, TrendingDown, Sparkles, Mail, ExternalLink,
-  CheckCircle2, AlertTriangle, Copy, Bell, BellOff, Crown, Lock, Loader2
+  CheckCircle2, AlertTriangle, Copy, Bell, BellOff, Crown, Lock, Loader2,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 import {
   AreaChart, Area, PieChart as RechartsPieChart, Cell, Pie,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar
 } from 'recharts';
 
 // Types
@@ -77,7 +78,6 @@ interface EmailNotificationPreferences {
 }
 
 export default function Feedback() {
-  // ✅ ALL HOOKS MUST BE CALLED FIRST - UNCONDITIONALLY
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -86,15 +86,11 @@ export default function Feedback() {
     allowBillingPage: false
   });
 
-  // ✅ Safe defaults
   const hasAccess = subscriptionStatus?.hasAccess ?? false;
   const loadingSubscription = subscriptionStatus?.isLoading ?? true;
   const isTrialExpired = subscriptionStatus?.isTrialExpired ?? false;
   const isSubscriptionExpired = subscriptionStatus?.isSubscriptionExpired ?? false;
-  const daysLeft = subscriptionStatus?.daysLeft ?? 0;
-  const status = subscriptionStatus?.status ?? 'inactive';
   
-  // ✅ ALL STATE HOOKS TOGETHER
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +107,6 @@ export default function Feedback() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
-  const [aiProcessing, setAiProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [emailPreferences, setEmailPreferences] = useState<EmailNotificationPreferences>({
     enabled: true,
@@ -122,7 +117,6 @@ export default function Feedback() {
   });
   const [savingPreferences, setSavingPreferences] = useState(false);
 
-  // ✅ ALL CALLBACKS
   const analyzeSentiment = useCallback((message: string): 'positive' | 'neutral' | 'negative' => {
     const lowerMessage = message.toLowerCase();
     const positiveWords = ['great', 'excellent', 'amazing', 'love', 'awesome', 'fantastic', 'good', 'best', 'wonderful'];
@@ -137,26 +131,16 @@ export default function Feedback() {
   }, []);
 
   const sendEmailNotification = useCallback(async (feedback: Feedback) => {
-    if (!emailPreferences.enabled || !emailPreferences.notifyOnNewFeedback) {
-      console.log('Email notifications disabled, skipping...');
-      return;
-    }
+    if (!emailPreferences.enabled || !emailPreferences.notifyOnNewFeedback) return;
 
     if (emailPreferences.notifyOnNegativeFeedback) {
       const sentiment = analyzeSentiment(feedback.message);
-      if (sentiment !== 'negative' && (!feedback.rating || feedback.rating > 2)) {
-        console.log('Not a negative feedback, skipping notification...');
-        return;
-      }
+      if (sentiment !== 'negative' && (!feedback.rating || feedback.rating > 2)) return;
     }
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        console.error('No active session for email notification');
-        return;
-      }
+      if (!session) return;
 
       const response = await fetch('/api/send-feedback-email', {
         method: 'POST',
@@ -176,19 +160,9 @@ export default function Feedback() {
         })
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to send email');
-      }
-
-      console.log('✅ Email notification sent:', result);
+      if (!response.ok) throw new Error('Failed to send email');
       
-      toast.success('Email notification sent', {
-        description: 'You\'ve been notified about the new feedback',
-        duration: 3000
-      });
-
+      toast.success('Email notification sent');
     } catch (error) {
       console.error('Failed to send email notification:', error);
     }
@@ -334,14 +308,10 @@ export default function Feedback() {
 
       if (error) throw error;
 
-      toast.success('Preferences saved', {
-        description: 'Your email notification settings have been updated.'
-      });
+      toast.success('Preferences saved');
     } catch (error) {
       console.error('Failed to save preferences:', error);
-      toast.error('Failed to save preferences', {
-        description: 'Please try again.'
-      });
+      toast.error('Failed to save preferences');
     } finally {
       setSavingPreferences(false);
     }
@@ -373,9 +343,8 @@ export default function Feedback() {
     toast.success('Export successful', {
       description: `${filteredFeedbacks.length} feedback entries exported to CSV`
     });
-  }, [feedbacks, filters]);
+  }, []);
 
-  // ✅ ALL useEffect HOOKS
   useEffect(() => {
     if (user && hasAccess) {
       loadFeedbackData();
@@ -385,8 +354,6 @@ export default function Feedback() {
   useEffect(() => {
     if (!user || !feedbackSettings || !hasAccess) return;
 
-    console.log('🔔 Setting up real-time feedback listener...');
-
     const channel = supabase
       .channel(`feedback-changes-${feedbackSettings.project_id}`)
       .on('postgres_changes', {
@@ -395,21 +362,14 @@ export default function Feedback() {
         table: 'feedback',
         filter: `project_id=eq.${feedbackSettings.project_id}`
       }, async (payload) => {
-        console.log('🎉 New feedback received:', payload);
         const newFeedback = payload.new as Feedback;
         await sendEmailNotification(newFeedback);
-        toast.success('New feedback received!', {
-          description: 'Dashboard data has been updated.',
-          icon: <Mail className="h-4 w-4" />
-        });
+        toast.success('New feedback received!');
         loadFeedbackData();
       })
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('🔕 Cleaning up feedback listener...');
       supabase.removeChannel(channel);
     };
   }, [user, feedbackSettings, sendEmailNotification, loadFeedbackData, hasAccess]);
@@ -436,7 +396,6 @@ export default function Feedback() {
     }
   }, [user]);
 
-  // ✅ ALL useMemo HOOKS
   const filteredFeedbacks = useMemo(() => {
     let filtered = feedbacks;
 
@@ -463,15 +422,6 @@ export default function Feedback() {
         f.message.toLowerCase().includes(query) ||
         (f.metadata?.email && f.metadata.email.toLowerCase().includes(query))
       );
-    }
-
-    if (filters.dateRange.from || filters.dateRange.to) {
-      filtered = filtered.filter(f => {
-        const feedbackDate = new Date(f.created_at);
-        const fromDate = filters.dateRange.from || new Date(0);
-        const toDate = filters.dateRange.to || new Date();
-        return feedbackDate >= fromDate && feedbackDate <= toDate;
-      });
     }
 
     return filtered;
@@ -513,7 +463,14 @@ export default function Feedback() {
     ].filter(item => item.value > 0);
   }, [stats]);
 
-  // Component helper
+  const ratingChartData = useMemo(() => {
+    if (!stats) return [];
+    return Object.entries(stats.ratingDistribution).map(([rating, count]) => ({
+      rating: `${rating} Star${rating !== '1' ? 's' : ''}`,
+      count
+    }));
+  }, [stats]);
+
   const SentimentBadge = ({ sentiment }: { sentiment: string }) => {
     const colors = {
       positive: 'bg-green-100 text-green-800',
@@ -528,7 +485,7 @@ export default function Feedback() {
     );
   };
 
-  // ✅ NOW SAFE TO DO CONDITIONAL RENDERS
+  // Conditional renders
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -640,10 +597,10 @@ export default function Feedback() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-        <Button onClick={exportToCSV} disabled={!hasAccess || filteredFeedbacks.length === 0}>
-           <Download className="h-4 w-4 mr-2" />
+          <Button onClick={exportToCSV} disabled={!hasAccess || filteredFeedbacks.length === 0}>
+            <Download className="h-4 w-4 mr-2" />
             Export
-        </Button>
+          </Button>
           <Button variant="outline" onClick={loadFeedbackData}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -776,7 +733,6 @@ export default function Feedback() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
-          {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -858,7 +814,6 @@ export default function Feedback() {
             </Card>
           </div>
 
-          {/* Recent Feedback */}
           <Card>
             <CardHeader>
               <CardTitle>Recent Feedback</CardTitle>
@@ -867,7 +822,7 @@ export default function Feedback() {
             <CardContent>
               <div className="space-y-3">
                 {stats?.recentFeedback.slice(0, 5).map((feedback) => (
-                  <div key={feedback.id} className="flex items-start justify-between p-3 border rounded-lg hover:bg-gray-50">
+                  <div key={feedback.id} className="flex items-start justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-1">
                         <Badge variant="outline" className="text-xs">
@@ -880,7 +835,7 @@ export default function Feedback() {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-gray-700 line-clamp-2">{feedback.message}</p>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">{feedback.message}</p>
                       <p className="text-xs text-gray-500 mt-1">
                         {format(new Date(feedback.created_at), 'MMM dd, yyyy • HH:mm')}
                       </p>
@@ -892,38 +847,296 @@ export default function Feedback() {
           </Card>
         </TabsContent>
 
-        {/* All Feedback Tab - keeping existing implementation */}
+        {/* All Feedback Tab */}
         <TabsContent value="feedback" className="space-y-6">
-          {/* Existing filters and feedback list code here */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Filter Feedback</CardTitle>
+              <CardDescription>Refine results using filters below</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>Search</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search feedback..."
+                      value={filters.searchQuery}
+                      onChange={(e) => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Form Type</Label>
+                  <Select value={filters.formType} onValueChange={(value) => setFilters(prev => ({ ...prev, formType: value }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="customer_satisfaction">Customer Satisfaction</SelectItem>
+                      <SelectItem value="product_feedback">Product Feedback</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Rating</Label>
+                  <Select value={filters.rating} onValueChange={(value) => setFilters(prev => ({ ...prev, rating: value }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Ratings</SelectItem>
+                      <SelectItem value="5">5 Stars</SelectItem>
+                      <SelectItem value="4">4 Stars</SelectItem>
+                      <SelectItem value="3">3 Stars</SelectItem>
+                      <SelectItem value="2">2 Stars</SelectItem>
+                      <SelectItem value="1">1 Star</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Sentiment</Label>
+                  <Select value={filters.sentiment} onValueChange={(value) => setFilters(prev => ({ ...prev, sentiment: value }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Sentiments</SelectItem>
+                      <SelectItem value="positive">Positive</SelectItem>
+                      <SelectItem value="neutral">Neutral</SelectItem>
+                      <SelectItem value="negative">Negative</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>All Feedback Entries</CardTitle>
               <CardDescription>View and manage all feedback ({filteredFeedbacks.length} entries)</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Feedback list implementation continues from original code...
-              </p>
+              {paginatedFeedbacks.length > 0 ? (
+                <div className="space-y-4">
+                  {paginatedFeedbacks.map((feedback) => (
+                    <div 
+                      key={feedback.id} 
+                      className="p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                      onClick={() => setSelectedFeedback(selectedFeedback?.id === feedback.id ? null : feedback)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2 flex-wrap">
+                          <Badge variant="outline">
+                            {feedback.form_type.replace('_', ' ')}
+                          </Badge>
+                          {feedback.sentiment && <SentimentBadge sentiment={feedback.sentiment} />}
+                          {feedback.rating && (
+                            <div className="flex items-center">
+                              {Array.from({ length: feedback.rating }).map((_, i) => (
+                                <Star key={i} className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {format(new Date(feedback.created_at), 'MMM dd, yyyy HH:mm')}
+                        </span>
+                      </div>
+                      
+                      <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+                        {feedback.message}
+                      </p>
+                      
+                      {feedback.metadata?.email && (
+                        <div className="flex items-center text-xs text-gray-500 mt-2">
+                          <Mail className="h-3 w-3 mr-1" />
+                          {feedback.metadata.email}
+                        </div>
+                      )}
+                      
+                      {selectedFeedback?.id === feedback.id && feedback.metadata && (
+                        <div className="mt-3 pt-3 border-t space-y-2 text-xs">
+                          {feedback.metadata.page_url && (
+                            <div className="flex items-center">
+                              <ExternalLink className="h-3 w-3 mr-2 text-gray-400" />
+                              <a href={feedback.metadata.page_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                {feedback.metadata.page_url}
+                              </a>
+                            </div>
+                          )}
+                          {feedback.metadata.browser && (
+                            <div className="text-gray-500">
+                              Browser: {feedback.metadata.browser}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-4">
+                      <p className="text-sm text-gray-600">
+                        Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredFeedbacks.length)} of {filteredFeedbacks.length} entries
+                      </p>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No feedback found</h3>
+                  <p className="text-gray-600">Try adjusting your filters or check back later</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Analytics Tab - keeping existing implementation */}
+        {/* Analytics Tab */}
         <TabsContent value="analytics" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Rating Distribution</CardTitle>
+                <CardDescription>Breakdown of customer ratings</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {ratingChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsBarChart data={ratingChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="rating" fontSize={12} />
+                      <YAxis fontSize={12} />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    </RechartsBarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-gray-400">
+                    <div className="text-center">
+                      <Star className="h-12 w-12 mx-auto mb-2" />
+                      <p>No rating data available</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Form Type Distribution</CardTitle>
+                <CardDescription>Breakdown by feedback type</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {stats && (stats.customerSatisfactionCount > 0 || stats.productFeedbackCount > 0) ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsPieChart>
+                      <Pie
+                        data={[
+                          { name: 'Customer Satisfaction', value: stats.customerSatisfactionCount, color: '#3b82f6' },
+                          { name: 'Product Feedback', value: stats.productFeedbackCount, color: '#10b981' }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        <Cell fill="#3b82f6" />
+                        <Cell fill="#10b981" />
+                      </Pie>
+                      <Tooltip />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-gray-400">
+                    <div className="text-center">
+                      <BarChart3 className="h-12 w-12 mx-auto mb-2" />
+                      <p>No form type data available</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>Analytics Overview</CardTitle>
-              <CardDescription>Detailed insights and trends</CardDescription>
+              <CardTitle>Key Insights</CardTitle>
+              <CardDescription>AI-powered analysis of your feedback</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Analytics implementation continues from original code...
-              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 border rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-sm">Most Common Rating</h4>
+                    <Star className="h-4 w-4 text-yellow-500" />
+                  </div>
+                  <p className="text-2xl font-bold">
+                    {stats && Object.entries(stats.ratingDistribution).reduce((a, b) => 
+                      stats.ratingDistribution[parseInt(a[0])] > stats.ratingDistribution[parseInt(b[0])] ? a : b
+                    )[0]} Stars
+                  </p>
+                </div>
+
+                <div className="p-4 border rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-sm">Dominant Sentiment</h4>
+                    <Sparkles className="h-4 w-4 text-purple-500" />
+                  </div>
+                  <p className="text-2xl font-bold capitalize">
+                    {stats && Object.entries(stats.sentimentBreakdown).reduce((a, b) => 
+                      a[1] > b[1] ? a : b
+                    )[0]}
+                  </p>
+                </div>
+
+                <div className="p-4 border rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-sm">Response Rate</h4>
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  </div>
+                  <p className="text-2xl font-bold">
+                    {stats ? ((stats.totalFeedback / Math.max(stats.totalFeedback, 1)) * 100).toFixed(0) : 0}%
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Email Notifications Settings Tab */}
+        {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-6">
           <Card>
             <CardHeader>
@@ -936,7 +1149,6 @@ export default function Feedback() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Master Toggle */}
               <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
                 <div className="space-y-0.5">
                   <Label className="text-base font-semibold">Enable Email Notifications</Label>
@@ -952,7 +1164,6 @@ export default function Feedback() {
                 />
               </div>
 
-              {/* Email Address */}
               <div className="space-y-2">
                 <Label htmlFor="notification-email">Notification Email Address</Label>
                 <Input
@@ -965,12 +1176,8 @@ export default function Feedback() {
                   }
                   disabled={!emailPreferences.enabled}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Email notifications will be sent to this address
-                </p>
               </div>
 
-              {/* Notification Options */}
               <div className="space-y-4">
                 <h4 className="text-sm font-semibold">Notification Triggers</h4>
                 
@@ -1005,46 +1212,12 @@ export default function Feedback() {
                     disabled={!emailPreferences.enabled || !emailPreferences.notifyOnNewFeedback}
                   />
                 </div>
-
-                <div className="flex items-center justify-between p-3 border rounded-lg opacity-50">
-                  <div className="space-y-0.5">
-                    <Label>Daily Digest</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Receive a summary of all feedback once per day (Coming soon)
-                    </p>
-                  </div>
-                  <Switch
-                    checked={emailPreferences.dailyDigest}
-                    disabled
-                  />
-                </div>
               </div>
 
-              {/* Info Box */}
-              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-                  <div className="space-y-1">
-                    <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-                      How Email Notifications Work
-                    </h4>
-                    <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1 ml-1">
-                      <li>• Emails are sent instantly when new feedback arrives via real-time database listeners</li>
-                      <li>• Rate limiting prevents spam (max 10 emails per minute per user)</li>
-                      <li>• Email delivery typically takes 1-3 seconds</li>
-                      <li>• Check your spam folder if you don't receive notifications</li>
-                      <li>• Test notifications by submitting feedback through your widget or forms</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              {/* Save Button */}
               <div className="flex justify-end gap-2">
                 <Button
                   variant="outline"
                   onClick={() => {
-                    // Reset to saved preferences
                     const saved = localStorage.getItem(`email_prefs_${user.id}`);
                     if (saved) {
                       setEmailPreferences(JSON.parse(saved));
@@ -1074,7 +1247,6 @@ export default function Feedback() {
             </CardContent>
           </Card>
 
-          {/* Test Email Card */}
           <Card className="border-dashed">
             <CardHeader>
               <CardTitle className="text-lg">Test Email Notification</CardTitle>
