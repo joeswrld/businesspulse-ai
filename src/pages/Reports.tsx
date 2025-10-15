@@ -69,6 +69,7 @@ interface AnalyticsData {
 
 export default function Reports() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Subscription + paywall
   const {
@@ -81,73 +82,15 @@ export default function Reports() {
     allowBillingPage: false,
   });
 
-  // Auth
-  const { user } = useAuth();
-
   // Local state
   const [insights, setInsights] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState<"all" | "7d" | "30d">("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
-  const [expandedInsightId, setExpandedInsightId] = useState<string | null>(
-    null
-  );
+  const [expandedInsightId, setExpandedInsightId] = useState<string | null>(null);
 
- 
-
-  // Show subscription loading state
-  if (loadingSubscription) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Checking access...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show paywall if user has no access
-  if (!hasAccess) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-red-950 p-4">
-        <Card className="w-full max-w-md shadow-2xl border-2 border-red-200 dark:border-red-800">
-          <CardHeader className="text-center space-y-4">
-            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
-              <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
-            </div>
-            <CardTitle className="text-2xl">Reports Access Locked</CardTitle>
-            <p className="text-muted-foreground">
-              {isTrialExpired
-                ? 'Your trial has expired. Upgrade to access reports.'
-                : isSubscriptionExpired
-                ? 'Your subscription has expired. Renew to continue.'
-                : 'Active subscription required to access reports.'}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button
-              onClick={() => navigate('/billing')}
-              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
-              size="lg"
-            >
-              <Crown className="h-5 w-5 mr-2" />
-              {isSubscriptionExpired ? 'Renew Subscription' : 'Upgrade Now'}
-            </Button>
-            <Button
-              onClick={() => navigate('/dashboard')}
-              variant="outline"
-              className="w-full"
-            >
-              Back to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
 
   // Load insights from Supabase
   const loadInsights = useCallback(async () => {
@@ -230,7 +173,7 @@ export default function Reports() {
       if (themesMatch) {
         const themeLines = themesMatch[1].split('\n');
         themeLines.forEach(line => {
-          const theme = line.replace(/^[•\-\*]\s*/, '').trim();
+          const theme = line.replace(/^[•\-\*\d.]\s*/, '').trim();
           if (theme) themes.push(theme);
         });
       }
@@ -313,12 +256,12 @@ export default function Reports() {
   }, [insights]);
 
   // Export to PDF
-  const exportToPDF = () => {
+  const exportToPDF = useCallback(() => {
     if (!hasAccess) {
       alert('Your trial/subscription has ended. Please upgrade to export reports.');
       navigate('/billing');
       return;
-  }
+    }
     try {
       toast.info('Generating PDF...', { description: 'Please wait' });
 
@@ -378,15 +321,15 @@ export default function Reports() {
       console.error('Error exporting PDF:', error);
       toast.error('Failed to export PDF');
     }
-  };
+  }, [hasAccess, navigate, analyticsData, insights]);
 
   // Export to CSV
-  const exportToCSV = () => {
+  const exportToCSV = useCallback(() => {
     if (!hasAccess) {
       alert('Your trial/subscription has ended. Please upgrade to export reports.');
       navigate('/billing');
       return;
-  }
+    }
     try {
       const headers = ['Title', 'Details', 'Feedback Count', 'Created Date'];
       const rows = insights.map(insight => [
@@ -416,7 +359,61 @@ export default function Reports() {
       console.error('Error exporting CSV:', error);
       toast.error('Failed to export CSV');
     }
-  };
+  }, [hasAccess, navigate, insights]);
+
+  // CONDITIONAL RETURNS AFTER ALL HOOKS
+
+  // Show subscription loading state
+  if (loadingSubscription) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show paywall if user has no access
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-red-950 p-4">
+        <Card className="w-full max-w-md shadow-2xl border-2 border-red-200 dark:border-red-800">
+          <CardHeader className="text-center space-y-4">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
+              <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+            <CardTitle className="text-2xl">Reports Access Locked</CardTitle>
+            <p className="text-muted-foreground">
+              {isTrialExpired
+                ? 'Your trial has expired. Upgrade to access reports.'
+                : isSubscriptionExpired
+                ? 'Your subscription has expired. Renew to continue.'
+                : 'Active subscription required to access reports.'}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button
+              onClick={() => navigate('/billing')}
+              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+              size="lg"
+            >
+              <Crown className="h-5 w-5 mr-2" />
+              {isSubscriptionExpired ? 'Renew Subscription' : 'Upgrade Now'}
+            </Button>
+            <Button
+              onClick={() => navigate('/dashboard')}
+              variant="outline"
+              className="w-full"
+            >
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -743,22 +740,21 @@ export default function Reports() {
 
           {/* Export Buttons */}
           <div className="flex justify-end space-x-2">
-          <Button 
-             onClick={exportToPDF} 
-             disabled={!hasAccess || insights.length === 0}
-             className={!hasAccess ? "opacity-50 cursor-not-allowed" : ""}
+            <Button 
+              onClick={exportToPDF} 
+              disabled={!hasAccess || insights.length === 0}
+              className={!hasAccess ? "opacity-50 cursor-not-allowed" : ""}
             >
               <FileDown className="h-4 w-4 mr-2" /> Export PDF
-          </Button>
+            </Button>
 
-          <Button 
+            <Button 
               onClick={exportToCSV} 
               disabled={!hasAccess || insights.length === 0}
               className={!hasAccess ? "opacity-50 cursor-not-allowed" : ""}
             >
-            <Download className="h-4 w-4 mr-2" /> Export CSV
-          </Button>
-
+              <Download className="h-4 w-4 mr-2" /> Export CSV
+            </Button>
           </div>
 
           {/* History Tab - Insights List */}
