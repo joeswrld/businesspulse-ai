@@ -28,7 +28,7 @@ const Signup = () => {
     try {
       // Trim inputs
       const fullName = formData.fullName.trim();
-      const email = formData.email.trim();
+      const email = formData.email.trim().toLowerCase();
       const password = formData.password;
       const companyName = formData.companyName.trim() || "Individual User";
   
@@ -41,10 +41,10 @@ const Signup = () => {
   
       // Trial calculation
       const trialStart = new Date();
-      const trialEnd = new Date(trialStart.getTime() + 8 * 24 * 60 * 60 * 1000); // 8-day trial
+      const trialEnd = new Date(trialStart.getTime() + 8 * 24 * 60 * 60 * 1000);
       const redirectUrl = `${window.location.origin}/verify-email`;
   
-      // Sign up user with Supabase and add trial metadata
+      // Sign up user - Let Supabase triggers handle profile creation
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -60,23 +60,39 @@ const Signup = () => {
         },
       });
   
-      if (error) throw error;
+      if (error) {
+        console.error("Signup error:", error);
+        throw new Error(error.message || "Failed to create account");
+      }
+
+      if (!data.user) {
+        throw new Error("Account created but user data is missing");
+      }
   
-      // Initialize billing profile
-      if (data.user) {
-        try {
-          await supabase.from("billing_profiles").insert({
+      // Wait a moment for triggers to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Verify billing profile was created (optional check)
+      const { data: billingCheck } = await supabase
+        .from("billing_profiles")
+        .select("id")
+        .eq("id", data.user.id)
+        .single();
+
+      if (!billingCheck) {
+        console.warn("Billing profile not found, creating manually...");
+        // Fallback: Create billing profile if trigger failed
+        const { error: billingError } = await supabase
+          .from("billing_profiles")
+          .insert({
             id: data.user.id,
             plan: "trial",
             trial_ends_at: trialEnd.toISOString(),
             subscription_status: "trial",
-            paystack_customer_id: null,
-            paystack_subscription_id: null,
-            next_billing_date: null,
           });
-        } catch (billingError) {
-          console.error("Error creating billing profile:", billingError);
-          // Continue anyway - Supabase trigger or later billing setup can handle it
+
+        if (billingError) {
+          console.error("Billing profile creation failed:", billingError);
         }
       }
   
@@ -90,16 +106,16 @@ const Signup = () => {
       navigate("/verify-email", { state: { email, companyName } });
   
     } catch (err: any) {
+      console.error("Signup error:", err);
       toast({
-        title: "Error",
-        description: err.message || "An unexpected error occurred.",
+        title: "Failed to create account",
+        description: err.message || "Please try again or contact support if the issue persists.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
-  
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
