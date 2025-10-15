@@ -1,8 +1,5 @@
-
-// src/pages/FeedbackSettings.tsx
-// Fixed version with proper JSX structure
-// At the top of FeedbackSettings.tsx, UPDATE the import section:
-
+import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,58 +41,6 @@ const FeedbackSettings: React.FC = () => {
   const csatQrRef = useRef<HTMLDivElement>(null);
   const productQrRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Loading subscription check
-  if (loadingSubscription) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Checking access...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Paywall check
-  if (!hasAccess) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-red-950 p-4">
-        <Card className="w-full max-w-md shadow-2xl border-2 border-red-200 dark:border-red-800">
-          <CardHeader className="text-center space-y-4">
-            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
-              <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
-            </div>
-            <CardTitle className="text-2xl">Settings Access Locked</CardTitle>
-            <p className="text-muted-foreground">
-              {isTrialExpired 
-                ? 'Your trial has expired. Upgrade to modify widget settings.'
-                : isSubscriptionExpired
-                ? 'Your subscription has expired. Renew to continue.'
-                : 'Active subscription required to manage feedback settings.'}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button 
-              onClick={() => navigate('/billing')}
-              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
-              size="lg"
-            >
-              <Crown className="h-5 w-5 mr-2" />
-              {isSubscriptionExpired ? 'Renew Subscription' : 'Upgrade Now'}
-            </Button>
-            <Button 
-              onClick={() => navigate('/dashboard')}
-              variant="outline"
-              className="w-full"
-            >
-              Back to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   const copyToClipboard = async (text: string, fieldName: string) => {
     try {
@@ -302,6 +247,60 @@ const FeedbackSettings: React.FC = () => {
       });
     }
   };
+
+  // CONDITIONAL RETURNS AFTER ALL HOOKS
+
+  // Loading subscription check
+  if (loadingSubscription) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Paywall check
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-red-950 p-4">
+        <Card className="w-full max-w-md shadow-2xl border-2 border-red-200 dark:border-red-800">
+          <CardHeader className="text-center space-y-4">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto">
+              <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+            <CardTitle className="text-2xl">Settings Access Locked</CardTitle>
+            <p className="text-muted-foreground">
+              {isTrialExpired 
+                ? 'Your trial has expired. Upgrade to modify widget settings.'
+                : isSubscriptionExpired
+                ? 'Your subscription has expired. Renew to continue.'
+                : 'Active subscription required to manage feedback settings.'}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button 
+              onClick={() => navigate('/billing')}
+              className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+              size="lg"
+            >
+              <Crown className="h-5 w-5 mr-2" />
+              {isSubscriptionExpired ? 'Renew Subscription' : 'Upgrade Now'}
+            </Button>
+            <Button 
+              onClick={() => navigate('/dashboard')}
+              variant="outline"
+              className="w-full"
+            >
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading || !settings) {
     return (
