@@ -186,7 +186,7 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
       const feedbackData = {
         project_id: settings.project_id,
         form_type: 'customer_satisfaction',
-        message: comments.trim() || `Customer satisfaction rating: ${rating}/5`,
+        message: message.trim() || `Product feedback rating: ${rating}/5`
         rating: rating,
         metadata: {
           email: email.trim() || null,
