@@ -185,7 +185,7 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
     try {
       const feedbackData = {
         project_id: settings.project_id,
-        form_type: 'customer_satisfaction',
+        form_type: 'product_feedback',
         message: message.trim() || `Product feedback rating: ${rating}/5`
         rating: rating,
         metadata: {
