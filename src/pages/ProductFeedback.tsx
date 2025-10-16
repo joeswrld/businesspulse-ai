@@ -120,120 +120,121 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (previewMode) {
-    toast({
-      title: 'Preview Mode',
-      description: 'This is a preview. Feedback will not be submitted.',
-      variant: 'default'
-    });
-    return;
-  }
-
-  if (!message.trim()) {
-    toast({
-      title: 'Message Required',
-      description: 'Please enter your feedback',
-      variant: 'destructive'
-    });
-    return;
-  }
-
-  if (!settings?.project_id) {
-    toast({
-      title: 'Invalid Project',
-      description: 'Cannot submit feedback for this project.',
-      variant: 'destructive'
-    });
-    return;
-  }
-
-  // ===== CHECK ACCESS BEFORE SUBMISSION =====
-  try {
-    const { data: accessCheck, error: accessError } = await supabase
-      .rpc('check_widget_access', { project_id_param: settings.project_id });
-
-    if (accessError) {
-      console.error('Access check error:', accessError);
+    if (previewMode) {
       toast({
-        title: 'Error',
-        description: 'Could not verify access. Please try again.',
+        title: 'Preview Mode',
+        description: 'This is a preview. Feedback will not be submitted.',
+        variant: 'default'
+      });
+      return;
+    }
+
+    if (!message.trim()) {
+      toast({
+        title: 'Message Required',
+        description: 'Please enter your feedback',
         variant: 'destructive'
       });
       return;
     }
 
-    const hasAccess = accessCheck === true || (accessCheck && accessCheck.has_access === true);
-
-    if (!hasAccess) {
+    if (!settings?.project_id) {
       toast({
-        title: 'Feedback Unavailable',
-        description: 'This feedback form is currently unavailable. The owner\'s trial or subscription has ended.',
+        title: 'Invalid Project',
+        description: 'Cannot submit feedback for this project.',
         variant: 'destructive'
       });
       return;
     }
-  } catch (err) {
-    console.error('Access verification failed:', err);
-  }
 
-  setIsSubmitting(true);
+    // ===== CHECK ACCESS BEFORE SUBMISSION =====
+    try {
+      const { data: accessCheck, error: accessError } = await supabase
+        .rpc('check_widget_access', { project_id_param: settings.project_id });
 
-  // ===== EXISTING SUBMISSION LOGIC =====
-  try {
-    const feedbackData = {
-      project_id: settings.project_id,
-      form_type: 'product_feedback',
-      message: message.trim() || `Product feedback rating: ${rating}/5`,  // FIXED: Added comma
-      rating: rating,
-      metadata: {
-        email: email.trim() || null,
-        page_url: window.location.href,
-        user_agent: navigator.userAgent,
-        timestamp: new Date().toISOString()
-      }
-    };
-
-    const { error } = await supabase.from('feedback').insert([feedbackData]);
-
-    if (error) {
-      let errorMessage = 'Failed to submit feedback.';
-      if (error.code === '23503') {
-        errorMessage = 'Invalid project reference. Please contact support.';
-      } else if (error.message) {
-        errorMessage = error.message;
+      if (accessError) {
+        console.error('Access check error:', accessError);
+        toast({
+          title: 'Error',
+          description: 'Could not verify access. Please try again.',
+          variant: 'destructive'
+        });
+        return;
       }
 
+      const hasAccess = accessCheck === true || (accessCheck && accessCheck.has_access === true);
+
+      if (!hasAccess) {
+        toast({
+          title: 'Feedback Unavailable',
+          description: 'This feedback form is currently unavailable. The owner\'s trial or subscription has ended.',
+          variant: 'destructive'
+        });
+        return;
+      }
+    } catch (err) {
+      console.error('Access verification failed:', err);
+    }
+
+    setIsSubmitting(true);
+
+    // ===== EXISTING SUBMISSION LOGIC =====
+    try {
+      const feedbackData = {
+        project_id: settings.project_id,
+        form_type: 'product_feedback',
+        message: message.trim() || `Product feedback rating: ${rating}/5`,
+        rating: rating,
+        metadata: {
+          email: email.trim() || null,
+          page_url: window.location.href,
+          user_agent: navigator.userAgent,
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      const { error } = await supabase.from('feedback').insert([feedbackData]);
+
+      if (error) {
+        let errorMessage = 'Failed to submit feedback.';
+        if (error.code === '23503') {
+          errorMessage = 'Invalid project reference. Please contact support.';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        toast({
+          title: 'Error',
+          description: errorMessage,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      setIsSubmitted(true);
+
+      if (onSubmitted) {
+        onSubmitted(feedbackData);
+      }
+
+      toast({
+        title: 'Thank you!',
+        description: 'Your feedback has been submitted successfully.'
+      });
+    } catch (err) {
+      console.error('❌ Submit failed:', err);
       toast({
         title: 'Error',
-        description: errorMessage,
+        description: 'Failed to submit feedback. Please try again.',
         variant: 'destructive'
       });
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
+  };
 
-    setIsSubmitted(true);
-
-    if (onSubmitted) {
-      onSubmitted(feedbackData);
-    }
-
-    toast({
-      title: 'Thank you!',
-      description: 'Your feedback has been submitted successfully.'
-    });
-  } catch (err) {
-    console.error('❌ Submit failed:', err);
-    toast({
-      title: 'Error',
-      description: 'Failed to submit feedback. Please try again.',
-      variant: 'destructive'
-    });
-  } finally {
-    setIsSubmitting(false);
-  }
-};
   if (isValidating) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-950 dark:to-purple-950">
