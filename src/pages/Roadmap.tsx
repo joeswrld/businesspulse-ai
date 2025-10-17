@@ -115,43 +115,49 @@ export default function EnhancedRoadmap() {
   if (!user) return;
 
   try {
+    // Get user's feedback_settings
     const { data: settingsData, error: settingsError } = await supabase
       .from('feedback_settings')
-      .select('id') // Changed from project_id to id
-      .eq('user_id', user.id);
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
 
     if (settingsError) {
       console.error('Error loading feedback settings:', settingsError);
       return;
     }
 
-    const projectIds = settingsData?.map(s => s.id) || []; // Changed to use id
-
-    if (projectIds.length > 0) {
-      const { data: feedbackData, error: feedbackError } = await supabase
-        .from('feedback')
-        .select('id, message, metadata, created_at')
-        .in('project_id', projectIds)
-        .order('created_at', { ascending: false });
-
-      if (feedbackError) {
-        console.error('Error loading feedbacks:', feedbackError);
-        return;
-      }
-
-      // Extract email from metadata
-      const formattedFeedback = feedbackData?.map(f => ({
-        ...f,
-        email: f.metadata?.email || null
-      })) || [];
-
-      setFeedbacks(formattedFeedback);
+    if (!settingsData) {
+      console.log('No feedback settings found for user');
+      return;
     }
+
+    // Get feedback using the feedback_settings.id as project_id
+    const { data: feedbackData, error: feedbackError } = await supabase
+      .from('feedback')
+      .select('id, message, metadata, created_at')
+      .eq('project_id', settingsData.id)
+      .order('created_at', { ascending: false });
+
+    if (feedbackError) {
+      console.error('Error loading feedbacks:', feedbackError);
+      return;
+    }
+
+    // Extract email from metadata
+    const formattedFeedback = (feedbackData || []).map(f => ({
+      id: f.id,
+      message: f.message,
+      email: f.metadata?.email || null,
+      created_at: f.created_at
+    }));
+
+    setFeedbacks(formattedFeedback);
+    console.log('Loaded feedbacks:', formattedFeedback.length);
   } catch (error) {
     console.error('Error loading feedbacks:', error);
   }
-}, [user]);
-  const loadChangelog = useCallback(async () => {
+}, [user]);  const loadChangelog = useCallback(async () => {
     if (!user) return;
 
     try {
