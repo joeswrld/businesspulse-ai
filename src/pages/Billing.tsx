@@ -212,61 +212,105 @@ const BillingPage: React.FC = () => {
     // Use setTimeout for async operations
     setTimeout(async () => {
       try {
-        // First, try manual verification via Edge Function
-        console.log('🔍 Verifying payment manually...');
+        console.log('💾 Recording transaction and updating subscription...');
         
-        try {
-          const verifyResponse = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-payment`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-              },
-              body: JSON.stringify({
-                reference: response.reference,
-                userId: user?.id,
-              }),
-            }
-          );
+        const nextBillingDate = new Date();
+        nextBillingDate.setDate(nextBillingDate.getDate() + 30);
 
-          if (verifyResponse.ok) {
-            const verifyData = await verifyResponse.json();
-            console.log('✅ Manual verification successful:', verifyData);
-            
-            // Refresh subscription data
-            await loadSubscriptionData();
+        // Step 1: Record the transaction
+        const { error: txError } = await supabase
+          .from('transactions')
+          .insert({
+            user_id: user?.id,
+            amount: 5300000, // ₦53,000 in kobo
+            currency: 'NGN',
+            status: 'success',
+            description: 'Business Plan Subscription',
+            paystack_reference: response.reference,
+            created_at: new Date().toISOString(),
+          });
 
-            toast.success('✅ Subscription Activated!', {
-              description: 'Redirecting to dashboard...',
-              duration: 3000
-            });
-            
-            setTimeout(() => {
-              navigate('/dashboard');
-            }, 2000);
-            
-            setIsProcessingPayment(false);
-            return;
-          }
-        } catch (verifyError) {
-          console.warn('⚠️ Manual verification failed, waiting for webhook...', verifyError);
+        if (txError) {
+          console.error('❌ Transaction insert error:', txError);
+        } else {
+          console.log('✅ Transaction recorded');
         }
 
-        // Fallback: Wait for webhook to process
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Step 2: Update billing profile
+        const { error: profileError } = await supabase
+          .from('billing_profiles')
+          .upsert({
+            id: user?.id,
+            plan: 'business',
+            subscription_status: 'active',
+            trial_ends_at: null,
+            next_billing_date: nextBillingDate.toISOString(),
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'id'
+          });
 
-        // Refresh subscription data
+        if (profileError) {
+          console.error('❌ Billing profile error:', profileError);
+        } else {
+          console.log('✅ Billing profile updated');
+        }
+
+        // Step 3: Update user_subscriptions
+        const { error: subError } = await supabase
+          .from('user_subscriptions')
+          .upsert({
+            user_id: user?.id,
+            plan_code: 'business',
+            plan_name: 'Business Plan',
+            status: 'active',
+            current_period_start: new Date().toISOString(),
+            current_period_end: nextBillingDate.toISOString(),
+            cancel_at_period_end: false,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'user_id'
+          });
+
+        if (subError) {
+          console.error('❌ User subscription error:', subError);
+        } else {
+          console.log('✅ User subscription updated');
+        }
+
+        // Step 4: Update profiles table (if it exists)
+        const { error: profilesError } = await supabase
+          .from('profiles')
+          .update({
+            plan: 'business',
+            subscription_status: 'active',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', user?.id);
+
+        if (profilesError) {
+          console.warn('⚠️ Profiles table update (optional):', profilesError);
+        } else {
+          console.log('✅ Profiles table updated');
+        }
+
+        // Step 5: Wait a moment for database to propagate
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Step 6: Refresh subscription data
         await loadSubscriptionData();
 
-        // Verify activation
+        // Step 7: Verify the update worked
         const { data: checkData } = await supabase
           .rpc('get_user_profile_with_access', { user_uuid: user?.id });
 
-        if (checkData?.[0]?.subscription_status === 'active') {
+        console.log('🔍 Verification result:', checkData);
+
+        if (checkData?.[0]?.plan === 'business' && checkData?.[0]?.subscription_status === 'active') {
+          console.log('✅ Subscription successfully activated!');
+          
           toast.success('✅ Subscription Activated!', {
-            description: 'Redirecting to dashboard...',
+            description: 'Welcome to Business Plan! Redirecting...',
             duration: 3000
           });
           
@@ -274,52 +318,32 @@ const BillingPage: React.FC = () => {
             navigate('/dashboard');
           }, 2000);
         } else {
-          // Final fallback: Update directly via Supabase
-          console.log('⚠️ Webhook not processed, updating directly...');
+          console.warn('⚠️ Subscription status not updated as expected:', checkData);
           
-          const nextBillingDate = new Date();
-          nextBillingDate.setDate(nextBillingDate.getDate() + 30);
-
-          const { error: directUpdateError } = await supabase
-            .from('billing_profiles')
-            .upsert({
-              id: user?.id,
-              plan: 'business',
-              subscription_status: 'active',
-              trial_ends_at: null,
-              next_billing_date: nextBillingDate.toISOString(),
-              updated_at: new Date().toISOString(),
-            }, {
-              onConflict: 'id'
-            });
-
-          if (!directUpdateError) {
-            await loadSubscriptionData();
-            
-            toast.success('✅ Subscription Activated!', {
-              description: 'Redirecting to dashboard...',
-              duration: 3000
-            });
-            
-            setTimeout(() => {
-              navigate('/dashboard');
-            }, 2000);
-          } else {
-            toast.warning('Payment received but activation pending', {
-              description: 'Please refresh the page in a moment or contact support.',
-              duration: 10000
-            });
-          }
+          toast.warning('Payment received!', {
+            description: 'Please refresh the page to see your updated subscription.',
+            duration: 5000,
+            action: {
+              label: 'Refresh Now',
+              onClick: () => window.location.reload()
+            }
+          });
         }
+
       } catch (error) {
-        console.error('Post-payment error:', error);
-        toast.error('Error activating subscription', {
-          description: 'Payment successful but activation failed. Please contact support.'
+        console.error('❌ Post-payment error:', error);
+        toast.error('Payment successful but activation failed', {
+          description: 'Please refresh the page or contact support.',
+          duration: 10000,
+          action: {
+            label: 'Refresh Page',
+            onClick: () => window.location.reload()
+          }
         });
       } finally {
         setIsProcessingPayment(false);
       }
-    }, 100);
+    }, 500);
   };
 
   // Handle payment closure
