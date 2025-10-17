@@ -1,35 +1,37 @@
+// src/components/layout/DashboardLayout.tsx - FIXED VERSION
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   LayoutDashboard, 
   FileText, 
   Brain, 
   BarChart3, 
-  Settings, 
   Menu,
   X,
-  LogOut,
-  User,
-  CreditCard,
-  Users,
-  MessageSquare,
   Crown,
   Star,
   Zap,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Cog
+  Cog,
+  CreditCard,
+  Users,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import TopNav from "@/components/layout/TopNav";
 
+interface PlanInfo {
+  planName: string;
+  planType: string;
+  planColor: string;
+  planIcon: JSX.Element;
+}
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -40,7 +42,6 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
-
 
   // Load user data
   const loadUserData = async () => {
@@ -60,15 +61,25 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           setProfile(profileData);
         }
         
-        // Load subscription
-        const { data: subscriptionData } = await supabase
-          .from('user_subscriptions')
-          .select('*')
-          .eq('user_id', currentUser.id)
-          .single();
+        // Load subscription using RPC for accuracy
+        const { data: billingData } = await supabase
+          .rpc('get_user_profile_with_access', { user_uuid: currentUser.id });
         
-        if (subscriptionData) {
-          setSubscription(subscriptionData);
+        if (billingData && billingData.length > 0) {
+          setSubscription(billingData[0]);
+          console.log('📊 Subscription data loaded:', billingData[0]);
+        } else {
+          // Fallback to direct query
+          const { data: fallbackData } = await supabase
+            .from('billing_profiles')
+            .select('*')
+            .eq('id', currentUser.id)
+            .single();
+          
+          if (fallbackData) {
+            setSubscription(fallbackData);
+            console.log('📊 Fallback subscription data:', fallbackData);
+          }
         }
       }
     } catch (error) {
@@ -81,10 +92,34 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   // Load data on mount
   useEffect(() => {
     loadUserData();
-  }, []);
+
+    // Set up realtime listener for subscription changes
+    if (user) {
+      const channel = supabase
+        .channel(`dashboard-subscription-${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'billing_profiles',
+            filter: `id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('🔔 Subscription updated in dashboard:', payload);
+            loadUserData();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [user?.id]);
 
   // Get plan info for badge
-  const getPlanInfo = () => {
+  const getPlanInfo = (): PlanInfo => {
     if (!subscription) {
       return {
         planName: 'Free Trial',
@@ -94,22 +129,45 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       };
     }
 
-    const planName = (subscription as any)?.plan_name?.toLowerCase?.() || (subscription as any)?.plan_type?.toLowerCase?.() || '';
-    const planType = planName.includes('business') ? 'business'
-      : (planName.includes('pro') || planName.includes('premium')) ? 'pro'
-      : (subscription as any).plan_type || 'free';
-    const isTrial = planType === 'trial' || (subscription as any).status === 'trialing';
-    
-    if (isTrial) {
+    const plan = subscription.plan?.toLowerCase() || '';
+    const status = subscription.subscription_status?.toLowerCase() || '';
+    const isCancelled = status === 'cancelled';
+    const isActive = status === 'active';
+    const isTrial = plan === 'trial';
+
+    console.log('🎯 Plan determination:', { plan, status, isCancelled, isActive, isTrial });
+
+    // Handle cancelled subscription
+    if (isCancelled) {
       return {
-        planName,
-        planType: 'trial',
-        planColor: 'bg-orange-100 text-orange-800 border-orange-200',
-        planIcon: <Star className="h-3 w-3" />
+        planName: 'Cancelled',
+        planType: 'cancelled',
+        planColor: 'bg-red-100 text-red-800 border-red-200',
+        planIcon: <X className="h-3 w-3" />
       };
     }
 
-    if (planType === 'pro') {
+    // Handle business plan
+    if (plan === 'business') {
+      if (isActive) {
+        return {
+          planName: 'Business',
+          planType: 'business',
+          planColor: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+          planIcon: <Crown className="h-3 w-3" />
+        };
+      } else {
+        return {
+          planName: 'Business (Inactive)',
+          planType: 'business',
+          planColor: 'bg-gray-100 text-gray-800 border-gray-200',
+          planIcon: <Crown className="h-3 w-3" />
+        };
+      }
+    }
+
+    // Handle pro plan (if exists)
+    if (plan === 'pro' || plan === 'premium') {
       return {
         planName: 'Pro',
         planType: 'pro',
@@ -118,25 +176,47 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       };
     }
 
+    // Handle trial (default)
+    if (isTrial || !plan) {
+      const daysLeft = subscription.days_left || 0;
+      const isExpired = daysLeft <= 0 && !subscription.has_access;
+      
+      if (isExpired) {
+        return {
+          planName: 'Trial Expired',
+          planType: 'trial',
+          planColor: 'bg-red-100 text-red-800 border-red-200',
+          planIcon: <Star className="h-3 w-3" />
+        };
+      }
+      
+      return {
+        planName: `Trial (${daysLeft}d)`,
+        planType: 'trial',
+        planColor: 'bg-orange-100 text-orange-800 border-orange-200',
+        planIcon: <Star className="h-3 w-3" />
+      };
+    }
+
+    // Fallback
     return {
-      planName: 'Business',
-      planType: 'business',
-      planColor: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      planIcon: <Crown className="h-3 w-3" />
+      planName: 'Free Trial',
+      planType: 'trial',
+      planColor: 'bg-orange-100 text-orange-800 border-orange-200',
+      planIcon: <Star className="h-3 w-3" />
     };
   };
 
-const navigation = [
-  { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Feedback", href: "/feedback", icon: MessageSquare },
-  { name: "AI Insights", href: "/insights-simple", icon: Brain },
-  { name: "Reports & Analytics", href: "/reports", icon: FileText },
-  { name: "Feedback Settings", href: "/feedback-settings", icon: Cog },
-  { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
-  { name: "Roadmap", href: "/roadmap", icon: BarChart3 },
-  { name: "Team Collaboration", href: "/teams", icon: Users },
-];
-
+  const navigation = [
+    { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Feedback", href: "/feedback", icon: MessageSquare },
+    { name: "AI Insights", href: "/insights-simple", icon: Brain },
+    { name: "Reports & Analytics", href: "/reports", icon: FileText },
+    { name: "Feedback Settings", href: "/feedback-settings", icon: Cog },
+    { name: "Pricing & Billing", href: "/billing", icon: CreditCard },
+    { name: "Roadmap", href: "/roadmap", icon: BarChart3 },
+    { name: "Team Collaboration", href: "/teams", icon: Users },
+  ];
 
   const handleSignOut = async () => {
     try {
@@ -151,6 +231,8 @@ const navigation = [
       });
     }
   };
+
+  const planInfo = getPlanInfo();
 
   return (
     <div className="min-h-screen bg-background">
@@ -227,11 +309,11 @@ const navigation = [
               <div className="flex items-center justify-between">
                 <Badge 
                   variant="outline" 
-                  className={`px-3 py-1 text-xs font-medium border ${getPlanInfo().planColor}`}
+                  className={`px-3 py-1 text-xs font-medium border ${planInfo.planColor}`}
                 >
                   <div className="flex items-center space-x-1">
-                    {getPlanInfo().planIcon}
-                    <span>{getPlanInfo().planName}</span>
+                    {planInfo.planIcon}
+                    <span>{planInfo.planName}</span>
                   </div>
                 </Badge>
                 <Link 
@@ -304,31 +386,13 @@ const navigation = [
                           "h-4 w-4",
                           isActive ? "text-white" : "text-slate-600 dark:text-slate-300"
                         )} />
-                        {item.notificationCount && item.notificationCount > 0 && (
-                          <Badge 
-                            variant="destructive" 
-                            className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 flex items-center justify-center text-xs font-bold bg-red-500 hover:bg-red-600"
-                          >
-                            {item.notificationCount > 9 ? '9+' : item.notificationCount}
-                          </Badge>
-                        )}
                       </div>
                       {!sidebarCollapsed && (
                         <>
                           <span className="flex-1">{item.name}</span>
-                          <div className="flex items-center space-x-2">
-                            {item.notificationCount && item.notificationCount > 0 && (
-                              <Badge 
-                                variant="destructive" 
-                                className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs font-bold bg-red-500 hover:bg-red-600"
-                              >
-                                {item.notificationCount > 99 ? '99+' : item.notificationCount}
-                              </Badge>
-                            )}
-                            {isActive && (
-                              <div className="w-2 h-2 bg-white rounded-full"></div>
-                            )}
-                          </div>
+                          {isActive && (
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                          )}
                         </>
                       )}
                     </Link>
@@ -341,9 +405,7 @@ const navigation = [
           {/* User Menu */}
           <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm transition-colors">
             <div className="space-y-1">
-             
-              
-              
+              {/* Reserved for future actions */}
             </div>
           </div>
         </div>
@@ -356,6 +418,7 @@ const navigation = [
       )}>
         {/* Top Navigation Bar */}
         <TopNav />
+        
         {/* Mobile menu button */}
         <div className="lg:hidden px-4 pt-2">
           <button
