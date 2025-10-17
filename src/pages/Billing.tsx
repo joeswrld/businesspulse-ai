@@ -1,4 +1,4 @@
-// src/pages/Billing.tsx - COMPLETE FIXED VERSION
+// src/pages/Billing.tsx - WITH BACK BUTTON
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -27,6 +27,7 @@ import {
   User,
   Mail,
   X,
+  ArrowLeft,
 } from 'lucide-react';
 
 interface Subscription {
@@ -573,6 +574,17 @@ NoteX Team
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(-1)}
+          className="mb-4 hover:bg-slate-100 dark:hover:bg-slate-800"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Billing & Subscription</h1>
