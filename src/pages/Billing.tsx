@@ -200,6 +200,62 @@ const BillingPage: React.FC = () => {
     }
   }, [user]);
 
+  // Handle payment success (moved outside to avoid async issues)
+  const handlePaymentSuccess = (response: any) => {
+    console.log('✅ Payment successful:', response);
+    
+    toast.success('🎉 Payment Successful!', {
+      description: 'Activating your subscription...',
+      duration: 5000
+    });
+
+    // Use setTimeout for async operations
+    setTimeout(async () => {
+      try {
+        // Wait 3 seconds for webhook to process
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        // Refresh subscription data
+        await loadSubscriptionData();
+
+        // Verify activation
+        const { data: checkData } = await supabase
+          .rpc('get_user_profile_with_access', { user_uuid: user?.id });
+
+        if (checkData?.[0]?.subscription_status === 'active') {
+          toast.success('✅ Subscription Activated!', {
+            description: 'Redirecting to dashboard...',
+            duration: 3000
+          });
+          
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 2000);
+        } else {
+          toast.warning('Payment processing...', {
+            description: 'Your subscription will be activated shortly. Please refresh in a moment.',
+            duration: 7000
+          });
+        }
+      } catch (error) {
+        console.error('Post-payment error:', error);
+        toast.error('Error activating subscription', {
+          description: 'Please contact support if this persists'
+        });
+      } finally {
+        setIsProcessingPayment(false);
+      }
+    }, 100);
+  };
+
+  // Handle payment closure
+  const handlePaymentClose = () => {
+    setIsProcessingPayment(false);
+    toast.info('Payment Cancelled', {
+      description: 'You can try again anytime'
+    });
+  };
+
   // Handle Paystack payment
   const handleUpgradeClick = () => {
     const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
@@ -238,48 +294,8 @@ const BillingPage: React.FC = () => {
             }
           ]
         },
-        callback: async function(response: any) {
-          console.log('✅ Payment successful:', response);
-          
-          toast.success('🎉 Payment Successful!', {
-            description: 'Activating your subscription...',
-            duration: 5000
-          });
-
-          // Wait 3 seconds for webhook to process
-          await new Promise(resolve => setTimeout(resolve, 3000));
-
-          // Refresh subscription data
-          await loadSubscriptionData();
-
-          // Verify activation
-          const { data: checkData } = await supabase
-            .rpc('get_user_profile_with_access', { user_uuid: user?.id });
-
-          if (checkData?.[0]?.subscription_status === 'active') {
-            toast.success('✅ Subscription Activated!', {
-              description: 'Redirecting to dashboard...',
-              duration: 3000
-            });
-            
-            setTimeout(() => {
-              navigate('/dashboard');
-            }, 2000);
-          } else {
-            toast.warning('Payment processing...', {
-              description: 'Your subscription will be activated shortly. Please refresh in a moment.',
-              duration: 7000
-            });
-          }
-
-          setIsProcessingPayment(false);
-        },
-        onClose: function() {
-          setIsProcessingPayment(false);
-          toast.info('Payment Cancelled', {
-            description: 'You can try again anytime'
-          });
-        },
+        callback: handlePaymentSuccess,
+        onClose: handlePaymentClose,
       });
       
       handler.openIframe();
