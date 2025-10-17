@@ -1,4 +1,4 @@
-// src/pages/Billing.tsx - FIXED VERSION
+// src/pages/Billing.tsx - FIXED VERSION with proper cancellation and transaction storage
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -34,9 +34,11 @@ interface Subscription {
   plan: string;
   isActive: boolean;
   isTrialExpired: boolean;
+  isCancelled: boolean;
   daysLeft: number;
   subscriptionId: string | null;
   nextBillingDate: string | null;
+  subscriptionStatus: string;
 }
 
 interface Transaction {
@@ -49,7 +51,6 @@ interface Transaction {
   paystack_reference: string;
 }
 
-// Declare Paystack type
 declare global {
   interface Window {
     PaystackPop: any;
@@ -66,7 +67,6 @@ const BillingPage: React.FC = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load subscription data
   const loadSubscriptionData = async () => {
     if (!user) return;
 
@@ -76,7 +76,6 @@ const BillingPage: React.FC = () => {
 
       console.log('🔄 Loading subscription data for user:', user.id);
 
-      // Use RPC function for accurate access check
       const { data: profileData, error: rpcError } = await supabase
         .rpc('get_user_profile_with_access', { user_uuid: user.id });
 
@@ -88,7 +87,6 @@ const BillingPage: React.FC = () => {
       console.log('📊 Profile data:', profileData);
 
       if (!profileData || profileData.length === 0) {
-        // Create trial profile
         console.log('⚠️ No profile found, creating trial...');
         const trialEndDate = new Date(Date.now() + 8 * 24 * 60 * 60 * 1000);
         
@@ -111,46 +109,56 @@ const BillingPage: React.FC = () => {
           plan: 'trial',
           isActive: true,
           isTrialExpired: false,
+          isCancelled: false,
           daysLeft: 8,
           subscriptionId: null,
           nextBillingDate: null,
+          subscriptionStatus: 'trial',
         });
       } else {
         const profile = profileData[0];
         const hasAccess = profile.has_access === true;
         const daysLeft = profile.days_left || 0;
+        const subscriptionStatus = profile.subscription_status;
 
-        // Determine plan and status
         const isTrialExpired = profile.plan === 'trial' && !hasAccess;
-        const isActive = profile.subscription_status === 'active' || hasAccess;
+        const isCancelled = subscriptionStatus === 'cancelled';
+        const isActive = (subscriptionStatus === 'active' || hasAccess) && !isCancelled;
 
         setSubscription({
           plan: profile.plan,
           isActive,
           isTrialExpired,
+          isCancelled,
           daysLeft,
           subscriptionId: profile.paystack_subscription_id || null,
           nextBillingDate: profile.next_billing_date,
+          subscriptionStatus,
         });
 
         console.log('✅ Subscription loaded:', {
           plan: profile.plan,
-          status: profile.subscription_status,
+          status: subscriptionStatus,
           hasAccess,
           isActive,
+          isCancelled,
           daysLeft
         });
       }
 
-      // Load transactions
+      // Load transactions with proper error handling
       const { data: transactionsData, error: txError } = await supabase
         .from('transactions')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (!txError) {
+      if (txError) {
+        console.error('Transaction load error:', txError);
+        setTransactions([]);
+      } else {
         setTransactions(transactionsData || []);
+        console.log(`✅ Loaded ${transactionsData?.length || 0} transactions`);
       }
 
     } catch (error) {
@@ -162,18 +170,16 @@ const BillingPage: React.FC = () => {
     }
   };
 
-  // Load data on mount
   useEffect(() => {
     loadSubscriptionData();
 
-    // Set up realtime listener for billing profile changes
     if (user) {
       const channel = supabase
         .channel(`billing-updates-${user.id}`)
         .on(
           'postgres_changes',
           {
-            event: 'UPDATE',
+            event: '*',
             schema: 'public',
             table: 'billing_profiles',
             filter: `id=eq.${user.id}`,
@@ -192,6 +198,19 @@ const BillingPage: React.FC = () => {
             loadSubscriptionData();
           }
         )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'transactions',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('🔔 New transaction:', payload);
+            loadSubscriptionData();
+          }
+        )
         .subscribe();
 
       return () => {
@@ -200,7 +219,6 @@ const BillingPage: React.FC = () => {
     }
   }, [user]);
 
-  // Handle payment success (moved outside to avoid async issues)
   const handlePaymentSuccess = (response: any) => {
     console.log('✅ Payment successful:', response);
     
@@ -209,7 +227,6 @@ const BillingPage: React.FC = () => {
       duration: 5000
     });
 
-    // Use setTimeout for async operations
     setTimeout(async () => {
       try {
         console.log('💾 Recording transaction and updating subscription...');
@@ -217,23 +234,25 @@ const BillingPage: React.FC = () => {
         const nextBillingDate = new Date();
         nextBillingDate.setDate(nextBillingDate.getDate() + 30);
 
-        // Step 1: Record the transaction
-        const { error: txError } = await supabase
+        // Step 1: Record the transaction with all required fields
+        const { data: txData, error: txError } = await supabase
           .from('transactions')
           .insert({
             user_id: user?.id,
-            amount: 5300000, // ₦53,000 in kobo
+            amount: 5300000,
             currency: 'NGN',
             status: 'success',
             description: 'Business Plan Subscription',
             paystack_reference: response.reference,
             created_at: new Date().toISOString(),
-          });
+          })
+          .select()
+          .single();
 
         if (txError) {
           console.error('❌ Transaction insert error:', txError);
         } else {
-          console.log('✅ Transaction recorded');
+          console.log('✅ Transaction recorded:', txData);
         }
 
         // Step 2: Update billing profile
@@ -278,29 +297,9 @@ const BillingPage: React.FC = () => {
           console.log('✅ User subscription updated');
         }
 
-        // Step 4: Update profiles table (if it exists)
-        const { error: profilesError } = await supabase
-          .from('profiles')
-          .update({
-            plan: 'business',
-            subscription_status: 'active',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('user_id', user?.id);
-
-        if (profilesError) {
-          console.warn('⚠️ Profiles table update (optional):', profilesError);
-        } else {
-          console.log('✅ Profiles table updated');
-        }
-
-        // Step 5: Wait a moment for database to propagate
         await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Step 6: Refresh subscription data
         await loadSubscriptionData();
 
-        // Step 7: Verify the update worked
         const { data: checkData } = await supabase
           .rpc('get_user_profile_with_access', { user_uuid: user?.id });
 
@@ -346,7 +345,6 @@ const BillingPage: React.FC = () => {
     }, 500);
   };
 
-  // Handle payment closure
   const handlePaymentClose = () => {
     setIsProcessingPayment(false);
     toast.info('Payment Cancelled', {
@@ -354,7 +352,6 @@ const BillingPage: React.FC = () => {
     });
   };
 
-  // Handle Paystack payment
   const handleUpgradeClick = () => {
     const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
     
@@ -378,11 +375,11 @@ const BillingPage: React.FC = () => {
       const handler = window.PaystackPop.setup({
         key: paystackKey,
         email: user?.email,
-        amount: 5300000, // ₦53,000 in kobo
+        amount: 5300000,
         currency: 'NGN',
         ref: `${Date.now()}-${user?.id}`,
         metadata: {
-          user_id: user?.id, // CRITICAL for webhook
+          user_id: user?.id,
           plan: 'business',
           custom_fields: [
             {
@@ -406,7 +403,6 @@ const BillingPage: React.FC = () => {
     }
   };
 
-  // Handle subscription cancellation
   const handleCancelSubscription = async () => {
     const confirmed = window.confirm(
       'Are you sure you want to cancel your subscription?\n\n' +
@@ -417,7 +413,10 @@ const BillingPage: React.FC = () => {
     if (!confirmed) return;
 
     try {
-      const { error: updateError } = await supabase
+      setIsLoading(true);
+
+      // Update billing_profiles
+      const { error: billingError } = await supabase
         .from('billing_profiles')
         .update({ 
           subscription_status: 'cancelled',
@@ -425,7 +424,19 @@ const BillingPage: React.FC = () => {
         })
         .eq('id', user?.id);
 
-      if (updateError) throw updateError;
+      if (billingError) throw billingError;
+
+      // Update user_subscriptions
+      const { error: subError } = await supabase
+        .from('user_subscriptions')
+        .update({
+          status: 'cancelled',
+          cancel_at_period_end: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user?.id);
+
+      if (subError) console.warn('Could not update user_subscriptions:', subError);
 
       toast.success('Subscription cancelled', {
         description: 'You can continue using your plan until the end of the billing period'
@@ -437,10 +448,11 @@ const BillingPage: React.FC = () => {
       toast.error('Failed to cancel subscription', {
         description: 'Please try again or contact support'
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Download transaction receipt
   const downloadReceipt = (transaction: Transaction) => {
     try {
       const formatDate = (dateString: string) => {
@@ -490,7 +502,6 @@ NoteX Team
     }
   };
 
-  // Get status display
   const getStatusDisplay = (status: string) => {
     switch (status) {
       case 'success':
@@ -504,13 +515,15 @@ NoteX Team
     }
   };
 
-  // Get plan display
   const getCurrentPlanDisplay = () => {
     const planName = subscription?.plan === 'business' ? 'Business Plan' : 'Free Trial';
     let color = 'bg-muted text-muted-foreground border-border';
     let statusLabel = '';
 
-    if (subscription?.plan === 'trial') {
+    if (subscription?.isCancelled) {
+      statusLabel = ' - Cancelled';
+      color = 'bg-destructive/10 text-destructive border-destructive/20';
+    } else if (subscription?.plan === 'trial') {
       if (subscription?.isTrialExpired) {
         statusLabel = ' - Expired';
         color = 'bg-destructive/10 text-destructive border-destructive/20';
@@ -529,6 +542,15 @@ NoteX Team
     }
 
     return { label: `${planName}${statusLabel}`, color };
+  };
+
+  const shouldShowUpgradeButton = () => {
+    return (
+      (subscription?.plan === 'trial' && !subscription?.isTrialExpired) ||
+      subscription?.isTrialExpired ||
+      subscription?.isCancelled ||
+      subscription?.plan === 'business' && !subscription?.isActive
+    );
   };
 
   const planPricing = {
@@ -558,7 +580,6 @@ NoteX Team
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Billing & Subscription</h1>
@@ -577,7 +598,6 @@ NoteX Team
           </Button>
         </div>
 
-        {/* Error Alert */}
         {error && (
           <Alert className="mb-6 border-warning/20 bg-warning/5">
             <AlertTriangle className="h-4 w-4 text-warning" />
@@ -596,7 +616,6 @@ NoteX Team
           </Alert>
         )}
 
-        {/* Trial Expired Alert */}
         {subscription?.isTrialExpired && (
           <Alert className="mb-6 border-destructive/20 bg-destructive/5">
             <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -614,8 +633,16 @@ NoteX Team
           </Alert>
         )}
 
+        {subscription?.isCancelled && (
+          <Alert className="mb-6 border-orange-500/20 bg-orange-500/5">
+            <AlertTriangle className="h-4 w-4 text-orange-600" />
+            <AlertDescription className="text-orange-600">
+              <strong>Subscription Cancelled</strong> - You can still access features until your billing period ends. Reactivate anytime!
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="grid gap-8 lg:grid-cols-3">
-          {/* Billing Info Sidebar */}
           <div className="lg:col-span-1">
             <Card>
               <CardHeader>
@@ -660,9 +687,7 @@ NoteX Team
             </Card>
           </div>
 
-          {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Current Plan */}
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-4">
@@ -674,7 +699,9 @@ NoteX Team
                       {subscription?.plan === 'business' ? 'Business Plan' : 'Free Trial'}
                     </CardTitle>
                     <CardDescription>
-                      {subscription?.plan === 'business' && subscription?.isActive 
+                      {subscription?.isCancelled
+                        ? 'Subscription cancelled - Access until billing period ends'
+                        : subscription?.plan === 'business' && subscription?.isActive 
                         ? 'Active subscription'
                         : subscription?.plan === 'trial' && !subscription?.isTrialExpired
                         ? `${subscription?.daysLeft || 0} days remaining`
@@ -685,7 +712,6 @@ NoteX Team
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-                  {/* Price */}
                   <div className="text-center p-6 bg-muted/50 rounded-xl">
                     <DollarSign className="h-6 w-6 mx-auto mb-3 text-muted-foreground" />
                     <div className="text-3xl font-bold mb-2">
@@ -698,7 +724,6 @@ NoteX Team
                     <div className="text-sm text-muted-foreground">per {pricing.period}</div>
                   </div>
                   
-                  {/* Days Left / Next Billing */}
                   {subscription?.plan === 'trial' && !subscription?.isTrialExpired ? (
                     <div className="text-center p-6 bg-primary/5 rounded-xl">
                       <Timer className="h-6 w-6 mx-auto mb-3 text-primary" />
@@ -721,19 +746,17 @@ NoteX Team
                     </div>
                   ) : null}
 
-                  {/* Status */}
                   <div className="text-center p-6 bg-purple-500/5 rounded-xl">
                     <Activity className="h-6 w-6 mx-auto mb-3 text-purple-600" />
                     <div className="text-lg font-bold text-purple-600 mb-2 capitalize">
-                      {subscription?.isActive ? 'active' : 'inactive'}
+                      {subscription?.isCancelled ? 'cancelled' : subscription?.isActive ? 'active' : 'inactive'}
                     </div>
                     <div className="text-sm text-purple-600">status</div>
                   </div>
                 </div>
 
-                {/* Action Buttons */}
                 <div className="pt-6 border-t flex gap-3">
-                  {((subscription?.plan === 'trial' && !subscription?.isTrialExpired) || subscription?.isTrialExpired) && (
+                  {shouldShowUpgradeButton() && (
                     <Button 
                       onClick={handleUpgradeClick} 
                       className="flex-1"
@@ -745,19 +768,97 @@ NoteX Team
                           Processing...
                         </>
                       ) : (
+                  <div className="space-y-4">
+                    {transactions.map((tx) => {
+                      const status = getStatusDisplay(tx.status);
+                      return (
+                        <div key={tx.id} className="p-6 border rounded-lg hover:shadow-sm transition-shadow">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className={`p-3 rounded-lg ${
+                                tx.status === 'success' ? 'bg-green-500/10' : 
+                                tx.status === 'pending' ? 'bg-yellow-500/10' : 'bg-red-500/10'
+                              }`}>
+                                <span className={status.color}>{status.icon}</span>
+                              </div>
+                              <div>
+                                <div className="font-semibold">
+                                  {tx.description || 'Subscription Payment'}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {new Date(tx.created_at).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </div>
+                                {tx.paystack_reference && (
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    Ref: {tx.paystack_reference}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <div className="text-xl font-bold">
+                                  {new Intl.NumberFormat('en-NG', {
+                                    style: 'currency',
+                                    currency: tx.currency || 'NGN',
+                                  }).format(tx.amount / 100)}
+                                </div>
+                                <Badge 
+                                  variant={tx.status === 'success' ? 'default' : 
+                                          tx.status === 'pending' ? 'secondary' : 
+                                          'destructive'}
+                                  className="mt-1"
+                                >
+                                  {tx.status}
+                                </Badge>
+                              </div>
+                              {tx.status === 'success' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => downloadReceipt(tx)}
+                                  title="Download Receipt"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default BillingPage;
                         <>
                           <Crown className="h-5 w-5 mr-2" />
-                          Upgrade to Business
+                          {subscription?.isCancelled ? 'Reactivate Business Plan' : 'Upgrade to Business'}
                         </>
                       )}
                     </Button>
                   )}
                   
-                  {subscription?.plan === 'business' && subscription?.isActive && (
+                  {subscription?.plan === 'business' && subscription?.isActive && !subscription?.isCancelled && (
                     <Button 
                       variant="outline" 
                       onClick={handleCancelSubscription}
                       className="border-destructive/20 text-destructive hover:bg-destructive/5"
+                      disabled={isLoading}
                     >
                       <X className="h-5 w-5 mr-2" />
                       Cancel Subscription
@@ -767,14 +868,13 @@ NoteX Team
               </CardContent>
             </Card>
 
-            {/* Transaction History */}
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <Receipt className="h-5 w-5 text-primary" />
                   <div>
                     <CardTitle>Transaction History</CardTitle>
-                    <CardDescription>Payment records</CardDescription>
+                    <CardDescription>Payment records and receipts</CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -782,14 +882,14 @@ NoteX Team
                 {isLoading ? (
                   <div className="text-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-                    <p className="text-muted-foreground">Loading...</p>
+                    <p className="text-muted-foreground">Loading transactions...</p>
                   </div>
                 ) : transactions.length === 0 ? (
                   <div className="text-center py-12">
                     <Receipt className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
                     <h3 className="text-lg font-semibold mb-2">No transactions yet</h3>
                     <p className="text-muted-foreground">
-                      Your payment history will appear here
+                      Your payment history will appear here once you make your first payment
                     </p>
                   </div>
                 ) : (
