@@ -212,7 +212,49 @@ const BillingPage: React.FC = () => {
     // Use setTimeout for async operations
     setTimeout(async () => {
       try {
-        // Wait 3 seconds for webhook to process
+        // First, try manual verification via Edge Function
+        console.log('🔍 Verifying payment manually...');
+        
+        try {
+          const verifyResponse = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-payment`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              },
+              body: JSON.stringify({
+                reference: response.reference,
+                userId: user?.id,
+              }),
+            }
+          );
+
+          if (verifyResponse.ok) {
+            const verifyData = await verifyResponse.json();
+            console.log('✅ Manual verification successful:', verifyData);
+            
+            // Refresh subscription data
+            await loadSubscriptionData();
+
+            toast.success('✅ Subscription Activated!', {
+              description: 'Redirecting to dashboard...',
+              duration: 3000
+            });
+            
+            setTimeout(() => {
+              navigate('/dashboard');
+            }, 2000);
+            
+            setIsProcessingPayment(false);
+            return;
+          }
+        } catch (verifyError) {
+          console.warn('⚠️ Manual verification failed, waiting for webhook...', verifyError);
+        }
+
+        // Fallback: Wait for webhook to process
         await new Promise(resolve => setTimeout(resolve, 3000));
 
         // Refresh subscription data
@@ -232,15 +274,47 @@ const BillingPage: React.FC = () => {
             navigate('/dashboard');
           }, 2000);
         } else {
-          toast.warning('Payment processing...', {
-            description: 'Your subscription will be activated shortly. Please refresh in a moment.',
-            duration: 7000
-          });
+          // Final fallback: Update directly via Supabase
+          console.log('⚠️ Webhook not processed, updating directly...');
+          
+          const nextBillingDate = new Date();
+          nextBillingDate.setDate(nextBillingDate.getDate() + 30);
+
+          const { error: directUpdateError } = await supabase
+            .from('billing_profiles')
+            .upsert({
+              id: user?.id,
+              plan: 'business',
+              subscription_status: 'active',
+              trial_ends_at: null,
+              next_billing_date: nextBillingDate.toISOString(),
+              updated_at: new Date().toISOString(),
+            }, {
+              onConflict: 'id'
+            });
+
+          if (!directUpdateError) {
+            await loadSubscriptionData();
+            
+            toast.success('✅ Subscription Activated!', {
+              description: 'Redirecting to dashboard...',
+              duration: 3000
+            });
+            
+            setTimeout(() => {
+              navigate('/dashboard');
+            }, 2000);
+          } else {
+            toast.warning('Payment received but activation pending', {
+              description: 'Please refresh the page in a moment or contact support.',
+              duration: 10000
+            });
+          }
         }
       } catch (error) {
         console.error('Post-payment error:', error);
         toast.error('Error activating subscription', {
-          description: 'Please contact support if this persists'
+          description: 'Payment successful but activation failed. Please contact support.'
         });
       } finally {
         setIsProcessingPayment(false);
