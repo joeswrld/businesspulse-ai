@@ -1,4 +1,4 @@
-// src/pages/Billing.tsx - FIXED VERSION with proper cancellation and transaction storage
+// src/pages/Billing.tsx - COMPLETE FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -26,7 +26,6 @@ import {
   Activity,
   User,
   Mail,
-  CreditCard as CreditCardIcon,
   X,
 } from 'lucide-react';
 
@@ -146,7 +145,6 @@ const BillingPage: React.FC = () => {
         });
       }
 
-      // Load transactions with proper error handling
       const { data: transactionsData, error: txError } = await supabase
         .from('transactions')
         .select('*')
@@ -234,7 +232,6 @@ const BillingPage: React.FC = () => {
         const nextBillingDate = new Date();
         nextBillingDate.setDate(nextBillingDate.getDate() + 30);
 
-        // Step 1: Record the transaction with all required fields
         const { data: txData, error: txError } = await supabase
           .from('transactions')
           .insert({
@@ -255,7 +252,6 @@ const BillingPage: React.FC = () => {
           console.log('✅ Transaction recorded:', txData);
         }
 
-        // Step 2: Update billing profile
         const { error: profileError } = await supabase
           .from('billing_profiles')
           .upsert({
@@ -275,7 +271,6 @@ const BillingPage: React.FC = () => {
           console.log('✅ Billing profile updated');
         }
 
-        // Step 3: Update user_subscriptions
         const { error: subError } = await supabase
           .from('user_subscriptions')
           .upsert({
@@ -415,7 +410,6 @@ const BillingPage: React.FC = () => {
     try {
       setIsLoading(true);
 
-      // Update billing_profiles
       const { error: billingError } = await supabase
         .from('billing_profiles')
         .update({ 
@@ -426,7 +420,6 @@ const BillingPage: React.FC = () => {
 
       if (billingError) throw billingError;
 
-      // Update user_subscriptions
       const { error: subError } = await supabase
         .from('user_subscriptions')
         .update({
@@ -549,7 +542,7 @@ NoteX Team
       (subscription?.plan === 'trial' && !subscription?.isTrialExpired) ||
       subscription?.isTrialExpired ||
       subscription?.isCancelled ||
-      subscription?.plan === 'business' && !subscription?.isActive
+      (subscription?.plan === 'business' && !subscription?.isActive)
     );
   };
 
@@ -768,83 +761,6 @@ NoteX Team
                           Processing...
                         </>
                       ) : (
-                  <div className="space-y-4">
-                    {transactions.map((tx) => {
-                      const status = getStatusDisplay(tx.status);
-                      return (
-                        <div key={tx.id} className="p-6 border rounded-lg hover:shadow-sm transition-shadow">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className={`p-3 rounded-lg ${
-                                tx.status === 'success' ? 'bg-green-500/10' : 
-                                tx.status === 'pending' ? 'bg-yellow-500/10' : 'bg-red-500/10'
-                              }`}>
-                                <span className={status.color}>{status.icon}</span>
-                              </div>
-                              <div>
-                                <div className="font-semibold">
-                                  {tx.description || 'Subscription Payment'}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                  {new Date(tx.created_at).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </div>
-                                {tx.paystack_reference && (
-                                  <div className="text-xs text-muted-foreground mt-1">
-                                    Ref: {tx.paystack_reference}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="text-right">
-                                <div className="text-xl font-bold">
-                                  {new Intl.NumberFormat('en-NG', {
-                                    style: 'currency',
-                                    currency: tx.currency || 'NGN',
-                                  }).format(tx.amount / 100)}
-                                </div>
-                                <Badge 
-                                  variant={tx.status === 'success' ? 'default' : 
-                                          tx.status === 'pending' ? 'secondary' : 
-                                          'destructive'}
-                                  className="mt-1"
-                                >
-                                  {tx.status}
-                                </Badge>
-                              </div>
-                              {tx.status === 'success' && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => downloadReceipt(tx)}
-                                  title="Download Receipt"
-                                >
-                                  <Download className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default BillingPage;
                         <>
                           <Crown className="h-5 w-5 mr-2" />
                           {subscription?.isCancelled ? 'Reactivate Business Plan' : 'Upgrade to Business'}
@@ -904,15 +820,26 @@ export default BillingPage;
                                 tx.status === 'success' ? 'bg-green-500/10' : 
                                 tx.status === 'pending' ? 'bg-yellow-500/10' : 'bg-red-500/10'
                               }`}>
-                                {status.icon}
+                                <span className={status.color}>{status.icon}</span>
                               </div>
                               <div>
                                 <div className="font-semibold">
                                   {tx.description || 'Subscription Payment'}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                  {new Date(tx.created_at).toLocaleDateString()}
+                                  {new Date(tx.created_at).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
                                 </div>
+                                {tx.paystack_reference && (
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    Ref: {tx.paystack_reference}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div className="flex items-center gap-4">
@@ -920,10 +847,15 @@ export default BillingPage;
                                 <div className="text-xl font-bold">
                                   {new Intl.NumberFormat('en-NG', {
                                     style: 'currency',
-                                    currency: 'NGN',
+                                    currency: tx.currency || 'NGN',
                                   }).format(tx.amount / 100)}
                                 </div>
-                                <Badge variant={tx.status === 'success' ? 'default' : 'secondary'}>
+                                <Badge 
+                                  variant={tx.status === 'success' ? 'default' : 
+                                          tx.status === 'pending' ? 'secondary' : 
+                                          'destructive'}
+                                  className="mt-1"
+                                >
                                   {tx.status}
                                 </Badge>
                               </div>
@@ -932,6 +864,7 @@ export default BillingPage;
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => downloadReceipt(tx)}
+                                  title="Download Receipt"
                                 >
                                   <Download className="h-4 w-4" />
                                 </Button>
