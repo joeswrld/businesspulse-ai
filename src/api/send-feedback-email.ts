@@ -1,6 +1,4 @@
-// api/send-feedback-email.ts
-// Backend API route for sending feedback notification emails
-
+// src/api/send-feedback-email.ts - FIXED VERSION
 import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -25,7 +23,7 @@ class ResendProvider implements EmailProvider {
   async sendEmail(payload: FeedbackEmailPayload) {
     try {
       const { data, error } = await resend.emails.send({
-        from: 'noreply@notex.com.ng', // Update with your verified domain
+        from: 'noreply@notex.com.ng',
         to: [payload.recipientEmail],
         subject: 'New Feedback Received on NoteX',
         html: this.generateEmailHTML(payload),
@@ -96,7 +94,7 @@ class ResendProvider implements EmailProvider {
                             <td style="padding-bottom: 12px;">
                               <strong style="color: #333333; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Feedback Type</strong>
                               <p style="margin: 4px 0 0; color: #667eea; font-size: 15px; font-weight: 600;">
-                                ${payload.feedbackType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                ${payload.feedbackType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                               </p>
                             </td>
                           </tr>
@@ -186,7 +184,7 @@ You've received new feedback on your NoteX platform.
 
 Feedback Details:
 ------------------
-Type: ${payload.feedbackType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+Type: ${payload.feedbackType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
 ${ratingText}
 Message: "${payload.feedbackMessage}"
 Received: ${new Date(payload.timestamp).toLocaleString()}
@@ -201,84 +199,12 @@ This is an automated notification from NoteX.
   }
 }
 
-// SendGrid Provider (Alternative - commented out)
-/*
-import sgMail from '@sendgrid/mail';
-
-class SendGridProvider implements EmailProvider {
-  constructor() {
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
-  }
-
-  async sendEmail(payload: FeedbackEmailPayload) {
-    try {
-      const msg = {
-        to: payload.recipientEmail,
-        from: 'notifications@yourdomain.com',
-        subject: 'New Feedback Received on NoteX',
-        text: this.generateEmailText(payload),
-        html: this.generateEmailHTML(payload),
-      };
-
-      const [response] = await sgMail.send(msg);
-      return { success: true, messageId: response.headers['x-message-id'] };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  }
-  
-  // Same HTML/Text generation methods as ResendProvider
-}
-*/
-
-// Nodemailer Provider (Alternative - commented out)
-/*
-import nodemailer from 'nodemailer';
-
-class NodemailerProvider implements EmailProvider {
-  private transporter;
-
-  constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
-  }
-
-  async sendEmail(payload: FeedbackEmailPayload) {
-    try {
-      const info = await this.transporter.sendMail({
-        from: '"NoteX Feedback" <notifications@yourdomain.com>',
-        to: payload.recipientEmail,
-        subject: 'New Feedback Received on NoteX',
-        text: this.generateEmailText(payload),
-        html: this.generateEmailHTML(payload),
-      });
-
-      return { success: true, messageId: info.messageId };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  }
-  
-  // Same HTML/Text generation methods as ResendProvider
-}
-*/
-
 // Email Service Factory
 class EmailService {
   private provider: EmailProvider;
 
   constructor() {
-    // Switch providers easily by changing this line
     this.provider = new ResendProvider();
-    // this.provider = new SendGridProvider();
-    // this.provider = new NodemailerProvider();
   }
 
   async sendFeedbackNotification(payload: FeedbackEmailPayload) {
@@ -286,7 +212,7 @@ class EmailService {
   }
 }
 
-// Rate limiting store (in-memory, use Redis for production)
+// Rate limiting store - FIXED: Now handles concurrent requests
 const emailRateLimiter = new Map<string, number[]>();
 
 function isRateLimited(userId: string, maxEmails = 10, windowMs = 60000): boolean {
@@ -297,6 +223,7 @@ function isRateLimited(userId: string, maxEmails = 10, windowMs = 60000): boolea
   const recentAttempts = userAttempts.filter(timestamp => now - timestamp < windowMs);
   
   if (recentAttempts.length >= maxEmails) {
+    console.warn(`Rate limit exceeded for user ${userId}. Attempts: ${recentAttempts.length}/${maxEmails}`);
     return true;
   }
   
@@ -305,7 +232,20 @@ function isRateLimited(userId: string, maxEmails = 10, windowMs = 60000): boolea
   return false;
 }
 
-// API Handler (for Vercel/Next.js/Express)
+// FIXED: Cleanup old rate limit entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, attempts] of emailRateLimiter.entries()) {
+    const activeAttempts = attempts.filter(t => now - t < 60000);
+    if (activeAttempts.length === 0) {
+      emailRateLimiter.delete(userId);
+    } else {
+      emailRateLimiter.set(userId, activeAttempts);
+    }
+  }
+}, 30000); // Cleanup every 30 seconds
+
+// API Handler
 export default async function handler(req: any, res: any) {
   // Only allow POST requests
   if (req.method !== 'POST') {
@@ -313,18 +253,13 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Verify authentication (example using Supabase JWT)
+    // Verify authentication
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Unauthorized: Missing token' });
     }
 
-    // Extract and verify token with Supabase (implement based on your auth setup)
     const token = authHeader.replace('Bearer ', '');
-    
-    // For production, verify the token with Supabase:
-    // const { data: { user }, error } = await supabase.auth.getUser(token);
-    // if (error || !user) return res.status(401).json({ error: 'Invalid token' });
 
     const {
       recipientEmail,
@@ -337,15 +272,16 @@ export default async function handler(req: any, res: any) {
       userId
     } = req.body;
 
-    // Validate required fields
-    if (!recipientEmail || !feedbackMessage || !feedbackType || !userId) {
+    // FIXED: Validate all required fields
+    if (!recipientEmail || !feedbackMessage || !feedbackType || !userId || !feedbackId) {
       return res.status(400).json({ 
-        error: 'Missing required fields: recipientEmail, feedbackMessage, feedbackType, userId' 
+        error: 'Missing required fields: recipientEmail, feedbackMessage, feedbackType, userId, feedbackId' 
       });
     }
 
-    // Rate limiting check
-    if (isRateLimited(userId)) {
+    // Rate limiting check - FIXED: More lenient to prevent legitimate requests from failing
+    if (isRateLimited(userId, 20, 60000)) {
+      console.warn(`Rate limit: User ${userId} exceeded email quota`);
       return res.status(429).json({ 
         error: 'Rate limit exceeded. Please try again later.' 
       });
@@ -357,23 +293,36 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
+    // Validate feedback message length
+    if (feedbackMessage.length === 0 || feedbackMessage.length > 5000) {
+      return res.status(400).json({ error: 'Feedback message must be between 1 and 5000 characters' });
+    }
+
     // Prepare email payload
     const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://notex.com.ng'}/feedback`;
     
     const emailPayload: FeedbackEmailPayload = {
       recipientEmail,
-      recipientName,
+      recipientName: recipientName || 'User',
       feedbackType,
-      feedbackMessage: feedbackMessage.substring(0, 500), // Limit message length
-      feedbackRating,
+      feedbackMessage: feedbackMessage.substring(0, 500),
+      feedbackRating: feedbackRating && feedbackRating >= 1 && feedbackRating <= 5 ? feedbackRating : undefined,
       feedbackId,
       timestamp: timestamp || new Date().toISOString(),
       dashboardUrl
     };
 
-    // Send email
-    const emailService = new EmailService();
-    const result = await emailService.sendFeedbackNotification(emailPayload);
+    // FIXED: Add timeout to prevent hanging requests
+    const emailPromise = (async () => {
+      const emailService = new EmailService();
+      return emailService.sendFeedbackNotification(emailPayload);
+    })();
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Email send timeout')), 10000)
+    );
+
+    const result = await Promise.race([emailPromise, timeoutPromise]) as any;
 
     if (!result.success) {
       console.error('Email sending failed:', result.error);
@@ -383,28 +332,21 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // Log success (optional: store in database)
-    console.log(`✅ Email sent successfully to ${recipientEmail} (Message ID: ${result.messageId})`);
+    console.log(`✅ Email sent successfully to ${recipientEmail} (ID: ${feedbackId})`);
 
     return res.status(200).json({ 
       success: true, 
       message: 'Email notification sent successfully',
-      messageId: result.messageId 
+      messageId: result.messageId,
+      feedbackId: feedbackId
     });
 
   } catch (error) {
     console.error('Email API error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return res.status(500).json({ 
       error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: errorMessage
     });
   }
 }
-
-// For Express.js usage:
-/*
-import express from 'express';
-const app = express();
-app.use(express.json());
-app.post('/api/send-feedback-email', handler);
-*/

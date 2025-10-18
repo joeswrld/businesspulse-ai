@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 import { useAuth } from '@/contexts/AuthContext';
@@ -80,6 +80,8 @@ interface EmailNotificationPreferences {
 export default function Feedback() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const realtimeChannelRef = useRef<any>(null);
+  const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const subscriptionStatus = useSubscriptionStatus({
     redirectOnExpiry: true,
@@ -116,6 +118,7 @@ export default function Feedback() {
     dailyDigest: false
   });
   const [savingPreferences, setSavingPreferences] = useState(false);
+  const [processingFeedbackIds, setProcessingFeedbackIds] = useState<Set<string>>(new Set());
 
   const analyzeSentiment = useCallback((message: string): 'positive' | 'neutral' | 'negative' => {
     const lowerMessage = message.toLowerCase();
@@ -130,43 +133,125 @@ export default function Feedback() {
     return 'neutral';
   }, []);
 
+  // FIXED: Complete rewrite with proper error handling and validation
   const sendEmailNotification = useCallback(async (feedback: Feedback) => {
-    if (!emailPreferences.enabled || !emailPreferences.notifyOnNewFeedback) return;
-
-    if (emailPreferences.notifyOnNegativeFeedback) {
-      const sentiment = analyzeSentiment(feedback.message);
-      if (sentiment !== 'negative' && (!feedback.rating || feedback.rating > 2)) return;
-    }
-
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      // Check if already processing this feedback
+      if (processingFeedbackIds.has(feedback.id)) {
+        console.log(`Already processing notification for ${feedback.id}`);
+        return;
+      }
 
-      const response = await fetch('/api/send-feedback-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          recipientEmail: emailPreferences.emailAddress,
-          recipientName: user?.user_metadata?.full_name || user?.email?.split('@')[0],
-          feedbackType: feedback.form_type,
-          feedbackMessage: feedback.message,
-          feedbackRating: feedback.rating,
-          feedbackId: feedback.id,
-          timestamp: feedback.created_at,
-          userId: user?.id
-        })
-      });
+      // Validate preferences
+      if (!emailPreferences.enabled) {
+        console.log('Email notifications disabled, skipping');
+        return;
+      }
 
-      if (!response.ok) throw new Error('Failed to send email');
-      
-      toast.success('Email notification sent');
+      if (!emailPreferences.notifyOnNewFeedback) {
+        console.log('notifyOnNewFeedback disabled, skipping');
+        return;
+      }
+
+      // Validate email
+      if (!emailPreferences.emailAddress || !emailPreferences.emailAddress.includes('@')) {
+        console.warn('Invalid email address in preferences:', emailPreferences.emailAddress);
+        return;
+      }
+
+      // Validate feedback
+      if (!feedback.id || !feedback.message) {
+        console.warn('Invalid feedback structure:', feedback);
+        return;
+      }
+
+      // Check negative feedback filter
+      if (emailPreferences.notifyOnNegativeFeedback) {
+        const sentiment = analyzeSentiment(feedback.message);
+        const isNegativeFeedback = sentiment === 'negative' || (feedback.rating && feedback.rating <= 2);
+        
+        if (!isNegativeFeedback) {
+          console.log('Not negative feedback, skipping');
+          return;
+        }
+      }
+
+      // Mark as processing
+      setProcessingFeedbackIds(prev => new Set(prev).add(feedback.id));
+
+      // Get session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.access_token) {
+        console.error('Failed to get session:', sessionError);
+        return;
+      }
+
+      // Setup timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      try {
+        const response = await fetch('/api/send-feedback-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            recipientEmail: emailPreferences.emailAddress,
+            recipientName: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User',
+            feedbackType: feedback.form_type,
+            feedbackMessage: feedback.message,
+            feedbackRating: feedback.rating || undefined,
+            feedbackId: feedback.id,
+            timestamp: feedback.created_at,
+            userId: user?.id
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Email API error:', response.status, errorData);
+          
+          if (response.status === 429) {
+            console.warn('Rate limited - skipping');
+            return;
+          }
+          
+          throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (result.success) {
+          console.log('✅ Email sent:', result.messageId);
+          toast.success('Notification sent', {
+            description: `Alert sent to ${emailPreferences.emailAddress}`
+          });
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          console.error('Email request timeout');
+          return;
+        }
+        
+        console.error('Fetch error:', fetchError);
+      }
     } catch (error) {
-      console.error('Failed to send email notification:', error);
+      console.error('Email notification error:', error);
+    } finally {
+      // Remove from processing
+      setProcessingFeedbackIds(prev => {
+        const next = new Set(prev);
+        next.delete(feedback.id);
+        return next;
+      });
     }
-  }, [emailPreferences, analyzeSentiment, user]);
+  }, [emailPreferences, analyzeSentiment, user, processingFeedbackIds]);
 
   const loadFeedbackData = useCallback(async () => {
     if (!user) return;
@@ -343,49 +428,108 @@ export default function Feedback() {
     toast.success('Export successful', {
       description: `${filteredFeedbacks.length} feedback entries exported to CSV`
     });
-  }, []);
+  }, [filteredFeedbacks]);
 
+  // Load initial data
   useEffect(() => {
     if (user && hasAccess) {
       loadFeedbackData();
     }
-  }, [loadFeedbackData, user, hasAccess]);
+  }, [user, hasAccess]);
 
+  // FIXED: Realtime subscription with proper cleanup
   useEffect(() => {
-    if (!user || !feedbackSettings || !hasAccess) return;
+    if (!user || !feedbackSettings || !hasAccess) {
+      // Clean up if conditions not met
+      if (realtimeChannelRef.current) {
+        supabase.removeChannel(realtimeChannelRef.current);
+        realtimeChannelRef.current = null;
+      }
+      return;
+    }
 
-    const channel = supabase
-      .channel(`feedback-changes-${feedbackSettings.project_id}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'feedback',
-        filter: `project_id=eq.${feedbackSettings.project_id}`
-      }, async (payload) => {
-        const newFeedback = payload.new as Feedback;
-        await sendEmailNotification(newFeedback);
-        toast.success('New feedback received!');
-        loadFeedbackData();
-      })
-      .subscribe();
+    let subscription: any = null;
+
+    try {
+      subscription = supabase
+        .channel(`feedback-changes-${feedbackSettings.project_id}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'feedback',
+          filter: `project_id=eq.${feedbackSettings.project_id}`
+        }, async (payload) => {
+          console.log('New feedback received:', payload);
+          
+          try {
+            const newFeedback = payload.new as Feedback;
+            
+            if (!newFeedback.id || !newFeedback.message) {
+              console.warn('Invalid feedback:', newFeedback);
+              return;
+            }
+
+            // Send notification
+            await sendEmailNotification(newFeedback);
+            
+            // Show toast
+            toast.success('New feedback received!', {
+              description: newFeedback.message.substring(0, 80)
+            });
+
+            // Reload after short delay to avoid race condition
+            if (notificationTimeoutRef.current) {
+              clearTimeout(notificationTimeoutRef.current);
+            }
+            notificationTimeoutRef.current = setTimeout(() => {
+              loadFeedbackData();
+            }, 500);
+          } catch (error) {
+            console.error('Error processing feedback:', error);
+          }
+        })
+        .subscribe((status) => {
+          console.log('Realtime status:', status);
+        });
+
+      realtimeChannelRef.current = subscription;
+    } catch (error) {
+      console.error('Realtime setup failed:', error);
+      toast.error('Real-time updates failed');
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (subscription) {
+        supabase.removeChannel(subscription);
+        realtimeChannelRef.current = null;
+      }
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
     };
-  }, [user, feedbackSettings, sendEmailNotification, loadFeedbackData, hasAccess]);
+  }, [user, feedbackSettings, hasAccess, sendEmailNotification, loadFeedbackData]);
 
+  // FIXED: Better preference loading
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       const savedPrefs = localStorage.getItem(`email_prefs_${user.id}`);
+      
       if (savedPrefs) {
         try {
           const parsed = JSON.parse(savedPrefs);
           setEmailPreferences({
-            ...parsed,
-            emailAddress: parsed.emailAddress || user.email || ''
+            enabled: parsed.enabled ?? true,
+            emailAddress: parsed.emailAddress || user.email || '',
+            notifyOnNewFeedback: parsed.notifyOnNewFeedback ?? true,
+            notifyOnNegativeFeedback: parsed.notifyOnNegativeFeedback ?? true,
+            dailyDigest: parsed.dailyDigest ?? false
           });
         } catch (error) {
-          console.error('Failed to parse email preferences:', error);
+          console.error('Parse error:', error);
+          setEmailPreferences(prev => ({
+            ...prev,
+            emailAddress: user.email || ''
+          }));
         }
       } else {
         setEmailPreferences(prev => ({
@@ -394,7 +538,7 @@ export default function Feedback() {
         }));
       }
     }
-  }, [user]);
+  }, [user?.id, user?.email]);
 
   const filteredFeedbacks = useMemo(() => {
     let filtered = feedbacks;
