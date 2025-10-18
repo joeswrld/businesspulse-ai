@@ -76,15 +76,55 @@ const BillingPage: React.FC = () => {
 
       console.log('🔄 Loading subscription data for user:', user.id);
 
-      const { data: profileData, error: rpcError } = await supabase
-        .rpc('get_user_profile_with_access', { user_uuid: user.id });
+      // First try to get from billing_profiles directly for faster response
+      const { data: directProfile, error: directError } = await supabase
+        .from('billing_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
-      if (rpcError) {
-        console.error('RPC Error:', rpcError);
-        throw rpcError;
+      console.log('📊 Direct profile data:', directProfile);
+
+      // If direct query fails, try RPC
+      let profileData = null;
+      if (directError || !directProfile) {
+        const { data: rpcData, error: rpcError } = await supabase
+          .rpc('get_user_profile_with_access', { user_uuid: user.id });
+
+        if (rpcError) {
+          console.error('RPC Error:', rpcError);
+          throw rpcError;
+        }
+        profileData = rpcData;
+      } else {
+        // Convert direct profile to RPC format
+        const now = new Date();
+        const trialEnd = directProfile.trial_ends_at ? new Date(directProfile.trial_ends_at) : null;
+        const hasAccess = directProfile.plan === 'business' && directProfile.subscription_status === 'active'
+          || (directProfile.plan === 'trial' && trialEnd && now <= trialEnd);
+        
+        let daysLeft = 0;
+        if (directProfile.plan === 'trial' && trialEnd) {
+          daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        } else if (directProfile.next_billing_date) {
+          const nextBilling = new Date(directProfile.next_billing_date);
+          daysLeft = Math.max(0, Math.ceil((nextBilling.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        }
+
+        profileData = [{
+          id: directProfile.user_id,
+          plan: directProfile.plan,
+          subscription_status: directProfile.subscription_status,
+          trial_ends_at: directProfile.trial_ends_at,
+          next_billing_date: directProfile.next_billing_date,
+          has_access: hasAccess,
+          days_left: daysLeft,
+          paystack_customer_id: directProfile.paystack_customer_code,
+          paystack_subscription_id: directProfile.paystack_subscription_code,
+        }];
       }
 
-      console.log('📊 Profile data:', profileData);
+      console.log('📊 Final profile data:', profileData);
 
       if (!profileData || profileData.length === 0) {
         console.log('⚠️ No profile found, creating trial...');
@@ -181,7 +221,7 @@ const BillingPage: React.FC = () => {
             event: '*',
             schema: 'public',
             table: 'billing_profiles',
-            filter: `id=eq.${user.id}`,
+            filter: `user_id=eq.${user.id}`,
           },
           (payload) => {
             console.log('🔔 Billing profile updated:', payload);
@@ -255,16 +295,15 @@ const BillingPage: React.FC = () => {
 
         const { error: profileError } = await supabase
           .from('billing_profiles')
-          .upsert({
-            id: user?.id,
+          .update({
             plan: 'business',
             subscription_status: 'active',
             trial_ends_at: null,
             next_billing_date: nextBillingDate.toISOString(),
+            paystack_customer_code: response.customer?.customer_code || null,
             updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'id'
-          });
+          })
+          .eq('user_id', user?.id);
 
         if (profileError) {
           console.error('❌ Billing profile error:', profileError);

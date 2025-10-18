@@ -89,33 +89,45 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Load data on mount
+  // Load data on mount and set up realtime
   useEffect(() => {
     loadUserData();
+  }, []);
 
-    // Set up realtime listener for subscription changes
-    if (user) {
-      const channel = supabase
-        .channel(`dashboard-subscription-${user.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'billing_profiles',
-            filter: `id=eq.${user.id}`,
-          },
-          (payload) => {
-            console.log('🔔 Subscription updated in dashboard:', payload);
-            loadUserData();
+  // Set up realtime listener when user is available
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`dashboard-subscription-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'billing_profiles',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('🔔 Subscription updated in dashboard:', payload);
+          const newData = payload.new as any;
+          
+          // Show success toast when business plan is activated
+          if (newData?.subscription_status === 'active' && newData?.plan === 'business') {
+            toast.success('🎉 Welcome to Business Plan!', {
+              description: 'You now have unlimited access to all features',
+              duration: 5000,
+            });
           }
-        )
-        .subscribe();
+          
+          loadUserData();
+        }
+      )
+      .subscribe();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user?.id]);
 
   // Get plan info for badge
@@ -131,14 +143,17 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
     const plan = subscription.plan?.toLowerCase() || '';
     const status = subscription.subscription_status?.toLowerCase() || '';
-    const isCancelled = status === 'cancelled';
-    const isActive = status === 'active';
-    const isTrial = plan === 'trial';
-
-    console.log('🎯 Plan determination:', { plan, status, isCancelled, isActive, isTrial });
+    
+    console.log('🎯 Plan determination:', { 
+      plan, 
+      status, 
+      raw_plan: subscription.plan,
+      raw_status: subscription.subscription_status,
+      has_access: subscription.has_access 
+    });
 
     // Handle cancelled subscription
-    if (isCancelled) {
+    if (status === 'cancelled') {
       return {
         planName: 'Cancelled',
         planType: 'cancelled',
@@ -147,14 +162,14 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       };
     }
 
-    // Handle business plan
+    // Handle business plan - MOST IMPORTANT CHECK
     if (plan === 'business') {
-      if (isActive) {
+      if (status === 'active' || subscription.has_access) {
         return {
           planName: 'Business',
           planType: 'business',
-          planColor: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-          planIcon: <Crown className="h-3 w-3" />
+          planColor: 'bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-900 border-yellow-300 font-semibold',
+          planIcon: <Crown className="h-4 w-4 text-yellow-600" />
         };
       } else {
         return {
@@ -166,18 +181,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       }
     }
 
-    // Handle pro plan (if exists)
-    if (plan === 'pro' || plan === 'premium') {
-      return {
-        planName: 'Pro',
-        planType: 'pro',
-        planColor: 'bg-blue-100 text-blue-800 border-blue-200',
-        planIcon: <Zap className="h-3 w-3" />
-      };
-    }
-
-    // Handle trial (default)
-    if (isTrial || !plan) {
+    // Handle trial
+    if (plan === 'trial' || !plan) {
       const daysLeft = subscription.days_left || 0;
       const isExpired = daysLeft <= 0 && !subscription.has_access;
       
@@ -200,9 +205,9 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
     // Fallback
     return {
-      planName: 'Free Trial',
+      planName: 'Unknown Plan',
       planType: 'trial',
-      planColor: 'bg-orange-100 text-orange-800 border-orange-200',
+      planColor: 'bg-gray-100 text-gray-800 border-gray-200',
       planIcon: <Star className="h-3 w-3" />
     };
   };
