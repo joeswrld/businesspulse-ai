@@ -93,6 +93,10 @@ export default function Feedback() {
   const isTrialExpired = subscriptionStatus?.isTrialExpired ?? false;
   const isSubscriptionExpired = subscriptionStatus?.isSubscriptionExpired ?? false;
   
+  // CRITICAL FIX: Move processingFeedbackIds BEFORE any callbacks that use it
+  const [processingFeedbackIds, setProcessingFeedbackIds] = useState<Set<string>>(new Set());
+  
+  // Other state declarations
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -118,8 +122,8 @@ export default function Feedback() {
     dailyDigest: false
   });
   const [savingPreferences, setSavingPreferences] = useState(false);
-  const [processingFeedbackIds, setProcessingFeedbackIds] = useState<Set<string>>(new Set());
 
+  // Sentiment analysis helper
   const analyzeSentiment = useCallback((message: string): 'positive' | 'neutral' | 'negative' => {
     const lowerMessage = message.toLowerCase();
     const positiveWords = ['great', 'excellent', 'amazing', 'love', 'awesome', 'fantastic', 'good', 'best', 'wonderful'];
@@ -133,7 +137,7 @@ export default function Feedback() {
     return 'neutral';
   }, []);
 
-  // FIXED: Complete rewrite with proper error handling and validation
+  // Email notification handler - NOW processingFeedbackIds is defined above
   const sendEmailNotification = useCallback(async (feedback: Feedback) => {
     try {
       // Check if already processing this feedback
@@ -402,6 +406,38 @@ export default function Feedback() {
     }
   }, [user, emailPreferences]);
 
+  // Computed values with proper dependency
+  const filteredFeedbacks = useMemo(() => {
+    let filtered = feedbacks;
+
+    if (filters.formType !== 'all') {
+      filtered = filtered.filter(f => f.form_type === filters.formType);
+    }
+
+    if (filters.rating !== 'all') {
+      const ratingValue = parseInt(filters.rating);
+      filtered = filtered.filter(f => f.rating === ratingValue);
+    }
+
+    if (filters.sentiment !== 'all') {
+      filtered = filtered.filter(f => f.sentiment === filters.sentiment);
+    }
+
+    if (filters.status !== 'all') {
+      filtered = filtered.filter(f => f.status === filters.status);
+    }
+
+    if (filters.searchQuery) {
+      const query = filters.searchQuery.toLowerCase();
+      filtered = filtered.filter(f => 
+        f.message.toLowerCase().includes(query) ||
+        (f.metadata?.email && f.metadata.email.toLowerCase().includes(query))
+      );
+    }
+
+    return filtered;
+  }, [feedbacks, filters]);
+
   const exportToCSV = useCallback(() => {
     const csvContent = [
       ['Date', 'Form Type', 'Message', 'Rating', 'Sentiment', 'Status', 'Email', 'Page URL'].join(','),
@@ -435,12 +471,11 @@ export default function Feedback() {
     if (user && hasAccess) {
       loadFeedbackData();
     }
-  }, [user, hasAccess]);
+  }, [user, hasAccess, loadFeedbackData]);
 
-  // FIXED: Realtime subscription with proper cleanup
+  // Realtime subscription
   useEffect(() => {
     if (!user || !feedbackSettings || !hasAccess) {
-      // Clean up if conditions not met
       if (realtimeChannelRef.current) {
         supabase.removeChannel(realtimeChannelRef.current);
         realtimeChannelRef.current = null;
@@ -469,15 +504,12 @@ export default function Feedback() {
               return;
             }
 
-            // Send notification
             await sendEmailNotification(newFeedback);
             
-            // Show toast
             toast.success('New feedback received!', {
               description: newFeedback.message.substring(0, 80)
             });
 
-            // Reload after short delay to avoid race condition
             if (notificationTimeoutRef.current) {
               clearTimeout(notificationTimeoutRef.current);
             }
@@ -509,7 +541,7 @@ export default function Feedback() {
     };
   }, [user, feedbackSettings, hasAccess, sendEmailNotification, loadFeedbackData]);
 
-  // FIXED: Better preference loading
+  // Load preferences
   useEffect(() => {
     if (user?.id) {
       const savedPrefs = localStorage.getItem(`email_prefs_${user.id}`);
@@ -539,37 +571,6 @@ export default function Feedback() {
       }
     }
   }, [user?.id, user?.email]);
-
-  const filteredFeedbacks = useMemo(() => {
-    let filtered = feedbacks;
-
-    if (filters.formType !== 'all') {
-      filtered = filtered.filter(f => f.form_type === filters.formType);
-    }
-
-    if (filters.rating !== 'all') {
-      const ratingValue = parseInt(filters.rating);
-      filtered = filtered.filter(f => f.rating === ratingValue);
-    }
-
-    if (filters.sentiment !== 'all') {
-      filtered = filtered.filter(f => f.sentiment === filters.sentiment);
-    }
-
-    if (filters.status !== 'all') {
-      filtered = filtered.filter(f => f.status === filters.status);
-    }
-
-    if (filters.searchQuery) {
-      const query = filters.searchQuery.toLowerCase();
-      filtered = filtered.filter(f => 
-        f.message.toLowerCase().includes(query) ||
-        (f.metadata?.email && f.metadata.email.toLowerCase().includes(query))
-      );
-    }
-
-    return filtered;
-  }, [feedbacks, filters]);
 
   const totalPages = useMemo(() => Math.ceil(filteredFeedbacks.length / itemsPerPage), [filteredFeedbacks.length, itemsPerPage]);
   
@@ -732,7 +733,6 @@ export default function Feedback() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Feedback Dashboard</h1>
@@ -752,7 +752,6 @@ export default function Feedback() {
         </div>
       </div>
 
-      {/* Email Notification Status Banner */}
       {emailPreferences.enabled && (
         <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
           <CardContent className="py-3 px-4">
@@ -776,7 +775,6 @@ export default function Feedback() {
         </Card>
       )}
 
-      {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card>
@@ -863,7 +861,6 @@ export default function Feedback() {
         </div>
       )}
 
-      {/* Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -875,7 +872,6 @@ export default function Feedback() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -991,7 +987,6 @@ export default function Feedback() {
           </Card>
         </TabsContent>
 
-        {/* All Feedback Tab */}
         <TabsContent value="feedback" className="space-y-6">
           <Card>
             <CardHeader>
@@ -1126,7 +1121,6 @@ export default function Feedback() {
                     </div>
                   ))}
 
-                  {/* Pagination */}
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between pt-4">
                       <p className="text-sm text-gray-600">
@@ -1167,7 +1161,6 @@ export default function Feedback() {
           </Card>
         </TabsContent>
 
-        {/* Analytics Tab */}
         <TabsContent value="analytics" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -1280,7 +1273,6 @@ export default function Feedback() {
           </Card>
         </TabsContent>
 
-        {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-6">
           <Card>
             <CardHeader>
