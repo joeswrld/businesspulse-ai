@@ -14,604 +14,275 @@ export type Database = {
   }
   public: {
     Tables: {
-      ai_insights: {
-        Row: {
-          confidence_score: number | null
-          content: Json
-          created_at: string
-          data_source_id: string | null
-          id: string
-          industry_category: string | null
-          insight_type: string
-          is_actionable: boolean | null
-          priority: string | null
-          summary: string | null
-          title: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          confidence_score?: number | null
-          content: Json
-          created_at?: string
-          data_source_id?: string | null
-          id?: string
-          industry_category?: string | null
-          insight_type: string
-          is_actionable?: boolean | null
-          priority?: string | null
-          summary?: string | null
-          title: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          confidence_score?: number | null
-          content?: Json
-          created_at?: string
-          data_source_id?: string | null
-          id?: string
-          industry_category?: string | null
-          insight_type?: string
-          is_actionable?: boolean | null
-          priority?: string | null
-          summary?: string | null
-          title?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ai_insights_data_source_id_fkey"
-            columns: ["data_source_id"]
-            isOneToOne: false
-            referencedRelation: "data_sources"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      analytics_events: {
-        Row: {
-          created_at: string
-          event_data: Json | null
-          event_type: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          event_data?: Json | null
-          event_type: string
-          id?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          event_data?: Json | null
-          event_type?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      analytics_history: {
-        Row: {
-          analysis_type: string
-          analytics_data: Json
-          created_at: string | null
-          id: string
-          insights_count: number
-          time_range: string
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          analysis_type?: string
-          analytics_data: Json
-          created_at?: string | null
-          id?: string
-          insights_count?: number
-          time_range?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          analysis_type?: string
-          analytics_data?: Json
-          created_at?: string | null
-          id?: string
-          insights_count?: number
-          time_range?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      audit_logs: {
-        Row: {
-          action: string
-          created_at: string | null
-          id: string
-          ip_address: unknown | null
-          new_values: Json | null
-          old_values: Json | null
-          record_id: string | null
-          table_name: string | null
-          user_agent: string | null
-          user_id: string | null
-        }
-        Insert: {
-          action: string
-          created_at?: string | null
-          id?: string
-          ip_address?: unknown | null
-          new_values?: Json | null
-          old_values?: Json | null
-          record_id?: string | null
-          table_name?: string | null
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          action?: string
-          created_at?: string | null
-          id?: string
-          ip_address?: unknown | null
-          new_values?: Json | null
-          old_values?: Json | null
-          record_id?: string | null
-          table_name?: string | null
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      auth_events: {
-        Row: {
-          created_at: string | null
-          event_data: Json | null
-          event_type: string
-          id: string
-          ip_address: unknown | null
-          user_agent: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          event_data?: Json | null
-          event_type: string
-          id?: string
-          ip_address?: unknown | null
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          event_data?: Json | null
-          event_type?: string
-          id?: string
-          ip_address?: unknown | null
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      billing: {
-        Row: {
-          created_at: string | null
-          end_date: string | null
-          plan: string | null
-          start_date: string | null
-          status: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          end_date?: string | null
-          plan?: string | null
-          start_date?: string | null
-          status?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          end_date?: string | null
-          plan?: string | null
-          start_date?: string | null
-          status?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "billing_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       billing_profiles: {
         Row: {
           created_at: string | null
           id: string
           next_billing_date: string | null
-          paystack_customer_id: string | null
-          paystack_subscription_id: string | null
+          paystack_customer_code: string | null
+          paystack_subscription_code: string | null
           plan: string | null
+          plan_type: string | null
+          subscription_end_date: string | null
+          subscription_start_date: string | null
           subscription_status: string | null
+          trial_end_date: string | null
           trial_ends_at: string | null
+          trial_start_date: string | null
+          updated_at: string | null
+          user_id: string
         }
         Insert: {
           created_at?: string | null
-          id: string
+          id?: string
           next_billing_date?: string | null
-          paystack_customer_id?: string | null
-          paystack_subscription_id?: string | null
+          paystack_customer_code?: string | null
+          paystack_subscription_code?: string | null
           plan?: string | null
+          plan_type?: string | null
+          subscription_end_date?: string | null
+          subscription_start_date?: string | null
           subscription_status?: string | null
+          trial_end_date?: string | null
           trial_ends_at?: string | null
+          trial_start_date?: string | null
+          updated_at?: string | null
+          user_id: string
         }
         Update: {
           created_at?: string | null
           id?: string
           next_billing_date?: string | null
-          paystack_customer_id?: string | null
-          paystack_subscription_id?: string | null
+          paystack_customer_code?: string | null
+          paystack_subscription_code?: string | null
           plan?: string | null
+          plan_type?: string | null
+          subscription_end_date?: string | null
+          subscription_start_date?: string | null
           subscription_status?: string | null
+          trial_end_date?: string | null
           trial_ends_at?: string | null
+          trial_start_date?: string | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
-      chat_sessions: {
+      feature_requests: {
         Row: {
-          created_at: string
+          created_at: string | null
+          description: string | null
+          feedback_ids: string[] | null
           id: string
-          messages: Json | null
+          is_public: boolean | null
+          milestone_date: string | null
+          released_at: string | null
+          status: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          feedback_ids?: string[] | null
+          id?: string
+          is_public?: boolean | null
+          milestone_date?: string | null
+          released_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          feedback_ids?: string[] | null
+          id?: string
+          is_public?: boolean | null
+          milestone_date?: string | null
+          released_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      feature_requests_backup: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          feedback_ids: string[] | null
+          id: string | null
+          is_public: boolean | null
+          milestone_date: string | null
+          released_at: string | null
           status: string | null
           title: string | null
-          updated_at: string
-          user_id: string
+          updated_at: string | null
+          user_id: string | null
         }
         Insert: {
-          created_at?: string
-          id?: string
-          messages?: Json | null
+          created_at?: string | null
+          description?: string | null
+          feedback_ids?: string[] | null
+          id?: string | null
+          is_public?: boolean | null
+          milestone_date?: string | null
+          released_at?: string | null
           status?: string | null
           title?: string | null
-          updated_at?: string
-          user_id: string
+          updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
-          created_at?: string
-          id?: string
-          messages?: Json | null
+          created_at?: string | null
+          description?: string | null
+          feedback_ids?: string[] | null
+          id?: string | null
+          is_public?: boolean | null
+          milestone_date?: string | null
+          released_at?: string | null
           status?: string | null
           title?: string | null
-          updated_at?: string
-          user_id?: string
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
-      data_sources: {
+      feedback: {
         Row: {
-          created_at: string
-          file_size: number | null
-          file_url: string | null
+          ai_summary: string | null
+          created_at: string | null
+          form_type: string | null
+          id: string
+          message: string
+          metadata: Json | null
+          project_id: string
+          rating: number | null
+          sentiment: string | null
+          status: string | null
+          suggested_reply: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          ai_summary?: string | null
+          created_at?: string | null
+          form_type?: string | null
+          id?: string
+          message: string
+          metadata?: Json | null
+          project_id: string
+          rating?: number | null
+          sentiment?: string | null
+          status?: string | null
+          suggested_reply?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          ai_summary?: string | null
+          created_at?: string | null
+          form_type?: string | null
+          id?: string
+          message?: string
+          metadata?: Json | null
+          project_id?: string
+          rating?: number | null
+          sentiment?: string | null
+          status?: string | null
+          suggested_reply?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "feedback_settings"
+            referencedColumns: ["project_id"]
+          },
+        ]
+      }
+      feedback_settings: {
+        Row: {
+          business_name: string | null
+          created_at: string | null
+          customer_satisfaction_enabled: boolean | null
+          customer_survey_url: string | null
+          id: string
+          logo_url: string | null
+          product_feedback_enabled: boolean | null
+          product_feedback_url: string | null
+          project_id: string | null
+          updated_at: string | null
+          user_id: string | null
+          widget_code: string | null
+        }
+        Insert: {
+          business_name?: string | null
+          created_at?: string | null
+          customer_satisfaction_enabled?: boolean | null
+          customer_survey_url?: string | null
+          id?: string
+          logo_url?: string | null
+          product_feedback_enabled?: boolean | null
+          product_feedback_url?: string | null
+          project_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          widget_code?: string | null
+        }
+        Update: {
+          business_name?: string | null
+          created_at?: string | null
+          customer_satisfaction_enabled?: boolean | null
+          customer_survey_url?: string | null
+          id?: string
+          logo_url?: string | null
+          product_feedback_enabled?: boolean | null
+          product_feedback_url?: string | null
+          project_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          widget_code?: string | null
+        }
+        Relationships: []
+      }
+      insights: {
+        Row: {
+          created_at: string | null
+          details: string
+          feedback_count: number | null
           id: string
           metadata: Json | null
-          name: string
-          status: string
-          type: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          file_size?: number | null
-          file_url?: string | null
-          id?: string
-          metadata?: Json | null
-          name: string
-          status?: string
-          type: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          file_size?: number | null
-          file_url?: string | null
-          id?: string
-          metadata?: Json | null
-          name?: string
-          status?: string
-          type?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      email_links: {
-        Row: {
-          created_at: string | null
-          id: string
-          link: string
-          project_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          link: string
-          project_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          link?: string
-          project_id?: string
-        }
-        Relationships: []
-      }
-      goals: {
-        Row: {
-          category: string
-          created_at: string
-          current_value: number | null
-          description: string | null
-          id: string
-          is_achieved: boolean | null
-          name: string
-          target_date: string | null
-          target_value: number | null
-          unit: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          category: string
-          created_at?: string
-          current_value?: number | null
-          description?: string | null
-          id?: string
-          is_achieved?: boolean | null
-          name: string
-          target_date?: string | null
-          target_value?: number | null
-          unit?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          category?: string
-          created_at?: string
-          current_value?: number | null
-          description?: string | null
-          id?: string
-          is_achieved?: boolean | null
-          name?: string
-          target_date?: string | null
-          target_value?: number | null
-          unit?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      insights_history: {
-        Row: {
-          analysis_result: Json
-          created_at: string | null
-          id: string
-          user_id: string | null
-        }
-        Insert: {
-          analysis_result: Json
-          created_at?: string | null
-          id?: string
-          user_id?: string | null
-        }
-        Update: {
-          analysis_result?: Json
-          created_at?: string | null
-          id?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      insights_results: {
-        Row: {
-          created_at: string | null
-          file_id: string
-          file_name: string
-          id: string
-          key_themes: string[]
-          performance: Json
-          sentiment: Json
-          suggested_actions: string[]
-          summary: string
-          trends: string[]
+          title: string
           updated_at: string | null
           user_id: string
         }
         Insert: {
           created_at?: string | null
-          file_id: string
-          file_name: string
+          details: string
+          feedback_count?: number | null
           id?: string
-          key_themes?: string[]
-          performance?: Json
-          sentiment?: Json
-          suggested_actions?: string[]
-          summary: string
-          trends?: string[]
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          file_id?: string
-          file_name?: string
-          id?: string
-          key_themes?: string[]
-          performance?: Json
-          sentiment?: Json
-          suggested_actions?: string[]
-          summary?: string
-          trends?: string[]
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      notification_preferences: {
-        Row: {
-          created_at: string | null
-          id: string
-          system_updates: boolean | null
-          updated_at: string | null
-          user_id: string
-          weekly_reports: boolean | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          system_updates?: boolean | null
-          updated_at?: string | null
-          user_id: string
-          weekly_reports?: boolean | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          system_updates?: boolean | null
-          updated_at?: string | null
-          user_id?: string
-          weekly_reports?: boolean | null
-        }
-        Relationships: []
-      }
-      notifications: {
-        Row: {
-          created_at: string
-          id: string
-          is_email_sent: boolean | null
-          is_read: boolean | null
-          message: string
-          related_id: string | null
+          metadata?: Json | null
           title: string
-          type: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_email_sent?: boolean | null
-          is_read?: boolean | null
-          message: string
-          related_id?: string | null
-          title: string
-          type: string
+          updated_at?: string | null
           user_id: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
+          details?: string
+          feedback_count?: number | null
           id?: string
-          is_email_sent?: boolean | null
-          is_read?: boolean | null
-          message?: string
-          related_id?: string | null
+          metadata?: Json | null
           title?: string
-          type?: string
+          updated_at?: string | null
           user_id?: string
-        }
-        Relationships: []
-      }
-      organizations: {
-        Row: {
-          created_at: string
-          id: string
-          industry: string | null
-          name: string
-          size: string | null
-          slug: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          industry?: string | null
-          name: string
-          size?: string | null
-          slug: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          industry?: string | null
-          name?: string
-          size?: string | null
-          slug?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      otp_tokens: {
-        Row: {
-          created_at: string | null
-          expires_at: string
-          id: string
-          token_hash: string
-          token_type: string
-          used_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          expires_at: string
-          id?: string
-          token_hash: string
-          token_type: string
-          used_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          expires_at?: string
-          id?: string
-          token_hash?: string
-          token_type?: string
-          used_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      plans: {
-        Row: {
-          code: string
-          created_at: string | null
-          id: string
-          limits: Json
-          name: string
-          updated_at: string | null
-        }
-        Insert: {
-          code: string
-          created_at?: string | null
-          id?: string
-          limits: Json
-          name: string
-          updated_at?: string | null
-        }
-        Update: {
-          code?: string
-          created_at?: string | null
-          id?: string
-          limits?: Json
-          name?: string
-          updated_at?: string | null
         }
         Relationships: []
       }
@@ -622,7 +293,8 @@ export type Database = {
           company: string | null
           company_name: string | null
           created_at: string
-          email: string | null
+          demo_data_seeded: boolean | null
+          email: string
           email_confirmed: boolean | null
           first_name: string | null
           full_name: string | null
@@ -636,9 +308,10 @@ export type Database = {
           preferences: Json | null
           role: string | null
           trial_end: string | null
+          trial_expired: boolean | null
           trial_start: string | null
           updated_at: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           authorization_code?: string | null
@@ -646,7 +319,8 @@ export type Database = {
           company?: string | null
           company_name?: string | null
           created_at?: string
-          email?: string | null
+          demo_data_seeded?: boolean | null
+          email: string
           email_confirmed?: boolean | null
           first_name?: string | null
           full_name?: string | null
@@ -660,9 +334,10 @@ export type Database = {
           preferences?: Json | null
           role?: string | null
           trial_end?: string | null
+          trial_expired?: boolean | null
           trial_start?: string | null
           updated_at?: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           authorization_code?: string | null
@@ -670,728 +345,137 @@ export type Database = {
           company?: string | null
           company_name?: string | null
           created_at?: string
-          email?: string | null
-          email_confirmed?: boolean | null
-          first_name?: string | null
-          full_name?: string | null
-          id?: string
-          industry?: string | null
-          is_active?: boolean | null
-          last_name?: string | null
-          onboarding_completed?: boolean | null
-          phone?: string | null
-          plan?: string | null
-          preferences?: Json | null
-          role?: string | null
-          trial_end?: string | null
-          trial_start?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      qr_links: {
-        Row: {
-          created_at: string | null
-          id: string
-          link: string
-          project_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          link: string
-          project_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          link?: string
-          project_id?: string
-        }
-        Relationships: []
-      }
-      reports: {
-        Row: {
-          id: string
-          user_id: string
-          title: string
-          feedback_ids: string[]
-          insights_text: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          title?: string
-          feedback_ids?: string[]
-          insights_text: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          title?: string
-          feedback_ids?: string[]
-          insights_text?: string
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "reports_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      subscription_plans: {
-        Row: {
-          created_at: string
-          currency: string | null
-          features: Json | null
-          id: string
-          interval: string
-          max_data_sources: number | null
-          max_insights_per_month: number | null
-          max_team_members: number | null
-          name: string
-          price: number
-        }
-        Insert: {
-          created_at?: string
-          currency?: string | null
-          features?: Json | null
-          id?: string
-          interval: string
-          max_data_sources?: number | null
-          max_insights_per_month?: number | null
-          max_team_members?: number | null
-          name: string
-          price: number
-        }
-        Update: {
-          created_at?: string
-          currency?: string | null
-          features?: Json | null
-          id?: string
-          interval?: string
-          max_data_sources?: number | null
-          max_insights_per_month?: number | null
-          max_team_members?: number | null
-          name?: string
-          price?: number
-        }
-        Relationships: []
-      }
-      subscriptions: {
-        Row: {
-          created_at: string | null
-          id: string
-          paystack_customer_id: string | null
-          paystack_subscription_code: string | null
-          plan: string
-          status: string | null
-          trial_end: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          paystack_customer_id?: string | null
-          paystack_subscription_code?: string | null
-          plan: string
-          status?: string | null
-          trial_end?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          paystack_customer_id?: string | null
-          paystack_subscription_code?: string | null
-          plan?: string
-          status?: string | null
-          trial_end?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      team_activities: {
-        Row: {
-          activity_data: Json | null
-          activity_type: string
-          created_at: string | null
-          id: string
-          team_id: string | null
-          user_id: string | null
-        }
-        Insert: {
-          activity_data?: Json | null
-          activity_type: string
-          created_at?: string | null
-          id?: string
-          team_id?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          activity_data?: Json | null
-          activity_type?: string
-          created_at?: string | null
-          id?: string
-          team_id?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "team_activities_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "teams"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      team_invitations: {
-        Row: {
-          accepted_at: string | null
-          created_at: string | null
-          declined_at: string | null
-          email: string
-          expires_at: string
-          id: string
-          invited_at: string | null
-          invited_by: string | null
-          inviter_id: string
-          message: string | null
-          personal_message: string | null
-          role: string
-          status: string
-          team_id: string | null
-          token: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          created_at?: string | null
-          declined_at?: string | null
-          email: string
-          expires_at: string
-          id?: string
-          invited_at?: string | null
-          invited_by?: string | null
-          inviter_id: string
-          message?: string | null
-          personal_message?: string | null
-          role?: string
-          status?: string
-          team_id?: string | null
-          token?: string
-        }
-        Update: {
-          accepted_at?: string | null
-          created_at?: string | null
-          declined_at?: string | null
+          demo_data_seeded?: boolean | null
           email?: string
-          expires_at?: string
+          email_confirmed?: boolean | null
+          first_name?: string | null
+          full_name?: string | null
           id?: string
-          invited_at?: string | null
-          invited_by?: string | null
-          inviter_id?: string
-          message?: string | null
-          personal_message?: string | null
-          role?: string
-          status?: string
-          team_id?: string | null
-          token?: string
+          industry?: string | null
+          is_active?: boolean | null
+          last_name?: string | null
+          onboarding_completed?: boolean | null
+          phone?: string | null
+          plan?: string | null
+          preferences?: Json | null
+          role?: string | null
+          trial_end?: string | null
+          trial_expired?: boolean | null
+          trial_start?: string | null
+          updated_at?: string
+          user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "team_invitations_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "teams"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
-      team_members: {
+      projects: {
         Row: {
-          id: string
-          joined_at: string | null
-          last_active: string | null
-          permissions: string[] | null
-          role: string
-          status: string
-          team_id: string | null
-          user_id: string | null
-        }
-        Insert: {
-          id?: string
-          joined_at?: string | null
-          last_active?: string | null
-          permissions?: string[] | null
-          role?: string
-          status?: string
-          team_id?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          id?: string
-          joined_at?: string | null
-          last_active?: string | null
-          permissions?: string[] | null
-          role?: string
-          status?: string
-          team_id?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "team_members_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "teams"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      teams: {
-        Row: {
-          analytics_enabled: boolean | null
-          avatar_url: string | null
           created_at: string | null
           description: string | null
           id: string
-          is_public: boolean | null
-          member_count: number | null
-          name: string
-          owner_id: string | null
-          real_time_collaboration: boolean | null
-          settings: Json | null
+          name: string | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
-          analytics_enabled?: boolean | null
-          avatar_url?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
-          is_public?: boolean | null
-          member_count?: number | null
-          name: string
-          owner_id?: string | null
-          real_time_collaboration?: boolean | null
-          settings?: Json | null
+          name?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
-          analytics_enabled?: boolean | null
-          avatar_url?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
-          is_public?: boolean | null
-          member_count?: number | null
-          name?: string
-          owner_id?: string | null
-          real_time_collaboration?: boolean | null
-          settings?: Json | null
+          name?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       transactions: {
         Row: {
-          amount: number | null
+          amount: number
           created_at: string | null
           currency: string | null
           description: string | null
-          id: number
+          id: string
           paystack_reference: string | null
+          paystack_transaction_id: string | null
           status: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
-          amount?: number | null
+          amount: number
           created_at?: string | null
           currency?: string | null
           description?: string | null
-          id?: number
+          id?: string
           paystack_reference?: string | null
+          paystack_transaction_id?: string | null
           status?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
-          amount?: number | null
+          amount?: number
           created_at?: string | null
           currency?: string | null
           description?: string | null
-          id?: number
+          id?: string
           paystack_reference?: string | null
+          paystack_transaction_id?: string | null
           status?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      usage_counters: {
-        Row: {
-          analytics_count: number | null
-          created_at: string | null
-          id: string
-          insights_count: number | null
-          month_start: string
-          reports_count: number | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          analytics_count?: number | null
-          created_at?: string | null
-          id?: string
-          insights_count?: number | null
-          month_start: string
-          reports_count?: number | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          analytics_count?: number | null
-          created_at?: string | null
-          id?: string
-          insights_count?: number | null
-          month_start?: string
-          reports_count?: number | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      usage_tracking: {
-        Row: {
-          analytics_count: number | null
-          created_at: string | null
- | null
-          id: string
-          insights_count: number | null
-          reports_count: number | null
-          teams_count: number | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          analytics_count?: number | null
-          created_at?: string | null
- | null
-          id: string
-          insights_count?: number | null
-          reports_count?: number | null
-          teams_count?: number | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          analytics_count?: number | null
-          created_at?: string | null
- | null
-          id?: string
-          insights_count?: number | null
-          reports_count?: number | null
-          teams_count?: number | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      user_insights_history: {
-        Row: {
-          analysis: Json | null
-          created_at: string | null
-          file_name: string | null
-          file_type: string | null
-          id: string
-          uploaded_data: Json | null
-          user_id: string | null
-        }
-        Insert: {
-          analysis?: Json | null
-          created_at?: string | null
-          file_name?: string | null
-          file_type?: string | null
-          id?: string
-          uploaded_data?: Json | null
-          user_id?: string | null
-        }
-        Update: {
-          analysis?: Json | null
-          created_at?: string | null
-          file_name?: string | null
-          file_type?: string | null
-          id?: string
-          uploaded_data?: Json | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      user_preferences: {
-        Row: {
-          ai_tone: string | null
-          alert_frequency: string | null
-          created_at: string
-          data_retention_days: number | null
-          email_notifications: boolean | null
-          id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          ai_tone?: string | null
-          alert_frequency?: string | null
-          created_at?: string
-          data_retention_days?: number | null
-          email_notifications?: boolean | null
-          id?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          ai_tone?: string | null
-          alert_frequency?: string | null
-          created_at?: string
-          data_retention_days?: number | null
-          email_notifications?: boolean | null
-          id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      user_profiles: {
-        Row: {
-          avatar_url: string | null
-          created_at: string | null
-          email: string | null
-          full_name: string | null
-          id: string
-          is_active: boolean | null
-          plan: string | null
-          subscription_active: boolean | null
-          subscription_expiry_date: string | null
-          trial_end: string | null
-          trial_expired: boolean | null
-          trial_start: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          created_at?: string | null
-          email?: string | null
-          full_name?: string | null
-          id?: string
-          is_active?: boolean | null
-          plan?: string | null
-          subscription_active?: boolean | null
-          subscription_expiry_date?: string | null
-          trial_end?: string | null
-          trial_expired?: boolean | null
-          trial_start?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          avatar_url?: string | null
-          created_at?: string | null
-          email?: string | null
-          full_name?: string | null
-          id?: string
-          is_active?: boolean | null
-          plan?: string | null
-          subscription_active?: boolean | null
-          subscription_expiry_date?: string | null
-          trial_end?: string | null
-          trial_expired?: boolean | null
-          trial_start?: string | null
-          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
       }
       user_subscriptions: {
         Row: {
-          cancel_at_period_end: boolean | null
-          canceled_at: string | null
           created_at: string | null
-          current_period_end: string | null
-          current_period_start: string | null
           id: string
-          plan_code: string
-          plan_name: string
-          status: string
+          next_payment_date: string | null
+          paystack_subscription_code: string | null
+          plan: string | null
+          status: string | null
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
-          cancel_at_period_end?: boolean | null
-          canceled_at?: string | null
           created_at?: string | null
-          current_period_end?: string | null
-          current_period_start?: string | null
           id?: string
-          plan_code: string
-          plan_name: string
-          status?: string
+          next_payment_date?: string | null
+          paystack_subscription_code?: string | null
+          plan?: string | null
+          status?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
-          cancel_at_period_end?: boolean | null
-          canceled_at?: string | null
           created_at?: string | null
-          current_period_end?: string | null
-          current_period_start?: string | null
           id?: string
-          plan_code?: string
-          plan_name?: string
-          status?: string
+          next_payment_date?: string | null
+          paystack_subscription_code?: string | null
+          plan?: string | null
+          status?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: []
-      }
-      whatsapp_links: {
-        Row: {
-          created_at: string | null
-          id: string
-          link: string
-          project_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          link: string
-          project_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          link?: string
-          project_id?: string
-        }
-        Relationships: []
-      }
-      feedback: {
-        Row: {
-          id: string
-          project_id: string
-          email: string | null
-          message: string
-          page_url: string | null
-          browser: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          project_id: string
-          email?: string | null
-          message: string
-          page_url?: string | null
-          browser?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          project_id?: string
-          email?: string | null
-          message?: string
-          page_url?: string | null
-          browser?: string | null
-          created_at?: string
-        }
-        Relationships: []
-      }
-      feedback_settings: {
-        Row: {
-          id: string
-          user_id: string
-          project_id: string
-          customer_survey_url: string | null
-          product_feedback_url: string | null
-          widget_code: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          project_id?: string
-          customer_survey_url?: string | null
-          product_feedback_url?: string | null
-          widget_code?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          project_id?: string
-          customer_survey_url?: string | null
-          product_feedback_url?: string | null
-          widget_code?: string | null
-          created_at?: string
-          updated_at?: string
-        }
         Relationships: [
           {
-            foreignKeyName: "feedback_settings_user_id_fkey"
+            foreignKeyName: "user_subscriptions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      feature_requests: {
-        Row: {
-          id: string
-          title: string
-          description: string | null
-          status: 'Planned' | 'In Progress' | 'Released'
-          feedback_ids: string[]
-          user_id: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          title: string
-          description?: string | null
-          status?: 'Planned' | 'In Progress' | 'Released'
-          feedback_ids?: string[]
-          user_id: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          title?: string
-          description?: string | null
-          status?: 'Planned' | 'In Progress' | 'Released'
-          feedback_ids?: string[]
-          user_id?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "feature_requests_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -1400,27 +484,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      can_use_feature: {
-        Args: { feature_name: string; user_uuid: string }
-        Returns: boolean
-      }
-      check_and_consume_usage: {
-        Args: { p_kind: string; p_user_id: string }
-        Returns: boolean
-      }
-      check_project_id_availability: {
-        Args: { current_user_id: string; project_id_param: string }
-        Returns: {
-          is_available: boolean
-          message: string
-          taken_by_email: string
-          taken_by_user_id: string
-        }[]
-      }
-      check_usage_limit: {
-        Args: { feature_type: string; user_uuid: string }
-        Returns: boolean
-      }
       check_user_access: {
         Args: { user_uuid: string }
         Returns: {
@@ -1428,303 +491,52 @@ export type Database = {
           has_access: boolean
           is_active: boolean
           plan: string
-          subscription_active: boolean
-          subscription_expiry_date: string
           trial_end: string
           trial_expired: boolean
-          trial_start: string
         }[]
       }
-      clean_expired_invitations: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      confirm_user_email: {
-        Args: { user_uuid: string }
-        Returns: Json
-      }
-      create_insights_result: {
-        Args: {
-          p_file_id: string
-          p_file_name: string
-          p_key_themes: string[]
-          p_performance: Json
-          p_sentiment: Json
-          p_suggested_actions: string[]
-          p_summary: string
-          p_trends: string[]
-          p_user_id: string
-        }
-        Returns: {
-          created_at: string | null
-          file_id: string
-          file_name: string
-          id: string
-          key_themes: string[]
-          performance: Json
-          sentiment: Json
-          suggested_actions: string[]
-          summary: string
-          trends: string[]
-          updated_at: string | null
-          user_id: string
-        }
-      }
-      create_user_billing_profile: {
-        Args: { user_uuid: string }
-        Returns: Json
-      }
-      create_user_profile_safe: {
-        Args: {
-          company_name?: string
-          first_name?: string
-          last_name?: string
-          user_email: string
-          user_uuid: string
-        }
-        Returns: Json
-      }
-      delete_insights_result: {
-        Args: { p_result_id: string; p_user_id: string }
+      check_widget_access: {
+        Args: { project_id_param: string }
         Returns: boolean
       }
-      delete_user_safe: {
-        Args: { p_user_id: string }
-        Returns: undefined
-      }
-      detect_urgent_keywords: {
-        Args: { message_text: string }
-        Returns: boolean
-      }
-      enforce_usage_limits: {
-        Args: { user_uuid?: string }
-        Returns: undefined
-      }
-      ensure_all_tables_for_user: {
+      create_feedback_settings_for_user: {
         Args: { user_id_param: string }
         Returns: undefined
       }
-      ensure_current_month_usage: {
-        Args: { user_uuid: string }
-        Returns: {
-          analytics_count: number
-          created_at: string
-          insights_count: number
-          month_start: string
-          reports_count: number
-          updated_at: string
-          user_id: string
-        }[]
-      }
-      get_all_project_ids: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          created_at: string
-          project_id: string
-          user_email: string
-          user_id: string
-        }[]
-      }
-      get_current_user_role: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_plan_limits: {
-        Args: { plan_code: string }
-        Returns: Json
-      }
-      get_team_invitation_stats: {
-        Args: { team_uuid: string }
-        Returns: {
-          accepted_invitations: number
-          declined_invitations: number
-          expired_invitations: number
-          pending_invitations: number
-          total_invitations: number
-        }[]
-      }
-      get_user_insights_results: {
+      get_or_create_user_project: {
         Args: { p_user_id: string }
         Returns: {
           created_at: string
-          file_id: string
-          file_name: string
           id: string
-          key_themes: string[]
-          performance: Json
-          sentiment: Json
-          suggested_actions: string[]
-          summary: string
-          trends: string[]
+          name: string
+          user_id: string
         }[]
       }
-      get_user_plan: {
+      get_user_profile_with_access: {
         Args: { user_uuid: string }
-        Returns: string
+        Returns: {
+          days_left: number
+          has_access: boolean
+          id: string
+          next_billing_date: string
+          paystack_customer_id: string
+          paystack_subscription_id: string
+          plan: string
+          subscription_status: string
+          trial_ends_at: string
+        }[]
       }
-      get_user_status: {
-        Args: { user_uuid: string }
-        Returns: Json
-      }
-      get_user_usage_summary: {
+      initialize_user_data: {
         Args: { p_user_id: string }
-        Returns: {
-          analytics_count: number
-          analytics_limit: number
-          analytics_remaining: number
-          insights_count: number
-          insights_limit: number
-          insights_remaining: number
-          month_start: string
-          plan_code: string
-          plan_name: string
-          reports_count: number
-          reports_limit: number
-          reports_remaining: number
-          user_id: string
-        }[]
-      }
-      get_user_usage_with_monthly_reset: {
-        Args: { user_uuid: string }
-        Returns: {
-          analytics_count: number
-          created_at: string
-          insights_count: number
-          is_reset: boolean
-          month_start: string
-          reports_count: number
-          updated_at: string
-          user_id: string
-        }[]
-      }
-      increment_usage_with_check: {
-        Args: { feature_name: string; user_uuid: string }
         Returns: Json
       }
       initialize_user_trial: {
         Args: { user_uuid: string }
         Returns: undefined
       }
-      refresh_usage_for_user: {
-        Args: { user_uuid: string }
-        Returns: {
-          ai_insights_count: number
-          analytics_reports_count: number
-          created_at: string
-          detailed_reports_count: number
-          month_start: string
-          updated_at: string
-          user_id: string
-        }[]
-      }
-      refresh_user_usage: {
-        Args: { target_month_start: string; user_uuid: string }
-        Returns: {
-          analytics_count: number
-          insights_count: number
-          month_start: string
-          reports_count: number
-          user_id: string
-        }[]
-      }
-      reset_monthly_usage: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      safe_create_user_profile: {
-        Args: { user_id_param: string }
-        Returns: undefined
-      }
-      test_increment_usage: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      test_insights_results_table: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      track_auth_event: {
-        Args: {
-          p_event_data?: Json
-          p_event_type: string
-          p_ip_address?: unknown
-          p_user_agent?: string
-          p_user_id: string
-        }
-        Returns: undefined
-      }
-      update_user_plan_after_payment: {
-        Args: {
-          new_plan: string
-          paystack_customer_id?: string
-          paystack_subscription_id?: string
-          user_uuid: string
-        }
-        Returns: Json
-      }
       upgrade_user_to_business: {
         Args: { user_uuid: string }
         Returns: undefined
-      }
-      upsert_user_subscription: {
-        Args: {
-          p_interval?: string
-          p_plan_name?: string
-          p_plan_type?: string
-          p_price?: number
-          p_user_id: string
-        }
-        Returns: string
-      }
-      validate_project_id: {
-        Args: { current_user_id: string; project_id_param: string }
-        Returns: {
-          error_message: string
-          is_available: boolean
-          is_valid: boolean
-          taken_by_email: string
-          taken_by_user_id: string
-        }[]
-      }
-      validate_security_policies: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          issues: string[]
-          policies_count: number
-          rls_enabled: boolean
-          table_name: string
-        }[]
-      }
-      get_or_create_feedback_settings: {
-        Args: { p_user_id: string }
-        Returns: {
-          id: string
-          user_id: string
-          project_id: string
-          customer_survey_url: string | null
-          product_feedback_url: string | null
-          widget_code: string | null
-          created_at: string
-          updated_at: string
-        }[]
-      }
-      update_feedback_settings: {
-        Args: { 
-          p_user_id: string
-          p_customer_survey_url?: string | null
-          p_product_feedback_url?: string | null
-          p_widget_code?: string | null
-        }
-        Returns: {
-          id: string
-          user_id: string
-          project_id: string
-          customer_survey_url: string | null
-          product_feedback_url: string | null
-          widget_code: string | null
-          created_at: string
-          updated_at: string
-        }[]
       }
     }
     Enums: {
