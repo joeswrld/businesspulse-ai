@@ -130,85 +130,92 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     };
   }, [user?.id]);
 
-  // Get plan info for badge
+  // Get plan info for badge - Shows correct status based on subscription
   const getPlanInfo = (): PlanInfo => {
     if (!subscription) {
       return {
         planName: 'Free Trial',
         planType: 'trial',
-        planColor: 'bg-orange-100 text-orange-800 border-orange-200',
-        planIcon: <Star className="h-3 w-3" />
+        planColor: 'bg-blue-50 text-blue-700 border-blue-200',
+        planIcon: <Zap className="h-3 w-3" />
       };
     }
 
     const plan = subscription.plan?.toLowerCase() || '';
     const status = subscription.subscription_status?.toLowerCase() || '';
+    const daysLeft = subscription.days_left || 0;
+    const hasAccess = subscription.has_access || false;
     
-    console.log('🎯 Plan determination:', { 
+    console.log('🎯 Subscription Status Check:', { 
       plan, 
       status, 
-      raw_plan: subscription.plan,
-      raw_status: subscription.subscription_status,
-      has_access: subscription.has_access 
+      daysLeft,
+      hasAccess,
+      raw_data: subscription
     });
 
-    // Handle cancelled subscription
-    if (status === 'cancelled') {
+    // 1. BUSINESS PLAN - Check first for active business subscriptions
+    if (plan === 'business' && status === 'active') {
+      console.log('✅ Displaying: Business Plan (Active)');
       return {
-        planName: 'Cancelled',
-        planType: 'cancelled',
-        planColor: 'bg-red-100 text-red-800 border-red-200',
+        planName: 'Business Plan',
+        planType: 'business',
+        planColor: 'bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-900 border-yellow-300 font-semibold',
+        planIcon: <Crown className="h-4 w-4 text-yellow-600" />
+      };
+    }
+
+    // 2. BUSINESS PLAN - Inactive/Cancelled
+    if (plan === 'business' && status !== 'active') {
+      console.log('⚠️ Displaying: Business Plan (Inactive)');
+      return {
+        planName: 'Business (Inactive)',
+        planType: 'business',
+        planColor: 'bg-gray-100 text-gray-700 border-gray-300',
+        planIcon: <Crown className="h-3 w-3 text-gray-500" />
+      };
+    }
+
+    // 3. FREE TRIAL - Active (has days remaining)
+    if (plan === 'trial' && daysLeft > 0) {
+      console.log(`✅ Displaying: Free Trial (${daysLeft} days left)`);
+      return {
+        planName: 'Free Trial',
+        planType: 'trial',
+        planColor: 'bg-blue-50 text-blue-700 border-blue-200',
+        planIcon: <Zap className="h-3 w-3" />
+      };
+    }
+
+    // 4. TRIAL EXPIRED - No days left
+    if (plan === 'trial' && daysLeft <= 0) {
+      console.log('❌ Displaying: Trial Expired');
+      return {
+        planName: 'Trial Expired',
+        planType: 'expired',
+        planColor: 'bg-red-50 text-red-700 border-red-200',
         planIcon: <X className="h-3 w-3" />
       };
     }
 
-    // Handle business plan - MOST IMPORTANT CHECK
-    if (plan === 'business') {
-      if (status === 'active' || subscription.has_access) {
-        return {
-          planName: 'Business',
-          planType: 'business',
-          planColor: 'bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-900 border-yellow-300 font-semibold',
-          planIcon: <Crown className="h-4 w-4 text-yellow-600" />
-        };
-      } else {
-        return {
-          planName: 'Business (Inactive)',
-          planType: 'business',
-          planColor: 'bg-gray-100 text-gray-800 border-gray-200',
-          planIcon: <Crown className="h-3 w-3" />
-        };
-      }
-    }
-
-    // Handle trial
-    if (plan === 'trial' || !plan) {
-      const daysLeft = subscription.days_left || 0;
-      const isExpired = daysLeft <= 0 && !subscription.has_access;
-      
-      if (isExpired) {
-        return {
-          planName: 'Trial Expired',
-          planType: 'trial',
-          planColor: 'bg-red-100 text-red-800 border-red-200',
-          planIcon: <Star className="h-3 w-3" />
-        };
-      }
-      
+    // 5. CANCELLED SUBSCRIPTION
+    if (status === 'cancelled') {
+      console.log('⚠️ Displaying: Subscription Cancelled');
       return {
-        planName: `Trial (${daysLeft}d)`,
-        planType: 'trial',
-        planColor: 'bg-orange-100 text-orange-800 border-orange-200',
-        planIcon: <Star className="h-3 w-3" />
+        planName: 'Subscription Cancelled',
+        planType: 'cancelled',
+        planColor: 'bg-red-50 text-red-700 border-red-200',
+        planIcon: <X className="h-3 w-3" />
       };
     }
 
-    // Fallback
+    // 6. FALLBACK - Unknown status
+    console.warn('⚠️ Unknown subscription status, showing Free Trial');
     return {
-      planName: 'Unknown Plan',
+      planName: 'Free Trial',
       planType: 'trial',
-      planColor: 'bg-gray-100 text-gray-800 border-gray-200',
-      planIcon: <Star className="h-3 w-3" />
+      planColor: 'bg-blue-50 text-blue-700 border-blue-200',
+      planIcon: <Zap className="h-3 w-3" />
     };
   };
 
