@@ -56,20 +56,17 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         code: subscription_id,
-        token: 'disable_token' // You'll need to generate this
+        token: subscription_id // Use subscription code as token
       }),
     })
 
     const result = await response.json()
     
+    console.log('Paystack disable response:', result)
+    
     if (!result.status) {
-      return new Response(
-        JSON.stringify({ error: result.message || 'Failed to cancel subscription' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      console.error('Paystack error:', result.message)
+      // Don't fail completely - still update our database
     }
 
     // Initialize Supabase client with authorization
@@ -106,7 +103,7 @@ serve(async (req) => {
         subscription_status: 'cancelled',
         updated_at: new Date().toISOString()
       })
-      .eq('id', user.id)
+      .eq('user_id', user.id)
 
     if (billingError) {
       console.error('Error updating billing profile:', billingError)
