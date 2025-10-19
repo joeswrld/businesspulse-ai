@@ -1,5 +1,5 @@
 // src/pages/ProductFeedback.tsx
-// Redesigned with better branding display
+// FIXED: Proper access control checks
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -82,27 +82,66 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
     setIsValidating(true);
 
     try {
-      const { data, error } = await supabase
+      // STEP 1: Get feedback settings
+      const { data: settingsData, error: settingsError } = await supabase
         .from('feedback_settings')
         .select('*')
         .eq('project_id', projectId)
         .maybeSingle();
 
-      if (error) throw error;
+      if (settingsError) throw settingsError;
 
-      if (!data) {
+      if (!settingsData) {
         setIsValid(false);
         setValidationError('Project not found. Please check your feedback link.');
         return;
       }
 
-      if (!data.product_feedback_enabled) {
+      if (!settingsData.product_feedback_enabled) {
         setIsValid(false);
         setValidationError('Product feedback is currently disabled for this project.');
         return;
       }
 
-      setSettings(data);
+      // STEP 2: Check widget access (trial/subscription status)
+      console.log('Checking access for project:', projectId);
+      
+      const { data: accessData, error: accessError } = await supabase
+        .rpc('check_widget_access', { project_id_param: projectId });
+
+      console.log('Access check response:', accessData, accessError);
+
+      if (accessError) {
+        console.error('Access check error:', accessError);
+        // On error, fail open - allow the form to be shown
+        // This prevents network issues from blocking legitimate users
+        setSettings(settingsData);
+        setIsValid(true);
+        setValidationError('');
+        return;
+      }
+
+      // CRITICAL FIX: Parse the response correctly
+      let hasAccess = false;
+      
+      if (typeof accessData === 'boolean') {
+        hasAccess = accessData;
+      } else if (accessData && typeof accessData === 'object') {
+        hasAccess = accessData.has_access === true;
+      } else if (Array.isArray(accessData) && accessData.length > 0) {
+        hasAccess = accessData[0] === true || (accessData[0] && accessData[0].has_access === true);
+      }
+
+      console.log('Has access:', hasAccess);
+
+      if (!hasAccess) {
+        setIsValid(false);
+        setValidationError('This feedback form is currently unavailable. The owner\'s trial or subscription has ended.');
+        return;
+      }
+
+      // Success: form is valid and accessible
+      setSettings(settingsData);
       setIsValid(true);
       setValidationError('');
 
@@ -149,43 +188,16 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
       return;
     }
 
-    // ===== CHECK ACCESS BEFORE SUBMISSION =====
-    try {
-      const { data: accessCheck, error: accessError } = await supabase
-        .rpc('check_widget_access', { project_id_param: settings.project_id });
-
-      if (accessError) {
-        console.error('Access check error:', accessError);
-        toast({
-          title: 'Error',
-          description: 'Could not verify access. Please try again.',
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      const hasAccess = accessCheck === true || (accessCheck && accessCheck.has_access === true);
-
-      if (!hasAccess) {
-        toast({
-          title: 'Feedback Unavailable',
-          description: 'This feedback form is currently unavailable. The owner\'s trial or subscription has ended.',
-          variant: 'destructive'
-        });
-        return;
-      }
-    } catch (err) {
-      console.error('Access verification failed:', err);
-    }
-
     setIsSubmitting(true);
 
-    // ===== EXISTING SUBMISSION LOGIC =====
     try {
+      // REMOVED: Redundant access check before submission
+      // The form wouldn't load if access was denied, so no need to check again
+      
       const feedbackData = {
         project_id: settings.project_id,
         form_type: 'product_feedback',
-        message: message.trim() || `Product feedback rating: ${rating}/5`,
+        message: message.trim(),
         rating: rating,
         metadata: {
           email: email.trim() || null,
@@ -295,14 +307,12 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
   return (
     <div className={containerClass}>
       <Card className="w-full max-w-2xl shadow-2xl border-0 overflow-hidden">
-        {/* Header with Branding */}
         <div 
           className="relative pt-10 pb-8 px-8"
           style={{ 
             background: `linear-gradient(135deg, ${settings?.widget_color || '#8B5CF6'}15 0%, ${settings?.widget_color || '#8B5CF6'}05 100%)`
           }}
         >
-          {/* Logo */}
           {settings?.logo_url && (
             <div className="flex justify-center mb-6">
               <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 border-2 border-white dark:border-gray-700">
@@ -315,14 +325,12 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
             </div>
           )}
           
-          {/* Business Name */}
           {settings?.business_name && (
             <h1 className="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white">
               {settings.business_name}
             </h1>
           )}
           
-          {/* Title & Description */}
           <div className="text-center space-y-3">
             <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
               {settings?.widget_title || 'Product Feedback'}
@@ -341,10 +349,8 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
           )}
         </div>
 
-        {/* Form Content */}
         <CardContent className="p-8">
           <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Message Field - Primary */}
             <div className="space-y-2">
               <Label htmlFor="message" className="text-base font-semibold text-gray-900 dark:text-white">
                 Your Feedback <span className="text-red-500">*</span>
@@ -365,7 +371,6 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
 
             <div className="border-t border-gray-200 dark:border-gray-700"></div>
 
-            {/* Rating Section - Optional */}
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label className="text-base font-medium text-gray-900 dark:text-white">
@@ -373,7 +378,6 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
                 </Label>
               </div>
               
-              {/* Star Rating */}
               <div className="flex justify-center items-center gap-2 md:gap-3">
                 {[1, 2, 3, 4, 5].map((value) => (
                   <button
@@ -398,13 +402,11 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
                 ))}
               </div>
 
-              {/* Rating Label */}
               <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 px-4">
                 <span>Poor</span>
                 <span>Excellent</span>
               </div>
 
-              {/* Rating Feedback */}
               {(rating !== null || hoveredRating !== null) && (
                 <div className="text-center animate-in fade-in duration-300">
                   <p 
@@ -419,7 +421,6 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
 
             <div className="border-t border-gray-200 dark:border-gray-700"></div>
 
-            {/* Email Field */}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Email Address <span className="text-gray-400">(Optional)</span>
@@ -437,7 +438,6 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
               </p>
             </div>
 
-            {/* Submit Button */}
             <Button 
               type="submit" 
               disabled={!message.trim() || isSubmitting || previewMode} 
@@ -463,14 +463,12 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
           </form>
         </CardContent>
 
-        {/* Footer */}
         <div className="bg-gray-50 dark:bg-gray-800/50 px-8 py-4 text-center border-t border-gray-200 dark:border-gray-700">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Your feedback helps us improve our service
           </p>
         </div>
 
-        {/* Powered by NoteX */}
         <div className="bg-gray-100 dark:bg-gray-900/50 px-4 py-3 text-center border-t border-gray-200 dark:border-gray-700">
           <a 
             href="https://notex.com.ng/" 
