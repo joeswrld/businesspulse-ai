@@ -1,5 +1,5 @@
 // public/widget.js
-// NoteX Feedback Widget - With Enhanced Trial & Subscription Access Control
+// NoteX Feedback Widget - FIXED Access Control
 
 if (typeof window !== 'undefined' && !window.ethereum) {
   console.info("NoteX: No Ethereum provider found, skipping Web3 init...");
@@ -55,7 +55,8 @@ if (typeof window !== 'undefined' && !window.ethereum) {
   }
 
   function checkWidgetAccess() {
-    // Check if the project owner has an active subscription or valid trial
+    console.log('NoteX: Checking widget access for project:', config.projectId);
+    
     fetch(config.supabaseUrl + '/rest/v1/rpc/check_widget_access', {
       method: 'POST',
       headers: {
@@ -66,38 +67,58 @@ if (typeof window !== 'undefined' && !window.ethereum) {
       body: JSON.stringify({ project_id_param: config.projectId })
     })
     .then(function(response) {
+      console.log('NoteX: Access check response status:', response.status);
       if (!response.ok) {
-        throw new Error('Access check failed');
+        throw new Error('Access check failed with status: ' + response.status);
       }
       return response.json();
     })
     .then(function(data) {
-      widgetState.isAccessValid = data === true || (data && data.has_access === true);
+      console.log('NoteX: Access check data:', data);
+      
+      // CRITICAL FIX: Handle different response formats
+      var hasAccess = false;
+      
+      if (typeof data === 'boolean') {
+        // Direct boolean response
+        hasAccess = data;
+      } else if (data && typeof data === 'object') {
+        // Object response with has_access property
+        hasAccess = data.has_access === true;
+      } else if (Array.isArray(data) && data.length > 0) {
+        // Array response (some Supabase configurations return arrays)
+        hasAccess = data[0] === true || (data[0] && data[0].has_access === true);
+      }
+      
+      widgetState.isAccessValid = hasAccess;
       widgetState.isChecking = false;
       
-      if (widgetState.isAccessValid) {
+      console.log('NoteX: Has access:', hasAccess);
+      
+      if (hasAccess) {
         widgetState.accessStatus = 'active';
+        console.log('NoteX: Creating widget - access granted');
         createWidget();
       } else {
         console.warn('NoteX: Widget disabled - Trial expired or subscription inactive');
         widgetState.errorMessage = 'The owner of this feedback form has an expired trial or subscription.';
         widgetState.accessStatus = 'expired';
-        // Still create widget button but it will show error message
         createDisabledWidget();
       }
     })
     .catch(function(error) {
       console.error('NoteX: Access check error:', error);
-      // Fail open - create widget anyway if check fails (network issues etc)
+      // CRITICAL FIX: Fail open - create widget if check fails (network issues, etc)
+      // This prevents legitimate users from being blocked due to network problems
       widgetState.isAccessValid = true;
       widgetState.isChecking = false;
       widgetState.accessStatus = 'unknown';
+      console.log('NoteX: Creating widget - access check failed, failing open');
       createWidget();
     });
   }
 
   function createDisabledWidget() {
-    // Create a button that shows the user the widget is disabled
     var button = document.createElement('button');
     button.id = 'notex-feedback-button';
     button.setAttribute('aria-label', 'Feedback unavailable');
@@ -126,17 +147,13 @@ if (typeof window !== 'undefined' && !window.ethereum) {
     };
 
     Object.assign(button.style, buttonStyles);
-
     button.addEventListener('click', showDisabledMessage);
-
     document.body.appendChild(button);
   }
 
   function showDisabledMessage() {
     var existing = document.getElementById('notex-feedback-modal');
-    if (existing) {
-      existing.remove();
-    }
+    if (existing) existing.remove();
 
     var modal = document.createElement('div');
     modal.id = 'notex-feedback-modal';
@@ -203,12 +220,11 @@ if (typeof window !== 'undefined' && !window.ethereum) {
   }
 
   function createWidget() {
-    if (!widgetState.isAccessValid) {
+    if (!widgetState.isAccessValid && widgetState.accessStatus !== 'unknown') {
       console.warn('NoteX: Widget access denied');
       return;
     }
 
-    // Create floating button with text
     var button = document.createElement('button');
     button.id = 'notex-feedback-button';
     button.setAttribute('aria-label', 'Share your feedback');
@@ -249,21 +265,19 @@ if (typeof window !== 'undefined' && !window.ethereum) {
     });
 
     button.addEventListener('click', openFeedbackModal);
-
     document.body.appendChild(button);
+    console.log('NoteX: Widget created successfully');
   }
 
   function openFeedbackModal() {
-    // Re-check access status before opening modal
+    // Don't re-check if status is expired
     if (widgetState.accessStatus === 'expired') {
       showDisabledMessage();
       return;
     }
 
     var existing = document.getElementById('notex-feedback-modal');
-    if (existing) {
-      existing.remove();
-    }
+    if (existing) existing.remove();
 
     var modal = document.createElement('div');
     modal.id = 'notex-feedback-modal';
@@ -298,7 +312,6 @@ if (typeof window !== 'undefined' && !window.ethereum) {
     };
 
     Object.assign(content.style, contentStyles);
-
     content.innerHTML = createModalHTML();
 
     modal.appendChild(content);
@@ -369,7 +382,6 @@ if (typeof window !== 'undefined' && !window.ethereum) {
         </form>
       </div>
 
-      <!-- Powered by NoteX -->
       <div style="background-color: ${config.theme === 'dark' ? '#111827' : '#f3f4f6'}; padding: 12px; text-align: center; border-top: 1px solid ${borderColor}; border-radius: 0 0 12px 12px;">
         <a href="https://notex.com.ng/" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #6b7280; text-decoration: none; transition: color 0.2s ease;">
           Powered by <span style="font-weight: 600;">NoteX</span>
@@ -460,7 +472,7 @@ if (typeof window !== 'undefined' && !window.ethereum) {
   }
 
   function submitFeedback(rating, closeCallback) {
-    // Double-check access before submission
+    // Only check status if it was explicitly set to expired
     if (widgetState.accessStatus === 'expired') {
       alert('Your trial or subscription has ended. Please upgrade to continue collecting feedback.');
       closeCallback();
