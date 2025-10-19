@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../integrations/supabase/client'
-import { LockScreen } from './LockScreen'
+import LockScreen from './LockScreen'
 
 interface UserAccess {
   has_access: boolean

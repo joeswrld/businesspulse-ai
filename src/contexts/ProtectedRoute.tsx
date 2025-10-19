@@ -1,12 +1,13 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { hasAccess, isLoading, plan, status } = useSubscription();
+  const { hasAccess, isLoading, plan, status } = useSubscriptionStatus();
   const location = useLocation();
 
   // Public paths that don't require subscription
@@ -36,7 +37,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     if (plan === 'expired' && status === 'expired') {
       // Trial expired
       return <Navigate to="/trial-expired" replace />;
-    } else if (plan === 'expired' && (status === 'cancelled' || status === 'failed')) {
+    } else if (plan === 'expired' && status === 'cancelled') {
       // Subscription expired
       return <Navigate to="/subscription-expired" replace />;
     } else {
