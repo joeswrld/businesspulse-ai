@@ -178,10 +178,11 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       daysLeft,
       trial_end_date: subscription.trial_end_date,
       subscription_start_date: subscription.subscription_start_date,
-      subscription_end_date: subscription.subscription_end_date
+      subscription_end_date: subscription.subscription_end_date,
+      raw_subscription: subscription
     });
 
-    // 1. BUSINESS PLAN - Active subscription
+    // 1. BUSINESS PLAN - Active subscription (HIGHEST PRIORITY)
     if (planType === 'business' && status === 'active') {
       console.log('✅ Displaying: Business Plan (Active)');
       return {
@@ -192,8 +193,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       };
     }
 
-    // 2. BUSINESS PLAN - Inactive/Expired
-    if (planType === 'business' && status !== 'active') {
+    // 2. BUSINESS PLAN - Expired
+    if (planType === 'business' && status === 'expired') {
       console.log('⚠️ Displaying: Business Plan (Expired)');
       return {
         planName: 'Business Plan Expired',
@@ -203,8 +204,19 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       };
     }
 
-    // 3. FREE TRIAL - Active (has days remaining)
-    if ((planType === 'trial' || planType === 'free') && daysLeft > 0) {
+    // 3. TRIAL EXPIRED (explicit status)
+    if (status === 'trial_expired') {
+      console.log('❌ Displaying: Trial Expired (status=trial_expired)');
+      return {
+        planName: 'Trial Expired',
+        planType: 'expired',
+        planColor: 'bg-red-50 text-red-700 border-red-300',
+        planIcon: <AlertCircle className="h-3 w-3" />
+      };
+    }
+
+    // 4. FREE TRIAL - Active (has days remaining AND status is 'trial')
+    if (status === 'trial' && daysLeft > 0) {
       console.log(`✅ Displaying: Free Trial (${daysLeft} days left)`);
       return {
         planName: `Free Trial`,
@@ -215,9 +227,9 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       };
     }
 
-    // 4. TRIAL EXPIRED
-    if ((planType === 'trial' || planType === 'free') && daysLeft <= 0) {
-      console.log('❌ Displaying: Trial Expired');
+    // 5. TRIAL EXPIRED (days <= 0 but status is still 'trial')
+    if (status === 'trial' && daysLeft <= 0) {
+      console.log('❌ Displaying: Trial Expired (days <= 0)');
       return {
         planName: 'Trial Expired',
         planType: 'expired',
@@ -226,7 +238,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       };
     }
 
-    // 5. CANCELLED SUBSCRIPTION
+    // 6. CANCELLED SUBSCRIPTION
     if (status === 'cancelled' || status === 'canceled') {
       console.log('⚠️ Displaying: Subscription Cancelled');
       return {
@@ -237,8 +249,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       };
     }
 
-    // 6. FALLBACK
-    console.warn('⚠️ Unknown plan status, defaulting to Free Trial');
+    // 7. FALLBACK - Unknown status (treat as trial)
+    console.warn('⚠️ Unknown subscription status, defaulting to Free Trial', { planType, status });
     return {
       planName: 'Free Trial',
       planType: 'trial',
