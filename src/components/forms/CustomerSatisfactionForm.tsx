@@ -48,8 +48,8 @@ export default function CustomerSatisfactionForm({
   const validateForm = (): boolean => {
     const newErrors: Partial<FormData> = {};
 
-    if (!formData.rating) {
-      newErrors.rating = 'Please provide a rating';
+    if (!formData.rating || formData.rating === 0) {
+      newErrors.rating = 'Please provide a rating' as any;
     }
 
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {

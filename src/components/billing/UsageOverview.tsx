@@ -112,7 +112,7 @@ const FeatureCard: React.FC<{ feature: Feature; onUpgrade?: (plan: 'business') =
         <div className="mt-3 p-2 bg-red-100 rounded text-xs text-red-700">
           <strong>Limit reached!</strong> Upgrade for unlimited access.
           {onUpgrade && (
-            <Button size="xs" className="ml-2 bg-red-600 hover:bg-red-700" onClick={() => onUpgrade('business')}>
+            <Button size="sm" className="ml-2 bg-red-600 hover:bg-red-700 text-xs" onClick={() => onUpgrade('business')}>
               Upgrade
             </Button>
           )}

@@ -29,9 +29,7 @@ interface PaystackConfig {
 
 declare global {
   interface Window {
-    PaystackPop: {
-      setup: (config: PaystackConfig) => { openIframe: () => void };
-    };
+    PaystackPop: any;
   }
 }
 

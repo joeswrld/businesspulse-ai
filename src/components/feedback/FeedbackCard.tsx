@@ -107,10 +107,10 @@ export default function FeedbackCard({
         {feedback.metadata && (
           <div className="text-xs text-gray-400 mb-3">
             {feedback.metadata.feedback_type && (
-              <span className="mr-3">Type: {feedback.metadata.feedback_type}</span>
+              <span className="mr-3">Type: {String(feedback.metadata.feedback_type)}</span>
             )}
             {feedback.metadata.priority && (
-              <span className="mr-3">Priority: {feedback.metadata.priority}</span>
+              <span className="mr-3">Priority: {String(feedback.metadata.priority)}</span>
             )}
             {feedback.metadata.page_url && (
               <span className="mr-3">From: {new URL(feedback.metadata.page_url).hostname}</span>

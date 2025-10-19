@@ -157,10 +157,6 @@ const GuidedTour: React.FC<GuidedTourProps> = ({ run, onComplete }) => {
         color: '#6B7280',
         fontSize: 14,
       },
-      beacon: {
-        inner: '#3B82F6',
-        outer: '#3B82F6',
-      },
     },
     locale: {
       back: 'Back',
