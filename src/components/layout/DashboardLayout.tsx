@@ -1,4 +1,4 @@
-// src/components/layout/DashboardLayout.tsx - FIXED VERSION
+// src/components/layout/DashboardLayout.tsx - FIXED VERSION WITH CORRECT PLAN DISPLAY
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
   CreditCard,
   Users,
   MessageSquare,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +32,7 @@ interface PlanInfo {
   planType: string;
   planColor: string;
   planIcon: JSX.Element;
+  daysLeft?: number;
 }
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
@@ -43,60 +45,77 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Load user data
+  // Load user data with proper error handling
   const loadUserData = async () => {
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (currentUser) {
-        setUser(currentUser);
+      if (!currentUser) {
+        setLoading(false);
+        return;
+      }
+
+      setUser(currentUser);
+      console.log('👤 Current user:', currentUser.id);
+      
+      // Load profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .single();
+      
+      if (profileError) {
+        console.error('Profile error:', profileError);
+      } else if (profileData) {
+        setProfile(profileData);
+        console.log('👤 Profile loaded:', profileData);
+      }
+      
+      // Load billing profile - FIXED QUERY
+      const { data: billingData, error: billingError } = await supabase
+        .from('billing_profiles')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+      
+      if (billingError) {
+        console.error('❌ Billing profile error:', billingError);
+      } else if (billingData) {
+        console.log('💳 Raw billing data:', billingData);
         
-        // Load profile
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', currentUser.id)
-          .single();
-        
-        if (profileData) {
-          setProfile(profileData);
-        }
-        
-        // Load subscription using RPC for accuracy
-        const { data: billingData } = await supabase
-          .rpc('get_user_profile_with_access', { user_uuid: currentUser.id });
-        
-        if (billingData && billingData.length > 0) {
-          setSubscription(billingData[0]);
-          console.log('📊 Subscription data loaded:', billingData[0]);
-        } else {
-          // Fallback to direct query
-          const { data: fallbackData } = await supabase
-            .from('billing_profiles')
-            .select('*')
-            .eq('id', currentUser.id)
-            .single();
+        // Calculate days left for trial
+        if (billingData.trial_end_date) {
+          const now = new Date();
+          const trialEnd = new Date(billingData.trial_end_date);
+          const diffTime = trialEnd.getTime() - now.getTime();
+          const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           
-          if (fallbackData) {
-            setSubscription(fallbackData);
-            console.log('📊 Fallback subscription data:', fallbackData);
-          }
+          billingData.days_left = daysLeft;
+          console.log('📅 Days left calculated:', daysLeft);
         }
+        
+        setSubscription(billingData);
+        console.log('💳 Subscription set:', billingData);
+      } else {
+        console.warn('⚠️ No billing profile found for user');
       }
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error('❌ Error loading user data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Load data on mount and set up realtime
+  // Load data on mount
   useEffect(() => {
     loadUserData();
   }, []);
 
-  // Set up realtime listener when user is available
+  // Set up realtime listener
   useEffect(() => {
     if (!user?.id) return;
+
+    console.log('🔔 Setting up realtime listener for user:', user.id);
 
     const channel = supabase
       .channel(`dashboard-subscription-${user.id}`)
@@ -109,30 +128,38 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('🔔 Subscription updated in dashboard:', payload);
+          console.log('🔔 Subscription updated:', payload);
           const newData = payload.new as any;
           
           // Show success toast when business plan is activated
-          if (newData?.subscription_status === 'active' && newData?.plan === 'business') {
+          if (newData?.subscription_status === 'active' && newData?.plan_type === 'business') {
             toast.success('🎉 Welcome to Business Plan!', {
               description: 'You now have unlimited access to all features',
               duration: 5000,
             });
           }
           
+          // Reload data
           loadUserData();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Realtime subscription status:', status);
+      });
 
     return () => {
+      console.log('🔌 Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [user?.id]);
 
-  // Get plan info for badge - Shows correct status based on subscription
+  // FIXED: Get plan info based on billing_profiles data
   const getPlanInfo = (): PlanInfo => {
+    console.log('🎯 Getting plan info for subscription:', subscription);
+
+    // No subscription data
     if (!subscription) {
+      console.log('❌ No subscription data - showing Free Trial');
       return {
         planName: 'Free Trial',
         planType: 'trial',
@@ -141,21 +168,21 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       };
     }
 
-    const plan = subscription.plan?.toLowerCase() || '';
-    const status = subscription.subscription_status?.toLowerCase() || '';
+    const planType = subscription.plan_type?.toLowerCase() || 'trial';
+    const status = subscription.subscription_status?.toLowerCase() || 'trial';
     const daysLeft = subscription.days_left || 0;
-    const hasAccess = subscription.has_access || false;
     
-    console.log('🎯 Subscription Status Check:', { 
-      plan, 
+    console.log('📊 Plan Info Debug:', { 
+      planType, 
       status, 
       daysLeft,
-      hasAccess,
-      raw_data: subscription
+      trial_end_date: subscription.trial_end_date,
+      subscription_start_date: subscription.subscription_start_date,
+      subscription_end_date: subscription.subscription_end_date
     });
 
-    // 1. BUSINESS PLAN - Check first for active business subscriptions
-    if (plan === 'business' && status === 'active') {
+    // 1. BUSINESS PLAN - Active subscription
+    if (planType === 'business' && status === 'active') {
       console.log('✅ Displaying: Business Plan (Active)');
       return {
         planName: 'Business Plan',
@@ -165,52 +192,53 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       };
     }
 
-    // 2. BUSINESS PLAN - Inactive/Cancelled
-    if (plan === 'business' && status !== 'active') {
-      console.log('⚠️ Displaying: Business Plan (Inactive)');
+    // 2. BUSINESS PLAN - Inactive/Expired
+    if (planType === 'business' && status !== 'active') {
+      console.log('⚠️ Displaying: Business Plan (Expired)');
       return {
-        planName: 'Business (Inactive)',
-        planType: 'business',
-        planColor: 'bg-gray-100 text-gray-700 border-gray-300',
-        planIcon: <Crown className="h-3 w-3 text-gray-500" />
+        planName: 'Business Plan Expired',
+        planType: 'expired',
+        planColor: 'bg-red-50 text-red-700 border-red-300',
+        planIcon: <AlertCircle className="h-3 w-3" />
       };
     }
 
     // 3. FREE TRIAL - Active (has days remaining)
-    if (plan === 'trial' && daysLeft > 0) {
+    if ((planType === 'trial' || planType === 'free') && daysLeft > 0) {
       console.log(`✅ Displaying: Free Trial (${daysLeft} days left)`);
       return {
-        planName: 'Free Trial',
+        planName: `Free Trial`,
         planType: 'trial',
         planColor: 'bg-blue-50 text-blue-700 border-blue-200',
-        planIcon: <Zap className="h-3 w-3" />
+        planIcon: <Zap className="h-3 w-3" />,
+        daysLeft: daysLeft
       };
     }
 
-    // 4. TRIAL EXPIRED - No days left
-    if (plan === 'trial' && daysLeft <= 0) {
+    // 4. TRIAL EXPIRED
+    if ((planType === 'trial' || planType === 'free') && daysLeft <= 0) {
       console.log('❌ Displaying: Trial Expired');
       return {
         planName: 'Trial Expired',
         planType: 'expired',
-        planColor: 'bg-red-50 text-red-700 border-red-200',
-        planIcon: <X className="h-3 w-3" />
+        planColor: 'bg-red-50 text-red-700 border-red-300',
+        planIcon: <AlertCircle className="h-3 w-3" />
       };
     }
 
     // 5. CANCELLED SUBSCRIPTION
-    if (status === 'cancelled') {
+    if (status === 'cancelled' || status === 'canceled') {
       console.log('⚠️ Displaying: Subscription Cancelled');
       return {
         planName: 'Subscription Cancelled',
         planType: 'cancelled',
-        planColor: 'bg-red-50 text-red-700 border-red-200',
+        planColor: 'bg-gray-100 text-gray-700 border-gray-300',
         planIcon: <X className="h-3 w-3" />
       };
     }
 
-    // 6. FALLBACK - Unknown status
-    console.warn('⚠️ Unknown subscription status, showing Free Trial');
+    // 6. FALLBACK
+    console.warn('⚠️ Unknown plan status, defaulting to Free Trial');
     return {
       planName: 'Free Trial',
       planType: 'trial',
@@ -317,23 +345,36 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                 </div>
               </div>
               
-              {/* Plan Badge */}
-              <div className="flex items-center justify-between">
+              {/* Plan Badge with Days Left */}
+              <div className="space-y-2">
                 <Badge 
                   variant="outline" 
-                  className={`px-3 py-1 text-xs font-medium border ${planInfo.planColor}`}
+                  className={`w-full px-3 py-2 text-xs font-medium border ${planInfo.planColor} justify-center`}
                 >
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-1.5">
                     {planInfo.planIcon}
                     <span>{planInfo.planName}</span>
                   </div>
                 </Badge>
-                <Link 
-                  to="/profile"
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                >
-                  View Profile →
-                </Link>
+                
+                {/* Show days left for trial */}
+                {planInfo.planType === 'trial' && planInfo.daysLeft !== undefined && (
+                  <div className="text-center">
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      {planInfo.daysLeft} {planInfo.daysLeft === 1 ? 'day' : 'days'} remaining
+                    </p>
+                  </div>
+                )}
+                
+                {/* Show upgrade prompt for expired or trial */}
+                {(planInfo.planType === 'expired' || planInfo.planType === 'trial') && (
+                  <Link 
+                    to="/billing"
+                    className="block text-center text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors py-1"
+                  >
+                    {planInfo.planType === 'expired' ? 'Upgrade Now →' : 'View Plans →'}
+                  </Link>
+                )}
               </div>
             </div>
           )}
