@@ -911,8 +911,8 @@ const Settings = () => {
         {/* Right Column */}
         <div className="space-y-6">
           {/* Subscription & Billing */}
-          <Card className="rounded-xl shadow-lg border-2 border-blue-100">
-            <CardHeader className="bg-blue-50 rounded-t-xl">
+          <Card className="rounded-xl shadow-lg border-2 ">
+            <CardHeader className=" rounded-t-xl">
               <CardTitle className="flex items-center space-x-2 text-blue-900">
                 <CreditCard className="h-5 w-5" />
                 <span>Subscription & Billing</span>
@@ -920,7 +920,7 @@ const Settings = () => {
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               {/* Current Plan */}
-              <div className="text-center p-4 bg-white rounded-lg border">
+              <div className="text-center p-4  rounded-lg border">
                 <div className="flex items-center justify-center space-x-2 mb-2">
                   {planInfo.planType === 'business' && <Crown className="h-5 w-5 text-yellow-500" />}
                   <h3 className="text-lg font-semibold text-gray-900">{planInfo.planName}</h3>
@@ -928,7 +928,7 @@ const Settings = () => {
                 
                 {planInfo.isTrial && planInfo.daysLeft > 0 && (
                   <div className="mb-3">
-                    <Badge variant="outline" className="text-orange-600 border-orange-200">
+                    <Badge variant="outline" className="text-orange-600 ">
                       <Calendar className="h-3 w-3 mr-1" />
                       {planInfo.daysLeft} days left in trial
                     </Badge>
