@@ -923,7 +923,7 @@ const Settings = () => {
               <div className="text-center p-4  rounded-lg border">
                 <div className="flex items-center justify-center space-x-2 mb-2">
                   {planInfo.planType === 'business' && <Crown className="h-5 w-5 text-yellow-500" />}
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-primary-foreground ">{planInfo.planName}</h3>
+                  <h3 className="text-lg font-semibold  ">{planInfo.planName}</h3>
                 </div>
                 
                 {planInfo.isTrial && planInfo.daysLeft > 0 && (
