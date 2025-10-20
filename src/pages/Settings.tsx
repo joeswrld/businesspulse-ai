@@ -146,7 +146,7 @@ const Settings = () => {
 
       // Fetch subscription
       const { data: subscriptionData, error: subscriptionError } = await supabase
-        .from('user_subscriptions')
+        .from('billing_profiles')
         .select('*')
         .eq('user_id', user.id)
         .single();
@@ -920,7 +920,7 @@ const Settings = () => {
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               {/* Current Plan */}
-              <div className="text-center p-4 bg-white rounded-lg border">
+              <div className="text-center p-4  rounded-lg border">
                 <div className="flex items-center justify-center space-x-2 mb-2">
                   {planInfo.planType === 'business' && <Crown className="h-5 w-5 text-yellow-500" />}
                   <h3 className="text-lg font-semibold text-gray-900">{planInfo.planName}</h3>
