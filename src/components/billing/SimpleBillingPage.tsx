@@ -95,7 +95,7 @@ const SimpleBillingPage: React.FC = () => {
       ],
       popular: false,
       current: false,
-      planCode: 'PLN_esryg99ztsy9xc8'
+      planCode: 'PLN_7k87nrcofadvkfe'
     }
   ];
 
