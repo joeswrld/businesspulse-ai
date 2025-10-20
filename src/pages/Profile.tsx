@@ -228,85 +228,70 @@ export default function EnhancedProfilePage() {
     }
   };
 
-  // FIXED: Get plan info with correct logic
+  // FIXED: Get plan info with correct logic - BUSINESS PLAN PRIORITY
   const getPlanInfo = () => {
-    console.log('🔍 Determining plan info for subscription:', subscription);
+    console.log('🔍 RAW Subscription Data:', JSON.stringify(subscription, null, 2));
 
     // No subscription record = Free Trial
     if (!subscription) {
+      console.log('❌ No subscription found - showing Free Trial');
       return {
         planName: 'Free Trial',
         planType: 'trial',
         isTrial: true,
-        daysLeft: 8, // Default trial period
+        daysLeft: 8,
         planIcon: <Star className="h-4 w-4" />,
         badgeColor: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
       };
     }
 
-    const status = subscription.status?.toLowerCase() || '';
-    const planType = subscription.plan_type?.toLowerCase() || '';
-    const planName = subscription.plan_name?.toLowerCase() || '';
+    const status = (subscription.status || '').toLowerCase().trim();
+    const planType = (subscription.plan_type || '').toLowerCase().trim();
+    const planName = (subscription.plan_name || '').toLowerCase().trim();
 
-    console.log('📋 Plan details:', { status, planType, planName });
+    console.log('📋 Parsed Plan Details:');
+    console.log('  - status:', status);
+    console.log('  - plan_type:', planType);
+    console.log('  - plan_name:', planName);
+    console.log('  - trial_ends_at:', subscription.trial_ends_at);
 
-    // Check if currently on trial
-    if (status === 'trialing' || planType === 'trial') {
-      const trialEnd = subscription.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
-      const now = new Date();
-      const daysLeft = trialEnd ? Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-
-      return {
-        planName: 'Free Trial',
-        planType: 'trial',
-        isTrial: true,
-        daysLeft: Math.max(0, daysLeft),
-        planIcon: <Star className="h-4 w-4" />,
-        badgeColor: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
-      };
-    }
-
-    // Check for Business Plan
-    if (
-      planType === 'business' || 
-      planName.includes('business') ||
-      status === 'active' && (planName === 'business' || planType === 'business')
-    ) {
-      return {
-        planName: 'Business Plan',
-        planType: 'business',
-        isTrial: false,
-        daysLeft: 0,
-        planIcon: <Crown className="h-4 w-4" />,
-        badgeColor: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-      };
-    }
-
-    // Check for Pro Plan
-    if (
-      planType === 'pro' || 
-      planName.includes('pro') || 
-      planName.includes('premium') ||
-      status === 'active' && (planName === 'pro' || planType === 'pro')
-    ) {
-      return {
-        planName: 'Pro Plan',
-        planType: 'pro',
-        isTrial: false,
-        daysLeft: 0,
-        planIcon: <Zap className="h-4 w-4" />,
-        badgeColor: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800'
-      };
-    }
-
-    // If status is active but no specific plan type, check trial_ends_at
+    // PRIORITY 1: Check for Business Plan FIRST (if status is active)
     if (status === 'active') {
+      console.log('✅ Status is ACTIVE');
+      
+      // Check if explicitly Business plan
+      if (planType === 'business' || planName.includes('business')) {
+        console.log('👑 BUSINESS PLAN DETECTED');
+        return {
+          planName: 'Business Plan',
+          planType: 'business',
+          isTrial: false,
+          daysLeft: 0,
+          planIcon: <Crown className="h-4 w-4" />,
+          badgeColor: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+        };
+      }
+
+      // Check if Pro plan
+      if (planType === 'pro' || planName.includes('pro') || planName.includes('premium')) {
+        console.log('⚡ PRO PLAN DETECTED');
+        return {
+          planName: 'Pro Plan',
+          planType: 'pro',
+          isTrial: false,
+          daysLeft: 0,
+          planIcon: <Zap className="h-4 w-4" />,
+          badgeColor: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+        };
+      }
+
+      // Check trial_ends_at only if no explicit plan type
       const trialEnd = subscription.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
       const now = new Date();
       
-      // If trial_ends_at exists and is in the future, user is on trial
       if (trialEnd && trialEnd > now) {
         const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        console.log('⏰ Trial active with', daysLeft, 'days left');
         return {
           planName: 'Free Trial',
           planType: 'trial',
@@ -317,7 +302,8 @@ export default function EnhancedProfilePage() {
         };
       }
 
-      // If trial ended and still active, assume Business plan
+      // Active but no plan type specified and trial expired = Business Plan (default paid)
+      console.log('🎯 Active subscription with expired/no trial - defaulting to Business Plan');
       return {
         planName: 'Business Plan',
         planType: 'business',
@@ -328,7 +314,51 @@ export default function EnhancedProfilePage() {
       };
     }
 
+    // PRIORITY 2: Check if status is trialing
+    if (status === 'trialing') {
+      const trialEnd = subscription.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
+      const now = new Date();
+      const daysLeft = trialEnd ? Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 8;
+
+      console.log('⏰ Status TRIALING with', daysLeft, 'days left');
+      return {
+        planName: 'Free Trial',
+        planType: 'trial',
+        isTrial: true,
+        daysLeft: Math.max(0, daysLeft),
+        planIcon: <Star className="h-4 w-4" />,
+        badgeColor: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
+      };
+    }
+
+    // PRIORITY 3: Explicit plan_type checking (for non-active statuses)
+    if (planType === 'business' || planName.includes('business')) {
+      console.log('👑 Business plan detected from plan_type/name');
+      return {
+        planName: 'Business Plan',
+        planType: 'business',
+        isTrial: false,
+        daysLeft: 0,
+        planIcon: <Crown className="h-4 w-4" />,
+        badgeColor: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+      };
+    }
+
+    if (planType === 'pro' || planName.includes('pro') || planName.includes('premium')) {
+      console.log('⚡ Pro plan detected from plan_type/name');
+      return {
+        planName: 'Pro Plan',
+        planType: 'pro',
+        isTrial: false,
+        daysLeft: 0,
+        planIcon: <Zap className="h-4 w-4" />,
+        badgeColor: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+      };
+    }
+
     // Default fallback
+    console.log('⚠️ No matching plan found - defaulting to Free Trial');
+    console.log('   Status was:', status, '| Plan type was:', planType, '| Plan name was:', planName);
     return {
       planName: 'Free Trial',
       planType: 'trial',
