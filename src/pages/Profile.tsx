@@ -102,20 +102,58 @@ export default function EnhancedProfilePage() {
         setProfile(profileData);
       }
 
-      // Fetch subscription
-      const { data: subscriptionData, error: subscriptionError } = await supabase
-        .from('user_subscriptions')
+      // FIXED: Try billing_profiles first, then fall back to user_subscriptions
+      console.log('🔍 Fetching subscription from billing_profiles...');
+      
+      const { data: billingData, error: billingError } = await supabase
+        .from('billing_profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .single();
 
-      if (subscriptionError && subscriptionError.code !== 'PGRST116') {
-        console.error('Error loading subscription:', subscriptionError);
+      if (billingError && billingError.code !== 'PGRST116') {
+        console.error('⚠️ Error loading billing_profiles:', billingError);
       }
 
-      if (subscriptionData) {
-        console.log('📊 Subscription data:', subscriptionData);
+      if (billingData) {
+        console.log('✅ Billing profile found:', billingData);
+        
+        // Convert billing_profiles format to subscription format
+        const subscriptionData: UserSubscription = {
+          id: billingData.id,
+          user_id: billingData.id,
+          plan_name: billingData.plan_type || 'business',
+          plan_type: billingData.plan_type || 'business',
+          status: billingData.subscription_status || 'active',
+          current_period_start: billingData.subscription_start || new Date().toISOString(),
+          current_period_end: billingData.subscription_end || new Date().toISOString(),
+          trial_ends_at: billingData.trial_ends_at,
+          created_at: billingData.created_at,
+          updated_at: billingData.updated_at
+        };
+        
+        console.log('📊 Converted subscription data:', subscriptionData);
         setSubscription(subscriptionData as any);
+      } else {
+        // Fallback to user_subscriptions table
+        console.log('⚠️ No billing_profiles, trying user_subscriptions...');
+        
+        const { data: subscriptionData, error: subscriptionError } = await supabase
+          .from('user_subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (subscriptionError && subscriptionError.code !== 'PGRST116') {
+          console.error('Error loading subscription:', subscriptionError);
+        }
+
+        if (subscriptionData) {
+          console.log('📊 User subscription found:', subscriptionData);
+          setSubscription(subscriptionData as any);
+        } else {
+          console.log('❌ No subscription data found in either table');
+        }
       }
 
       // Fetch activity stats
