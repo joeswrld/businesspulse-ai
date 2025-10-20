@@ -146,7 +146,7 @@ const Settings = () => {
 
       // Fetch subscription
       const { data: subscriptionData, error: subscriptionError } = await supabase
-        .from('billing_profiles')
+        .from('user_subscriptions')
         .select('*')
         .eq('user_id', user.id)
         .single();
@@ -920,7 +920,7 @@ const Settings = () => {
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               {/* Current Plan */}
-              <div className="text-center p-4  rounded-lg border">
+              <div className="text-center p-4 bg-white rounded-lg border">
                 <div className="flex items-center justify-center space-x-2 mb-2">
                   {planInfo.planType === 'business' && <Crown className="h-5 w-5 text-yellow-500" />}
                   <h3 className="text-lg font-semibold text-gray-900">{planInfo.planName}</h3>
@@ -928,7 +928,7 @@ const Settings = () => {
                 
                 {planInfo.isTrial && planInfo.daysLeft > 0 && (
                   <div className="mb-3">
-                    <Badge variant="outline" className="text-orange-600 ">
+                    <Badge variant="outline" className="text-orange-600 border-orange-200">
                       <Calendar className="h-3 w-3 mr-1" />
                       {planInfo.daysLeft} days left in trial
                     </Badge>
@@ -982,11 +982,11 @@ const Settings = () => {
                     <>
                       <li className="flex items-center space-x-2">
                         <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span>Unlimited feedback collection</span>
+                        <span>Everything in Pro</span>
                       </li>
                       <li className="flex items-center space-x-2">
                         <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span>Advanced analytics & insights</span>
+                        <span>Team collaboration</span>
                       </li>
                       <li className="flex items-center space-x-2">
                         <CheckCircle className="h-4 w-4 text-green-500" />
