@@ -139,7 +139,7 @@ export default function EnhancedProfilePage() {
         console.log('⚠️ No billing_profiles, trying user_subscriptions...');
         
         const { data: subscriptionData, error: subscriptionError } = await supabase
-          .from('user_subscriptions')
+          .from('billing_profiles')
           .select('*')
           .eq('user_id', user.id)
           .single();
