@@ -982,11 +982,11 @@ const Settings = () => {
                     <>
                       <li className="flex items-center space-x-2">
                         <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span>Everything in Pro</span>
+                        <span>Unlimited feedback collection</span>
                       </li>
                       <li className="flex items-center space-x-2">
                         <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span>Team collaboration</span>
+                        <span>Advanced analytics & insights</span>
                       </li>
                       <li className="flex items-center space-x-2">
                         <CheckCircle className="h-4 w-4 text-green-500" />
