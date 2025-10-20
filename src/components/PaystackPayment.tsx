@@ -29,9 +29,7 @@ interface PaystackConfig {
 
 declare global {
   interface Window {
-    PaystackPop: {
-      setup: (config: PaystackConfig) => { openIframe: () => void };
-    };
+    PaystackPop: any;
   }
 }
 
@@ -77,11 +75,11 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
   const amount = planPricing[plan];
   const reference = `notex_${plan}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-  // Plan details with actual Paystack plan codes
+  // Plan details with actual Paystack plan codes (LIVE MODE)
   const planDetails = {
     business: {
       name: 'Business Plan',
-      planCode: 'PLN_esryg99ztsy9xc8',
+      planCode: 'PLN_7k87nrcofadvkfe',
       duration: '30 days',
       features: [
         'Unlimited usage across all features',

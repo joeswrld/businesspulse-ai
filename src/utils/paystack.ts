@@ -35,7 +35,8 @@ declare global {
     handler.openIframe();
   }
   
-  // Usage in Billing component:
+  // Usage example in Billing component:
+  /*
   function handleUpgrade() {
     initializePayment({
       email: user.email,
@@ -52,3 +53,4 @@ declare global {
       },
     });
   }
+  */

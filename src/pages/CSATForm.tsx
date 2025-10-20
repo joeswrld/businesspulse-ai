@@ -1,5 +1,5 @@
 // src/pages/CSATForm.tsx
-// Redesigned with better branding display
+// Public form - Always available (No access restrictions)
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -83,27 +83,30 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
     setIsValidating(true);
 
     try {
-      const { data, error } = await supabase
+      // Only check if project exists and is enabled
+      // NO ACCESS/SUBSCRIPTION CHECK - form is always available
+      const { data: settingsData, error: settingsError } = await supabase
         .from('feedback_settings')
         .select('*')
         .eq('project_id', projectId)
         .maybeSingle();
 
-      if (error) throw error;
+      if (settingsError) throw settingsError;
 
-      if (!data) {
+      if (!settingsData) {
         setIsValid(false);
         setValidationError('Project not found. Please check your survey link.');
         return;
       }
 
-      if (!data.customer_satisfaction_enabled) {
+      if (!settingsData.customer_satisfaction_enabled) {
         setIsValid(false);
         setValidationError('Customer satisfaction survey is currently disabled for this project.');
         return;
       }
 
-      setSettings(data);
+      // Success: form is valid and available
+      setSettings(settingsData);
       setIsValid(true);
       setValidationError('');
 
@@ -150,39 +153,8 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
       return;
     }
   
-    // ===== CHECK ACCESS BEFORE SUBMISSION =====
-    try {
-      const { data: accessCheck, error: accessError } = await supabase
-        .rpc('check_widget_access', { project_id_param: settings.project_id });
-  
-      if (accessError) {
-        console.error('Access check error:', accessError);
-        toast({
-          title: 'Error',
-          description: 'Could not verify access. Please try again.',
-          variant: 'destructive'
-        });
-        return;
-      }
-  
-      const hasAccess = accessCheck === true || (accessCheck && accessCheck.has_access === true);
-  
-      if (!hasAccess) {
-        toast({
-          title: 'Feedback Unavailable',
-          description: 'This feedback form is currently unavailable. The owner\'s trial or subscription has ended.',
-          variant: 'destructive'
-        });
-        return;
-      }
-    } catch (err) {
-      console.error('Access verification failed:', err);
-      // Optional: continue submission even if check fails due to network issues
-    }
-  
     setIsSubmitting(true);
   
-    // ===== EXISTING SUBMISSION LOGIC =====
     try {
       const feedbackData = {
         project_id: settings.project_id,
@@ -297,14 +269,12 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
   return (
     <div className={containerClass}>
       <Card className="w-full max-w-2xl shadow-2xl border-0 overflow-hidden">
-        {/* Header with Branding */}
         <div 
           className="relative pt-10 pb-8 px-8"
           style={{ 
             background: `linear-gradient(135deg, ${settings?.widget_color || '#3B82F6'}15 0%, ${settings?.widget_color || '#3B82F6'}05 100%)`
           }}
         >
-          {/* Logo */}
           {settings?.logo_url && (
             <div className="flex justify-center mb-6">
               <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 border-2 border-white dark:border-gray-700">
@@ -317,14 +287,12 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
             </div>
           )}
           
-          {/* Business Name */}
           {settings?.business_name && (
             <h1 className="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-900 dark:text-white">
               {settings.business_name}
             </h1>
           )}
           
-          {/* Title & Description */}
           <div className="text-center space-y-3">
             <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
               {settings?.widget_title || 'Customer Satisfaction Survey'}
@@ -343,10 +311,8 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
           )}
         </div>
 
-        {/* Form Content */}
         <CardContent className="p-8">
           <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Rating Section */}
             <div className="space-y-6">
               <div className="text-center space-y-2">
                 <Label className="text-xl font-semibold text-gray-900 dark:text-white block">
@@ -355,7 +321,6 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
                 <p className="text-sm text-gray-500 dark:text-gray-400">Click on a star to rate us</p>
               </div>
               
-              {/* Star Rating */}
               <div className="flex justify-center items-center gap-2 md:gap-3">
                 {[1, 2, 3, 4, 5].map((value) => (
                   <button
@@ -380,7 +345,6 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
                 ))}
               </div>
 
-              {/* Rating Feedback */}
               {(rating !== null || hoveredRating !== null) && (
                 <div className="text-center space-y-2 animate-in fade-in duration-300">
                   <div className="text-5xl">
@@ -398,7 +362,6 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
 
             <div className="border-t border-gray-200 dark:border-gray-700"></div>
 
-            {/* Email Field */}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Email Address <span className="text-gray-400">(Optional)</span>
@@ -416,7 +379,6 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
               </p>
             </div>
 
-            {/* Comments Field */}
             <div className="space-y-2">
               <Label htmlFor="comments" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Additional Comments <span className="text-gray-400">(Optional)</span>
@@ -431,7 +393,6 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
               />
             </div>
 
-            {/* Submit Button */}
             <Button 
               type="submit" 
               disabled={!rating || isSubmitting || previewMode} 
@@ -457,14 +418,12 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
           </form>
         </CardContent>
 
-        {/* Footer */}
         <div className="bg-gray-50 dark:bg-gray-800/50 px-8 py-4 text-center border-t border-gray-200 dark:border-gray-700">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Thank you for helping us improve our product
           </p>
         </div>
 
-        {/* Powered by NoteX */}
         <div className="bg-gray-100 dark:bg-gray-900/50 px-4 py-3 text-center border-t border-gray-200 dark:border-gray-700">
           <a 
             href="https://notex.com.ng/" 
@@ -479,6 +438,5 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
     </div>
   );
 };
-
 
 export default CustomerSatisfactionForm;

@@ -14,7 +14,7 @@ import {
   Zap,
   MessageSquare,
   MessageCircle,
-  Widget
+  SlidersHorizontal
 } from 'lucide-react'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
@@ -69,7 +69,7 @@ const navigationItems: NavItem[] = [
   {
     id: 'feedback-settings',
     label: 'Feedback Settings',
-    icon: <Widget className="h-5 w-5" />,
+    icon: <SlidersHorizontal className="h-5 w-5" />,
     path: '/feedback-settings',
     requiresAccess: false,
     allowedWhenExpired: true

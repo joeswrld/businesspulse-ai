@@ -29,7 +29,6 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Insights = lazy(() => import("./pages/Insights"));
 const InsightsSimple = lazy(() => import("./pages/InsightsSimple"));
 const Reports = lazy(() => import("./pages/Reports"));
-const Analytics = lazy(() => import("./pages/Analytics"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Teams = lazy(() => import("./pages/Teams"));
 const Profile = lazy(() => import("./pages/Profile"));
@@ -218,14 +217,6 @@ const App = () => (
                 <ProtectedDashboardLayout>
                   <Suspense fallback={<LoadingSpinner />}>
                     <Reports />
-                  </Suspense>
-                </ProtectedDashboardLayout>
-              } />
-              
-              <Route path="/analytics" element={
-                <ProtectedDashboardLayout>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <Analytics />
                   </Suspense>
                 </ProtectedDashboardLayout>
               } />

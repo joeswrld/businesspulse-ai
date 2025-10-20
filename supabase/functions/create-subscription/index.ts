@@ -25,10 +25,10 @@ serve(async (req) => {
       )
     }
 
-    // Paystack configuration
+    // Paystack configuration (LIVE MODE)
     const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')
-    const PRO_PLAN_CODE = 'PLN_4z2wpgmw41w2k7r'
-    const BUSINESS_PLAN_CODE = 'PLN_esryg99ztsy9xc8'
+    const PRO_PLAN_CODE = 'PLN_4z2wpgmw41w2k7r' // Legacy - not in use
+    const BUSINESS_PLAN_CODE = 'PLN_7k87nrcofadvkfe' // Live mode business plan
 
     if (!PAYSTACK_SECRET_KEY) {
       return new Response(

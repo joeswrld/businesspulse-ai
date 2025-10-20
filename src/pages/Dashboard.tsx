@@ -533,9 +533,9 @@ export default function Dashboard() {
                                     initialFocus
                                     mode="range"
                                     defaultMonth={customDateRange.from}
-                                    selected={customDateRange}
+                                    selected={customDateRange as any}
                                     onSelect={(range) => {
-                                        setCustomDateRange(range || { from: undefined, to: undefined });
+                                        setCustomDateRange(range as any || { from: undefined, to: undefined });
                                         setDatePickerOpen(false);
                                     }}
                                     numberOfMonths={2}

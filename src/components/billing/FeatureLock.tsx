@@ -16,7 +16,8 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  TrendingUp
+  TrendingUp,
+  Star
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -144,7 +145,7 @@ const FeatureLock: React.FC<FeatureLockProps> = ({
         limit = billingData.reports_limit;
         break;
       case 'team_members':
-        currentUsage = billingData.current_team_members_usage || 0;
+        currentUsage = (billingData as any).current_team_members_usage || 0;
         limit = billingData.team_members_limit;
         break;
     }

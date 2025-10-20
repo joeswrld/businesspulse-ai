@@ -8,6 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import {
   Download,
@@ -66,6 +76,8 @@ const BillingPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const loadSubscriptionData = async () => {
     if (!user) return;
@@ -76,15 +88,55 @@ const BillingPage: React.FC = () => {
 
       console.log('🔄 Loading subscription data for user:', user.id);
 
-      const { data: profileData, error: rpcError } = await supabase
-        .rpc('get_user_profile_with_access', { user_uuid: user.id });
+      // First try to get from billing_profiles directly for faster response
+      const { data: directProfile, error: directError } = await supabase
+        .from('billing_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
-      if (rpcError) {
-        console.error('RPC Error:', rpcError);
-        throw rpcError;
+      console.log('📊 Direct profile data:', directProfile);
+
+      // If direct query fails, try RPC
+      let profileData = null;
+      if (directError || !directProfile) {
+        const { data: rpcData, error: rpcError } = await supabase
+          .rpc('get_user_profile_with_access', { user_uuid: user.id });
+
+        if (rpcError) {
+          console.error('RPC Error:', rpcError);
+          throw rpcError;
+        }
+        profileData = rpcData;
+      } else {
+        // Convert direct profile to RPC format
+        const now = new Date();
+        const trialEnd = directProfile.trial_ends_at ? new Date(directProfile.trial_ends_at) : null;
+        const hasAccess = directProfile.plan === 'business' && directProfile.subscription_status === 'active'
+          || (directProfile.plan === 'trial' && trialEnd && now <= trialEnd);
+        
+        let daysLeft = 0;
+        if (directProfile.plan === 'trial' && trialEnd) {
+          daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        } else if (directProfile.next_billing_date) {
+          const nextBilling = new Date(directProfile.next_billing_date);
+          daysLeft = Math.max(0, Math.ceil((nextBilling.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        }
+
+        profileData = [{
+          id: directProfile.user_id,
+          plan: directProfile.plan,
+          subscription_status: directProfile.subscription_status,
+          trial_ends_at: directProfile.trial_ends_at,
+          next_billing_date: directProfile.next_billing_date,
+          has_access: hasAccess,
+          days_left: daysLeft,
+          paystack_customer_id: directProfile.paystack_customer_code,
+          paystack_subscription_id: directProfile.paystack_subscription_code,
+        }];
       }
 
-      console.log('📊 Profile data:', profileData);
+      console.log('📊 Final profile data:', profileData);
 
       if (!profileData || profileData.length === 0) {
         console.log('⚠️ No profile found, creating trial...');
@@ -181,7 +233,7 @@ const BillingPage: React.FC = () => {
             event: '*',
             schema: 'public',
             table: 'billing_profiles',
-            filter: `id=eq.${user.id}`,
+            filter: `user_id=eq.${user.id}`,
           },
           (payload) => {
             console.log('🔔 Billing profile updated:', payload);
@@ -255,16 +307,15 @@ const BillingPage: React.FC = () => {
 
         const { error: profileError } = await supabase
           .from('billing_profiles')
-          .upsert({
-            id: user?.id,
+          .update({
             plan: 'business',
             subscription_status: 'active',
             trial_ends_at: null,
             next_billing_date: nextBillingDate.toISOString(),
+            paystack_customer_code: response.customer?.customer_code || null,
             updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'id'
-          });
+          })
+          .eq('user_id', user?.id);
 
         if (profileError) {
           console.error('❌ Billing profile error:', profileError);
@@ -399,51 +450,71 @@ const BillingPage: React.FC = () => {
     }
   };
 
-  const handleCancelSubscription = async () => {
-    const confirmed = window.confirm(
-      'Are you sure you want to cancel your subscription?\n\n' +
-      'You will continue to have access until the end of your billing period.\n\n' +
-      'This action cannot be undone.'
-    );
-
-    if (!confirmed) return;
-
+  const confirmCancelSubscription = async () => {
     try {
-      setIsLoading(true);
+      setIsCancelling(true);
+      console.log('🔄 Initiating subscription cancellation...');
 
-      const { error: billingError } = await supabase
-        .from('billing_profiles')
-        .update({ 
-          subscription_status: 'cancelled',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user?.id);
+      // If there's a Paystack subscription code, call the edge function to cancel with Paystack
+      if (subscription?.subscriptionId) {
+        console.log('📡 Calling cancel-subscription edge function with ID:', subscription.subscriptionId);
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error('Authentication required');
+        }
 
-      if (billingError) throw billingError;
+        const response = await supabase.functions.invoke('cancel-subscription', {
+          body: { subscription_id: subscription.subscriptionId }
+        });
 
-      const { error: subError } = await supabase
-        .from('user_subscriptions')
-        .update({
-          status: 'cancelled',
-          cancel_at_period_end: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user?.id);
+        if (response.error) {
+          console.error('❌ Edge function error:', response.error);
+          throw new Error(response.error.message || 'Failed to cancel subscription');
+        }
 
-      if (subError) console.warn('Could not update user_subscriptions:', subError);
+        console.log('✅ Subscription cancelled with Paystack:', response.data);
+      } else {
+        console.log('⚠️ No subscription ID found, updating database only...');
+        
+        // No Paystack subscription, just update our database
+        const { error: billingError } = await supabase
+          .from('billing_profiles')
+          .update({ 
+            subscription_status: 'cancelled',
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user?.id);
 
-      toast.success('Subscription cancelled', {
-        description: 'You can continue using your plan until the end of the billing period'
+        if (billingError) throw billingError;
+
+        const { error: subError } = await supabase
+          .from('user_subscriptions')
+          .update({
+            status: 'cancelled',
+            cancel_at_period_end: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user?.id);
+
+        if (subError) console.warn('Could not update user_subscriptions:', subError);
+      }
+
+      toast.success('Subscription cancelled successfully', {
+        description: 'You can continue using your plan until the end of the billing period',
+        duration: 5000
       });
 
+      setShowCancelDialog(false);
       await loadSubscriptionData();
     } catch (error) {
-      console.error('Cancellation error:', error);
+      console.error('❌ Cancellation error:', error);
       toast.error('Failed to cancel subscription', {
-        description: 'Please try again or contact support'
+        description: error instanceof Error ? error.message : 'Please try again or contact support',
+        duration: 5000
       });
     } finally {
-      setIsLoading(false);
+      setIsCancelling(false);
     }
   };
 
@@ -784,12 +855,12 @@ NoteX Team
                   {subscription?.plan === 'business' && subscription?.isActive && !subscription?.isCancelled && (
                     <Button 
                       variant="outline" 
-                      onClick={handleCancelSubscription}
+                      onClick={() => setShowCancelDialog(true)}
                       className="border-destructive/20 text-destructive hover:bg-destructive/5"
-                      disabled={isLoading}
+                      disabled={isLoading || isCancelling}
                     >
                       <X className="h-5 w-5 mr-2" />
-                      Cancel Subscription
+                      {isCancelling ? 'Cancelling...' : 'Cancel Subscription'}
                     </Button>
                   )}
                 </div>
@@ -893,6 +964,62 @@ NoteX Team
           </div>
         </div>
       </div>
+
+      {/* Cancel Subscription Confirmation Dialog */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Cancel Subscription?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 pt-2">
+              <p>
+                Are you sure you want to cancel your Business Plan subscription?
+              </p>
+              <div className="bg-muted p-3 rounded-lg space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                  <span>You'll continue to have full access until the end of your current billing period</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <XCircle className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                  <span>After that, your account will revert to the free trial limitations</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                  <span>You can reactivate your subscription anytime</span>
+                </div>
+              </div>
+              <p className="text-sm font-medium">
+                This action will cancel future payments but won't issue a refund for the current billing period.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCancelling}>
+              Keep Subscription
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmCancelSubscription}
+              disabled={isCancelling}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isCancelling ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Cancelling...
+                </>
+              ) : (
+                <>
+                  <X className="h-4 w-4 mr-2" />
+                  Yes, Cancel Subscription
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

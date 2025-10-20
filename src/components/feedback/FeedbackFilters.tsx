@@ -132,9 +132,9 @@ export default function FeedbackFilters({
                   initialFocus
                   mode="range"
                   defaultMonth={filters.dateRange?.start}
-                  selected={filters.dateRange}
+                  selected={filters.dateRange as any}
                   onSelect={(range) => {
-                    handleFilterChange('dateRange', range);
+                    handleFilterChange('dateRange', range as any);
                     setDatePickerOpen(false);
                   }}
                   numberOfMonths={2}

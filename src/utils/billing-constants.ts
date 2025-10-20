@@ -35,8 +35,8 @@ export const PLAN_PRICES = {
 
 export const PLAN_CODES = {
   free: 'free',
-  pro: 'PLN_4z2wpgmw41w2k7r',
-  business: 'PLN_esryg99ztsy9xc8',
+  pro: 'PLN_4z2wpgmw41w2k7r', // Legacy - not in use
+  business: 'PLN_7k87nrcofadvkfe', // Live mode business plan
 } as const;
 
 export const SUBSCRIPTION_STATUS = {

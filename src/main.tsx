@@ -25,7 +25,7 @@ if (typeof window !== 'undefined') {
     originalConsoleError.apply(console, args);
   };
 
-  if (window.ethereum === undefined) {
+  if ((window as any).ethereum === undefined) {
     console.debug("No web3 provider found, skipping ethereum injection...");
   }
 }

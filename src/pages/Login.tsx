@@ -19,7 +19,7 @@ const Login = () => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
-  const { subscription, loading: subLoading } = useSubscriptionStatus();
+  const { isLoading: subLoading } = useSubscriptionStatus();
 
   
 

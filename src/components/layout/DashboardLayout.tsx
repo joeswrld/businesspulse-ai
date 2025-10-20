@@ -1,4 +1,4 @@
-// src/components/layout/DashboardLayout.tsx - FIXED VERSION
+// src/components/layout/DashboardLayout.tsx - FIXED VERSION WITH CORRECT PLAN DISPLAY
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
   CreditCard,
   Users,
   MessageSquare,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +32,7 @@ interface PlanInfo {
   planType: string;
   planColor: string;
   planIcon: JSX.Element;
+  daysLeft?: number;
 }
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
@@ -43,47 +45,62 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Load user data
+  // Load user data with proper error handling
   const loadUserData = async () => {
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (currentUser) {
-        setUser(currentUser);
+      if (!currentUser) {
+        setLoading(false);
+        return;
+      }
+
+      setUser(currentUser);
+      console.log('👤 Current user:', currentUser.id);
+      
+      // Load profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .single();
+      
+      if (profileError) {
+        console.error('Profile error:', profileError);
+      } else if (profileData) {
+        setProfile(profileData);
+        console.log('👤 Profile loaded:', profileData);
+      }
+      
+      // Load billing profile - FIXED QUERY
+      const { data: billingData, error: billingError } = await supabase
+        .from('billing_profiles')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+      
+      if (billingError) {
+        console.error('❌ Billing profile error:', billingError);
+      } else if (billingData) {
+        console.log('💳 Raw billing data:', billingData);
         
-        // Load profile
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', currentUser.id)
-          .single();
-        
-        if (profileData) {
-          setProfile(profileData);
-        }
-        
-        // Load subscription using RPC for accuracy
-        const { data: billingData } = await supabase
-          .rpc('get_user_profile_with_access', { user_uuid: currentUser.id });
-        
-        if (billingData && billingData.length > 0) {
-          setSubscription(billingData[0]);
-          console.log('📊 Subscription data loaded:', billingData[0]);
-        } else {
-          // Fallback to direct query
-          const { data: fallbackData } = await supabase
-            .from('billing_profiles')
-            .select('*')
-            .eq('id', currentUser.id)
-            .single();
+        // Calculate days left for trial
+        if (billingData.trial_end_date) {
+          const now = new Date();
+          const trialEnd = new Date(billingData.trial_end_date);
+          const diffTime = trialEnd.getTime() - now.getTime();
+          const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           
-          if (fallbackData) {
-            setSubscription(fallbackData);
-            console.log('📊 Fallback subscription data:', fallbackData);
-          }
+          billingData.days_left = daysLeft;
+          console.log('📅 Days left calculated:', daysLeft);
         }
+        
+        setSubscription(billingData);
+        console.log('💳 Subscription set:', billingData);
+      } else {
+        console.warn('⚠️ No billing profile found for user');
       }
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error('❌ Error loading user data:', error);
     } finally {
       setLoading(false);
     }
@@ -92,118 +109,153 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   // Load data on mount
   useEffect(() => {
     loadUserData();
+  }, []);
 
-    // Set up realtime listener for subscription changes
-    if (user) {
-      const channel = supabase
-        .channel(`dashboard-subscription-${user.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'billing_profiles',
-            filter: `id=eq.${user.id}`,
-          },
-          (payload) => {
-            console.log('🔔 Subscription updated in dashboard:', payload);
-            loadUserData();
+  // Set up realtime listener
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log('🔔 Setting up realtime listener for user:', user.id);
+
+    const channel = supabase
+      .channel(`dashboard-subscription-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'billing_profiles',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('🔔 Subscription updated:', payload);
+          const newData = payload.new as any;
+          
+          // Show success toast when business plan is activated
+          if (newData?.subscription_status === 'active' && newData?.plan_type === 'business') {
+            toast.success('🎉 Welcome to Business Plan!', {
+              description: 'You now have unlimited access to all features',
+              duration: 5000,
+            });
           }
-        )
-        .subscribe();
+          
+          // Reload data
+          loadUserData();
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Realtime subscription status:', status);
+      });
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
+    return () => {
+      console.log('🔌 Cleaning up realtime subscription');
+      supabase.removeChannel(channel);
+    };
   }, [user?.id]);
 
-  // Get plan info for badge
+  // FIXED: Get plan info based on billing_profiles data
   const getPlanInfo = (): PlanInfo => {
+    console.log('🎯 Getting plan info for subscription:', subscription);
+
+    // No subscription data
     if (!subscription) {
+      console.log('❌ No subscription data - showing Free Trial');
       return {
         planName: 'Free Trial',
         planType: 'trial',
-        planColor: 'bg-orange-100 text-orange-800 border-orange-200',
-        planIcon: <Star className="h-3 w-3" />
-      };
-    }
-
-    const plan = subscription.plan?.toLowerCase() || '';
-    const status = subscription.subscription_status?.toLowerCase() || '';
-    const isCancelled = status === 'cancelled';
-    const isActive = status === 'active';
-    const isTrial = plan === 'trial';
-
-    console.log('🎯 Plan determination:', { plan, status, isCancelled, isActive, isTrial });
-
-    // Handle cancelled subscription
-    if (isCancelled) {
-      return {
-        planName: 'Cancelled',
-        planType: 'cancelled',
-        planColor: 'bg-red-100 text-red-800 border-red-200',
-        planIcon: <X className="h-3 w-3" />
-      };
-    }
-
-    // Handle business plan
-    if (plan === 'business') {
-      if (isActive) {
-        return {
-          planName: 'Business',
-          planType: 'business',
-          planColor: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-          planIcon: <Crown className="h-3 w-3" />
-        };
-      } else {
-        return {
-          planName: 'Business (Inactive)',
-          planType: 'business',
-          planColor: 'bg-gray-100 text-gray-800 border-gray-200',
-          planIcon: <Crown className="h-3 w-3" />
-        };
-      }
-    }
-
-    // Handle pro plan (if exists)
-    if (plan === 'pro' || plan === 'premium') {
-      return {
-        planName: 'Pro',
-        planType: 'pro',
-        planColor: 'bg-blue-100 text-blue-800 border-blue-200',
+        planColor: 'bg-blue-50 text-blue-700 border-blue-200',
         planIcon: <Zap className="h-3 w-3" />
       };
     }
 
-    // Handle trial (default)
-    if (isTrial || !plan) {
-      const daysLeft = subscription.days_left || 0;
-      const isExpired = daysLeft <= 0 && !subscription.has_access;
-      
-      if (isExpired) {
-        return {
-          planName: 'Trial Expired',
-          planType: 'trial',
-          planColor: 'bg-red-100 text-red-800 border-red-200',
-          planIcon: <Star className="h-3 w-3" />
-        };
-      }
-      
+    const planType = subscription.plan_type?.toLowerCase() || 'trial';
+    const status = subscription.subscription_status?.toLowerCase() || 'trial';
+    const daysLeft = subscription.days_left || 0;
+    
+    console.log('📊 Plan Info Debug:', { 
+      planType, 
+      status, 
+      daysLeft,
+      trial_end_date: subscription.trial_end_date,
+      subscription_start_date: subscription.subscription_start_date,
+      subscription_end_date: subscription.subscription_end_date,
+      raw_subscription: subscription
+    });
+
+    // 1. BUSINESS PLAN - Active subscription (HIGHEST PRIORITY)
+    if (planType === 'business' && status === 'active') {
+      console.log('✅ Displaying: Business Plan (Active)');
       return {
-        planName: `Trial (${daysLeft}d)`,
-        planType: 'trial',
-        planColor: 'bg-orange-100 text-orange-800 border-orange-200',
-        planIcon: <Star className="h-3 w-3" />
+        planName: 'Business Plan',
+        planType: 'business',
+        planColor: 'bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-900 border-yellow-300 font-semibold',
+        planIcon: <Crown className="h-4 w-4 text-yellow-600" />
       };
     }
 
-    // Fallback
+    // 2. BUSINESS PLAN - Expired
+    if (planType === 'business' && status === 'expired') {
+      console.log('⚠️ Displaying: Business Plan (Expired)');
+      return {
+        planName: 'Business Plan Expired',
+        planType: 'expired',
+        planColor: 'bg-red-50 text-red-700 border-red-300',
+        planIcon: <AlertCircle className="h-3 w-3" />
+      };
+    }
+
+    // 3. TRIAL EXPIRED (explicit status)
+    if (status === 'trial_expired') {
+      console.log('❌ Displaying: Trial Expired (status=trial_expired)');
+      return {
+        planName: 'Trial Expired',
+        planType: 'expired',
+        planColor: 'bg-red-50 text-red-700 border-red-300',
+        planIcon: <AlertCircle className="h-3 w-3" />
+      };
+    }
+
+    // 4. FREE TRIAL - Active (has days remaining AND status is 'trial')
+    if (status === 'trial' && daysLeft > 0) {
+      console.log(`✅ Displaying: Free Trial (${daysLeft} days left)`);
+      return {
+        planName: `Free Trial`,
+        planType: 'trial',
+        planColor: 'bg-blue-50 text-blue-700 border-blue-200',
+        planIcon: <Zap className="h-3 w-3" />,
+        daysLeft: daysLeft
+      };
+    }
+
+    // 5. TRIAL EXPIRED (days <= 0 but status is still 'trial')
+    if (status === 'trial' && daysLeft <= 0) {
+      console.log('❌ Displaying: Trial Expired (days <= 0)');
+      return {
+        planName: 'Trial Expired',
+        planType: 'expired',
+        planColor: 'bg-red-50 text-red-700 border-red-300',
+        planIcon: <AlertCircle className="h-3 w-3" />
+      };
+    }
+
+    // 6. CANCELLED SUBSCRIPTION
+    if (status === 'cancelled' || status === 'canceled') {
+      console.log('⚠️ Displaying: Subscription Cancelled');
+      return {
+        planName: 'Subscription Cancelled',
+        planType: 'cancelled',
+        planColor: 'bg-gray-100 text-gray-700 border-gray-300',
+        planIcon: <X className="h-3 w-3" />
+      };
+    }
+
+    // 7. FALLBACK - Unknown status (treat as trial)
+    console.warn('⚠️ Unknown subscription status, defaulting to Free Trial', { planType, status });
     return {
       planName: 'Free Trial',
       planType: 'trial',
-      planColor: 'bg-orange-100 text-orange-800 border-orange-200',
-      planIcon: <Star className="h-3 w-3" />
+      planColor: 'bg-blue-50 text-blue-700 border-blue-200',
+      planIcon: <Zap className="h-3 w-3" />
     };
   };
 
@@ -305,23 +357,36 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
                 </div>
               </div>
               
-              {/* Plan Badge */}
-              <div className="flex items-center justify-between">
+              {/* Plan Badge with Days Left */}
+              <div className="space-y-2">
                 <Badge 
                   variant="outline" 
-                  className={`px-3 py-1 text-xs font-medium border ${planInfo.planColor}`}
+                  className={`w-full px-3 py-2 text-xs font-medium border ${planInfo.planColor} justify-center`}
                 >
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-1.5">
                     {planInfo.planIcon}
                     <span>{planInfo.planName}</span>
                   </div>
                 </Badge>
-                <Link 
-                  to="/profile"
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                >
-                  View Profile →
-                </Link>
+                
+                {/* Show days left for trial */}
+                {planInfo.planType === 'trial' && planInfo.daysLeft !== undefined && (
+                  <div className="text-center">
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      {planInfo.daysLeft} {planInfo.daysLeft === 1 ? 'day' : 'days'} remaining
+                    </p>
+                  </div>
+                )}
+                
+                {/* Show upgrade prompt for expired or trial */}
+                {(planInfo.planType === 'expired' || planInfo.planType === 'trial') && (
+                  <Link 
+                    to="/billing"
+                    className="block text-center text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors py-1"
+                  >
+                    {planInfo.planType === 'expired' ? 'Upgrade Now →' : 'View Plans →'}
+                  </Link>
+                )}
               </div>
             </div>
           )}

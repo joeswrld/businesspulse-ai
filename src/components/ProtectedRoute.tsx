@@ -1,7 +1,6 @@
 import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
-import { AccessLocked } from '@/components/AccessLocked';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
@@ -9,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { isLoading, hasAccess, status, daysRemaining, isTrialActive } = useSubscriptionStatus();
+  const { isLoading, hasAccess, status } = useSubscriptionStatus();
 
   // Show loading spinner while checking subscription
   if (isLoading) {
@@ -34,10 +33,10 @@ import { AlertCircle, Lock, CreditCard } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface AccessLockedProps {
-  status: 'trial' | 'active' | 'expired' | 'failed' | 'unknown';
+  status: 'trial' | 'active' | 'expired' | 'cancelled';
 }
 
-export const AccessLocked = ({ status }: AccessLockedProps) => {
+const AccessLocked = ({ status }: AccessLockedProps) => {
   const getMessage = () => {
     switch (status) {
       case 'expired':
@@ -46,10 +45,10 @@ export const AccessLocked = ({ status }: AccessLockedProps) => {
           description: 'Your 8-day free trial has ended. Upgrade to continue using NoteX.',
           icon: AlertCircle,
         };
-      case 'failed':
+      case 'cancelled':
         return {
-          title: 'Payment Failed',
-          description: 'We couldn\'t process your payment. Please update your payment method.',
+          title: 'Subscription Cancelled',
+          description: 'Your subscription has been cancelled. Please reactivate to continue.',
           icon: CreditCard,
         };
       default:
@@ -80,7 +79,7 @@ export const AccessLocked = ({ status }: AccessLockedProps) => {
             to="/billing"
             className="block w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
           >
-            {status === 'failed' ? 'Update Payment' : 'Upgrade Now'}
+            {status === 'cancelled' ? 'Reactivate Subscription' : 'Upgrade Now'}
           </Link>
           
           <Link

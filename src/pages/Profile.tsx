@@ -42,7 +42,7 @@ interface UserSubscription {
   status: string;
   current_period_start: string;
   current_period_end: string;
-  trial_end?: string;
+  trial_ends_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -102,19 +102,58 @@ export default function EnhancedProfilePage() {
         setProfile(profileData);
       }
 
-      // Fetch subscription
-      const { data: subscriptionData, error: subscriptionError } = await supabase
-        .from('user_subscriptions')
+      // FIXED: Try billing_profiles first, then fall back to user_subscriptions
+      console.log('🔍 Fetching subscription from billing_profiles...');
+      
+      const { data: billingData, error: billingError } = await supabase
+        .from('billing_profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .single();
 
-      if (subscriptionError && subscriptionError.code !== 'PGRST116') {
-        console.error('Error loading subscription:', subscriptionError);
+      if (billingError && billingError.code !== 'PGRST116') {
+        console.error('⚠️ Error loading billing_profiles:', billingError);
       }
 
-      if (subscriptionData) {
+      if (billingData) {
+        console.log('✅ Billing profile found:', billingData);
+        
+        // Convert billing_profiles format to subscription format
+        const subscriptionData: UserSubscription = {
+          id: billingData.id,
+          user_id: billingData.id,
+          plan_name: billingData.plan_type || 'business',
+          plan_type: billingData.plan_type || 'business',
+          status: billingData.subscription_status || 'active',
+          current_period_start: billingData.subscription_start || new Date().toISOString(),
+          current_period_end: billingData.subscription_end || new Date().toISOString(),
+          trial_ends_at: billingData.trial_ends_at,
+          created_at: billingData.created_at,
+          updated_at: billingData.updated_at
+        };
+        
+        console.log('📊 Converted subscription data:', subscriptionData);
         setSubscription(subscriptionData as any);
+      } else {
+        // Fallback to user_subscriptions table
+        console.log('⚠️ No billing_profiles, trying user_subscriptions...');
+        
+        const { data: subscriptionData, error: subscriptionError } = await supabase
+          .from('billing_profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (subscriptionError && subscriptionError.code !== 'PGRST116') {
+          console.error('Error loading subscription:', subscriptionError);
+        }
+
+        if (subscriptionData) {
+          console.log('📊 User subscription found:', subscriptionData);
+          setSubscription(subscriptionData as any);
+        } else {
+          console.log('❌ No subscription data found in either table');
+        }
       }
 
       // Fetch activity stats
@@ -227,54 +266,144 @@ export default function EnhancedProfilePage() {
     }
   };
 
-  // Get plan info for display
+  // FIXED: Get plan info with correct logic - BUSINESS PLAN PRIORITY
   const getPlanInfo = () => {
+    console.log('🔍 RAW Subscription Data:', JSON.stringify(subscription, null, 2));
+
+    // No subscription record = Free Trial
     if (!subscription) {
+      console.log('❌ No subscription found - showing Free Trial');
       return {
         planName: 'Free Trial',
         planType: 'trial',
         isTrial: true,
-        daysLeft: 0,
-        planIcon: <Star className="h-4 w-4" />
+        daysLeft: 8,
+        planIcon: <Star className="h-4 w-4" />,
+        badgeColor: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
       };
     }
 
-    const planName = subscription.plan_name?.toLowerCase() || subscription.plan_type?.toLowerCase() || '';
-    const planType = planName.includes('business') ? 'business'
-      : (planName.includes('pro') || planName.includes('premium')) ? 'pro'
-      : subscription.plan_type || 'free';
-    const isTrial = planType === 'trial' || subscription.status === 'trialing';
-    
-    if (isTrial && subscription.trial_end) {
-      const trialEnd = new Date(subscription.trial_end);
-      const now = new Date();
-      const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const status = (subscription.status || '').toLowerCase().trim();
+    const planType = (subscription.plan_type || '').toLowerCase().trim();
+    const planName = (subscription.plan_name || '').toLowerCase().trim();
+
+    console.log('📋 Parsed Plan Details:');
+    console.log('  - status:', status);
+    console.log('  - plan_type:', planType);
+    console.log('  - plan_name:', planName);
+    console.log('  - trial_ends_at:', subscription.trial_ends_at);
+
+    // PRIORITY 1: Check for Business Plan FIRST (if status is active)
+    if (status === 'active') {
+      console.log('✅ Status is ACTIVE');
       
+      // Check if explicitly Business plan
+      if (planType === 'business' || planName.includes('business')) {
+        console.log('👑 BUSINESS PLAN DETECTED');
+        return {
+          planName: 'Business Plan',
+          planType: 'business',
+          isTrial: false,
+          daysLeft: 0,
+          planIcon: <Crown className="h-4 w-4" />,
+          badgeColor: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+        };
+      }
+
+      // Check if Pro plan
+      if (planType === 'pro' || planName.includes('pro') || planName.includes('premium')) {
+        console.log('⚡ PRO PLAN DETECTED');
+        return {
+          planName: 'Pro Plan',
+          planType: 'pro',
+          isTrial: false,
+          daysLeft: 0,
+          planIcon: <Zap className="h-4 w-4" />,
+          badgeColor: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+        };
+      }
+
+      // Check trial_ends_at only if no explicit plan type
+      const trialEnd = subscription.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
+      const now = new Date();
+      
+      if (trialEnd && trialEnd > now) {
+        const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        console.log('⏰ Trial active with', daysLeft, 'days left');
+        return {
+          planName: 'Free Trial',
+          planType: 'trial',
+          isTrial: true,
+          daysLeft: Math.max(0, daysLeft),
+          planIcon: <Star className="h-4 w-4" />,
+          badgeColor: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
+        };
+      }
+
+      // Active but no plan type specified and trial expired = Business Plan (default paid)
+      console.log('🎯 Active subscription with expired/no trial - defaulting to Business Plan');
+      return {
+        planName: 'Business Plan',
+        planType: 'business',
+        isTrial: false,
+        daysLeft: 0,
+        planIcon: <Crown className="h-4 w-4" />,
+        badgeColor: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+      };
+    }
+
+    // PRIORITY 2: Check if status is trialing
+    if (status === 'trialing') {
+      const trialEnd = subscription.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
+      const now = new Date();
+      const daysLeft = trialEnd ? Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 8;
+
+      console.log('⏰ Status TRIALING with', daysLeft, 'days left');
       return {
         planName: 'Free Trial',
         planType: 'trial',
         isTrial: true,
         daysLeft: Math.max(0, daysLeft),
-        planIcon: <Star className="h-4 w-4" />
+        planIcon: <Star className="h-4 w-4" />,
+        badgeColor: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
       };
     }
 
-    if (planType === 'pro') {
+    // PRIORITY 3: Explicit plan_type checking (for non-active statuses)
+    if (planType === 'business' || planName.includes('business')) {
+      console.log('👑 Business plan detected from plan_type/name');
       return {
-        planName: 'Pro',
+        planName: 'Business Plan',
+        planType: 'business',
+        isTrial: false,
+        daysLeft: 0,
+        planIcon: <Crown className="h-4 w-4" />,
+        badgeColor: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+      };
+    }
+
+    if (planType === 'pro' || planName.includes('pro') || planName.includes('premium')) {
+      console.log('⚡ Pro plan detected from plan_type/name');
+      return {
+        planName: 'Pro Plan',
         planType: 'pro',
         isTrial: false,
         daysLeft: 0,
-        planIcon: <Zap className="h-4 w-4" />
+        planIcon: <Zap className="h-4 w-4" />,
+        badgeColor: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800'
       };
     }
 
+    // Default fallback
+    console.log('⚠️ No matching plan found - defaulting to Free Trial');
+    console.log('   Status was:', status, '| Plan type was:', planType, '| Plan name was:', planName);
     return {
-      planName: 'Business',
-      planType: 'business',
-      isTrial: false,
+      planName: 'Free Trial',
+      planType: 'trial',
+      isTrial: true,
       daysLeft: 0,
-      planIcon: <Crown className="h-4 w-4" />
+      planIcon: <Star className="h-4 w-4" />,
+      badgeColor: 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-800'
     };
   };
 
@@ -470,12 +599,17 @@ export default function EnhancedProfilePage() {
                   )}
                 </div>
 
-                {/* Plan Badge */}
-                <div className="flex items-center justify-center">
-                  <div className="px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-2 border-blue-200 dark:border-blue-800 rounded-full text-sm font-medium flex items-center space-x-2">
+                {/* Plan Badge - FIXED */}
+                <div className="flex flex-col items-center space-y-2">
+                  <div className={`px-4 py-2 ${planInfo.badgeColor} border-2 rounded-full text-sm font-medium flex items-center space-x-2`}>
                     {planInfo.planIcon}
                     <span>{planInfo.planName}</span>
                   </div>
+                  {planInfo.isTrial && planInfo.daysLeft > 0 && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {planInfo.daysLeft} day{planInfo.daysLeft !== 1 ? 's' : ''} remaining
+                    </p>
+                  )}
                 </div>
 
                 {/* Edit Button */}

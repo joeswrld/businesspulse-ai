@@ -563,7 +563,7 @@ const BillingPage: React.FC = () => {
               Complete Payment for {planTiers.find(p => p.name === selectedPlan)?.display_name} Plan
             </h3>
             <PaystackPayment
-              plan={selectedPlan}
+              plan={selectedPlan as 'business' | 'pro'}
               planName={planTiers.find(p => p.name === selectedPlan)?.display_name || ''}
               planPrice={formatPrice(planTiers.find(p => p.name === selectedPlan)?.price_monthly || 0)}
               onSuccess={handlePaymentSuccess}
