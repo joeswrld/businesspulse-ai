@@ -1,5 +1,5 @@
 // src/pages/ProductFeedback.tsx
-// FIXED: Proper access control checks
+// Public form - Always available (No access restrictions)
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -82,7 +82,8 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
     setIsValidating(true);
 
     try {
-      // STEP 1: Get feedback settings
+      // Only check if project exists and is enabled
+      // NO ACCESS/SUBSCRIPTION CHECK - form is always available
       const { data: settingsData, error: settingsError } = await supabase
         .from('feedback_settings')
         .select('*')
@@ -103,44 +104,7 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
         return;
       }
 
-      // STEP 2: Check widget access (trial/subscription status)
-      console.log('Checking access for project:', projectId);
-      
-      const { data: accessData, error: accessError } = await supabase
-        .rpc('check_widget_access', { project_id_param: projectId });
-
-      console.log('Access check response:', accessData, accessError);
-
-      if (accessError) {
-        console.error('Access check error:', accessError);
-        // On error, fail open - allow the form to be shown
-        // This prevents network issues from blocking legitimate users
-        setSettings(settingsData);
-        setIsValid(true);
-        setValidationError('');
-        return;
-      }
-
-      // CRITICAL FIX: Parse the response correctly
-      let hasAccess = false;
-      
-      if (typeof accessData === 'boolean') {
-        hasAccess = accessData;
-      } else if (accessData && typeof accessData === 'object') {
-        hasAccess = accessData.has_access === true;
-      } else if (Array.isArray(accessData) && accessData.length > 0) {
-        hasAccess = accessData[0] === true || (accessData[0] && accessData[0].has_access === true);
-      }
-
-      console.log('Has access:', hasAccess);
-
-      if (!hasAccess) {
-        setIsValid(false);
-        setValidationError('This feedback form is currently unavailable. The owner\'s trial or subscription has ended.');
-        return;
-      }
-
-      // Success: form is valid and accessible
+      // Success: form is valid and available
       setSettings(settingsData);
       setIsValid(true);
       setValidationError('');

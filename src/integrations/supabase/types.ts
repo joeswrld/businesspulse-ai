@@ -294,7 +294,7 @@ export type Database = {
           company_name: string | null
           created_at: string
           demo_data_seeded: boolean | null
-          email: string
+          email: string | null
           email_confirmed: boolean | null
           first_name: string | null
           full_name: string | null
@@ -320,7 +320,7 @@ export type Database = {
           company_name?: string | null
           created_at?: string
           demo_data_seeded?: boolean | null
-          email: string
+          email?: string | null
           email_confirmed?: boolean | null
           first_name?: string | null
           full_name?: string | null
@@ -346,7 +346,7 @@ export type Database = {
           company_name?: string | null
           created_at?: string
           demo_data_seeded?: boolean | null
-          email?: string
+          email?: string | null
           email_confirmed?: boolean | null
           first_name?: string | null
           full_name?: string | null
@@ -392,15 +392,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "projects_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
-          },
-        ]
+        Relationships: []
       }
       transactions: {
         Row: {
@@ -506,10 +498,8 @@ export type Database = {
       get_or_create_user_project: {
         Args: { p_user_id: string }
         Returns: {
-          created_at: string
-          id: string
-          name: string
-          user_id: string
+          project_id: string
+          project_name: string
         }[]
       }
       get_user_profile_with_access: {
