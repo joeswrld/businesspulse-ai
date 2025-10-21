@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import {
   User,
@@ -19,22 +18,16 @@ import {
   Trash2,
   Camera,
   Mail,
-  Lock,
-  AlertTriangle,
-  Crown,
-  Calendar,
   Clock,
   CheckCircle,
-  XCircle,
   RefreshCw,
   Upload,
-  Download,
-  ExternalLink,
-  Zap,
+  Crown,
+  Calendar,
+  AlertTriangle,
   Key,
-  Smartphone,
-  Building,
-  Globe
+  Star,
+  Zap
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -52,15 +45,13 @@ interface UserProfile {
   updated_at: string;
 }
 
-interface UserSubscription {
+interface BillingProfile {
   id: string;
-  user_id: string;
-  plan_name: string;
   plan_type: string;
-  status: string;
-  current_period_start: string;
-  current_period_end: string;
-  trial_end?: string;
+  subscription_status: string;
+  trial_ends_at: string | null;
+  subscription_start: string | null;
+  subscription_end: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -81,7 +72,7 @@ const Settings = () => {
   
   // State management
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
+  const [billing, setBilling] = useState<BillingProfile | null>(null);
   const [notifications, setNotifications] = useState<NotificationPreferences | null>(null);
   const [lastLogin, setLastLogin] = useState<string | null>(null);
   
@@ -144,23 +135,27 @@ const Settings = () => {
         }
       }
 
-      // Fetch subscription
-      const { data: subscriptionData, error: subscriptionError } = await supabase
+      // FIXED: Fetch from billing_profiles (not user_subscriptions)
+      console.log('🔍 Fetching billing profile for user:', user.id);
+      const { data: billingData, error: billingError } = await supabase
         .from('billing_profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .single();
 
-      if (subscriptionError && subscriptionError.code !== 'PGRST116') {
-        console.error('Error loading subscription:', subscriptionError);
+      if (billingError && billingError.code !== 'PGRST116') {
+        console.error('⚠️ Error loading billing_profiles:', billingError);
       }
 
-      if (subscriptionData) {
-        setSubscription(subscriptionData as any);
+      if (billingData) {
+        console.log('✅ Billing profile found:', billingData);
+        setBilling(billingData);
+      } else {
+        console.log('⚠️ No billing profile found');
       }
 
       // Fetch notification preferences
-      const { data: notificationsData, error: notificationsError } = await (supabase as any)
+      const { data: notificationsData, error: notificationsError } = await supabase
         .from('notification_preferences')
         .select('*')
         .eq('user_id', user.id)
@@ -171,10 +166,10 @@ const Settings = () => {
       }
 
       if (notificationsData) {
-        setNotifications(notificationsData as any);
+        setNotifications(notificationsData);
       } else {
         // Create default notification preferences
-        const { data: newNotifications } = await (supabase as any)
+        const { data: newNotifications } = await supabase
           .from('notification_preferences')
           .insert({
             user_id: user.id,
@@ -186,7 +181,7 @@ const Settings = () => {
           .single();
         
         if (newNotifications) {
-          setNotifications(newNotifications as any);
+          setNotifications(newNotifications);
         }
       }
 
@@ -222,7 +217,7 @@ const Settings = () => {
       }
 
       // Validate file size (5MB limit)
-      const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+      const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         toast.error('File size must be less than 5MB');
         event.target.value = '';
@@ -247,43 +242,12 @@ const Settings = () => {
     try {
       setUploadingAvatar(true);
       
-      // Validate file size (5MB limit)
-      const maxSize = 5 * 1024 * 1024; // 5MB in bytes
-      if (avatarFile.size > maxSize) {
-        toast.error('File size must be less than 5MB');
-        return;
-      }
-
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-      if (!allowedTypes.includes(avatarFile.type)) {
-        toast.error('Please select a valid image file (JPG, PNG, GIF, or WebP)');
-        return;
-      }
-
       const fileExt = avatarFile.name.split('.').pop()?.toLowerCase();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
 
-      console.log('Attempting to upload to path:', filePath);
-
-      // First, check if the avatars bucket exists
-      const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
-      if (bucketError) {
-        console.error('Error checking buckets:', bucketError);
-        toast.error('Storage service unavailable. Please try again later.');
-        return;
-      }
-
-      const avatarsBucket = buckets.find(bucket => bucket.name === 'avatars');
-      if (!avatarsBucket) {
-        console.error('Avatars bucket not found');
-        toast.error('Avatar storage not configured. Please contact support.');
-        return;
-      }
-
       // Upload to Supabase storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, avatarFile, {
           cacheControl: '3600',
@@ -292,28 +256,14 @@ const Settings = () => {
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
-        
-        // Provide specific error messages
-        if (uploadError.message.includes('bucket')) {
-          toast.error('Storage bucket not found. Please contact support.');
-        } else if (uploadError.message.includes('policy')) {
-          toast.error('Upload permission denied. Please contact support.');
-        } else if (uploadError.message.includes('size')) {
-          toast.error('File size too large. Please select a smaller image.');
-        } else {
-          toast.error(`Upload failed: ${uploadError.message}`);
-        }
+        toast.error(`Upload failed: ${uploadError.message}`);
         return;
       }
-
-      console.log('Upload successful:', uploadData);
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
-
-      console.log('Public URL:', publicUrl);
 
       // Update profile with new avatar URL
       const { error: updateError } = await supabase
@@ -336,25 +286,11 @@ const Settings = () => {
       setAvatarPreview(null);
 
       toast.success('Profile picture updated successfully!');
-      
-      // Refresh the page data
       await loadUserData();
       
     } catch (error) {
       console.error('Error uploading avatar:', error);
-      
-      // Provide more specific error messages
-      if (error instanceof Error) {
-        if (error.message.includes('network')) {
-          toast.error('Network error. Please check your connection and try again.');
-        } else if (error.message.includes('timeout')) {
-          toast.error('Upload timeout. Please try again with a smaller image.');
-        } else {
-          toast.error(`Upload failed: ${error.message}`);
-        }
-      } else {
-        toast.error('An unexpected error occurred. Please try again.');
-      }
+      toast.error('Failed to upload avatar. Please try again.');
     } finally {
       setUploadingAvatar(false);
     }
@@ -434,7 +370,7 @@ const Settings = () => {
 
     setSaving(true);
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('notification_preferences')
         .update({
           feedback_alerts: notifications.feedback_alerts,
@@ -455,87 +391,123 @@ const Settings = () => {
     }
   };
 
-  // Delete account - Safe implementation
+  // Delete account
   const handleDeleteAccount = async () => {
     if (!user) return;
 
     setDeletingAccount(true);
     try {
       console.log('🗑️ Starting account deletion process for:', user.email);
-      
-      // Call the unified auth flow delete function
       await deleteAccount();
-      
       console.log('✅ Account deletion completed successfully');
-      // User will be redirected to auth page by the unified auth flow
     } catch (error) {
       console.error('❌ Error deleting account:', error);
       toast.error('Failed to delete account. Please contact support if this issue persists.');
-      // Error handling is done in the unified auth flow
     } finally {
       setDeletingAccount(false);
       setShowDeleteModal(false);
     }
   };
 
-  // Get plan info for display
+  // FIXED: Get plan info from billing_profiles
   const getPlanInfo = () => {
-    // No subscription: treat as Free Trial based on account creation date
-    if (!subscription) {
-      const createdAt = user?.created_at ? new Date(user.created_at) : null;
-      let daysLeft = 0;
-      if (createdAt) {
-        const trialEnd = new Date(createdAt);
-        trialEnd.setDate(trialEnd.getDate() + 8);
-        const now = new Date();
-        daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-      }
+    console.log('🎯 Getting plan info from billing:', billing);
+
+    // No billing profile = Free Trial
+    if (!billing) {
+      const createdAt = user?.created_at ? new Date(user.created_at) : new Date();
+      const trialEnd = new Date(createdAt);
+      trialEnd.setDate(trialEnd.getDate() + 8);
+      const now = new Date();
+      const daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+      
       return {
         planName: 'Free Trial',
         planType: 'trial',
         isTrial: true,
         daysLeft,
-        upgradeText: 'Upgrade to Pro',
-        upgradeLink: '/billing?plan=pro'
+        upgradeText: 'Upgrade Now',
+        upgradeLink: '/billing',
+        icon: <Star className="h-5 w-5 text-yellow-500" />,
+        badgeColor: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
       };
     }
 
-    // With subscription: show trial badge if status is trialing, else show paid plan
-    const isTrialing = subscription.status === 'trialing';
-    if (isTrialing) {
-      const trialEnd = subscription.trial_end ? new Date(subscription.trial_end) : null;
+    const status = (billing.subscription_status || '').toLowerCase().trim();
+    const planType = (billing.plan_type || '').toLowerCase().trim();
+
+    console.log('📋 Plan details:', { status, planType });
+
+    // Check if on trial
+    if (status === 'trialing' || status === 'trial') {
+      const trialEnd = billing.trial_ends_at ? new Date(billing.trial_ends_at) : null;
       const now = new Date();
       const daysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) : 0;
+      
       return {
         planName: 'Free Trial',
         planType: 'trial',
         isTrial: true,
         daysLeft,
-        upgradeText: 'Upgrade to Pro',
-        upgradeLink: '/billing?plan=pro'
+        upgradeText: 'Upgrade Now',
+        upgradeLink: '/billing',
+        icon: <Star className="h-5 w-5 text-yellow-500" />,
+        badgeColor: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
       };
     }
 
-    // Determine paid plan label
-    const planType = (subscription.plan_type || '').toLowerCase();
-    if (planType === 'pro') {
+    // Business Plan
+    if (planType === 'business' || status === 'active' && planType === 'business') {
       return {
-        planName: 'Pro',
+        planName: 'Business Plan',
+        planType: 'business',
+        isTrial: false,
+        daysLeft: 0,
+        upgradeText: 'Manage Subscription',
+        upgradeLink: '/billing',
+        icon: <Crown className="h-5 w-5 text-purple-500" />,
+        badgeColor: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+      };
+    }
+
+    // Pro Plan
+    if (planType === 'pro' || status === 'active' && planType === 'pro') {
+      return {
+        planName: 'Pro Plan',
         planType: 'pro',
         isTrial: false,
         daysLeft: 0,
         upgradeText: 'Upgrade to Business',
-        upgradeLink: '/billing?plan=business'
+        upgradeLink: '/billing?plan=business',
+        icon: <Zap className="h-5 w-5 text-blue-500" />,
+        badgeColor: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800'
       };
     }
 
+    // Default: Active subscription with no specific type = Business
+    if (status === 'active') {
+      return {
+        planName: 'Business Plan',
+        planType: 'business',
+        isTrial: false,
+        daysLeft: 0,
+        upgradeText: 'Manage Subscription',
+        upgradeLink: '/billing',
+        icon: <Crown className="h-5 w-5 text-purple-500" />,
+        badgeColor: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+      };
+    }
+
+    // Fallback
     return {
-      planName: 'Business',
-      planType: 'business',
-      isTrial: false,
+      planName: 'Free Trial',
+      planType: 'trial',
+      isTrial: true,
       daysLeft: 0,
-      upgradeText: 'Manage Subscription',
-      upgradeLink: '/billing'
+      upgradeText: 'Upgrade Now',
+      upgradeLink: '/billing',
+      icon: <Star className="h-5 w-5 text-gray-500" />,
+      badgeColor: 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-800'
     };
   };
 
@@ -835,12 +807,14 @@ const Settings = () => {
               {/* 2FA Toggle (Placeholder) */}
               <Separator />
               <div className="flex items-center justify-between">
-                <div className="space-y-1">
+                <div className="space-y-1 flex-1">
                   <Label className="text-sm font-medium">Two-Factor Authentication</Label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Add an extra layer of security to your account</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Add an extra layer of security</p>
                 </div>
-                <Switch disabled />
-                <Badge variant="outline" className="text-xs">Coming Soon</Badge>
+                <div className="flex items-center gap-2">
+                  <Switch disabled />
+                  <Badge variant="outline" className="text-xs">Coming Soon</Badge>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -911,26 +885,26 @@ const Settings = () => {
         {/* Right Column */}
         <div className="space-y-6">
           {/* Subscription & Billing */}
-          <Card className="rounded-xl shadow-lg border-2 ">
-            <CardHeader className=" rounded-t-xl">
-              <CardTitle className="flex items-center space-x-2 text-blue-900">
+          <Card className="rounded-xl shadow-lg border-2 border-blue-100 dark:border-blue-900/50 bg-white dark:bg-slate-900">
+            <CardHeader className="bg-blue-50 dark:bg-slate-900/60 rounded-t-xl">
+              <CardTitle className="flex items-center space-x-2 text-blue-900 dark:text-blue-200">
                 <CreditCard className="h-5 w-5" />
                 <span>Subscription & Billing</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               {/* Current Plan */}
-              <div className="text-center p-4  rounded-lg border">
+              <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-indigo-950 rounded-lg border-2 border-blue-200 dark:border-blue-800">
                 <div className="flex items-center justify-center space-x-2 mb-2">
-                  {planInfo.planType === 'business' && <Crown className="h-5 w-5 text-yellow-500" />}
-                  <h3 className="text-lg font-semibold ">{planInfo.planName}</h3>
+                  {planInfo.icon}
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{planInfo.planName}</h3>
                 </div>
                 
                 {planInfo.isTrial && planInfo.daysLeft > 0 && (
                   <div className="mb-3">
-                    <Badge variant="outline" className="text-orange-600 border-orange-200">
+                    <Badge className={planInfo.badgeColor}>
                       <Calendar className="h-3 w-3 mr-1" />
-                      {planInfo.daysLeft} days left in trial
+                      {planInfo.daysLeft} day{planInfo.daysLeft !== 1 ? 's' : ''} left in trial
                     </Badge>
                   </div>
                 )}
@@ -944,8 +918,8 @@ const Settings = () => {
 
               {/* Plan Features */}
               <div className="space-y-2">
-                <h4 className="font-medium text-gray-900">Current Plan Features:</h4>
-                <ul className="space-y-1 text-sm text-gray-600">
+                <h4 className="font-medium text-gray-900 dark:text-gray-100">Current Plan Features:</h4>
+                <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                   {planInfo.planType === 'trial' && (
                     <>
                       <li className="flex items-center space-x-2">
@@ -976,21 +950,29 @@ const Settings = () => {
                         <CheckCircle className="h-4 w-4 text-green-500" />
                         <span>Custom branding</span>
                       </li>
+                      <li className="flex items-center space-x-2">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span>Email support</span>
+                      </li>
                     </>
                   )}
                   {planInfo.planType === 'business' && (
                     <>
                       <li className="flex items-center space-x-2">
                         <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span>Unlimited feedback collection</span>
+                        <span>Everything in Pro</span>
                       </li>
                       <li className="flex items-center space-x-2">
                         <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span>Advanced analytics & insights</span>
+                        <span>Unlimited team members</span>
                       </li>
                       <li className="flex items-center space-x-2">
                         <CheckCircle className="h-4 w-4 text-green-500" />
                         <span>Priority support</span>
+                      </li>
+                      <li className="flex items-center space-x-2">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span>Advanced integrations</span>
                       </li>
                     </>
                   )}
@@ -1055,6 +1037,7 @@ const Settings = () => {
                   variant="outline"
                   onClick={() => setShowDeleteModal(false)}
                   className="flex-1"
+                  disabled={deletingAccount}
                 >
                   Cancel
                 </Button>
