@@ -110,48 +110,6 @@ export type Database = {
         }
         Relationships: []
       }
-      feature_requests_backup: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          feedback_ids: string[] | null
-          id: string | null
-          is_public: boolean | null
-          milestone_date: string | null
-          released_at: string | null
-          status: string | null
-          title: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          feedback_ids?: string[] | null
-          id?: string | null
-          is_public?: boolean | null
-          milestone_date?: string | null
-          released_at?: string | null
-          status?: string | null
-          title?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          feedback_ids?: string[] | null
-          id?: string | null
-          is_public?: boolean | null
-          milestone_date?: string | null
-          released_at?: string | null
-          status?: string | null
-          title?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       feedback: {
         Row: {
           ai_summary: string | null
@@ -288,7 +246,6 @@ export type Database = {
       }
       profiles: {
         Row: {
-          authorization_code: string | null
           avatar_url: string | null
           company: string | null
           company_name: string | null
@@ -314,7 +271,6 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          authorization_code?: string | null
           avatar_url?: string | null
           company?: string | null
           company_name?: string | null
@@ -340,7 +296,6 @@ export type Database = {
           user_id: string
         }
         Update: {
-          authorization_code?: string | null
           avatar_url?: string | null
           company?: string | null
           company_name?: string | null
@@ -501,6 +456,10 @@ export type Database = {
           project_id: string
           project_name: string
         }[]
+      }
+      get_public_widget_settings: {
+        Args: { project_uuid: string }
+        Returns: Json
       }
       get_user_profile_with_access: {
         Args: { user_uuid: string }
