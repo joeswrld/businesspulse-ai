@@ -768,7 +768,7 @@ NoteX Team
               <CardHeader>
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-gradient-to-br from-primary to-primary/80 rounded-xl">
-                    <Crown className="h-6 w-6 text-white" />
+                    <Crown className="h-6 w-6 text-white dark:text-primary-foreground" />
                   </div>
                   <div>
                     <CardTitle className="text-2xl">

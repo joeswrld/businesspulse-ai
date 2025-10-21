@@ -245,7 +245,7 @@ const Header = () => {
                           className="w-12 h-12 rounded-full object-cover"
                         />
                       ) : (
-                        <User className="h-6 w-6 text-white" />
+                        <User className="h-6 w-6 text-white dark:text-primary-foreground" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">

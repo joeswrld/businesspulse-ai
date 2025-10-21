@@ -57,7 +57,7 @@ if (typeof window !== 'undefined' && !window.ethereum) {
     var buttonStyles = {
       position: 'fixed',
       bottom: '20px',
-      right: '20px',
+      left: '20px',  // Changed from right: '20px'
       padding: '12px 20px',
       borderRadius: '25px',
       backgroundColor: config.brandColor,

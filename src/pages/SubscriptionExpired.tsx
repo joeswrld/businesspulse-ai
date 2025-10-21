@@ -55,7 +55,7 @@ const SubscriptionExpiredPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <img src="/favicon.ico" alt="NoteX" className="h-8 w-8" />
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">NoteX</h1>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white"></h1>
             </div>
             <Button
               variant="ghost"
@@ -167,7 +167,7 @@ const SubscriptionExpiredPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-3 bg-gradient-to-br from-primary to-primary/80 rounded-xl shadow-lg">
-                      <Crown className="h-8 w-8 text-white" />
+                      <Crown className="h-8 w-8 text-white dark:text-primary-foreground" />
                     </div>
                     <div>
                       <CardTitle className="text-3xl font-bold text-foreground">
