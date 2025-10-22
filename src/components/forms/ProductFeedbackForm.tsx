@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ProductFeedbackFormProps {
   projectId: string;
@@ -155,17 +156,13 @@ export default function ProductFeedbackForm({
         }
       };
 
-      // Submit to API
-      const response = await fetch('/api/widget/feedback', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(feedbackData),
+      // Submit to Edge Function via Supabase SDK
+      const { data, error } = await supabase.functions.invoke('widget-feedback', {
+        body: feedbackData,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to submit feedback');
+      if (error) {
+        throw new Error(error.message || 'Failed to submit feedback');
       }
 
       setSubmitted(true);
