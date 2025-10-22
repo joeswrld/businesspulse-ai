@@ -443,69 +443,71 @@ export default function Reports() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold">AI Insights History</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold">AI Insights History</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
             View and export your AI-generated insights from uploaded files
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={loadInsights}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={loadInsights} size="sm" className="sm:size-default">
+            <RefreshCw className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
         </div>
       </div>
 
       {/* Filters Bar */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
-            <div className="flex-1 min-w-0">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col gap-3 sm:gap-4">
+            <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search insights by file name or summary..."
+                  placeholder="Search insights..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 text-sm"
                 />
               </div>
             </div>
 
-            <Select value={dateRange} onValueChange={(value: "all" | "7d" | "30d") => setDateRange(value)}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Date Range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="7d">Last 7 Days</SelectItem>
-                <SelectItem value="30d">Last 30 Days</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <Select value={dateRange} onValueChange={(value: "all" | "7d" | "30d") => setDateRange(value)}>
+                <SelectTrigger className="w-full text-sm">
+                  <SelectValue placeholder="Date Range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="7d">Last 7 Days</SelectItem>
+                  <SelectItem value="30d">Last 30 Days</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={sortOrder} onValueChange={(value: "newest" | "oldest") => setSortOrder(value)}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Sort Order" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">
-                  <div className="flex items-center space-x-2">
-                    <SortDesc className="h-4 w-4" />
-                    <span>Newest First</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="oldest">
-                  <div className="flex items-center space-x-2">
-                    <SortAsc className="h-4 w-4" />
-                    <span>Oldest First</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={sortOrder} onValueChange={(value: "newest" | "oldest") => setSortOrder(value)}>
+                <SelectTrigger className="w-full text-sm">
+                  <SelectValue placeholder="Sort Order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">
+                    <div className="flex items-center gap-2">
+                      <SortDesc className="h-4 w-4" />
+                      <span>Newest First</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="oldest">
+                    <div className="flex items-center gap-2">
+                      <SortAsc className="h-4 w-4" />
+                      <span>Oldest First</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
