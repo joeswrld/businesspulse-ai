@@ -24,7 +24,7 @@ const HeroSection = () => {
             {/* Main Headline */}
             <div className="space-y-3 sm:space-y-4">
               <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-[1.2] sm:leading-tight">
-                Your Clients Are <span className="gradient-text">Talking</span> </br> Hear Them
+                Your Clients Are <span className="gradient-text">Talking</span> <br /> Hear Them
               </h1>
               <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-full sm:max-w-xl">
                 Every message, complaint, and idea your customers share is a signal — but most businesses miss it. NoteX helps you capture and analyze client feedback in real time using AI, so you can fix issues faster, double satisfaction, and grow without guesswork.
