@@ -34,7 +34,7 @@ const HeroSection = () => {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <Button variant="hero" size="lg" className="w-full sm:w-auto" asChild>
-                <Link to="/signup">Start Free — Hear Your Clients Clearly ✨ <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 ml-2" /></Link>
+                <Link to="/signup">Start Free ✨ <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 ml-2" /></Link>
               </Button>
             </div>
 
