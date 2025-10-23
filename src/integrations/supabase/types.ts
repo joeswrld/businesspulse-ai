@@ -475,14 +475,8 @@ export type Database = {
           trial_ends_at: string
         }[]
       }
-      initialize_user_data: {
-        Args: { p_user_id: string }
-        Returns: Json
-      }
-      initialize_user_trial: {
-        Args: { user_uuid: string }
-        Returns: undefined
-      }
+      initialize_user_data: { Args: { p_user_id: string }; Returns: Json }
+      initialize_user_trial: { Args: { user_uuid: string }; Returns: undefined }
       upgrade_user_to_business: {
         Args: { user_uuid: string }
         Returns: undefined
