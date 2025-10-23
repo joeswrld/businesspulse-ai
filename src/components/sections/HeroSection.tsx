@@ -24,19 +24,19 @@ const HeroSection = () => {
             {/* Main Headline */}
             <div className="space-y-3 sm:space-y-4">
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
-                Turn Customer{" "}
-                <span className="gradient-text">Feedback</span> Into
-                Business Growth
+                Your Clients Are{" "}
+                <span className="gradient-text">Talking</span> . Let’s Make Sure You Hear Them.
               </h1>
               <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-xl">
-                NoteX helps businesses collect, analyze, and act on customer feedback with AI-powered insights. Get real-time sentiment analysis, trend detection, and actionable recommendations to boost customer satisfaction and drive growth.
+                Every message, complaint, and idea your customers share is a signal — but most businesses miss it. NoteX helps you capture and analyze client feedback in real time using AI, so you can fix issues faster, double satisfaction, and grow without guesswork.
+
               </p>
             </div>
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <Button variant="hero" size="lg" className="w-full sm:w-auto" asChild>
-                <Link to="/signup">Start Collecting Feedback ✨ <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 ml-2" /></Link>
+                <Link to="/signup">Start Free — See What Your Clients Really Think ✨ <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 ml-2" /></Link>
               </Button>
             </div>
 
@@ -49,7 +49,7 @@ const HeroSection = () => {
                 <span className="text-xs sm:text-sm text-muted-foreground ml-2">4.9/5 rating</span>
               </div>
               <div className="text-xs sm:text-sm text-muted-foreground">
-                Trusted by 500+ businesses to boost customer satisfaction 🚀
+                No credit card needed. Trusted by 500+ businesses to boost customer satisfaction 🚀
               </div>
             </div>
           </div>
