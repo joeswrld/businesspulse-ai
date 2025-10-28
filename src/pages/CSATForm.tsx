@@ -11,6 +11,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle, AlertCircle, Star } from 'lucide-react';
+import { z } from 'zod';
+
+// Input validation schema
+const feedbackSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  email: z.string().email().max(255).optional().or(z.literal('')),
+  comments: z.string().trim().max(2000, 'Comments must be less than 2000 characters').optional(),
+  projectId: z.string().uuid()
+});
 
 interface CustomerSatisfactionFormProps {
   projectId?: string;
@@ -47,6 +56,7 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
+  const [lastSubmit, setLastSubmit] = useState<number>(0);
 
   const [rating, setRating] = useState<number | null>(null);
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
@@ -83,8 +93,6 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
     setIsValidating(true);
 
     try {
-      // Only check if project exists and is enabled
-      // NO ACCESS/SUBSCRIPTION CHECK - form is always available
       const { data: settingsData, error: settingsError } = await supabase
         .from('feedback_settings')
         .select('*')
@@ -105,7 +113,6 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
         return;
       }
 
-      // Success: form is valid and available
       setSettings(settingsData);
       setIsValid(true);
       setValidationError('');
@@ -126,6 +133,16 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
   
+    // Rate limiting check
+    if (Date.now() - lastSubmit < 5000) {
+      toast({
+        title: 'Too Fast',
+        description: 'Please wait before submitting again',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (previewMode) {
       toast({
         title: 'Preview Mode',
@@ -156,13 +173,21 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
     setIsSubmitting(true);
   
     try {
+      // Validate input with zod
+      const validated = feedbackSchema.parse({
+        rating,
+        email: email.trim(),
+        comments: comments.trim(),
+        projectId: settings.project_id
+      });
+
       const feedbackData = {
-        project_id: settings.project_id,
+        project_id: validated.projectId,
         form_type: 'customer_satisfaction',
-        message: comments.trim() || `Customer satisfaction rating: ${rating}/5`,
-        rating: rating,
+        message: validated.comments || `Customer satisfaction rating: ${validated.rating}/5`,
+        rating: validated.rating,
         metadata: {
-          email: email.trim() || null,
+          email: validated.email || null,
           page_url: window.location.href,
           user_agent: navigator.userAgent,
           timestamp: new Date().toISOString()
@@ -188,6 +213,7 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
       }
   
       setIsSubmitted(true);
+      setLastSubmit(Date.now());
   
       if (onSubmitted) {
         onSubmitted(feedbackData);
@@ -197,13 +223,21 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
         title: 'Thank you!',
         description: 'Your feedback has been submitted successfully.'
       });
-    } catch (err) {
-      console.error('❌ Submit failed:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to submit feedback. Please try again.',
-        variant: 'destructive'
-      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast({
+          title: 'Invalid Input',
+          description: error.errors[0].message,
+          variant: 'destructive',
+        });
+      } else {
+        console.error('❌ Submit failed:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to submit feedback. Please try again.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -373,6 +407,7 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-12 text-base"
+                maxLength={255}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 We'll only use this to follow up if needed
@@ -390,7 +425,11 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
                 onChange={(e) => setComments(e.target.value)}
                 rows={4}
                 className="resize-none text-base"
+                maxLength={2000}
               />
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {comments.length}/2000 characters
+              </p>
             </div>
 
             <Button 

@@ -11,6 +11,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle, AlertCircle, Star } from 'lucide-react';
+import { z } from 'zod';
+
+// Input validation schema
+const feedbackSchema = z.object({
+  email: z.string().email().max(255).optional().or(z.literal('')),
+  message: z.string().trim().min(1, 'Message is required').max(2000, 'Message must be less than 2000 characters'),
+  rating: z.number().int().min(1).max(5).optional().nullable(),
+  projectId: z.string().uuid()
+});
 
 interface ProductFeedbackFormProps {
   projectId?: string;
@@ -47,6 +56,7 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
+  const [lastSubmit, setLastSubmit] = useState<number>(0);
 
   const [rating, setRating] = useState<number | null>(null);
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
@@ -82,8 +92,6 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
     setIsValidating(true);
 
     try {
-      // Only check if project exists and is enabled
-      // NO ACCESS/SUBSCRIPTION CHECK - form is always available
       const { data: settingsData, error: settingsError } = await supabase
         .from('feedback_settings')
         .select('*')
@@ -104,7 +112,6 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
         return;
       }
 
-      // Success: form is valid and available
       setSettings(settingsData);
       setIsValid(true);
       setValidationError('');
@@ -124,6 +131,16 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Rate limiting check
+    if (Date.now() - lastSubmit < 5000) {
+      toast({
+        title: 'Too Fast',
+        description: 'Please wait before submitting again',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     if (previewMode) {
       toast({
@@ -155,16 +172,21 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
     setIsSubmitting(true);
 
     try {
-      // REMOVED: Redundant access check before submission
-      // The form wouldn't load if access was denied, so no need to check again
-      
-      const feedbackData = {
-        project_id: settings.project_id,
-        form_type: 'product_feedback',
+      // Validate input with zod
+      const validated = feedbackSchema.parse({
+        email: email.trim(),
         message: message.trim(),
         rating: rating,
+        projectId: settings.project_id
+      });
+      
+      const feedbackData = {
+        project_id: validated.projectId,
+        form_type: 'product_feedback',
+        message: validated.message,
+        rating: validated.rating,
         metadata: {
-          email: email.trim() || null,
+          email: validated.email || null,
           page_url: window.location.href,
           user_agent: navigator.userAgent,
           timestamp: new Date().toISOString()
@@ -190,6 +212,7 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
       }
 
       setIsSubmitted(true);
+      setLastSubmit(Date.now());
 
       if (onSubmitted) {
         onSubmitted(feedbackData);
@@ -199,13 +222,21 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
         title: 'Thank you!',
         description: 'Your feedback has been submitted successfully.'
       });
-    } catch (err) {
-      console.error('❌ Submit failed:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to submit feedback. Please try again.',
-        variant: 'destructive'
-      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast({
+          title: 'Invalid Input',
+          description: error.errors[0].message,
+          variant: 'destructive',
+        });
+      } else {
+        console.error('❌ Submit failed:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to submit feedback. Please try again.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -327,9 +358,10 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
                 rows={5}
                 className="resize-none text-base"
                 required
+                maxLength={2000}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Please be as detailed as possible
+                {message.length}/2000 characters
               </p>
             </div>
 
@@ -396,6 +428,7 @@ const ProductFeedbackForm: React.FC<ProductFeedbackFormProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-12 text-base"
+                maxLength={255}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 We'll only use this to follow up if needed

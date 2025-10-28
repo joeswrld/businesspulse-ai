@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Star, CheckCircle, AlertCircle, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CustomerSatisfactionFormProps {
   projectId: string;
@@ -83,17 +84,13 @@ export default function CustomerSatisfactionForm({
         }
       };
 
-      // Submit to API
-      const response = await fetch('/api/widget/feedback', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(feedbackData),
+      // Submit to Edge Function via Supabase SDK
+      const { data, error } = await supabase.functions.invoke('widget-feedback', {
+        body: feedbackData,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to submit feedback');
+      if (error) {
+        throw new Error(error.message || 'Failed to submit feedback');
       }
 
       setSubmitted(true);

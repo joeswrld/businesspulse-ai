@@ -1,5 +1,6 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { Resend } from "npm:resend@6.1.2"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,15 +24,20 @@ serve(async (req) => {
   }
 
   try {
-    // Create Supabase client
+    // Create Supabase clients
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: req.headers.get('Authorization') || '' },
         },
       }
+    )
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
     // Parse request body
@@ -122,6 +128,66 @@ serve(async (req) => {
 
     // Log the submission for analytics
     console.log(`Feedback submitted: ${form_type} for project ${project_id}`)
+
+    // Attempt to send email notification to project owner (non-blocking)
+    try {
+      const resend = new Resend(Deno.env.get('RESEND_API_KEY') || '')
+
+      // Fetch recipient email and brand info
+      const [{ data: profile }, { data: settings }] = await Promise.all([
+        supabaseClient
+          .from('profiles')
+          .select('email, full_name, company_name')
+          .eq('user_id', project.user_id)
+          .single(),
+        supabaseClient
+          .from('feedback_settings')
+          .select('business_name')
+          .eq('project_id', project_id)
+          .single(),
+      ])
+
+      const recipientEmail = profile?.email
+      if (recipientEmail) {
+        const businessName = settings?.business_name || profile?.company_name || 'NoteX'
+        const feedbackUrl = `${Deno.env.get('NEXT_PUBLIC_APP_URL') || 'https://notex.com.ng'}/feedback`
+        const subject = `New ${form_type === 'customer_satisfaction' ? 'CSAT' : 'Product'} feedback received`
+
+        const ratingText = form_type === 'customer_satisfaction' && rating ? `\nRating: ${'★'.repeat(rating)} (${rating}/5)` : ''
+        const text = `Hello,\n\nYou just received new ${form_type.replace('_', ' ')} on ${businessName}.\n${ratingText}\nMessage: ${message}\n\nView in dashboard: ${feedbackUrl}\n\nFeedback ID: ${feedback.id}\nReceived: ${new Date().toISOString()}`
+
+        const html = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;">
+            <h2 style="margin:0 0 8px 0;">New ${form_type === 'customer_satisfaction' ? 'Customer Satisfaction' : 'Product'} Feedback</h2>
+            <p style="margin:0 0 12px 0;color:#555">${businessName}</p>
+            ${form_type === 'customer_satisfaction' && rating ? `<p style="margin:0 0 12px 0;font-size:16px;">Rating: ${'⭐'.repeat(rating)}</p>` : ''}
+            <div style="background:#f8f9fa;border-left:4px solid #6366f1;padding:12px;border-radius:6px;margin-bottom:12px;">
+              <div style="color:#111;white-space:pre-wrap;">${message.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+            </div>
+            <p style="margin:0 0 16px 0;color:#666;font-size:12px;">Feedback ID: ${feedback.id}</p>
+            <a href="${feedbackUrl}" style="display:inline-block;background:#6366f1;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;">View in Dashboard →</a>
+          </div>
+        `
+
+        const { error: emailError } = await resend.emails.send({
+          from: 'NoteX <noreply@notex.com.ng>',
+          to: [recipientEmail],
+          subject,
+          text,
+          html,
+        })
+
+        if (emailError) {
+          console.error('Failed to send feedback email:', emailError)
+        } else {
+          console.log(`Email notification sent to ${recipientEmail} for feedback ${feedback.id}`)
+        }
+      } else {
+        console.warn('No recipient email found for project owner; skipping email notification')
+      }
+    } catch (emailErr) {
+      console.error('Email notification error:', emailErr)
+    }
 
     // Return success response
     return new Response(

@@ -23,20 +23,18 @@ const HeroSection = () => {
 
             {/* Main Headline */}
             <div className="space-y-3 sm:space-y-4">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
-                Turn Customer{" "}
-                <span className="gradient-text">Feedback</span> Into
-                Business Growth
+              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-[1.2] sm:leading-tight">
+               Turn Every <span className="gradient-text"> Customer Message</span> <br /> Into Actionable Insights — Instantly.
               </h1>
-              <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-xl">
-                NoteX helps businesses collect, analyze, and act on customer feedback with AI-powered insights. Get real-time sentiment analysis, trend detection, and actionable recommendations to boost customer satisfaction and drive growth.
+              <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-full sm:max-w-xl">
+                NoteX uses AI to summarize customer feedback, detect emotion, and uncover trends so you can make smarter business decisions without reading a thousand comments.
               </p>
             </div>
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <Button variant="hero" size="lg" className="w-full sm:w-auto" asChild>
-                <Link to="/signup">Start Collecting Feedback ✨ <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 ml-2" /></Link>
+                <Link to="/signup">Start Free ✨ <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 ml-2" /></Link>
               </Button>
             </div>
 
@@ -49,7 +47,7 @@ const HeroSection = () => {
                 <span className="text-xs sm:text-sm text-muted-foreground ml-2">4.9/5 rating</span>
               </div>
               <div className="text-xs sm:text-sm text-muted-foreground">
-                Trusted by 500+ businesses to boost customer satisfaction 🚀
+                No credit card needed. Trusted by 500+ businesses to boost customer satisfaction 🚀
               </div>
             </div>
           </div>
