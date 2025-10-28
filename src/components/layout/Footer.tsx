@@ -102,7 +102,7 @@ const Footer = () => {
         <div className="py-6 border-t border-secondary-foreground/20">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-secondary-foreground/80">
-              © 2025 NoteX. All rights reserved.
+              © ${new Date().getFullYear()} NoteX. All rights reserved.
             </div>
           </div>
         </div>
