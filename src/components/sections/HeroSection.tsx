@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Play, Star, TrendingUp, Zap, Brain } from "lucide-react";
+import { ArrowRight, TrendingUp, Zap, Brain } from "lucide-react";
 import heroImage from "@/assets/dashboard.png";
 
 const HeroSection = () => {
@@ -23,17 +23,17 @@ const HeroSection = () => {
             {/* Main Headline */}
             <div className="space-y-3 sm:space-y-4">
               <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-[1.2] sm:leading-tight">
-               Ready To <span className="gradient-text"> Hear What Your</span> <br /> Clients Really Think?
+                Stop Guessing. <span className="gradient-text">Start Knowing</span><br />What Your Clients Really Want.
               </h1>
               <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-full sm:max-w-xl">
-                NoteX uses AI to summarize customer feedback, detect emotion, and uncover trends so you can make smarter business decisions without reading a thousand comments.
+                NoteX turns messy feedback into crystal-clear insights. AI-powered summaries, emotion detection, and actionable trends—so you can fix what matters and grow faster.
               </p>
             </div>
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <Button variant="hero" size="lg" className="w-full sm:w-auto" asChild>
-                <Link to="/signup">Start Free ✨ <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 ml-2" /></Link>
+                <Link to="/signup">Get Instant Insights — Free <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 ml-2" /></Link>
               </Button>
             </div>
 
