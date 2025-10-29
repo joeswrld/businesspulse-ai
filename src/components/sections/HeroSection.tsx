@@ -24,7 +24,7 @@ const HeroSection = () => {
             {/* Main Headline */}
             <div className="space-y-3 sm:space-y-4">
               <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-[1.2] sm:leading-tight">
-               Turn Every <span className="gradient-text"> Customer Message</span> <br /> Into Actionable Insights — Instantly.
+               Ready To <span className="gradient-text"> Hear What Your</span> <br /> Clients Really Think?
               </h1>
               <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-full sm:max-w-xl">
                 NoteX uses AI to summarize customer feedback, detect emotion, and uncover trends so you can make smarter business decisions without reading a thousand comments.
@@ -40,12 +40,6 @@ const HeroSection = () => {
 
             {/* Social Proof */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 pt-3 sm:pt-4">
-              <div className="flex items-center space-x-1">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="h-3 w-3 sm:h-4 sm:w-4 fill-warning text-warning" />
-                ))}
-                <span className="text-xs sm:text-sm text-muted-foreground ml-2">4.9/5 rating</span>
-              </div>
               <div className="text-xs sm:text-sm text-muted-foreground">
                 No credit card needed. Trusted by 500+ businesses to boost customer satisfaction 🚀
               </div>
