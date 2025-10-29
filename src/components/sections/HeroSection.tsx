@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,11 +37,27 @@ const HeroSection = () => {
               </Button>
             </div>
 
-            {/* Social Proof */}
+            {/* Social Proof & Product Hunt Badge */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 pt-3 sm:pt-4">
               <div className="text-xs sm:text-sm text-muted-foreground">
                 No credit card needed. Trusted by 500+ businesses to boost customer satisfaction 🚀
               </div>
+              
+              {/* Product Hunt Badge */}
+              <a 
+                href="https://www.producthunt.com/products/notex-turn-feedback-into-growth?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-notex&#0045;turn&#0045;feedback&#0045;into&#0045;growth" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-block hover:opacity-80 transition-opacity"
+              >
+                <img 
+                  src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1030180&theme=light&t=1761775600937" 
+                  alt="NoteX – Turn Feedback Into Growth - Turn customer feedback into business growth. | Product Hunt" 
+                  className="w-[200px] sm:w-[250px] h-auto"
+                  width="250" 
+                  height="54" 
+                />
+              </a>
             </div>
           </div>
 
