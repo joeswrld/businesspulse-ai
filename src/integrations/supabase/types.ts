@@ -263,7 +263,6 @@ export type Database = {
           phone: string | null
           plan: string | null
           preferences: Json | null
-          role: string | null
           trial_end: string | null
           trial_expired: boolean | null
           trial_start: string | null
@@ -288,7 +287,6 @@ export type Database = {
           phone?: string | null
           plan?: string | null
           preferences?: Json | null
-          role?: string | null
           trial_end?: string | null
           trial_expired?: boolean | null
           trial_start?: string | null
@@ -313,7 +311,6 @@ export type Database = {
           phone?: string | null
           plan?: string | null
           preferences?: Json | null
-          role?: string | null
           trial_end?: string | null
           trial_expired?: boolean | null
           trial_start?: string | null
@@ -381,6 +378,30 @@ export type Database = {
           paystack_reference?: string | null
           paystack_transaction_id?: string | null
           status?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
         Relationships: []
@@ -475,6 +496,13 @@ export type Database = {
           trial_ends_at: string
         }[]
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       initialize_user_data: { Args: { p_user_id: string }; Returns: Json }
       initialize_user_trial: { Args: { user_uuid: string }; Returns: undefined }
       upgrade_user_to_business: {
@@ -483,7 +511,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "user" | "moderator" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -610,6 +638,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["user", "moderator", "admin"],
+    },
   },
 } as const
