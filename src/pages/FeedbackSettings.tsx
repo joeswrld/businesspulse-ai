@@ -617,7 +617,7 @@ const FeedbackSettings: React.FC = () => {
                       className="p-4 bg-white dark:bg-gray-900 border-2 rounded-xl shadow-sm"
                     >
                       <QRCodeSVG 
-                        value={settings.customer_survey_url} 
+                        value={`${window.location.origin}/survey/${settings.project_id}`} 
                         size={120}
                         level="H"
                         includeMargin
@@ -731,7 +731,7 @@ const FeedbackSettings: React.FC = () => {
                       className="p-4 bg-white dark:bg-gray-900 border-2 rounded-xl shadow-sm"
                     >
                       <QRCodeSVG 
-                        value={settings.product_feedback_url} 
+                        value={`${window.location.origin}/feedback/${settings.project_id}`} 
                         size={120}
                         level="H"
                         includeMargin
