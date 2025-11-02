@@ -138,7 +138,7 @@ const Settings = () => {
       // FIXED: Fetch from billing_profiles (not user_subscriptions)
       console.log('🔍 Fetching billing profile for user:', user.id);
       const { data: billingData, error: billingError } = await supabase
-        .from('billing-profiles')
+        .from('billing_profiles')
         .select('*')
         .eq('id', user.id)
         .single();
