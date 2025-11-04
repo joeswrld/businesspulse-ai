@@ -12,6 +12,7 @@ export default defineConfig(({ command, mode }) => ({
     },
   },
   server: command === 'serve' ? {
+    port: 8080,
     proxy: {
       // Proxy API calls to Supabase Edge Functions (development only)
       '/api/process-upload': {

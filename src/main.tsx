@@ -1,5 +1,6 @@
 // src/main.tsx
 import { createRoot } from 'react-dom/client';
+import { HelmetProvider } from 'react-helmet-async';
 import App from './App.tsx';
 import './index.css';
 
@@ -34,5 +35,7 @@ if (typeof window !== 'undefined') {
 errorHandler.logNoteX('Application starting...');
 
 createRoot(document.getElementById('root')!).render(
-  <App />
+  <HelmetProvider>
+    <App />
+  </HelmetProvider>
 );

@@ -66,8 +66,9 @@ const HeroSection = () => {
             <div className="relative rounded-xl sm:rounded-2xl overflow-hidden shadow-large hero-glow">
               <img
                 src={heroImage}
-                alt="NoteX AI Feedback Analytics Dashboard"
+                alt="NoteX AI-powered feedback analytics dashboard showing real-time sentiment analysis, customer insights, and automated reporting interface"
                 className="w-full h-auto object-cover"
+                loading="eager"
               />
               
               {/* Floating Elements */}

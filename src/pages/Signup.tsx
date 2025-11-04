@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Eye, EyeOff, Loader2, Building2, User, Mail, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import SEO from "@/components/SEO";
 
 const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -125,7 +126,14 @@ const Signup = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-subtle flex flex-col">
+    <>
+      <SEO
+        title="Sign Up for NoteX - Start Your Free Trial Today"
+        description="Create your free NoteX account and transform customer feedback into actionable insights. Get started with AI-powered analytics in minutes. No credit card required."
+        keywords="notex signup, free trial feedback analytics, customer insights signup, ai analytics registration"
+        url="/signup"
+      />
+      <div className="min-h-screen bg-gradient-subtle flex flex-col">
       {/* Header */}
       <div className="p-4">
         <div className="flex items-center justify-between max-w-md mx-auto">
@@ -283,6 +291,7 @@ const Signup = () => {
         </Card>
       </div>
     </div>
+    </>
   );
 };
 
