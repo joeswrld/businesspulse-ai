@@ -133,6 +133,8 @@ const App = () => (
                   <Toaster />
                   <Sonner />
                   <AppRoutes />
+                  <Analytics />
+                  <SpeedInsights />
                 </SubscriptionProvider>
               </ErrorBoundary>
             </BrowserRouter>
@@ -141,6 +143,7 @@ const App = () => (
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
+  
 );
 
 export default App;
