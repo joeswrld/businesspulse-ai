@@ -8,6 +8,7 @@ import { ArrowLeft, Eye, EyeOff, Loader2, Mail, Lock, AlertCircle } from "lucide
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
+import SEO from "@/components/SEO";
 
 
 const Login = () => {
@@ -110,7 +111,14 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-subtle flex flex-col">
+    <>
+      <SEO
+        title="Login to NoteX - Access Your AI Feedback Analytics Dashboard"
+        description="Sign in to your NoteX account to access AI-powered feedback analytics, customer insights, and real-time sentiment analysis. Secure login for business intelligence."
+        keywords="notex login, feedback analytics login, ai dashboard access, customer insights platform"
+        url="/login"
+      />
+      <div className="min-h-screen bg-gradient-subtle flex flex-col">
       {/* Header */}
       <div className="p-4">
         <div className="flex items-center justify-between max-w-md mx-auto">
@@ -229,6 +237,7 @@ const Login = () => {
         </Card>
       </div>
     </div>
+    </>
   );
 };
 

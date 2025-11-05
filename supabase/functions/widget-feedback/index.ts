@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { Resend } from "npm:resend@6.1.2"
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -40,11 +41,41 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Parse request body
-    const body = await req.json()
+    // Define validation schema
+    const feedbackSchema = z.object({
+      project_id: z.string().uuid(),
+      form_type: z.enum(['customer_satisfaction', 'product_feedback']),
+      message: z.string().trim().min(1).max(5000),
+      rating: z.number().int().min(1).max(5).optional(),
+      metadata: z.object({
+        email: z.string().email().max(255).optional(),
+        name: z.string().max(100).optional()
+      }).optional()
+    })
+
+    // Parse and validate request body
+    const body = feedbackSchema.parse(await req.json())
     const { project_id, form_type, message, rating, metadata } = body
 
-    // Validate required fields
+    // Rate limiting check
+    const oneHourAgo = new Date(Date.now() - 3600000).toISOString()
+    const { count } = await supabaseAdmin
+      .from('feedback')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', project_id)
+      .gte('created_at', oneHourAgo)
+
+    if (count && count > 100) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+        { 
+          status: 429, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Validate required fields (redundant but kept for backwards compatibility)
     if (!project_id || !form_type || !message) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: project_id, form_type, message' }),
@@ -94,15 +125,18 @@ serve(async (req) => {
       )
     }
 
+    // Sanitize message
+    const sanitizedMessage = message.replace(/<[^>]*>/g, '')
+
     // Prepare feedback data
     const feedbackData = {
       project_id,
       user_id: project.user_id,
       form_type,
-      message: message.trim(),
+      message: sanitizedMessage,
       rating: form_type === 'customer_satisfaction' ? rating : null,
       metadata: {
-        ...metadata,
+        ...(metadata || {}),
         submitted_at: new Date().toISOString(),
         ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
       }
@@ -154,7 +188,7 @@ serve(async (req) => {
         const subject = `New ${form_type === 'customer_satisfaction' ? 'CSAT' : 'Product'} feedback received`
 
         const ratingText = form_type === 'customer_satisfaction' && rating ? `\nRating: ${'★'.repeat(rating)} (${rating}/5)` : ''
-        const text = `Hello,\n\nYou just received new ${form_type.replace('_', ' ')} on ${businessName}.\n${ratingText}\nMessage: ${message}\n\nView in dashboard: ${feedbackUrl}\n\nFeedback ID: ${feedback.id}\nReceived: ${new Date().toISOString()}`
+        const text = `Hello,\n\nYou just received new ${form_type.replace('_', ' ')} on ${businessName}.\n${ratingText}\nMessage: ${sanitizedMessage}\n\nView in dashboard: ${feedbackUrl}\n\nFeedback ID: ${feedback.id}\nReceived: ${new Date().toISOString()}`
 
         const html = `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;">
@@ -162,7 +196,7 @@ serve(async (req) => {
             <p style="margin:0 0 12px 0;color:#555">${businessName}</p>
             ${form_type === 'customer_satisfaction' && rating ? `<p style="margin:0 0 12px 0;font-size:16px;">Rating: ${'⭐'.repeat(rating)}</p>` : ''}
             <div style="background:#f8f9fa;border-left:4px solid #6366f1;padding:12px;border-radius:6px;margin-bottom:12px;">
-              <div style="color:#111;white-space:pre-wrap;">${message.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+              <div style="color:#111;white-space:pre-wrap;">${sanitizedMessage.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
             </div>
             <p style="margin:0 0 16px 0;color:#666;font-size:12px;">Feedback ID: ${feedback.id}</p>
             <a href="${feedbackUrl}" style="display:inline-block;background:#6366f1;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;">View in Dashboard →</a>

@@ -310,3 +310,10 @@ port = 54327
 vector_port = 54328
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"
+
+# Make public-facing feedback functions accessible without JWT (they validate inputs themselves)
+[functions.widget-settings]
+verify_jwt = false
+
+[functions.widget-feedback]
+verify_jwt = false

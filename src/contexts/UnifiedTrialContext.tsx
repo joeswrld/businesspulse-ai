@@ -50,6 +50,7 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
   });
 
   // Initialize trial for new user (8 days from signup)
+  // SECURITY: Always creates trial in database, localStorage is for display only
   const initializeTrial = async (): Promise<UnifiedTrialStatus> => {
     if (!user) {
       return {
@@ -67,32 +68,13 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
       };
     }
 
-    // Check if user already has trial data in localStorage
-    const existingTrialData = localStorage.getItem(`unified_trial_${user.id}`);
-    if (existingTrialData) {
-      try {
-        const parsed = JSON.parse(existingTrialData);
-        // If trial already exists, don't reinitialize
-        if (parsed.trialStart && parsed.plan === 'free_trial') {
-          console.log('🔄 Using existing trial data from localStorage');
-          return {
-            ...parsed,
-            loading: false,
-            error: null,
-          };
-        }
-      } catch (error) {
-        console.warn('Error parsing existing trial data:', error);
-      }
-    }
-
-    // Check if user has trial data in database
+    // Check if user has trial data in database first
     try {
       const { data: existingData, error: dbError } = await supabase
         .from('billing_profiles')
         .select('*')
-        .eq('id', user.id)
-        .single();
+        .eq('user_id', user.id)
+        .maybeSingle();
 
       if (existingData && !dbError) {
         console.log('🔄 Using existing trial data from database');
@@ -119,8 +101,8 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
             error: null,
           };
 
-          // Update localStorage
-          localStorage.setItem(`unified_trial_${user.id}`, JSON.stringify(status));
+          // Cache for display only
+          localStorage.setItem(`unified_trial_${user.id}_cache`, JSON.stringify(status));
           return status;
         }
       }
@@ -131,7 +113,7 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
     // Create new trial - 8 days from now
     const now = new Date();
     const trialStart = now.toISOString();
-    const trialEnd = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString(); // 8 days
+    const trialEnd = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString();
 
     console.log('🆕 Initializing new trial for user:', user.id, {
       trialStart,
@@ -139,7 +121,7 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
       daysLeft: 8
     });
 
-    // Try to initialize in database
+    // Create in database
     try {
       const { error } = await supabase.rpc('initialize_user_trial', {
         user_uuid: user.id,
@@ -154,23 +136,9 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
       console.error('Error initializing trial:', error);
     }
 
-    // Store in localStorage as backup
-    const trialData = {
-      plan: 'free_trial',
-      isActive: true,
-      subscriptionActive: false,
-      trialStart,
-      trialEnd,
-      trialExpired: false,
-      daysLeft: 8,
-      subscriptionExpiryDate: null,
-    };
-    
-    localStorage.setItem(`unified_trial_${user.id}`, JSON.stringify(trialData));
-
-    return {
-      hasAccess: true, // New users should have access
-      plan: 'free_trial',
+    const status = {
+      hasAccess: true,
+      plan: 'free_trial' as const,
       isActive: true,
       subscriptionActive: false,
       trialExpired: false,
@@ -181,9 +149,15 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
       loading: false,
       error: null,
     };
+
+    // Cache for display only - not used for authorization
+    localStorage.setItem(`unified_trial_${user.id}_cache`, JSON.stringify(status));
+
+    return status;
   };
 
   // Fetch trial status from database
+  // SECURITY: Always fetches from database, never trusts localStorage for authorization
   const fetchTrialStatus = async (): Promise<UnifiedTrialStatus> => {
     if (!user) {
       return {
@@ -210,18 +184,20 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
 
       if (error) {
         console.error('Database error:', error);
-        // Use localStorage fallback
-        const localData = localStorage.getItem(`unified_trial_${user.id}`);
-        if (localData) {
-          const local = JSON.parse(localData);
-          return {
-            ...local,
-            loading: false,
-            error: null,
-          };
-        }
-        // No local data, create new trial
-        return await initializeTrial();
+        // SECURITY: On error, deny access - do NOT fall back to localStorage
+        return {
+          hasAccess: false,
+          plan: 'free_trial',
+          isActive: false,
+          trialExpired: true,
+          daysLeft: 0,
+          trialStart: null,
+          trialEnd: null,
+          subscriptionActive: false,
+          subscriptionExpiryDate: null,
+          loading: false,
+          error: error.message,
+        };
       }
 
       if (!data || data.length === 0) {
@@ -236,11 +212,9 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
       // Calculate days left
       let daysLeft = 0;
       if (result.plan === 'business' && result.is_active) {
-        // Business users - show days since upgrade (countdown from when they paid)
         const upgradeDate = new Date(result.trial_end || new Date());
         daysLeft = Math.max(0, Math.floor((now.getTime() - upgradeDate.getTime()) / (1000 * 60 * 60 * 24)));
       } else if (result.plan === 'free_trial' && result.trial_end) {
-        // Trial users - show days remaining (countdown to trial end)
         const trialEndDate = new Date(result.trial_end);
         daysLeft = Math.max(0, Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
       }
@@ -267,24 +241,26 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
         daysLeft: status.daysLeft
       });
 
-      // Sync with localStorage
-      localStorage.setItem(`unified_trial_${user.id}`, JSON.stringify(status));
+      // Cache for display only - not used for authorization
+      localStorage.setItem(`unified_trial_${user.id}_cache`, JSON.stringify(status));
 
       return status;
     } catch (error) {
       console.error('Error in fetchTrialStatus:', error);
-      // Use localStorage fallback
-      const localData = localStorage.getItem(`unified_trial_${user.id}`);
-      if (localData) {
-        const local = JSON.parse(localData);
-        return {
-          ...local,
-          loading: false,
-          error: null,
-        };
-      }
-      // No local data, create new trial
-      return await initializeTrial();
+      // SECURITY: On error, deny access - do NOT fall back to localStorage
+      return {
+        hasAccess: false,
+        plan: 'free_trial',
+        isActive: false,
+        trialExpired: true,
+        daysLeft: 0,
+        trialStart: null,
+        trialEnd: null,
+        subscriptionActive: false,
+        subscriptionExpiryDate: null,
+        loading: false,
+        error: 'Failed to fetch trial status',
+      };
     }
   };
 
@@ -318,41 +294,14 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
 
       if (error) {
         console.error('Database upgrade error:', error);
-        // Continue with localStorage update
-      } else {
-        console.log('✅ Database upgrade successful');
+        toast.error('Failed to upgrade to Business plan');
+        throw error;
       }
 
-      // Update localStorage
-      const now = new Date();
-      const businessData = {
-        plan: 'business',
-        isActive: true,
-        subscriptionActive: true,
-        trialExpired: false,
-        daysLeft: 0, // Business users start countdown from 0
-        trialStart: now.toISOString(), // Business plan start date
-        trialEnd: now.toISOString(), // Business plan start date (same as trialStart for business)
-        subscriptionExpiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-      };
-      
-      localStorage.setItem(`unified_trial_${user.id}`, JSON.stringify(businessData));
+      console.log('✅ Database upgrade successful');
 
-      // Update state immediately
-      setTrialStatus(prev => ({
-        ...prev,
-        hasAccess: true,
-        plan: 'business',
-        isActive: true,
-        subscriptionActive: true,
-        trialExpired: false,
-        daysLeft: 0, // Business users start countdown from 0
-        trialStart: now.toISOString(), // Business plan start date
-        trialEnd: now.toISOString(), // Business plan start date
-        subscriptionExpiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        loading: false,
-        error: null,
-      }));
+      // Refresh from database
+      await refreshTrialStatus();
 
       console.log('🎉 Successfully upgraded to Business plan');
       toast.success('🎉 Welcome to Business! Your subscription has been activated.');
@@ -427,31 +376,25 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
   // Load trial status on mount and when user changes
   useEffect(() => {
     if (user) {
-      console.log('👤 User logged in, initializing trial system:', user.id);
+      console.log('👤 User logged in, fetching trial status from database:', user.id);
       
-      // First, check localStorage for immediate status
-      const localData = localStorage.getItem(`unified_trial_${user.id}`);
-      if (localData) {
+      // Show cached data immediately for UX, but always validate with database
+      const cachedData = localStorage.getItem(`unified_trial_${user.id}_cache`);
+      if (cachedData) {
         try {
-          const local = JSON.parse(localData);
+          const cached = JSON.parse(cachedData);
           setTrialStatus({
-            ...local,
-            loading: false,
+            ...cached,
+            loading: true, // Still loading actual status
             error: null,
           });
-          console.log('✅ Loaded trial status from localStorage:', local);
+          console.log('✅ Loaded cached status for display');
         } catch (e) {
-          console.error('Error parsing localStorage data:', e);
-          // Create new trial
-          initializeTrial().then(setTrialStatus);
+          console.error('Error parsing cached data:', e);
         }
-      } else {
-        // No local data, create new trial
-        console.log('🆕 No local trial data, creating new trial');
-        initializeTrial().then(setTrialStatus);
       }
       
-      // Then try to sync with database
+      // Always fetch from database for real authorization
       refreshTrialStatus();
     } else {
       console.log('👤 No user logged in, resetting trial status');
@@ -482,7 +425,7 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
     return () => {
       clearInterval(interval);
     };
-  }, [user, refreshTrialStatus]);
+  }, [user]);
 
   const contextValue: UnifiedTrialContextType = {
     trialStatus,
@@ -502,13 +445,11 @@ export const UnifiedTrialProvider: React.FC<{ children: ReactNode }> = ({ childr
   );
 };
 
-// Hook to use unified trial context
+// Hook to use the Unified Trial Context
 export const useUnifiedTrial = (): UnifiedTrialContextType => {
   const context = useContext(UnifiedTrialContext);
-  if (context === undefined) {
-    throw new Error('useUnifiedTrial must be used within a UnifiedTrialProvider');
+  if (!context) {
+    throw new Error('useUnifiedTrial must be used within UnifiedTrialProvider');
   }
   return context;
 };
-
-export default UnifiedTrialProvider;

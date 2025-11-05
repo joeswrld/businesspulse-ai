@@ -21,6 +21,8 @@ import {
   Zap
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import SEO from "@/components/SEO";
+import { generateFAQSchema, generateBreadcrumbSchema } from "@/utils/structuredData";
 
 const HelpCenter = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -188,8 +190,32 @@ const HelpCenter = () => {
     )
   })).filter(category => category.articles.length > 0);
 
+  const breadcrumbItems = [
+    { name: "Home", url: "/" },
+    { name: "Help Center", url: "/help-center" },
+  ];
+
+  const faqData = [
+    { question: "How do I set up my first feedback widget?", answer: "Follow our step-by-step guide to embed your first feedback widget on your website in minutes." },
+    { question: "Can I customize the feedback forms?", answer: "Yes, you can fully customize feedback forms, colors, and questions to match your brand." },
+    { question: "How does AI analysis work?", answer: "Our AI analyzes feedback sentiment, extracts key themes, and generates actionable insights automatically." },
+  ];
+
+  const structuredData = [
+    generateBreadcrumbSchema(breadcrumbItems),
+    generateFAQSchema(faqData),
+  ];
+
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      <SEO
+        title="Help Center - NoteX Support & Documentation"
+        description="Get help with NoteX AI feedback analytics platform. Browse guides, tutorials, and FAQs. Contact our support team for assistance with customer insights and analytics."
+        keywords="notex help, feedback analytics support, customer support, help documentation, tutorials"
+        url="/help-center"
+        structuredData={structuredData}
+      />
+      <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-gradient-to-r  ">
         <div className="container mx-auto px-4 py-8">
@@ -359,6 +385,7 @@ const HelpCenter = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

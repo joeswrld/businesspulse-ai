@@ -16,8 +16,19 @@ import {
   Star
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import SEO from "@/components/SEO";
+import { generateOrganizationSchema, generateBreadcrumbSchema } from "@/utils/structuredData";
 
 const About = () => {
+  const breadcrumbItems = [
+    { name: "Home", url: "/" },
+    { name: "About", url: "/about" },
+  ];
+
+  const structuredData = [
+    generateOrganizationSchema(),
+    generateBreadcrumbSchema(breadcrumbItems),
+  ];
   const stats = [
     { icon: Users, value: "500+", label: "Active Businesses" },
     { icon: MessageSquare, value: "1M+", label: "Feedback Responses" },
@@ -70,7 +81,15 @@ const About = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      <SEO
+        title="About NoteX - Transform Customer Feedback Into Business Growth"
+        description="Learn about NoteX's mission to help businesses understand their customers better through AI-powered feedback analytics. Join 500+ businesses using NoteX to turn feedback into actionable insights."
+        keywords="about notex, feedback analytics company, AI feedback platform, customer insights solution, feedback management software"
+        url="/about"
+        structuredData={structuredData}
+      />
+      <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-gradient-to-r   ">
         <div className="container mx-auto px-4 py-8">
@@ -219,6 +238,7 @@ const About = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

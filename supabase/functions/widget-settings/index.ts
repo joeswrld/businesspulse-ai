@@ -13,15 +13,10 @@ serve(async (req) => {
   }
 
   try {
-    // Create Supabase client
-    const supabaseClient = createClient(
+    // Use service role for safe, read-only access to public widget settings
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
     // Get project ID from URL path
@@ -39,49 +34,32 @@ serve(async (req) => {
       )
     }
 
-    // Fetch widget settings for the project
-    const { data: settings, error } = await supabaseClient
+    // Fetch a safe subset of widget settings for the project (public fields only)
+    const { data: settings, error } = await supabaseAdmin
       .from('feedback_settings')
-      .select('*')
+      .select('project_id, widget_title, widget_color, greeting_text, customer_satisfaction_enabled, product_feedback_enabled, business_name, logo_url')
       .eq('project_id', projectId)
       .maybeSingle()
 
     if (error) {
       console.error('Error fetching widget settings:', error)
-      
-      // If no settings found, return default settings
-      if (error.code === 'PGRST116') {
-        const defaultSettings = {
-          customer_satisfaction_enabled: true,
-          product_feedback_enabled: true,
-          widget_title: 'We love your feedback!',
-          widget_color: '#3B82F6',
-          greeting_text: 'Help us improve by sharing your thoughts',
-          widget_position: 'bottom-right',
-          show_branding: true
-        }
-        
-        return new Response(
-          JSON.stringify(defaultSettings),
-          { 
-            status: 200, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
-      }
-      
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch widget settings' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+    }
+
+    // If no settings found, return sensible defaults so public forms still render
+    const responsePayload = settings ?? {
+      project_id: projectId,
+      customer_satisfaction_enabled: true,
+      product_feedback_enabled: true,
+      widget_title: 'We love your feedback!',
+      widget_color: '#3B82F6',
+      greeting_text: 'Help us improve by sharing your thoughts',
+      business_name: null,
+      logo_url: null,
     }
 
     // Return the settings
     return new Response(
-      JSON.stringify(settings),
+      JSON.stringify(responsePayload),
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

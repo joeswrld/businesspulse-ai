@@ -93,18 +93,20 @@ const CustomerSatisfactionForm: React.FC<CustomerSatisfactionFormProps> = ({
     setIsValidating(true);
 
     try {
-      const { data: settingsData, error: settingsError } = await supabase
-        .from('feedback_settings')
-        .select('*')
-        .eq('project_id', projectId)
-        .maybeSingle();
+      const baseUrl = 'https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/widget-settings';
+      const res = await fetch(`${baseUrl}/${projectId}`);
 
-      if (settingsError) throw settingsError;
-
-      if (!settingsData) {
+      if (!res.ok) {
         setIsValid(false);
-        setValidationError('Project not found. Please check your survey link.');
+        setValidationError('Unable to load survey settings. Please try again later.');
         return;
+      }
+
+      const settingsData = await res.json();
+
+      if (!settingsData || settingsData.project_id !== projectId) {
+        // Ensure project_id consistency
+        settingsData.project_id = projectId;
       }
 
       if (!settingsData.customer_satisfaction_enabled) {

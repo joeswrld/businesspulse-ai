@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { TrialProvider } from "@/contexts/TrialContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { useGoogleAnalytics } from "@/hooks/useGoogleAnalytics";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
@@ -52,8 +53,73 @@ import ProductFeedback from "./pages/ProductFeedback";
 import CSATForm from "./pages/CSATForm";
 import ProductFeedbackForm from "./pages/ProductFeedback";
 import SubscriptionExpired from "./pages/SubscriptionExpired";
+import BlogPost from "./pages/BlogPost";
+import BlogEditor from "./pages/BlogEditor";
+import FAQ from "./pages/FAQ";
 
 const queryClient = new QueryClient();
+
+const AppRoutes = () => {
+  useGoogleAnalytics();
+  
+  return (
+    <Routes>
+      {/* 🌍 PUBLIC ROUTES */}
+      <Route path="/" element={<Index />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/trial-expired" element={<TrialExpired />} />
+      <Route path="/testimonials" element={<Testimonials />} />
+      <Route path="/about" element={<About />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+      <Route path="/terms-of-service" element={<TermsOfService />} />
+      <Route path="/help" element={<HelpCenter />} />
+      <Route path="/integrations" element={<Integrations />} />
+      <Route path="/api" element={<API />} />
+      <Route path="/blog" element={<Blog />} />
+      <Route path="/blog/:slug" element={<BlogPost />} />
+      <Route path="/blog/edit/:slug" element={<BlogEditor />} />
+      <Route path="/blog/new" element={<BlogEditor />} />
+      <Route path="/faq" element={<FAQ />} />
+      <Route path="/careers" element={<Careers />} />
+      <Route path="/press" element={<Press />} />
+      <Route path="/partners" element={<Partners />} />
+      <Route path="/documentation" element={<Documentation />} />
+      <Route path="/guides" element={<Guides />} />
+      <Route path="/community" element={<Community />} />
+      <Route path="/templates" element={<Templates />} />
+      <Route path="/cookie-policy" element={<CookiePolicy />} />
+
+      {/* 📝 PUBLIC FEEDBACK ROUTES */}
+      <Route path="/survey/:projectId" element={<CSATSurvey />} />
+      <Route path="/csat/:projectId" element={<CSATForm />} />
+      <Route path="/feedback/:projectId" element={<ProductFeedback />} />
+      <Route path="/product-feedback/:projectId" element={<ProductFeedbackForm />} />
+
+      {/* Always Accessible */}
+      <Route path="/billing" element={<Billing />} />
+      <Route path="/account" element={<Settings />} />
+      <Route path="/subscription-expired" element={<SubscriptionExpired />} />
+
+      {/* 🔒 PROTECTED ROUTES */}
+      <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
+      <Route path="/insights" element={<DashboardLayout><Insights /></DashboardLayout>} />
+      <Route path="/insights-simple" element={<DashboardLayout><InsightsSimple /></DashboardLayout>} />
+      <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
+      <Route path="/feedback" element={<DashboardLayout><Feedback /></DashboardLayout>} />
+      <Route path="/roadmap" element={<DashboardLayout><Roadmap /></DashboardLayout>} />
+      <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
+      <Route path="/teams" element={<DashboardLayout><Teams /></DashboardLayout>} />
+      <Route path="/feedback-settings" element={<DashboardLayout><FeedbackSettings /></DashboardLayout>} />
+      <Route path="/profile" element={<DashboardLayout><Profile /></DashboardLayout>} />
+
+      {/* ❌ 404 */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -66,57 +132,7 @@ const App = () => (
                 <SubscriptionProvider>
                   <Toaster />
                   <Sonner />
-                  <Routes>
-                    {/* 🌍 PUBLIC ROUTES */}
-                    <Route path="/" element={<Index />} />
-                    <Route path="/signup" element={<Signup />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/reset-password" element={<ResetPassword />} />
-                    <Route path="/verify-email" element={<VerifyEmail />} />
-                    <Route path="/trial-expired" element={<TrialExpired />} />
-                    <Route path="/testimonials" element={<Testimonials />} />
-                    <Route path="/about" element={<About />} />
-                    <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                    <Route path="/terms-of-service" element={<TermsOfService />} />
-                    <Route path="/help" element={<HelpCenter />} />
-                    <Route path="/integrations" element={<Integrations />} />
-                    <Route path="/api" element={<API />} />
-                    <Route path="/blog" element={<Blog />} />
-                    <Route path="/careers" element={<Careers />} />
-                    <Route path="/press" element={<Press />} />
-                    <Route path="/partners" element={<Partners />} />
-                    <Route path="/documentation" element={<Documentation />} />
-                    <Route path="/guides" element={<Guides />} />
-                    <Route path="/community" element={<Community />} />
-                    <Route path="/templates" element={<Templates />} />
-                    <Route path="/cookie-policy" element={<CookiePolicy />} />
-
-                    {/* 📝 PUBLIC FEEDBACK ROUTES */}
-                    <Route path="/survey/:projectId" element={<CSATSurvey />} />
-                    <Route path="/csat/:projectId" element={<CSATForm />} />
-                    <Route path="/feedback/:projectId" element={<ProductFeedback />} />
-                    <Route path="/product-feedback/:projectId" element={<ProductFeedbackForm />} />
-
-                    {/* Always Accessible */}
-                    <Route path="/billing" element={<Billing />} />
-                    <Route path="/account" element={<Settings />} />
-                    <Route path="/subscription-expired" element={<SubscriptionExpired />} />
-
-                    {/* 🔒 PROTECTED ROUTES */}
-                    <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
-                    <Route path="/insights" element={<DashboardLayout><Insights /></DashboardLayout>} />
-                    <Route path="/insights-simple" element={<DashboardLayout><InsightsSimple /></DashboardLayout>} />
-                    <Route path="/reports" element={<DashboardLayout><Reports /></DashboardLayout>} />
-                    <Route path="/feedback" element={<DashboardLayout><Feedback /></DashboardLayout>} />
-                    <Route path="/roadmap" element={<DashboardLayout><Roadmap /></DashboardLayout>} />
-                    <Route path="/settings" element={<DashboardLayout><Settings /></DashboardLayout>} />
-                    <Route path="/teams" element={<DashboardLayout><Teams /></DashboardLayout>} />
-                    <Route path="/feedback-settings" element={<DashboardLayout><FeedbackSettings /></DashboardLayout>} />
-                    <Route path="/profile" element={<DashboardLayout><Profile /></DashboardLayout>} />
-
-                    {/* ❌ 404 */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
+                  <AppRoutes />
                 </SubscriptionProvider>
               </ErrorBoundary>
             </BrowserRouter>
