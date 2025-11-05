@@ -12,6 +12,8 @@ import { ProjectManagement } from "@/components/ProjectManagement";
 import { EnhancedLockScreen } from "@/components/EnhancedLockScreen";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { lazy, Suspense } from "react";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 // Loading component
 const LoadingSpinner = () => (
