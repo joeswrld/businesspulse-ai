@@ -11,8 +11,8 @@ import { useGoogleAnalytics } from "@/hooks/useGoogleAnalytics";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
-import { Analytics } from "@vercel/analytics/next"
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 // Pages
 import Index from "./pages/Index";
 import Signup from "./pages/Signup";
