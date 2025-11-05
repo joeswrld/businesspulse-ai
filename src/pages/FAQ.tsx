@@ -61,15 +61,11 @@ const FAQ = () => {
       questions: [
         {
           question: 'What plans does NoteX offer?',
-          answer: 'We offer a Business plan at ₦25,000/month that includes unlimited feedback collection, AI-powered analytics, automated reporting, team collaboration tools, and priority support. All new users get an 8-day free trial.',
+          answer: 'We offer a Business plan at ₦53,000/month that includes unlimited feedback collection, AI-powered analytics, automated reporting, team collaboration tools, and priority support. All new users get an 8-day free trial.',
         },
         {
           question: 'Can I cancel my subscription at any time?',
           answer: 'Yes, you can cancel your subscription at any time. There are no long-term contracts or cancellation fees. If you cancel, you\'ll continue to have access until the end of your billing period.',
-        },
-        {
-          question: 'Do you offer refunds?',
-          answer: 'We offer a 30-day money-back guarantee. If you\'re not satisfied with NoteX within the first 30 days, contact our support team for a full refund.',
         },
         {
           question: 'What payment methods do you accept?',
