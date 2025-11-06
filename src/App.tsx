@@ -13,6 +13,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from "@vercel/speed-insights/next";
+
 // Pages
 import Index from "./pages/Index";
 import Signup from "./pages/Signup";
@@ -58,6 +59,7 @@ import ProductFeedbackForm from "./pages/ProductFeedback";
 import SubscriptionExpired from "./pages/SubscriptionExpired";
 import SubscriptionStatus from "./pages/SubscriptionStatus";
 import FAQ from "./pages/FAQ";
+import Admin from "./pages/admin";
 
 const queryClient = new QueryClient();
 
@@ -119,6 +121,9 @@ const AppRoutes = () => {
       <Route path="/feedback-settings" element={<DashboardLayout><FeedbackSettings /></DashboardLayout>} />
       <Route path="/profile" element={<DashboardLayout><Profile /></DashboardLayout>} />
 
+      {/* 👑 ADMIN ROUTE - Requires admin privileges */}
+      <Route path="/admin" element={<Admin />} />
+
       {/* ❌ 404 */}
       <Route path="*" element={<NotFound />} />
     </Routes>
@@ -147,7 +152,6 @@ const App = () => (
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
-  
 );
 
 export default App;
