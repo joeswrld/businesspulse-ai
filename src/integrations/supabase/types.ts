@@ -95,6 +95,60 @@ export type Database = {
         }
         Relationships: []
       }
+      blog_comments: {
+        Row: {
+          author_email: string
+          author_name: string
+          content: string
+          created_at: string | null
+          id: string
+          parent_id: string | null
+          post_id: string
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          author_email: string
+          author_name: string
+          content: string
+          created_at?: string | null
+          id?: string
+          parent_id?: string | null
+          post_id: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          author_email?: string
+          author_name?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          parent_id?: string | null
+          post_id?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blog_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "blog_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blog_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "blog_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blog_post_tags: {
         Row: {
           post_id: string
@@ -125,6 +179,82 @@ export type Database = {
           },
         ]
       }
+      blog_post_versions: {
+        Row: {
+          content: string
+          created_at: string | null
+          excerpt: string | null
+          id: string
+          post_id: string
+          title: string
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          excerpt?: string | null
+          id?: string
+          post_id: string
+          title: string
+          user_id: string
+          version_number: number
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          excerpt?: string | null
+          id?: string
+          post_id?: string
+          title?: string
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blog_post_versions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "blog_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blog_post_views: {
+        Row: {
+          id: string
+          ip_address: string | null
+          post_id: string
+          user_agent: string | null
+          user_id: string | null
+          viewed_at: string | null
+        }
+        Insert: {
+          id?: string
+          ip_address?: string | null
+          post_id: string
+          user_agent?: string | null
+          user_id?: string | null
+          viewed_at?: string | null
+        }
+        Update: {
+          id?: string
+          ip_address?: string | null
+          post_id?: string
+          user_agent?: string | null
+          user_id?: string | null
+          viewed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blog_post_views_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "blog_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blog_posts: {
         Row: {
           author_name: string | null
@@ -136,13 +266,16 @@ export type Database = {
           id: string
           published: boolean | null
           published_at: string | null
+          scheduled_for: string | null
           seo_description: string | null
           seo_keywords: string | null
           seo_title: string | null
           slug: string
+          status: string | null
           title: string
           updated_at: string | null
           user_id: string
+          view_count: number | null
         }
         Insert: {
           author_name?: string | null
@@ -154,13 +287,16 @@ export type Database = {
           id?: string
           published?: boolean | null
           published_at?: string | null
+          scheduled_for?: string | null
           seo_description?: string | null
           seo_keywords?: string | null
           seo_title?: string | null
           slug: string
+          status?: string | null
           title: string
           updated_at?: string | null
           user_id: string
+          view_count?: number | null
         }
         Update: {
           author_name?: string | null
@@ -172,13 +308,16 @@ export type Database = {
           id?: string
           published?: boolean | null
           published_at?: string | null
+          scheduled_for?: string | null
           seo_description?: string | null
           seo_keywords?: string | null
           seo_title?: string | null
           slug?: string
+          status?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string
+          view_count?: number | null
         }
         Relationships: [
           {

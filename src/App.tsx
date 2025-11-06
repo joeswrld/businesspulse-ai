@@ -37,6 +37,9 @@ import HelpCenter from "./pages/HelpCenter";
 import Integrations from "./pages/Integrations";
 import API from "./pages/API";
 import Blog from "./pages/Blog";
+import BlogPost from './pages/BlogPost';
+import BlogEditor from './pages/BlogEditor';
+import BlogAnalytics from './pages/BlogAnalytics';
 import Careers from "./pages/Careers";
 import Press from "./pages/Press";
 import Partners from "./pages/Partners";
@@ -53,8 +56,7 @@ import ProductFeedback from "./pages/ProductFeedback";
 import CSATForm from "./pages/CSATForm";
 import ProductFeedbackForm from "./pages/ProductFeedback";
 import SubscriptionExpired from "./pages/SubscriptionExpired";
-import BlogPost from "./pages/BlogPost";
-import BlogEditor from "./pages/BlogEditor";
+import SubscriptionStatus from "./pages/SubscriptionStatus";
 import FAQ from "./pages/FAQ";
 
 const queryClient = new QueryClient();
@@ -79,10 +81,12 @@ const AppRoutes = () => {
       <Route path="/integrations" element={<Integrations />} />
       <Route path="/api" element={<API />} />
       <Route path="/blog" element={<Blog />} />
-      <Route path="/blog/:slug" element={<BlogPost />} />
-      <Route path="/blog/edit/:slug" element={<BlogEditor />} />
       <Route path="/blog/new" element={<BlogEditor />} />
+      <Route path="/blog/edit/:slug" element={<BlogEditor />} />
+      <Route path="/blog/analytics" element={<BlogAnalytics />} />
+      <Route path="/blog/:slug" element={<BlogPost />} />
       <Route path="/faq" element={<FAQ />} />
+      <Route path="/subscription-status" element={<SubscriptionStatus />} />
       <Route path="/careers" element={<Careers />} />
       <Route path="/press" element={<Press />} />
       <Route path="/partners" element={<Partners />} />

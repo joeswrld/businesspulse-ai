@@ -1,13 +1,23 @@
 import { useParams } from 'react-router-dom';
 import { useBlogPost } from '@/hooks/useBlog';
+import { useTrackPostView } from '@/hooks/useBlogAnalytics';
 import { BlogPostDetail } from '@/components/blog/BlogPostDetail';
+import { BlogComments } from '@/components/blog/BlogComments';
 import SEO from '@/components/SEO';
 import { generateArticleSchema, generateBreadcrumbSchema } from '@/utils/structuredData';
 import { Loader2 } from 'lucide-react';
+import { useEffect } from 'react';
 
 const BlogPost = () => {
   const { slug } = useParams<{ slug: string }>();
   const { data: post, isLoading, error } = useBlogPost(slug || '');
+  const trackView = useTrackPostView();
+
+  useEffect(() => {
+    if (post?.id) {
+      trackView.mutate(post.id);
+    }
+  }, [post?.id]);
 
   if (isLoading) {
     return (
@@ -60,6 +70,7 @@ const BlogPost = () => {
       />
       <div className="container mx-auto px-4">
         <BlogPostDetail post={post} />
+        <BlogComments postId={post.id} />
       </div>
     </div>
   );
