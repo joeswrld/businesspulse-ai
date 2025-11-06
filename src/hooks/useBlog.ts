@@ -14,6 +14,9 @@ export interface BlogPost {
   author_name: string | null;
   published: boolean;
   published_at: string | null;
+  status: 'draft' | 'scheduled' | 'published';
+  scheduled_for: string | null;
+  view_count: number;
   seo_title: string | null;
   seo_description: string | null;
   seo_keywords: string | null;
@@ -107,18 +110,41 @@ export const useCreateBlogPost = () => {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
 
+      // Determine status
+      let status = post.status || 'draft';
+      let published_at = null;
+
+      if (post.scheduled_for && new Date(post.scheduled_for) > new Date()) {
+        status = 'scheduled';
+      } else if (post.published) {
+        status = 'published';
+        published_at = new Date().toISOString();
+      }
+
       const { data, error } = await supabase
         .from('blog_posts')
         .insert({
           ...post,
           slug,
           user_id: user.id,
-          published_at: post.published ? new Date().toISOString() : null,
+          status,
+          published_at,
         })
         .select()
         .single();
 
       if (error) throw error;
+
+      // Save version
+      await supabase.from('blog_post_versions').insert({
+        post_id: data.id,
+        user_id: user.id,
+        title: data.title,
+        content: data.content,
+        excerpt: data.excerpt,
+        version_number: 1,
+      });
+
       return data;
     },
     onSuccess: () => {
@@ -136,17 +162,53 @@ export const useUpdateBlogPost = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<BlogPost> & { id: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Determine status
+      let status = updates.status;
+      let published_at = null;
+
+      if (updates.scheduled_for && new Date(updates.scheduled_for) > new Date()) {
+        status = 'scheduled';
+      } else if (updates.published) {
+        status = 'published';
+        published_at = new Date().toISOString();
+      }
+
       const { data, error } = await supabase
         .from('blog_posts')
         .update({
           ...updates,
-          published_at: updates.published ? new Date().toISOString() : null,
+          status,
+          published_at,
         })
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
+
+      // Get latest version number
+      const { data: versions } = await supabase
+        .from('blog_post_versions')
+        .select('version_number')
+        .eq('post_id', id)
+        .order('version_number', { ascending: false })
+        .limit(1);
+
+      const nextVersion = (versions?.[0]?.version_number || 0) + 1;
+
+      // Save new version
+      await supabase.from('blog_post_versions').insert({
+        post_id: id,
+        user_id: user.id,
+        title: data.title,
+        content: data.content,
+        excerpt: data.excerpt,
+        version_number: nextVersion,
+      });
+
       return data;
     },
     onSuccess: () => {

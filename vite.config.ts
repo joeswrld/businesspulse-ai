@@ -5,15 +5,10 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command, mode }) => ({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-  server: command === 'serve' ? {
+  server: {
+    host: "::",
     port: 8080,
-    proxy: {
+    proxy: command === 'serve' ? {
       // Proxy API calls to Supabase Edge Functions (development only)
       '/api/process-upload': {
         target: 'https://xjbrqeqizpoqdjkiyqzt.supabase.co/functions/v1/process-upload',
@@ -39,6 +34,15 @@ export default defineConfig(({ command, mode }) => ({
           'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY || ''}`,
         },
       },
+    } : undefined,
+  },
+  plugins: [
+    react(),
+    mode === 'development' && componentTagger(),
+  ].filter(Boolean),
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
     },
-  } : undefined,
+  },
 }));
