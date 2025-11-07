@@ -55,7 +55,6 @@ const BlogEditor = () => {
 
         <BlogPostForm
           post={!isNewPost ? post : undefined}
-          onSuccess={() => navigate('/blog')}
         />
       </div>
     </div>
