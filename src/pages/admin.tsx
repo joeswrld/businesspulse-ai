@@ -7,7 +7,15 @@ import { supabase } from '@/integrations/supabase/client';
 // ===========================
 // STAT CARD COMPONENT
 // ===========================
-const StatCard = ({ title, value, change, trend, icon: Icon, color = 'blue', loading = false }) => {
+const StatCard = ({ title, value, change, trend, icon: Icon, color = 'blue', loading = false }: {
+  title: string;
+  value: string;
+  change?: number;
+  trend?: 'up' | 'down';
+  icon: any;
+  color?: string;
+  loading?: boolean;
+}) => {
   const colorClasses = {
     blue: 'bg-blue-50 text-blue-600',
     green: 'bg-green-50 text-green-600',
@@ -210,6 +218,7 @@ const NoteXAdminDashboard = () => {
     activeSubscriptions: 0,
     totalRevenue: 0,
     totalFeedback: 0,
+    feedbackLast24h: 0,
     totalProjects: 0,
     totalInsights: 0,
     recentTransactions: [],
@@ -288,7 +297,7 @@ const NoteXAdminDashboard = () => {
       const last24hFeedback = feedback?.filter(f => {
         const created = new Date(f.created_at);
         const now = new Date();
-        return (now - created) / (1000 * 60 * 60) <= 24;
+        return (now.getTime() - created.getTime()) / (1000 * 60 * 60) <= 24;
       }).length || 0;
 
       setDashboardData({
