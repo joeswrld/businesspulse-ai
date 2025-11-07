@@ -1,51 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, DollarSign, MessageSquare, Zap, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Settings, Menu, X, Search, Filter, Download, Mail, Shield, FileText, Activity, BarChart3, Sparkles, FlaskConical, RefreshCw } from 'lucide-react';
-
-// ===========================
-// SUPABASE CONFIGURATION
-// ===========================
-// Replace these with your actual Supabase credentials
-const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
-
-// Simple Supabase client (no external dependencies)
-const supabaseClient = {
-  async query(table, options = {}) {
-    try {
-      let url = `${SUPABASE_URL}/rest/v1/${table}`;
-      const params = new URLSearchParams();
-      
-      if (options.select) params.append('select', options.select);
-      if (options.count) params.append('count', 'exact');
-      if (options.order) params.append('order', options.order);
-      if (options.limit) params.append('limit', options.limit);
-      
-      if (params.toString()) url += `?${params.toString()}`;
-      
-      const headers = {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': options.count ? 'count=exact' : ''
-      };
-
-      const response = await fetch(url, { headers });
-      const data = await response.json();
-      const count = response.headers.get('Content-Range')?.split('/')[1];
-      
-      return { data, count: count ? parseInt(count) : null, error: null };
-    } catch (error) {
-      console.error('Supabase query error:', error);
-      return { data: null, count: null, error };
-    }
-  }
-};
+import { supabase } from '@/integrations/supabase/client';
 
 // ===========================
 // STAT CARD COMPONENT
 // ===========================
-const StatCard = ({ title, value, change, trend, icon: Icon, color = 'blue', loading = false }) => {
+const StatCard = ({ title, value, change, trend, icon: Icon, color = 'blue', loading = false }: {
+  title: string;
+  value: string | number;
+  change?: number;
+  trend?: 'up' | 'down';
+  icon: any;
+  color?: 'blue' | 'green' | 'purple' | 'orange' | 'pink';
+  loading?: boolean;
+}) => {
   const colorClasses = {
     blue: 'bg-blue-50 text-blue-600',
     green: 'bg-green-50 text-green-600',
@@ -248,13 +217,15 @@ const NoteXAdminDashboard = () => {
     activeSubscriptions: 0,
     totalRevenue: 0,
     totalFeedback: 0,
+    feedbackLast24h: 0,
     totalProjects: 0,
     totalInsights: 0,
     recentTransactions: [],
     users: [],
     feedback: [],
     subscriptions: [],
-    projects: []
+    projects: [],
+    feedbackSettings: []
   });
 
   // Fetch all data on mount
@@ -275,13 +246,13 @@ const NoteXAdminDashboard = () => {
         insightsRes,
         feedbackSettingsRes
       ] = await Promise.all([
-        supabaseClient.query('profiles', { select: '*', count: true }),
-        supabaseClient.query('billing_profiles', { select: '*', order: 'created_at.desc' }),
-        supabaseClient.query('feedback', { select: '*', count: true, order: 'created_at.desc', limit: 100 }),
-        supabaseClient.query('transactions', { select: '*', order: 'created_at.desc', limit: 50 }),
-        supabaseClient.query('projects', { select: '*', count: true }),
-        supabaseClient.query('insights', { select: '*', count: true }),
-        supabaseClient.query('feedback_settings', { select: '*' })
+        supabase.from('profiles').select('*', { count: 'exact' }),
+        supabase.from('billing_profiles').select('*').order('created_at', { ascending: false }),
+        supabase.from('feedback').select('*', { count: 'exact' }).order('created_at', { ascending: false }).limit(100),
+        supabase.from('transactions').select('*').order('created_at', { ascending: false }).limit(50),
+        supabase.from('projects').select('*', { count: 'exact' }),
+        supabase.from('insights').select('*', { count: 'exact' }),
+        supabase.from('feedback_settings').select('*')
       ]);
 
       // Calculate metrics
@@ -290,7 +261,7 @@ const NoteXAdminDashboard = () => {
       const last24hFeedback = feedbackRes.data?.filter(f => {
         const created = new Date(f.created_at);
         const now = new Date();
-        return (now - created) / (1000 * 60 * 60) <= 24;
+        return (now.getTime() - created.getTime()) / (1000 * 60 * 60) <= 24;
       }).length || 0;
 
       setDashboardData({
@@ -904,17 +875,17 @@ const NoteXAdminDashboard = () => {
     const last7Days = dashboardData.users.filter(u => {
       const created = new Date(u.created_at);
       const now = new Date();
-      return (now - created) / (1000 * 60 * 60 * 24) <= 7;
+      return (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24) <= 7;
     }).length;
 
     const last30Days = dashboardData.users.filter(u => {
       const created = new Date(u.created_at);
       const now = new Date();
-      return (now - created) / (1000 * 60 * 60 * 24) <= 30;
+      return (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24) <= 30;
     }).length;
 
     // User growth by month
-    const monthlyGrowth = {};
+    const monthlyGrowth: Record<string, number> = {};
     dashboardData.users.forEach(u => {
       const month = new Date(u.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
       monthlyGrowth[month] = (monthlyGrowth[month] || 0) + 1;
@@ -926,14 +897,14 @@ const NoteXAdminDashboard = () => {
     })).slice(-12); // Last 12 months
 
     // Feedback by project
-    const feedbackByProject = {};
+    const feedbackByProject: Record<string, number> = {};
     dashboardData.feedback.forEach(f => {
       const projectId = f.project_id || 'Unknown';
       feedbackByProject[projectId] = (feedbackByProject[projectId] || 0) + 1;
     });
 
     const topProjects = Object.entries(feedbackByProject)
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => (b[1] as number) - (a[1] as number))
       .slice(0, 10)
       .map(([id, count]) => ({
         project: dashboardData.projects.find(p => p.id === id)?.name || `Project ${id.substring(0, 8)}`,
