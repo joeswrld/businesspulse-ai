@@ -610,11 +610,12 @@ const NoteXAdminDashboard = () => {
   // ===========================
   const FeedbackView = () => {
     const feedbackTableData = dashboardData.feedback.map(f => ({
-      user: dashboardData.users.find(u => u.id === f.user_id)?.email || 'N/A',
-      content: f.content?.substring(0, 100) + '...' || 'N/A',
-      type: f.feedback_type || 'General',
+      user: dashboardData.users.find(u => u.id === f.user_id)?.email || 'Anonymous',
+      message: f.message?.substring(0, 100) + '...' || 'No message',
+      type: f.form_type || 'General',
       created_at: new Date(f.created_at).toLocaleString(),
-      sentiment: f.sentiment || 'neutral'
+      sentiment: f.sentiment || 'neutral',
+      status: f.status || 'new'
     }));
 
     return (
@@ -648,8 +649,17 @@ const NoteXAdminDashboard = () => {
         <DataTable
           columns={[
             { label: 'User', key: 'user' },
-            { label: 'Content', key: 'content' },
+            { label: 'Message', key: 'message' },
             { label: 'Type', key: 'type' },
+            { label: 'Status', key: 'status', render: (val) => (
+              <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                val === 'resolved' ? 'bg-green-100 text-green-800' :
+                val === 'new' ? 'bg-blue-100 text-blue-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {val}
+              </span>
+            )},
             { label: 'Sentiment', key: 'sentiment', render: (val) => (
               <span className={`px-2 py-1 rounded text-xs font-semibold ${
                 val === 'positive' ? 'bg-green-100 text-green-800' :
@@ -737,12 +747,24 @@ const NoteXAdminDashboard = () => {
   // INSIGHTS VIEW
   // ===========================
   const InsightsView = () => {
-    const insightsData = dashboardData.feedbackSettings.map(fs => ({
-      business_name: fs.business_name || 'N/A',
-      customer_survey: fs.customer_survey_url ? 'Yes' : 'No',
-      product_feedback: fs.product_feedback_url ? 'Yes' : 'No',
-      project_id: fs.project_id || 'N/A',
-      has_logo: fs.logo_url ? 'Yes' : 'No'
+    const [insights, setInsights] = useState([]);
+    const [loadingInsights, setLoadingInsights] = useState(true);
+
+    useEffect(() => {
+      const fetchInsights = async () => {
+        const { data } = await supabase.from('insights').select('*').order('created_at', { ascending: false });
+        setInsights(data || []);
+        setLoadingInsights(false);
+      };
+      fetchInsights();
+    }, []);
+
+    const insightsTableData = insights.map(insight => ({
+      title: insight.title || 'Untitled',
+      details: insight.details?.substring(0, 80) || 'No details',
+      user: dashboardData.users.find(u => u.id === insight.user_id)?.email || 'N/A',
+      feedback_count: insight.feedback_count || 0,
+      created_at: new Date(insight.created_at).toLocaleDateString()
     }));
 
     return (
@@ -755,7 +777,7 @@ const NoteXAdminDashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <StatCard
             title="Total Insights Generated"
-            value={dashboardData.totalInsights.toLocaleString()}
+            value={insights.length.toLocaleString()}
             icon={Sparkles}
             color="pink"
           />
@@ -775,16 +797,16 @@ const NoteXAdminDashboard = () => {
 
         <DataTable
           columns={[
-            { label: 'Business Name', key: 'business_name' },
-            { label: 'Has Logo', key: 'has_logo' },
-            { label: 'Customer Survey', key: 'customer_survey' },
-            { label: 'Product Feedback', key: 'product_feedback' },
-            { label: 'Project ID', key: 'project_id' }
+            { label: 'Title', key: 'title' },
+            { label: 'Details', key: 'details' },
+            { label: 'User', key: 'user' },
+            { label: 'Feedback Count', key: 'feedback_count' },
+            { label: 'Created', key: 'created_at' }
           ]}
-          data={insightsData}
-          title={`Feedback Settings (${dashboardData.feedbackSettings.length})`}
-          loading={loading}
-          onExport={() => exportToCSV(insightsData, 'feedback_settings')}
+          data={insightsTableData}
+          title={`AI Insights (${insights.length})`}
+          loading={loadingInsights}
+          onExport={() => exportToCSV(insightsTableData, 'insights')}
         />
       </div>
     );
@@ -798,9 +820,10 @@ const NoteXAdminDashboard = () => {
       user: dashboardData.users.find(u => u.id === t.user_id)?.email || 'N/A',
       amount: `₦${parseFloat(t.amount || 0).toLocaleString()}`,
       status: t.status || 'completed',
-      payment_method: t.payment_method || 'N/A',
+      description: t.description || 'Subscription Payment',
       created_at: new Date(t.created_at).toLocaleString(),
-      reference: t.reference || 'N/A'
+      reference: t.paystack_reference || t.paystack_transaction_id || 'N/A',
+      currency: t.currency || 'NGN'
     }));
 
     const totalAmount = dashboardData.recentTransactions.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
@@ -845,6 +868,7 @@ const NoteXAdminDashboard = () => {
           columns={[
             { label: 'User', key: 'user' },
             { label: 'Amount', key: 'amount' },
+            { label: 'Currency', key: 'currency' },
             { label: 'Status', key: 'status', render: (val) => (
               <span className={`px-2 py-1 rounded text-xs font-semibold ${
                 val === 'success' || val === 'completed' ? 'bg-green-100 text-green-800' :
@@ -854,7 +878,7 @@ const NoteXAdminDashboard = () => {
                 {val}
               </span>
             )},
-            { label: 'Payment Method', key: 'payment_method' },
+            { label: 'Description', key: 'description' },
             { label: 'Reference', key: 'reference' },
             { label: 'Date', key: 'created_at' }
           ]}
