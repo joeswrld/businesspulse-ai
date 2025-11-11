@@ -59,7 +59,7 @@ import ProductFeedbackForm from "./pages/ProductFeedback";
 import SubscriptionExpired from "./pages/SubscriptionExpired";
 import SubscriptionStatus from "./pages/SubscriptionStatus";
 import FAQ from "./pages/FAQ";
-import Admin from "./pages/admin";
+import Admin from "./pages/Admin";
 
 const queryClient = new QueryClient();
 
@@ -122,7 +122,7 @@ const AppRoutes = () => {
       <Route path="/profile" element={<DashboardLayout><Profile /></DashboardLayout>} />
 
       {/* 👑 ADMIN ROUTE - Requires admin privileges */}
-      <Route path="/admin" element={<Admin />} />
+      <Route path="/Admin" element={<Admin />} />
 
       {/* ❌ 404 */}
       <Route path="*" element={<NotFound />} />
