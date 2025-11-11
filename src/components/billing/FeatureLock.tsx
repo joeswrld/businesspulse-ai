@@ -210,7 +210,7 @@ const FeatureLock: React.FC<FeatureLockProps> = ({
       },
       {
         name: 'Scale',
-        price: 5300000,
+        price: 2600000,
         limit: -1,
         features: ['Unlimited everything', 'Dedicated support', 'Custom integrations', 'API access']
       }

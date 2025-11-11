@@ -73,8 +73,8 @@ const BillingPage: React.FC = () => {
     {
       id: 'business',
       name: 'Business',
-      price: '₦53,000',
-      pricePerMonth: '₦53,000/month',
+      price: '26,000',
+      pricePerMonth: '₦26,000/month',
       features: [
         'Unlimited data sources',
         'Unlimited AI insights',

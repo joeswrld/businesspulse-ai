@@ -185,7 +185,7 @@ const SubscriptionExpiredPage: React.FC = () => {
               <CardContent className="space-y-6">
                 {/* Pricing */}
                 <div className="flex items-baseline gap-2 p-6 bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl border border-primary/20">
-                  <span className="text-5xl font-bold text-foreground">₦53,000</span>
+                  <span className="text-5xl font-bold text-foreground">₦26,000</span>
                   <span className="text-xl text-muted-foreground">/month</span>
                 </div>
 

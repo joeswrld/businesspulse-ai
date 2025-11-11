@@ -57,8 +57,8 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({
     {
       id: 'business' as PlanTier,
       name: 'Business',
-      price: '₦53,000',
-      pricePerMonth: '₦53,000/month',
+      price: '₦26,000',
+      pricePerMonth: '₦26,000/month',
       icon: Crown,
       features: [
         'Unlimited feedback submissions',

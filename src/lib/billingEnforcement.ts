@@ -92,7 +92,7 @@ export const PLAN_NAMES: Record<PlanTier, string> = {
 export const PLAN_PRICING: Record<PlanTier, string> = {
   free: 'Free',
   pro: '₦35,000/month',
-  business: '₦53,000/month'
+  business: '₦26,000/month'
 };
 
 /**

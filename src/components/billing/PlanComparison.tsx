@@ -39,7 +39,7 @@ const PlanComparison: React.FC<PlanComparisonProps> = ({
       name: 'Business Plan',
       planCode: 'PLN_esryg99ztsy9xc8',
       description: 'Complete solution for businesses of all sizes',
-      price: 5300000, // ₦53,000 in kobo
+      price: 2600000, // ₦26,000 in kobo
       currency: 'NGN',
       period: '30 days',
       features: [

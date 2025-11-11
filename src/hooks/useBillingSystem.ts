@@ -110,7 +110,7 @@ const PLAN_LIMITS: Record<string, UsageLimits> = {
 // Plan pricing (amounts in kobo - smallest currency unit for Paystack)
 const PLAN_PRICING = {
   trial: { price: 0, currency: 'NGN', period: '8 days' },
-  business: { price: 5300000, currency: 'NGN', period: '30 days' } // ₦53,000 in kobo
+  business: { price: 2600000, currency: 'NGN', period: '30 days' } // ₦26,000 in kobo
 };
 
 export function useBillingSystem(): BillingSystemState {
@@ -692,7 +692,7 @@ export function getPlanPrice(plan: string): string {
   const planPrices: Record<string, string> = {
     trial: 'Free',
     pro: '₦35,000/mo',
-    business: '₦53,000/mo'
+    business: '₦26,000/mo'
   };
   return planPrices[plan] || 'Contact Sales';
 }

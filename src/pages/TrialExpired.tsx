@@ -182,7 +182,7 @@ const TrialExpired = () => {
               </Badge>
               <h2 className="text-3xl font-bold text-white mb-2">Business Plan</h2>
               <div className="flex items-baseline justify-center gap-2">
-                <span className="text-5xl font-bold text-white">₦53,000</span>
+                <span className="text-5xl font-bold text-white">₦26,000</span>
                 <span className="text-xl text-blue-100">/month</span>
               </div>
               <p className="text-blue-100 mt-2">Billed monthly</p>

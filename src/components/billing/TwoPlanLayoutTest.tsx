@@ -38,7 +38,7 @@ const TwoPlanLayoutTest: React.FC<TwoPlanLayoutTestProps> = ({
       id: 'business',
       name: 'Business Plan',
       description: 'Complete solution for businesses of all sizes',
-      price: 5300000, // ₦53,000 in kobo
+      price: 2600000, // ₦26,000 in kobo
       currency: 'NGN',
       period: '30 days',
       features: [

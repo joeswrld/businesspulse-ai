@@ -85,7 +85,7 @@ const UpgradeLock: React.FC = () => {
           <PaystackPayment
             plan="business"
             planName="Business Plan"
-            planPrice="₦53,000"
+            planPrice="₦26,000"
             onSuccess={() => handlePaymentSuccess()}
             onCancel={() => setShowPayment(false)}
           />

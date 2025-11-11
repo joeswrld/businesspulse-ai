@@ -69,7 +69,7 @@ const PaystackPayment: React.FC<PaystackPaymentProps> = ({
 
   // Plan pricing in kobo (smallest currency unit)
   const planPricing = {
-    business: 5300000 // ₦53,000 in kobo
+    business: 2600000 // ₦26,000 in kobo
   };
 
   const amount = planPricing[plan];

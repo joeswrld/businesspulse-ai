@@ -289,7 +289,7 @@ const BillingPage: React.FC = () => {
           .from('transactions')
           .insert({
             user_id: user?.id,
-            amount: 5300000,
+            amount: 2600000,
             currency: 'NGN',
             status: 'success',
             description: 'Business Plan Subscription',
@@ -422,7 +422,7 @@ const BillingPage: React.FC = () => {
       const handler = window.PaystackPop.setup({
         key: paystackKey,
         email: user?.email,
-        amount: 5300000,
+        amount: 2600000,
         currency: 'NGN',
         ref: `${Date.now()}-${user?.id}`,
         metadata: {
@@ -620,7 +620,7 @@ NoteX Team
 
   const planPricing = {
     trial: { price: 0, currency: 'NGN', period: '8 days' },
-    business: { price: 5300000, currency: 'NGN', period: '30 days' }
+    business: { price: 2600000, currency: 'NGN', period: '30 days' }
   };
   
   const pricing = planPricing[subscription?.plan as keyof typeof planPricing] || planPricing.trial;

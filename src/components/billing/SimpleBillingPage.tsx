@@ -77,7 +77,7 @@ const SimpleBillingPage: React.FC = () => {
     {
       id: 'business',
       name: 'Business Plan',
-      price: '₦53,000.00',
+      price: '₦26,000.00',
       period: 'per 30 days',
       icon: <Shield className="h-6 w-8 text-purple-600" />,
       features: [
@@ -111,7 +111,7 @@ const SimpleBillingPage: React.FC = () => {
     {
       date: 'Aug 30, 2025',
       description: 'Business Plan Subscription',
-      amount: '₦53,000.00',
+      amount: '₦26,000.00',
       status: 'Success',
       receipt: 'Receipt'
     },

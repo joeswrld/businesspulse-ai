@@ -31,7 +31,7 @@ price: 3500000 // ₦35,000 in kobo
 
 // Business Plan  
 planCode: 'PLN_esryg99ztsy9xc8'
-price: 5300000 // ₦53,000 in kobo
+price: 2600000 // ₦53,000 in kobo
 ```
 
 ### **Paystack Configuration:**

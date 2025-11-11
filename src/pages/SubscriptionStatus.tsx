@@ -282,7 +282,7 @@ const AccessLockedScreen: React.FC = () => {
           <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-6 rounded-xl border-2 border-amber-200 dark:border-amber-800">
             <div className="text-center">
               <div className="text-sm text-muted-foreground mb-1">Business Plan</div>
-              <div className="text-4xl font-bold mb-2">₦53,000</div>
+              <div className="text-4xl font-bold mb-2">₦26,000</div>
               <div className="text-sm text-muted-foreground mb-4">per month</div>
               <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400 font-medium">
                 <CheckCircle className="h-4 w-4" />

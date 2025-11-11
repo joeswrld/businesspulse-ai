@@ -98,7 +98,7 @@ export const TrialExpiredBlock: React.FC = () => {
               <span>Upgrade to Business Plan</span>
             </Button>
             <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
-              Starting at ₦53,000/month • Cancel anytime
+              Starting at ₦26,000/month • Cancel anytime
             </p>
           </div>
         </div>

@@ -31,7 +31,7 @@ const PricingSection = () => {
     },
     {
       name: "Business",
-      price: "₦53,000",
+      price: "₦26,000",
       period: "/month",
       description: "Complete solution for businesses of all sizes",
       icon: Crown,

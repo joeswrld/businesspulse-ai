@@ -61,7 +61,7 @@ const FAQ = () => {
       questions: [
         {
           question: 'What plans does NoteX offer?',
-          answer: 'We offer a Business plan at ₦53,000/month that includes unlimited feedback collection, AI-powered analytics, automated reporting, team collaboration tools, and priority support. All new users get an 8-day free trial.',
+          answer: 'We offer a Business plan at ₦26,000/month that includes unlimited feedback collection, AI-powered analytics, automated reporting, team collaboration tools, and priority support. All new users get an 8-day free trial.',
         },
         {
           question: 'Can I cancel my subscription at any time?',

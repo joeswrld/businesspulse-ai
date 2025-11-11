@@ -30,7 +30,7 @@ export const PLAN_NAMES = {
 export const PLAN_PRICES = {
   free: { amount: 0, currency: 'NGN', interval: 'trial' },
   pro: { amount: 3500000, currency: 'NGN', interval: 'monthly' }, // ₦35,000 in kobo
-  business: { amount: 5300000, currency: 'NGN', interval: 'monthly' }, // ₦53,000 in kobo
+  business: { amount: 2600000, currency: 'NGN', interval: 'monthly' }, // ₦26,000 in kobo
 } as const;
 
 export const PLAN_CODES = {
