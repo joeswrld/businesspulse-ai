@@ -1,4 +1,4 @@
-}
+
 
 # 🚀 NoteX — Real-Time AI Feedback Intelligence
 
